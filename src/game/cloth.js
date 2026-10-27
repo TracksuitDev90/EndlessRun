@@ -11,8 +11,8 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 //     skin drag along it;
 //   - travelling turbulence that ripples from the shoulders to the hem, faster
 //     and harder as the wind rises — the flapping.
-// A soft ceiling a little above the pins lets it billow but never whip up
-// over the shoulders.
+// A soft ceiling a little above the pins, sloping up behind, lets it billow
+// and stream up behind the back but never whip forward over the shoulders.
 // Simulation space has world axes with its origin at the runner, so turning
 // and leaning swing the cape rather than carrying it rigidly.
 
@@ -55,7 +55,10 @@ export class Cloth {
       }
     }
     for (let j = 1; j < rows; j++) for (let i = 0; i < cols - 2; i++) add(id(i, j), id(i + 2, j), 0.4);
-    for (let j = 0; j < rows - 2; j++) for (let i = 0; i < cols; i++) add(id(i, j), id(i, j + 2), 0.5);
+    // bending: stiffer in the top rows (a hemmed band that can't kink just
+    // under the pins), soft below so the rest rolls freely
+    for (let j = 0; j < rows - 2; j++) for (let i = 0; i < cols; i++) add(id(i, j), id(i, j + 2), j < 3 ? 1 : 0.5);
+    for (let j = 0; j < 3; j++) for (let i = 0; i < cols; i++) add(id(i, j), id(i, j + 3), 0.6);
     this.cA = Uint16Array.from(A);
     this.cB = Uint16Array.from(B);
     this.cL = Float32Array.from(L);
@@ -217,9 +220,16 @@ export class Cloth {
 
   collide(floor, lift) {
     const { cols, n, p, q } = this;
-    let ceil = 0;
-    for (let i = 0; i < cols; i++) ceil += p[i * 3 + 1];
+    // A soft ceiling over the shoulders keeps the cloth from flipping forward
+    // over them; it slopes up behind, so the cape can still stream up and
+    // back (falling from a jump) instead of crumpling against it.
+    let ceil = 0, back = 0;
+    for (let i = 0; i < cols; i++) {
+      ceil += p[i * 3 + 1];
+      back += p[i * 3 + 2];
+    }
     ceil = ceil / cols + lift;
+    back = back / cols + 0.08;
     // broad phase: only colliders whose bounds reach the cloth's box
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let o = cols * 3; o < n * 3; o += 3) {
@@ -280,7 +290,10 @@ export class Cloth {
           }
         }
       }
-      if (y > ceil) y = ceil + (y - ceil) * 0.3;
+      let top = ceil + (z > back ? (z - back) * 1.4 : 0);
+      // the first rows lie under the mantle's hem: they can't rise above it
+      if (k < cols * 4) top = Math.min(top, p[(k % cols) * 3 + 1] + 0.015);
+      if (y > top) y = top + (y - top) * 0.3;
       if (y < floor) {
         y = floor;
         // ground friction: drag the last position along
