@@ -454,6 +454,259 @@ void main() {
 }
 `;
 
+// ---------------------------------------------------------------------------
+// The runner: an illustrated look of its own. Flat local colours, one crisp,
+// broad shadow shape (warm, with a share of the world's tint), a restrained
+// rim, no specular. Linework that would be fussy to model — quilting seams,
+// laces, the face, trims — is drawn from each vertex's rest position and a few
+// smooth garment coordinates (aD), so it stays crisp at any distance. The ink
+// hull is thin and takes a dark shade of the local colour.
+// ---------------------------------------------------------------------------
+const VS_CHAR = COMMON + /* glsl */ `
+#include <skinning_pars_vertex>
+attribute vec4 aD;
+attribute float aMat;
+#ifdef OUTLINE
+uniform float uOutline;
+attribute vec3 onrm;
+#endif
+varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec2 vUv;
+varying vec3 vFx;
+varying vec3 vRest;
+varying vec4 vD;
+varying float vMat;
+
+void main() {
+  vec3 lp = position;
+  vec3 ln = normal;
+  #ifdef OUTLINE
+    vec3 lo = onrm;
+  #endif
+  #ifdef USE_SKINNING
+    mat4 skinM = skinWeight.x * getBoneMatrix(skinIndex.x)
+      + skinWeight.y * getBoneMatrix(skinIndex.y)
+      + skinWeight.z * getBoneMatrix(skinIndex.z)
+      + skinWeight.w * getBoneMatrix(skinIndex.w);
+    skinM = bindMatrixInverse * skinM * bindMatrix;
+    lp = (skinM * vec4(lp, 1.0)).xyz;
+    ln = mat3(skinM) * ln;
+    #ifdef OUTLINE
+      lo = mat3(skinM) * lo;
+    #endif
+  #endif
+  vec3 wp = (modelMatrix * vec4(lp, 1.0)).xyz;
+  vPos = wp;
+  #ifdef OUTLINE
+    float w = length(onrm);
+    if (w > 0.0001) {
+      float dist = length(wp - uCamPos);
+      wp += normalize(mat3(modelMatrix) * lo) * (w * uOutline * (1.0 + dist * 0.011));
+    }
+  #endif
+  wp = bendPos(wp);
+  vWorld = wp;
+  vNormal = normalize(mat3(modelMatrix) * ln);
+  vColor = vec3(0.0);
+  vUv = vec2(0.0);
+  vFx = vec3(0.0);
+  vRest = position;
+  vD = aD;
+  vMat = aMat;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+
+// Palette slots beyond the garment ids (see COL in game/outfit.js).
+const CHAR_DETAIL = /* glsl */ `
+uniform vec3 uPal[32];
+// [0]: x sock line, y boot x offset, z sleeve cuff start, w shorts hem;
+// [1]: x boot collar height over the ankle, y its rise toward the heel, z sole height
+uniform vec4 uRig[2];
+varying vec3 vRest;
+varying vec4 vD;
+varying float vMat;
+#define P_SEAM 13
+#define P_CUFF 14
+#define P_SOCK 15
+#define P_BOOT_DARK 16
+#define P_SOLE 17
+#define P_MIDSOLE 18
+#define P_LACE 19
+#define P_TRIM 20
+#define P_LINING 21
+#define P_EYE 22
+#define P_IRIS 23
+#define P_INK 24
+#define P_MOUTH 25
+#define P_BLUSH 26
+#define P_FLAP 27
+#define P_SHORTS_LINE 28
+#define P_ZIP 29
+// antialiased coverage of d < 0, and of a band |d| < halfw
+float fill(float d) {
+  float w = fwidth(d) * 0.75 + 1e-6;
+  return 1.0 - smoothstep(-w, w, d);
+}
+float band(float d, float halfw) {
+  return fill(abs(d) - halfw);
+}
+// lines at every integer of x, halfw in the same units
+float lines(float x, float halfw) {
+  return band(abs(fract(x + 0.5) - 0.5), halfw);
+}
+// The face, drawn on the front of the head like an illustration: almond eyes
+// with a heavy upper lash line, brows, a small smile, a touch of blush.
+// Returns the colour and how much of it ignores the light (the eyes glint).
+vec3 drawFace(vec3 base, vec3 r, inout float unlit) {
+  float front = smoothstep(-0.055, -0.08, r.z);
+  if (front <= 0.0) return base;
+  vec2 f = vec2(abs(r.x), r.y);
+  vec3 c = base;
+  vec2 E = vec2(0.036, 1.389);
+  // blush
+  vec2 bq = (f - vec2(0.058, 1.35)) / vec2(0.017, 0.009);
+  c = mix(c, uPal[P_BLUSH], 0.4 * (1.0 - smoothstep(0.6, 1.0, length(bq))) * front);
+  // eye white: an almond, wider than tall, flatter along the upper lid
+  vec2 q = f - E;
+  vec2 qa = vec2(q.x, q.y * (q.y > 0.0 ? 1.15 : 1.0));
+  float dS = (length(qa / vec2(0.0225, 0.0185)) - 1.0) * 0.0185;
+  float sclera = fill(dS) * front;
+  c = mix(c, uPal[P_EYE], sclera);
+  unlit = max(unlit, sclera * 0.4);
+  // iris filling the eye's height, pupil, one catch-light
+  float dI = length(q - vec2(-0.003, -0.001)) - 0.0148;
+  c = mix(c, uPal[P_IRIS], fill(max(dI, dS)) * front);
+  c = mix(c, uPal[P_INK], fill(max(length(q - vec2(-0.003, -0.0015)) - 0.0068, dS)) * front);
+  float hl = fill(length(q - vec2(0.0035, 0.0055)) - 0.0036) * front;
+  c = mix(c, vec3(1.0), hl);
+  unlit = max(unlit, hl);
+  // upper lid line, heavier toward the outer corner where it flicks out
+  vec2 lq = qa / vec2(0.0236, 0.0196);
+  float upper = smoothstep(-0.35, 0.05, q.y / 0.0196);
+  float lash = band(length(lq) - 1.0, 0.1 + 0.16 * smoothstep(-0.01, 0.022, q.x)) * upper;
+  float flick = band(q.y - 0.004 - (q.x - 0.02) * 0.45, 0.0018) * step(0.019, q.x) * step(q.x, 0.0275);
+  c = mix(c, uPal[P_INK], max(lash, flick) * front);
+  // brows
+  vec2 bc = (f - vec2(0.039, 1.408)) / vec2(0.026, 0.02);
+  float brow = band(length(bc) - 1.0, 0.22 - 0.08 * smoothstep(-0.3, 0.9, bc.x)) * step(0.4, bc.y) * step(abs(bc.x), 0.95);
+  c = mix(c, uPal[P_INK], brow * front);
+  // smile
+  vec2 m = r.xy - vec2(0.0, 1.352);
+  float smile = band(length(m) - 0.02, 0.0016) * step(m.y, -0.011) * step(abs(m.x), 0.015);
+  c = mix(c, uPal[P_MOUTH], smile * front);
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    c = drawFace(base, d.xyz, unlit); // head space (the head is placed scaled)
+  } else if (m == 3) {
+    // quilted puffer: stitched seams round the body and the sleeves, ribbed
+    // cuffs, the zip up the front
+    float torso = d.z;
+    float seamT = lines(d.x, 0.026) * step(-0.5, d.x) * step(d.x, 4.5) * torso;
+    float seamS = lines(d.y, 0.024) * step(-0.5, d.y) * step(d.y, 2.5) * (1.0 - torso) * step(d.w, uRig[0].z - 0.012);
+    c = mix(c, uPal[P_SEAM], max(seamT, seamS) * 0.85);
+    c = mix(c, uPal[P_CUFF], fill(uRig[0].z - d.w) * (1.0 - torso));
+    float zip = band(r.x, 0.0024) * step(r.z, -0.05);
+    c = mix(c, uPal[P_ZIP], zip);
+  } else if (m == 5) {
+    c = mix(c, uPal[P_SHORTS_LINE], band(r.y - uRig[0].w - 0.013, 0.0015));
+  } else if (m == 6) {
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float a = atan(r.z, r.x - side * uRig[0].y);
+    c = mix(c, uPal[P_SOCK], fill(r.y - (uRig[0].x + 0.0025 * sin(a * 3.0 + side))));
+  } else if (m == 7) {
+    // hiking boots: lugged outsole, cream midsole, darker toe cap, heel and
+    // padded collar, laces criss-crossing the tongue
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float x = r.x - side * uRig[0].y;
+    float y = r.y - 0.028 * pow(smoothstep(-0.08, -0.205, r.z), 2.0);
+    c = mix(c, uPal[P_BOOT_DARK], fill(r.z + 0.128 + max(0.0, y - 0.056) * 0.9));
+    c = mix(c, uPal[P_BOOT_DARK], fill(0.04 - r.z + max(0.0, y - 0.08) * 0.9));
+    float collar = uRig[1].x + uRig[1].y * (r.z - 0.004);
+    c = mix(c, uPal[P_BOOT_DARK], fill(collar - 0.01 - r.y));
+    c = mix(c, uPal[P_MIDSOLE], fill(y - uRig[1].z));
+    c = mix(c, uPal[P_SOLE], fill(y - uRig[1].z * 0.6));
+    // laces up the instep, from the toe box to the collar
+    float onTongue = step(r.z, -0.1 + (r.y - 0.085) * 0.55) * step(abs(x), 0.026) * step(0.085, r.y) * step(r.y, collar - 0.008);
+    float lace = max(band(abs(fract((r.y + x * 0.9) / 0.024 + 0.5) - 0.5), 0.1), band(abs(fract((r.y - x * 0.9) / 0.024 + 0.5) - 0.5), 0.1));
+    c = mix(c, uPal[P_LACE], lace * onTongue * step(abs(x), 0.021));
+    float eyelet = fill(length(vec2(abs(x) - 0.023, fract((r.y - 0.085) / 0.024 + 0.5) * 0.024 - 0.012)) - 0.0028) * onTongue;
+    c = mix(c, uPal[P_LACE], eyelet);
+  } else if (m == 9) {
+    // mantle: crimson wool, burgundy lining, gold at the hem and round the hood
+    c = mix(c, uPal[P_LINING], step(0.5, d.w));
+    c = mix(c, uPal[P_TRIM], max(fill(d.x - 0.016), band(d.y, 0.0035) * step(d.w, 0.5)));
+  } else if (m == 10) {
+    // the cape (u, v across and down): lining inside, a gold hem band, and
+    // the crest — a sun over two peaks in a ring — on the back
+    c = mix(c, uPal[P_LINING], step(0.5, d.w));
+    c = mix(c, uPal[P_TRIM], band(d.y - 0.955, 0.018));
+    if (d.w < 0.5) {
+      vec2 p = (d.xy - vec2(0.5, 0.38)) * vec2(0.74, -0.62);
+      float rr = length(p);
+      float ring = band(rr - 0.074, 0.0055);
+      vec2 pk = vec2(abs(p.x + 0.006), p.y + 0.028);
+      float peaks = fill(max(pk.y - 0.062 + pk.x * 1.4, -pk.y)) * step(rr, 0.065);
+      float sun = fill(length(p - vec2(0.03, 0.034)) - 0.012);
+      c = mix(c, uPal[P_TRIM], max(ring, max(peaks, sun)));
+    }
+  } else if (m == 11) {
+    c = mix(c, uPal[P_FLAP], step(0.5, d.x));
+  }
+  return c;
+}
+`;
+
+const FS_CHAR = FS_HEAD + CHAR_DETAIL + /* glsl */ `
+uniform vec3 uLightDir;
+uniform vec3 uShadowTint;
+uniform vec4 uRim;
+uniform sampler2D uNoise;
+void main() {
+  int m = int(vMat + 0.5);
+  float unlit = 0.0;
+  vec3 base = charDetail(m, uPal[m], vRest, vD, unlit);
+  vec3 n = normalize(vNormal);
+  n = gl_FrontFacing ? n : -n;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  // one broad, crisp shadow shape (a touch softer on the hanging cloth, whose
+  // panels bend against each other)
+  float soft = (m == 9 || m == 10) ? 0.09 : 0.045;
+  float lit = smoothstep(-soft, soft, dot(n, uLightDir) + 0.15);
+  vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
+  vec3 col = base * mix(sh, vec3(1.0), max(lit, unlit));
+  if (m == 2) {
+    // one restrained lighter tone where the curls face the light from above
+    float hl = smoothstep(0.58, 0.64, dot(n, uLightDir)) * smoothstep(0.25, 0.5, n.y);
+    col = mix(col, uPal[30], hl * 0.8);
+  }
+  float fres = 1.0 - abs(dot(n, V));
+  float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
+  float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y));
+  col += uRim.rgb * base * rim * 0.45 * (1.0 - unlit);
+  col *= 1.0 + (texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5) * 0.035;
+  col = atmos(col, v, dist, 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), 1.0);
+}
+`;
+
+const FS_CHAR_INK = FS_HEAD + CHAR_DETAIL + /* glsl */ `
+void main() {
+  vec3 ink = uPal[int(vMat + 0.5)] * 0.3;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  gl_FragColor = vec4(grade(atmos(ink, v, dist, 0.0), uTrip), 1.0);
+}
+`;
+
 const FS_GLASS = FS_HEAD + /* glsl */ `
 uniform vec4 uGlass;
 void main() {
@@ -860,6 +1113,22 @@ export function makeInkMaterial(toon, width) {
     vertexColors: true,
     side: THREE.BackSide,
   });
+}
+
+// The runner's surface and ink materials (VS_CHAR / FS_CHAR). pal is an array
+// of 32 THREE.Color palette slots indexed by material id; rig a Vector4 of
+// garment constants (sock line, boot offset, sleeve cuff start).
+export function makeCharacterMaterials(env, pal, rig, outline) {
+  const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig } }); // rig: [Vector4, Vector4]
+  const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VS_CHAR, fragmentShader: FS_CHAR });
+  const ink = new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, uniforms, { uOutline: { value: outline } }),
+    defines: { OUTLINE: '' },
+    vertexShader: VS_CHAR,
+    fragmentShader: FS_CHAR_INK,
+    side: THREE.BackSide,
+  });
+  return { mat, ink };
 }
 
 export function makeGlassMaterial(env, o = {}) {

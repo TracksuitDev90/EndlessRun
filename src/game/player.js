@@ -1,60 +1,26 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { CONFIG } from '../config.js';
-import { P, part } from '../render/geo.js';
-import { makeEnvUniforms, makeToonMaterial, makeInkMaterial } from '../render/shaders.js';
+import { makeEnvUniforms, makeCharacterMaterials } from '../render/shaders.js';
+import { TAU, damp, clamp, smooth, Spring } from './rig.js';
+import { Cloth } from './cloth.js';
+import { runner } from './runner-asset.js';
+import { RIG, MANTLE, CAPE, configureRig, mantleEZ, mantleWeights, capeBind, capeFrame, palette, buildRunnerGeometry } from './outfit.js';
 
-// The runner: a boy in a bright orange coat. He is one continuous skinned
-// mesh (plus its ink hull) on a ~60-bone skeleton, so sleeves and trouser legs
-// bend smoothly at elbows, wrists, knees and ankles. On top of the keyframed
-// run / jump / slide / idle poses sits a layer of secondary motion:
-//   - springs give the head, torso, wrists and hair lag and overshoot;
-//   - the coat skirt is eight hinged panels that flare in the wind, lift when
-//     falling and get pushed aside by the legs;
-//   - the scarf tails are verlet chains streaming in the air flow;
-//   - the satchel is a pendulum that bumps against his hip, lid flapping.
+// The runner: a young wayfarer in a hooded cape. The body and clothes are
+// sculpted offline (tools/runner/build.py, loaded by runner-asset.js) as
+// continuous surfaces skinned to this skeleton; the cape is built in
+// outfit.js. One skinned mesh plus its ink hull: two draw calls. On top of the
+// keyframed run / jump / slide / idle poses sits a layer of secondary motion:
+//   - springs give the head, torso, wrists and curls lag and overshoot;
+//   - the mantle over the shoulders (and the hood lying on it) is twelve
+//     hinged panels that flare in the wind, lift when falling and get
+//     shouldered aside by the swinging arms;
+//   - the cape beneath it is a cloth simulation (cloth.js) — a particle grid
+//     driving one bone each — hung from the mantle's hem, kept off the body by
+//     capsules and blown about by air that grows into a flapping gale as the
+//     run speeds up;
+//   - the hip pouch is a pendulum that bumps against the hip, flap lifting.
 // Also owns lane / jump / slide movement.
-
-const COL = {
-  coat: '#ff7a1c',
-  coatDark: '#d9531a',
-  coatLight: '#ff9a3c',
-  lining: '#f2b93b',
-  belt: '#4a2a18',
-  brass: '#f2c84b',
-  skin: '#f3c4a0',
-  blush: '#f0a088',
-  hair: '#3b2417',
-  pants: '#2b3558',
-  pantsDark: '#202846',
-  sock: '#f2e8d4',
-  shoe: '#7a3a22',
-  shoeDark: '#5a2814',
-  sole: '#f2e8d4',
-  scarf: '#1d7090',
-  scarfDark: '#145a76',
-  stripe: '#5fb6c8',
-  stripe2: '#f6ecd4',
-  strap: '#6b3f1f',
-  bag: '#9a6232',
-  bagDark: '#6b3f1f',
-};
-
-// --- bind-pose proportions (meters, root space; the boy faces -z) ------------
-const HIP_Y = 0.79;
-const SHOULDER = { x: 0.165, y: 1.15 };
-const UPPER_ARM = 0.23;
-const FOREARM = 0.2;
-const HIP_JOINT = { x: 0.092, y: 0.755 };
-const THIGH = 0.35;
-const SHIN = 0.33;
-const SKIRT_TOP = 0.878;
-const SKIRT_PANELS = 8;
-const SKIRT_HINGE_R = 0.156;
-const SKIRT_EZ = 0.84; // the coat is an ellipse, narrower front to back
-const SCARF_A = { anchor: [-0.062, 1.19, 0.118], n: 10, seg: 0.064, w: 0.1, drift: -2.6 };
-const SCARF_B = { anchor: [-0.022, 1.19, 0.122], n: 7, seg: 0.058, w: 0.084, drift: -1.2 };
-const BAG_PIVOT = [0.15, 0.905, 0.128];
-
 // --- pose channels -----------------------------------------------------------
 // Lateral channels (z / twist) for limbs are stored as per-side magnitudes
 // (positive = outward) and get the side's sign when applied.
@@ -63,7 +29,7 @@ const NAMES = [
   'spLean', 'spTwist', 'spSide', 'chLean', 'chTwist', 'chSide',
   'hdPitch', 'hdYaw', 'hdRoll',
   'clL', 'clR', 'shLx', 'shRx', 'shLy', 'shRy', 'shLz', 'shRz', 'elL', 'elR', 'wrL', 'wrR', 'wrLz', 'wrRz',
-  'thLx', 'thRx', 'thLz', 'thRz', 'knL', 'knR', 'anL', 'anR', 'toL', 'toR',
+  'thLx', 'thRx', 'thLz', 'thRz', 'thLy', 'thRy', 'knL', 'knR', 'anL', 'anR', 'toL', 'toR',
   'bodyPitch', 'bodyZ', 'bodyRoll', 'sq',
 ];
 const C = {};
@@ -71,7 +37,7 @@ NAMES.forEach((n, i) => (C[n] = i));
 const N = NAMES.length;
 const PAIRS = [
   ['clL', 'clR'], ['shLx', 'shRx'], ['shLy', 'shRy'], ['shLz', 'shRz'], ['elL', 'elR'], ['wrL', 'wrR'], ['wrLz', 'wrRz'],
-  ['thLx', 'thRx'], ['thLz', 'thRz'], ['knL', 'knR'], ['anL', 'anR'], ['toL', 'toR'],
+  ['thLx', 'thRx'], ['thLz', 'thRz'], ['thLy', 'thRy'], ['knL', 'knR'], ['anL', 'anR'], ['toL', 'toR'],
 ].map(([a, b]) => [C[a], C[b]]);
 const NEGATE = ['hipX', 'hipYaw', 'hipRoll', 'spTwist', 'spSide', 'chTwist', 'chSide', 'hdYaw', 'hdRoll', 'bodyRoll'].map((n) => C[n]);
 
@@ -84,31 +50,71 @@ function mirror(p) {
   for (const i of NEGATE) p[i] = -p[i];
 }
 
-// Run cycle keys, 8 per stride (phase 0 = thigh passing vertical going forward,
-// pi/2 = thigh fully forward, pi = mid-stance, 3pi/2 = toe-off).
-const LEG = {
-  thigh: [0.38, 0.86, 0.92, 0.55, 0.08, -0.36, -0.66, -0.3],
-  knee: [1.95, 1.25, 0.42, 0.3, 0.48, 0.4, 0.3, 1.25],
-  ankle: [0.36, 0.3, 0.12, 0.0, 0.12, -0.1, -0.55, -0.16],
-  toe: [0.0, 0.0, 0.0, 0.0, 0.04, 0.3, 0.55, 0.15],
+// Running legs are placed, not keyed (phase pi = the left foot's mid-stance,
+// the right foot half a stride later). While a foot is down, the ball of the
+// boot is pinned to the ground and carried back at exactly the ground speed as
+// the heel peels up over it; in the air the ankle follows a designed path —
+// the heel kicks up under the hips, the knee drives through, the foot reaches
+// and paws back down — and a two-bone solve turns the ankle's position into
+// thigh and knee angles, so the knee always bends forward and a planted foot
+// never sinks, floats or skids sideways.
+// A 0.6 m leg can only stay planted for about 0.58 m of ground; at the game's
+// 12-28 m/s that is a few hundredths of a second, so contact is as long as the
+// leg can reach (no slip at all at the start speed), but never shorter than
+// minContact so the planted pose always reaches the screen — any slip that
+// leaves at top speed is straight back along the run, inside those frames.
+const STRIDE = {
+  reach: 0.58, // m of ground the ball can cover while planted
+  minContact: 0.04, // s
+  maxDuty: 0.36, // of the cycle, at a jog
+  ballZ: -0.02, // middle of the planted stretch (forward of the hips)
+  heelLift: 0.75, // rad, the foot's pitch at toe-off
+  hipY: 0.69, // pelvis height at mid-stance (the knee bends ~45 degrees)
+  bob: 0.03, // pelvis rise in flight
+  trackX: 0.074, // planted feet land a little inside the hips...
+  swingX: 0.096, // ...and pass wide of each other
+  toeOut: 0.06, // rad
 };
+// The ankle's path through the air (root space, s = 0 at toe-off .. 1 at
+// touchdown): [s, z, y, z per unit speed, y per unit speed].
+const SWING = [
+  [0.16, 0.36, 0.29, 0.03, 0.03], // the heel rises behind
+  [0.4, 0.2, 0.44, 0.0, 0.08], // tucked up under the hips
+  [0.65, -0.15, 0.36, -0.04, 0.03], // the knee drives through, the foot following
+  [0.84, -0.28, 0.24, -0.02, 0.0], // reach...
+];
 // Arms swing with the opposite leg's phase.
+const ARM_SAMPLES = [0.35, 0.6, 0.85, 1.3]; // along the upper arm (1.3: past the elbow)
 const ARM = {
-  swing: [0.24, 0.72, 0.84, 0.5, -0.12, -0.6, -0.72, -0.42],
-  abd: [0.2, 0.13, 0.12, 0.16, 0.22, 0.28, 0.3, 0.26],
-  elbow: [1.25, 1.5, 1.62, 1.45, 1.15, 0.92, 0.88, 1.0],
+  // a compact swing (the upper arm stays under the mantle; the bent elbow
+  // carries the hand up and through)
+  swing: [0.16, 0.5, 0.58, 0.36, -0.1, -0.44, -0.54, -0.32],
+  abd: [0.44, 0.38, 0.37, 0.41, 0.45, 0.49, 0.5, 0.48], // held out clear of the puffer
+  elbow: [1.35, 1.65, 1.78, 1.6, 1.25, 1.0, 0.95, 1.1],
 };
+
+// Proportions come with the generated rig (see configure()).
+let HIP_Y, HIP_JOINT, THIGH, SHIN, CHEST_Y, UPPER_ARM, FOREARM;
+let ANKLE_H, TOE_D, TOE_F; // ankle height over the ground; ball of the foot below and ahead of it
+
+function configure() {
+  configureRig();
+  HIP_Y = RIG.hipY;
+  HIP_JOINT = { x: RIG.hipJoint[0], y: RIG.hipJoint[1] };
+  THIGH = RIG.thigh;
+  SHIN = RIG.shin;
+  CHEST_Y = RIG.chestY;
+  UPPER_ARM = RIG.upperArm;
+  FOREARM = RIG.forearm;
+  ANKLE_H = HIP_JOINT.y - THIGH - SHIN;
+  TOE_D = RIG.toe[0];
+  TOE_F = RIG.toe[1];
+}
+
+const wrapAngle = (a) => a - TAU * Math.floor((a + Math.PI) / TAU);
 
 const G = (8 * CONFIG.jump.height) / (CONFIG.jump.time * CONFIG.jump.time);
 const V0 = (4 * CONFIG.jump.height) / CONFIG.jump.time;
-const TAU = Math.PI * 2;
-
-const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
-const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const smooth = (e0, e1, x) => {
-  const t = clamp((x - e0) / (e1 - e0), 0, 1);
-  return t * t * (3 - 2 * t);
-};
 
 // Catmull-Rom through a cyclic list of keys, sampled at phase p (radians).
 function cyc(keys, p) {
@@ -125,149 +131,49 @@ function cyc(keys, p) {
   return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t2 * t);
 }
 
-// Damped spring follower (implicit Euler, stable at any frame time). Low zeta
-// = bouncy overshoot; it is what makes limbs feel loose rather than driven.
-class Spring {
-  constructor(x = 0) {
-    this.x = x;
-    this.v = 0;
-  }
-  step(target, freq, zeta, dt) {
-    const w = TAU * freq;
-    this.v = (this.v + dt * w * w * (target - this.x)) / (1 + 2 * zeta * w * dt + w * w * dt * dt);
-    this.x += this.v * dt;
-    return this.x;
-  }
-  reset(x = 0) {
-    this.x = x;
-    this.v = 0;
-  }
+// Cubic Hermite through (t, value) keys with Catmull-Rom tangents (given end
+// tangents), for the non-uniform swing path.
+function hermite(ts, vs, m0, m1, t) {
+  let i = 0;
+  while (i < ts.length - 2 && t > ts[i + 1]) i++;
+  const t0 = ts[i], t1 = ts[i + 1];
+  const h = t1 - t0;
+  const u = clamp((t - t0) / h, 0, 1);
+  const tan = (k) => (k === 0 ? m0 : k === ts.length - 1 ? m1 : (vs[k + 1] - vs[k - 1]) / (ts[k + 1] - ts[k - 1]));
+  const a = tan(i) * h, b = tan(i + 1) * h;
+  const u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * vs[i] + (u3 - 2 * u2 + u) * a + (-2 * u3 + 3 * u2) * vs[i + 1] + (u3 - u2) * b;
 }
 
-// --- skinned geometry helpers --------------------------------------------------
-const SKIN_ATTRS = [['position', 3], ['normal', 3], ['uv', 2], ['color', 3], ['fx', 3], ['onrm', 3], ['skinIndex', 4], ['skinWeight', 4]];
-
-// Attach bone weights to a finished part. fn(x, y, z, out) pushes
-// [bone, weight] pairs (up to four) for a bind-pose vertex position.
-function skin(geo, fn) {
-  const pos = geo.attributes.position.array;
-  const n = pos.length / 3;
-  const si = new Float32Array(n * 4);
-  const sw = new Float32Array(n * 4);
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    out.length = 0;
-    fn(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], out);
-    let total = 0;
-    for (let k = 1; k < out.length && k < 8; k += 2) total += out[k];
-    for (let k = 0, j = 0; k < out.length && j < 4; k += 2, j++) {
-      si[i * 4 + j] = out[k];
-      sw[i * 4 + j] = out[k + 1] / (total || 1);
-    }
-  }
-  geo.setAttribute('skinIndex', new THREE.Float32BufferAttribute(si, 4));
-  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
-  return geo;
-}
-
-function mergeSkinned(list) {
-  let total = 0;
-  for (const g of list) total += g.attributes.position.count;
-  const out = new THREE.BufferGeometry();
-  for (const [name, size] of SKIN_ATTRS) {
-    const arr = new Float32Array(total * size);
-    let off = 0;
-    for (const g of list) {
-      arr.set(g.attributes[name].array, off);
-      off += g.attributes[name].array.length;
-    }
-    out.setAttribute(name, new THREE.BufferAttribute(arr, size));
-  }
-  for (const g of list) g.dispose();
-  return out;
-}
-
-// Turn a part inside out (for coat linings): reverse winding, flip normals.
-function insideOut(g) {
-  for (const name of Object.keys(g.attributes)) {
-    const a = g.attributes[name];
-    const s = a.itemSize;
-    const arr = a.array;
-    for (let t = 0; t < arr.length; t += s * 3) {
-      for (let k = 0; k < s; k++) {
-        const tmp = arr[t + s + k];
-        arr[t + s + k] = arr[t + s * 2 + k];
-        arr[t + s * 2 + k] = tmp;
-      }
-    }
-  }
-  const nrm = g.attributes.normal.array;
-  for (let i = 0; i < nrm.length; i++) nrm[i] = -nrm[i];
-  return g;
-}
-
-const rigid = (b) => (x, y, z, out) => out.push(b, 1);
-const mix2 = (a, wa, b) => (x, y, z, out) => out.push(a, wa, b, 1 - wa);
-// Blend between bones along one coordinate through sorted control points.
-function along(coord, ctrl) {
-  return (x, y, z, out) => {
-    const t = coord(x, y, z);
-    if (t <= ctrl[0][0]) return out.push(ctrl[0][1], 1);
-    for (let i = 0; i < ctrl.length - 1; i++) {
-      const [t0, b0] = ctrl[i];
-      const [t1, b1] = ctrl[i + 1];
-      if (t <= t1) {
-        if (b0 === b1) return out.push(b0, 1);
-        const u = smooth(t0, t1, t);
-        return out.push(b0, 1 - u, b1, u);
-      }
-    }
-    return out.push(ctrl[ctrl.length - 1][1], 1);
-  };
-}
-const Y = (x, y) => y;
-const Z = (x, y, z) => z;
-
-// A flat strap following a path of points over a surface. outward(p) gives
-// the surface normal direction at a point.
-function strapParts(pts, width, thick, color, outward) {
-  const parts = [];
-  const m = new THREE.Matrix4();
-  const a = new THREE.Vector3();
-  const b = new THREE.Vector3();
-  const yAxis = new THREE.Vector3();
-  const zAxis = new THREE.Vector3();
-  const xAxis = new THREE.Vector3();
-  for (let i = 0; i < pts.length - 1; i++) {
-    a.fromArray(pts[i]);
-    b.fromArray(pts[i + 1]);
-    yAxis.subVectors(b, a);
-    const len = yAxis.length();
-    yAxis.normalize();
-    zAxis.fromArray(outward(a.clone().add(b).multiplyScalar(0.5)));
-    zAxis.addScaledVector(yAxis, -zAxis.dot(yAxis)).normalize();
-    xAxis.crossVectors(yAxis, zAxis);
-    const g = P.box(width, len + 0.012, thick);
-    m.makeBasis(xAxis, yAxis, zAxis);
-    m.setPosition(a.clone().add(b).multiplyScalar(0.5));
-    g.applyMatrix4(m);
-    parts.push(part(g, color, { outline: 0.7 }));
-  }
-  return parts;
-}
+const _st = new Float64Array(SWING.length + 2);
+const _sz = new Float64Array(SWING.length + 2);
+const _sy = new Float64Array(SWING.length + 2);
+const _hips = new THREE.Matrix4();
+const _hipsInv = new THREE.Matrix4();
+const _eul = new THREE.Euler();
+const _qh = new THREE.Quaternion();
+const _one = new THREE.Vector3(1, 1, 1);
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
+const _m = new THREE.Matrix4();
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Player {
   constructor(envDef) {
+    configure();
     this.u = makeEnvUniforms(envDef);
-    this.mat = makeToonMaterial(this.u, { skinned: true });
-    this.inkMat = makeInkMaterial(this.mat, 0.028);
+    const rig = [
+      new THREE.Vector4(RIG.sockY, RIG.bootX, RIG.cuffU, RIG.shortsHem),
+      new THREE.Vector4(RIG.bootCollar[0], RIG.bootCollar[1], RIG.soleH, 0),
+    ];
+    const { mat, ink } = makeCharacterMaterials(this.u, palette(), rig, 0.0105);
+    this.mat = mat;
+    this.inkMat = ink;
     this.root = new THREE.Group();
     this.root.name = 'player';
     this.buildSkeleton();
@@ -282,12 +188,14 @@ export class Player {
     this.pIdle = new Float32Array(N);
     this.pCrash = new Float32Array(N);
     this.w = { run: 0, jump: 0, slide: 0, idle: 1 };
+    this.stride = 0;
     this.springs = {};
     for (const k of ['hdPitch', 'hdYaw', 'hdRoll', 'spLean', 'chTwist', 'elL', 'elR', 'swL', 'swR', 'abL', 'abR', 'lane', 'land']) {
       this.springs[k] = new Spring();
     }
-    this.hair = [0, 1, 2].map(() => ({ x: new Spring(), z: new Spring() }));
-    this.skirt = Array.from({ length: SKIRT_PANELS }, () => new Spring(0.06));
+    this.hairBones = RIG.hair.map((h) => ({ name: h.name, dir: new THREE.Vector3(...h.dir) }));
+    this.hair = this.hairBones.map(() => ({ x: new Spring(), y: new Spring(), z: new Spring() }));
+    this.mantle = Array.from({ length: MANTLE.panels }, () => new Spring(0.02));
     this.lid = new Spring();
     this.reset();
   }
@@ -297,56 +205,45 @@ export class Player {
     const bones = [];
     const ids = {};
     this.b = {};
-    const bone = (name, parent, x, y, z) => {
-      const b = new THREE.Bone();
+    const add = (name, parent, b) => {
       b.name = name;
-      b.position.set(x, y, z);
       if (parent) parent.add(b);
       ids[name] = bones.length;
       bones.push(b);
       this.b[name] = b;
       return b;
     };
-    const body = bone('body', null, 0, 0, 0);
-    const hips = bone('hips', body, 0, HIP_Y, 0);
-    const spine = bone('spine', hips, 0, 0.07, 0);
-    const chest = bone('chest', spine, 0, 0.17, 0);
-    const neck = bone('neck', chest, 0, 0.17, 0);
-    const head = bone('head', neck, 0, 0.06, 0);
-    bone('hair0', head, 0, 0.285, 0.04);
-    bone('hair1', head, -0.075, 0.21, 0.12);
-    bone('hair2', head, 0.08, 0.23, 0.115);
-    for (const [s, L] of [[-1, 'L'], [1, 'R']]) {
-      const clav = bone('clav' + L, chest, s * 0.05, 0.12, 0);
-      const arm = bone('arm' + L, clav, s * (SHOULDER.x - 0.05), 0, 0);
-      const fore = bone('fore' + L, arm, 0, -UPPER_ARM, 0);
-      bone('hand' + L, fore, 0, -FOREARM, 0);
-      const thigh = bone('thigh' + L, hips, s * HIP_JOINT.x, HIP_JOINT.y - HIP_Y, 0);
-      const shin = bone('shin' + L, thigh, 0, -THIGH, 0);
-      const foot = bone('foot' + L, shin, 0, -SHIN, 0);
-      bone('toe' + L, foot, 0, -0.05, -0.085);
+    // the sculpted body's skeleton, bound as it was modelled (arms a little
+    // out); the poses set absolute rotations, so the bind angles never show
+    for (const d of runner().meta.bones) {
+      const b = new THREE.Bone();
+      // (yaw outermost: the mantle panels turn to face out; the thighs turn
+      // against the pelvis so a planted foot keeps pointing down the track)
+      if (d.name.startsWith('mtU') || d.name.startsWith('thigh')) b.rotation.order = 'YXZ';
+      b.position.fromArray(d.p);
+      b.quaternion.fromArray(d.q);
+      add(d.name, d.parent ? this.b[d.parent] : null, b);
     }
-    this.panelAngle = [];
-    for (let k = 0; k < SKIRT_PANELS; k++) {
-      const th = (k / SKIRT_PANELS) * TAU;
-      this.panelAngle.push(th);
-      const u = bone('skU' + k, hips, Math.sin(th) * SKIRT_HINGE_R, SKIRT_TOP - HIP_Y, Math.cos(th) * SKIRT_HINGE_R * SKIRT_EZ);
-      u.rotation.order = 'YXZ';
-      u.rotation.y = th;
-      bone('skL' + k, u, 0, -0.17, 0.03);
+    this.panelAngle = Array.from({ length: MANTLE.panels }, (_, k) => (k / MANTLE.panels) * TAU);
+    // one bone per cape particle, in root space, bound in the cape's rest shape
+    this.capeRest = capeBind();
+    this.capeBones = [];
+    this.capeFirst = bones.length;
+    for (let j = 0; j < CAPE.rows; j++) {
+      for (let i = 0; i < CAPE.cols; i++) {
+        const k = j * CAPE.cols + i;
+        const b = add('cp' + k, this.b.sim, new THREE.Bone());
+        b.position.fromArray(this.capeRest, k * 3);
+        capeFrame(this.capeRest, i, j, b.quaternion);
+        this.capeBones.push(b);
+      }
     }
-    // Simulated bones live directly in root space.
-    const sim = bone('sim', null, 0, 0, 0);
-    for (const [tag, spec] of [['scA', SCARF_A], ['scB', SCARF_B]]) {
-      for (let i = 0; i < spec.n; i++) bone(tag + i, sim, spec.anchor[0], spec.anchor[1] - i * spec.seg, spec.anchor[2]);
-    }
-    const bag = bone('bag', sim, BAG_PIVOT[0], BAG_PIVOT[1], BAG_PIVOT[2]);
-    bone('bagLid', bag, 0.02, -0.055, 0.044);
 
     this.ids = ids;
     this.bones = bones;
-    this.body = body;
-    this.root.add(body, sim);
+    this.body = this.b.body;
+    this.simRoot = this.b.sim;
+    this.root.add(this.body, this.simRoot);
     this.root.updateMatrixWorld(true);
     this.skeleton = new THREE.Skeleton(bones);
     this.bindPos = {};
@@ -355,137 +252,7 @@ export class Player {
 
   // --- the model ------------------------------------------------------------------
   buildBody() {
-    const I = this.ids;
-    const g = [];
-    const add = (geo, fn) => g.push(skin(geo, fn));
-
-    // coat body
-    add(part(P.lathe([[0.148, 0.8], [0.15, 0.86], [0.158, 0.94], [0.168, 1.02], [0.166, 1.09], [0.15, 1.145], [0.12, 1.18], [0.075, 1.205], [0, 1.212]], 18), null, {
-      sz: 0.8, grad: [COL.coatDark, COL.coatLight, 0.82, 1.2],
-    }), along(Y, [[0.84, I.hips], [0.9, I.spine], [0.98, I.spine], [1.08, I.chest]]));
-    // back seam and folded hood
-    add(part(P.box(0.014, 0.25, 0.012), COL.coatDark, { y: 1.0, z: 0.13, outline: 0 }), along(Y, [[0.9, I.spine], [1.06, I.chest]]));
-    add(part(P.sphere(0.1, 12, 8), null, { y: 1.16, z: 0.095, sx: 1.25, sy: 0.5, sz: 0.55, grad: [COL.coatDark, COL.coat, 1.12, 1.2] }), rigid(I.chest));
-    // belt with a back tab and brass buttons
-    add(part(P.cyl(0.158, 0.158, 0.05, 18), COL.belt, { y: 0.868, sz: 0.83, outline: 0.6 }), mix2(I.hips, 0.5, I.spine));
-    add(part(P.box(0.11, 0.042, 0.02), COL.coat, { y: 0.868, z: 0.133 }), mix2(I.hips, 0.5, I.spine));
-    for (const x of [-0.034, 0.034]) add(part(P.sphere(0.013, 6, 4), COL.brass, { x, y: 0.868, z: 0.146, outline: 0.5 }), mix2(I.hips, 0.5, I.spine));
-
-    // coat skirt: hinged panels, mustard lining inside, darker hem
-    const skirtW = (x, y, z, out) => {
-      let th = Math.atan2(x, z / SKIRT_EZ);
-      if (th < 0) th += TAU;
-      const u = (th / TAU) * SKIRT_PANELS;
-      const k = Math.floor(u) % SKIRT_PANELS;
-      const f = u - Math.floor(u);
-      const k1 = (k + 1) % SKIRT_PANELS;
-      const gl = smooth(0.13, 0.21, SKIRT_TOP - y);
-      out.push(I['skU' + k], (1 - f) * (1 - gl), I['skU' + k1], f * (1 - gl), I['skL' + k], (1 - f) * gl, I['skL' + k1], f * gl);
-    };
-    add(part(P.lathe([[0.222, 0.535], [0.205, 0.6], [0.183, 0.7], [0.164, 0.8], [0.156, SKIRT_TOP]], 24), null, {
-      sz: SKIRT_EZ, grad: [COL.coatDark, COL.coat, 0.54, 0.86],
-    }), skirtW);
-    add(part(P.lathe([[0.226, 0.533], [0.222, 0.565]], 24), COL.coatDark, { sz: SKIRT_EZ, outline: 0.5 }), skirtW);
-    add(insideOut(part(P.lathe([[0.214, 0.54], [0.198, 0.6], [0.177, 0.7], [0.158, 0.8], [0.15, SKIRT_TOP]], 24), COL.lining, { sz: SKIRT_EZ, outline: 0 })), skirtW);
-
-    // scarf: the wrap, the knot, and two tails on simulated chains
-    add(part(P.torus(0.088, 0.037, 8, 18), COL.scarf, { y: 1.213, rx: Math.PI / 2, sz: 0.92 }), mix2(I.neck, 0.45, I.chest));
-    add(part(P.sphere(0.044, 8, 6), COL.scarfDark, { x: -0.05, y: 1.2, z: 0.102 }), rigid(I.chest));
-    for (const [tag, spec] of [['scA', SCARF_A], ['scB', SCARF_B]]) {
-      const [ax, ay, az] = spec.anchor;
-      const L = spec.n * spec.seg;
-      const ids = Array.from({ length: spec.n }, (_, i) => I[tag + i]);
-      const chain = (x, y, z, out) => {
-        const s = clamp((ay - y) / spec.seg, 0, spec.n - 1e-4);
-        const i = Math.floor(s);
-        const f = s - i;
-        if (f < 0.5 && i > 0) out.push(ids[i], 0.5 + f, ids[i - 1], 0.5 - f);
-        else if (f >= 0.5 && i < spec.n - 1) out.push(ids[i], 1.5 - f, ids[i + 1], f - 0.5);
-        else out.push(ids[i], 1);
-      };
-      add(part(P.box(spec.w, L, 0.022, 1, spec.n * 3, 1), null, { x: ax, y: ay - L / 2, z: az, grad: [COL.scarf, COL.scarfDark, ay - L, ay] }), chain);
-      for (const [f, c] of [[0.6, COL.stripe], [0.7, COL.stripe2], [0.8, COL.stripe]]) {
-        add(part(P.box(spec.w + 0.006, L * 0.055, 0.027), c, { x: ax, y: ay - L * f, z: az, outline: 0 }), chain);
-      }
-      for (let k = 0; k < 5; k++) {
-        const fx = ax - spec.w * 0.4 + (spec.w * 0.8 * k) / 4;
-        add(part(P.box(0.008, 0.045 + (k % 2) * 0.012, 0.01), k % 2 ? COL.stripe : COL.scarf, { x: fx, y: ay - L - 0.02, z: az, outline: 0 }), chain);
-      }
-    }
-
-    // head
-    add(part(P.cyl(0.046, 0.05, 0.11, 10), COL.skin, { y: 1.235 }), rigid(I.neck));
-    add(part(P.sphere(0.145, 16, 12), COL.skin, { y: 1.405, z: -0.008 }), rigid(I.head));
-    for (const s of [-1, 1]) {
-      add(part(P.sphere(0.034, 8, 6), COL.skin, { x: s * 0.143, y: 1.39, z: 0.005, sx: 0.55 }), rigid(I.head));
-      add(part(P.sphere(0.03, 8, 6), COL.blush, { x: s * 0.085, y: 1.37, z: -0.122, sz: 0.4, outline: 0 }), rigid(I.head));
-    }
-    add(part(P.sphere(0.022, 8, 6), COL.skin, { y: 1.39, z: -0.152 }), rigid(I.head));
-    add(part(P.sphere(0.153, 16, 12), COL.hair, { y: 1.428, z: 0.02, sy: 0.96 }), rigid(I.head));
-    for (const [x, y, z] of [[-0.06, 1.5, -0.1], [0.015, 1.515, -0.112], [0.075, 1.49, -0.092]]) {
-      add(part(P.sphere(0.052, 8, 6), COL.hair, { x, y, z }), rigid(I.head));
-    }
-    // hair tufts on springs
-    const tuft = (name, r, h, rx, rz) => {
-      const geo = P.cone(r, h, 7);
-      geo.translate(0, h / 2, 0);
-      const p = this.bindPos[name];
-      add(part(geo, COL.hair, { x: p.x, y: p.y, z: p.z, rx, rz }), rigid(I[name]));
-    };
-    tuft('hair0', 0.05, 0.14, 0.95, 0);
-    tuft('hair1', 0.042, 0.12, 1.1, 0.55);
-    tuft('hair2', 0.044, 0.12, 1.15, -0.5);
-
-    // arms: one continuous sleeve from shoulder to cuff, bending at the elbow
-    for (const [s, L] of [[-1, 'L'], [1, 'R']]) {
-      const sx = s * SHOULDER.x;
-      const sy = SHOULDER.y;
-      const arm = I['arm' + L];
-      const fore = I['fore' + L];
-      const hand = I['hand' + L];
-      add(part(P.lathe([[0, -0.425], [0.054, -0.425], [0.058, -0.405], [0.051, -0.37], [0.049, -0.3], [0.051, -0.24], [0.054, -0.17], [0.058, -0.09], [0.06, -0.02], [0.052, 0.03], [0.034, 0.056], [0, 0.064]], 12), null, {
-        x: sx, y: sy, grad: [COL.coatDark, COL.coat, sy - 0.43, sy],
-      }), along(Y, [[sy - 0.29, fore], [sy - 0.17, arm]]));
-      add(part(P.cyl(0.061, 0.061, 0.045, 12), COL.coatDark, { x: sx, y: sy - 0.405 }), rigid(fore));
-      add(part(P.sphere(0.047, 10, 8), COL.skin, { x: sx + s * 0.004, y: sy - 0.475, sx: 0.8, sy: 1.12 }), rigid(hand));
-      add(part(P.sphere(0.021, 8, 6), COL.skin, { x: sx - s * 0.022, y: sy - 0.46, z: -0.03 }), rigid(hand));
-    }
-
-    // legs: trousers bend at the knee; chunky sneakers with a hinged toe
-    for (const [s, L] of [[-1, 'L'], [1, 'R']]) {
-      const hx = s * HIP_JOINT.x;
-      const hy = HIP_JOINT.y;
-      const thigh = I['thigh' + L];
-      const shin = I['shin' + L];
-      const foot = I['foot' + L];
-      const toe = I['toe' + L];
-      add(part(P.lathe([[0, -0.668], [0.054, -0.668], [0.058, -0.645], [0.052, -0.6], [0.049, -0.5], [0.055, -0.42], [0.062, -0.35], [0.069, -0.26], [0.076, -0.14], [0.079, -0.04], [0.072, 0.02], [0.045, 0.055], [0, 0.062]], 12), null, {
-        x: hx, y: hy, grad: [COL.pantsDark, COL.pants, hy - 0.68, hy],
-      }), along(Y, [[hy - 0.43, shin], [hy - 0.27, thigh]]));
-      add(part(P.cyl(0.059, 0.059, 0.03, 12), COL.pantsDark, { x: hx, y: hy - 0.652, outline: 0.6 }), rigid(shin));
-      add(part(P.cyl(0.044, 0.046, 0.07, 10), COL.sock, { x: hx, y: 0.105 }), mix2(foot, 0.6, shin));
-      add(part(P.sphere(1, 12, 8), COL.shoe, { x: hx, y: 0.058, z: -0.03, sx: 0.068, sy: 0.056, sz: 0.118 }), rigid(foot));
-      add(part(P.sphere(1, 10, 6), COL.shoeDark, { x: hx, y: 0.062, z: 0.052, sx: 0.06, sy: 0.05, sz: 0.045 }), rigid(foot));
-      add(part(P.cyl(1, 1, 0.026, 16), COL.sole, { x: hx, y: 0.013, z: -0.035, sx: 0.073, sz: 0.128 }), along(Z, [[-0.11, toe], [-0.05, foot]]));
-      add(part(P.sphere(1, 10, 8), COL.shoe, { x: hx, y: 0.042, z: -0.11, sx: 0.062, sy: 0.045, sz: 0.06 }), rigid(toe));
-      add(part(P.box(0.05, 0.012, 0.016), COL.sole, { x: hx, y: 0.107, z: -0.035, outline: 0 }), rigid(foot));
-      add(part(P.box(0.046, 0.012, 0.016), COL.sole, { x: hx, y: 0.098, z: -0.065, outline: 0 }), rigid(foot));
-    }
-
-    // satchel strap across the back, and the swinging satchel itself
-    const strapPts = [[-0.12, 1.2, -0.03], [-0.115, 1.19, 0.06], [-0.085, 1.14, 0.12], [-0.03, 1.07, 0.138], [0.03, 1.0, 0.14], [0.09, 0.945, 0.137], [BAG_PIVOT[0], BAG_PIVOT[1], BAG_PIVOT[2]]];
-    for (const geo of strapParts(strapPts, 0.036, 0.012, COL.strap, (p) => [p.x, 0.15, p.z / 0.64])) {
-      add(geo, along(Y, [[0.93, I.hips], [0.99, I.spine], [1.06, I.chest]]));
-    }
-    const [px, py, pz] = BAG_PIVOT;
-    add(part(P.box(0.03, 0.065, 0.012), COL.strap, { x: px + 0.01, y: py - 0.03, z: pz + 0.004 }), rigid(I.bag));
-    add(part(P.box(0.2, 0.13, 0.075), COL.bag, { x: px + 0.02, y: py - 0.12, z: pz }), rigid(I.bag));
-    add(part(P.cyl(0.0375, 0.0375, 0.2, 10), COL.bag, { x: px + 0.02, y: py - 0.185, z: pz, rz: Math.PI / 2 }), rigid(I.bag));
-    const lid = this.bindPos.bagLid;
-    add(part(P.box(0.208, 0.092, 0.014), COL.bagDark, { x: lid.x, y: lid.y - 0.044, z: lid.z }), rigid(I.bagLid));
-    add(part(P.box(0.04, 0.03, 0.012), COL.brass, { x: lid.x, y: lid.y - 0.08, z: lid.z + 0.01, outline: 0.5 }), rigid(I.bagLid));
-
-    const geo = mergeSkinned(g);
+    const geo = buildRunnerGeometry(this.capeFirst);
     this.mesh = new THREE.SkinnedMesh(geo, this.mat);
     this.inkMesh = new THREE.SkinnedMesh(geo, this.inkMat);
     for (const m of [this.mesh, this.inkMesh]) {
@@ -515,18 +282,45 @@ export class Player {
 
   // --- secondary-motion state ------------------------------------------------------
   buildSim() {
-    const chest = this.bindPos.chest;
-    this.tails = [SCARF_A, SCARF_B].map((spec, t) => ({
-      spec,
-      bones: Array.from({ length: spec.n }, (_, i) => this.b[(t ? 'scB' : 'scA') + i]),
-      local: new THREE.Vector3(spec.anchor[0], spec.anchor[1], spec.anchor[2]).sub(chest),
-      pts: new Float32Array((spec.n + 1) * 3),
-      prv: new Float32Array((spec.n + 1) * 3),
-      phase: t * 2.1,
-    }));
-    this.bagSim = {
-      local: new THREE.Vector3(...BAG_PIVOT).sub(this.bindPos.hips),
-      len: 0.12,
+    // the cape, pinned along the inside of the mantle's hem: each pin follows
+    // the mantle bones exactly as the hem's own vertices do
+    this.cloth = new Cloth(CAPE.cols, CAPE.rows, this.capeRest);
+    const mw = mantleWeights(this.ids);
+    this.pins = [];
+    for (let i = 0; i < CAPE.cols; i++) {
+      const p = new THREE.Vector3().fromArray(this.capeRest, i * 3);
+      const out = [];
+      mw(p.x, p.y, p.z, out);
+      let total = 0;
+      for (let k = 1; k < out.length; k += 2) total += out[k];
+      const w = [];
+      for (let k = 0; k < out.length; k += 2) w.push([out[k], out[k + 1] / total]);
+      this.pins.push({ p, w });
+    }
+    // what the cape can't pass through: torso and hips (elliptic), head,
+    // limbs, boots and the pouch
+    const col = (bone, a, b, r, rz = 0) => ({ bone: this.b[bone], a: new THREE.Vector3(...a), b: new THREE.Vector3(...b), r, rz });
+    this.colliders = [
+      col('hips', [0, -0.12, 0.006], [0, 0.1, 0.006], 0.205, 0.168),
+      col('chest', [0, -0.05, 0.01], [0, 0.14, 0.01], 0.19, 0.155),
+      col('head', [0, 0.1, 0.01], [0, 0.145, 0.01], 0.125),
+      col('pouch', [-0.012, -0.04, 0], [-0.012, -0.09, 0], 0.045),
+    ];
+    for (const L of ['L', 'R']) {
+      this.colliders.push(
+        col('arm' + L, [0, 0, 0], [0, -UPPER_ARM, 0], 0.085),
+        col('fore' + L, [0, 0, 0], [0, -FOREARM - 0.07, 0], 0.075),
+        col('thigh' + L, [0, 0, 0], [0, -THIGH, 0], 0.1),
+        col('shin' + L, [0, 0, 0], [0, -SHIN + 0.05, 0], 0.058),
+        col('foot' + L, [0, -0.04, 0.04], [0, -0.055, -0.13], 0.07),
+      );
+    }
+    this.cloth.setColliderCount(this.colliders.length);
+    this.wind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, turb: 0, freq: 1, wave: 1, kn: 0, kt: 0, floor: 0, t: 0 };
+
+    this.pouchSim = {
+      local: new THREE.Vector3(...RIG.pouch).sub(this.bindPos.hips),
+      len: 0.05,
       p: new THREE.Vector3(),
       q: new THREE.Vector3(),
       vy: 0,
@@ -541,23 +335,18 @@ export class Player {
     this.headPos = new THREE.Vector3();
     this.headVel = new THREE.Vector3();
     this.headAcc = new THREE.Vector3();
-    this.spheres = [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()];
     this.hipsInv = new THREE.Matrix4();
+    this.chestInv = new THREE.Matrix4();
+    this.chestPrev = new THREE.Vector3();
+    // points along each upper arm, in the mantle's terms (see armOffsets)
+    this._arms = Array.from({ length: 2 * ARM_SAMPLES.length }, () => ({ th: 0, r: 0, drop: 0 }));
   }
 
   resetSim() {
-    for (const t of this.tails) {
-      const { anchor, n, seg } = t.spec;
-      for (let i = 0; i <= n; i++) {
-        t.pts[i * 3] = t.prv[i * 3] = anchor[0];
-        t.pts[i * 3 + 1] = t.prv[i * 3 + 1] = anchor[1] - i * seg;
-        t.pts[i * 3 + 2] = t.prv[i * 3 + 2] = anchor[2] + i * 0.01;
-      }
-    }
-    const bs = this.bagSim;
-    bs.p.set(BAG_PIVOT[0] + 0.02, BAG_PIVOT[1] - bs.len, BAG_PIVOT[2]);
-    bs.q.copy(bs.p);
-    bs.vy = 0;
+    const ps = this.pouchSim;
+    ps.p.set(RIG.pouch[0] - 0.01, RIG.pouch[1] - ps.len, RIG.pouch[2]);
+    ps.q.copy(ps.p);
+    ps.vy = 0;
     this.frameVel.set(0, 0, 0);
     this.frameAcc.set(0, 0, 0);
     this.headVel.set(0, 0, 0);
@@ -597,9 +386,10 @@ export class Player {
     for (const s of Object.values(this.springs)) s.reset();
     for (const h of this.hair) {
       h.x.reset();
+      h.y.reset();
       h.z.reset();
     }
-    for (const s of this.skirt) s.reset(0.06);
+    for (const s of this.mantle) s.reset(0.02);
     this.lid.reset();
     this.root.visible = true;
     this.resetSim();
@@ -748,6 +538,7 @@ export class Player {
     const sp = clamp((speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start), 0, 1);
     const running = this.mode === 'run' && speed > 0.5;
     const freq = running ? 1.5 + speed * 0.055 : 0;
+    this.stride = freq;
     this.phase += dt * TAU * freq;
     const f = this.phase;
     const t = this.time;
@@ -884,12 +675,12 @@ export class Player {
     const s = Math.sin(f);
     // slow wander so no two strides are quite the same
     const wander = 0.5 * Math.sin(f * 0.31 + 1.3) + 0.5 * Math.sin(f * 0.19);
-    const legAmp = 0.86 + 0.22 * sp;
     const armAmp = (0.88 + 0.22 * sp) * (1 + 0.08 * wander);
-    const bob = 0.5 - 0.5 * Math.cos(2 * f - 0.55);
-    r[C.hipY] = HIP_Y - 0.05 + 0.06 * bob * (0.85 + 0.3 * sp);
+    // the pelvis sinks into each contact and rises through the flight
+    const bob = 0.5 - 0.5 * Math.cos(2 * f);
+    r[C.hipY] = STRIDE.hipY + STRIDE.bob * (0.9 + 0.2 * sp) * bob;
     r[C.hipX] = 0.012 * Math.sin(f - 1.2);
-    r[C.hipYaw] = -0.2 * s;
+    r[C.hipYaw] = -0.2 * Math.sin(f - 0.5);
     r[C.hipRoll] = 0.055 * Math.cos(f + 0.3);
     r[C.hipPitch] = 0.06;
     r[C.spLean] = 0.17 + 0.12 * sp + 0.035 * Math.cos(2 * f - 1.0);
@@ -901,28 +692,132 @@ export class Player {
     r[C.hdPitch] = r[C.hipPitch] + r[C.spLean] + r[C.chLean] - 0.22;
     r[C.hdYaw] = -0.7 * (r[C.hipYaw] + r[C.spTwist] + r[C.chTwist]);
     r[C.hdRoll] = -0.6 * (r[C.hipRoll] + r[C.spSide]);
-    for (const [ph, th, kn, an, to, sh, sy, sz, el, cl, wr, wz, tz] of [
-      [f, C.thLx, C.knL, C.anL, C.toL, C.shLx, C.shLy, C.shLz, C.elL, C.clL, C.wrL, C.wrLz, C.thLz],
-      [f + Math.PI, C.thRx, C.knR, C.anR, C.toR, C.shRx, C.shRy, C.shRz, C.elR, C.clR, C.wrR, C.wrRz, C.thRz],
+    for (const [ph, sh, sy, sz, el, cl, wr, wz] of [
+      [f, C.shLx, C.shLy, C.shLz, C.elL, C.clL, C.wrL, C.wrLz],
+      [f + Math.PI, C.shRx, C.shRy, C.shRz, C.elR, C.clR, C.wrR, C.wrRz],
     ]) {
-      r[th] = cyc(LEG.thigh, ph) * legAmp + 0.04;
-      r[kn] = cyc(LEG.knee, ph) * (0.9 + 0.15 * sp);
-      r[an] = cyc(LEG.ankle, ph);
-      r[to] = cyc(LEG.toe, ph);
-      r[tz] = 0.035;
       const q = ph + Math.PI; // arm follows the opposite leg
       r[sh] = cyc(ARM.swing, q) * armAmp + 0.06;
       r[sz] = cyc(ARM.abd, q) + 0.04;
       r[sy] = 0.1 * Math.sin(q);
       r[el] = cyc(ARM.elbow, q - 0.25);
-      r[cl] = 0.05 * Math.max(0, r[sh]);
+      r[cl] = 0;
       r[wr] = 0.18;
       r[wz] = 0.05;
     }
     r[C.bodyPitch] = 0;
     r[C.bodyZ] = 0;
     r[C.bodyRoll] = 0;
-    r[C.sq] = 1 + 0.025 * (bob - 0.5);
+    r[C.sq] = 1;
+    this.runLegs(r, f, sp);
+  }
+
+  // Place both feet for run phase f (see STRIDE) and solve the legs.
+  runLegs(r, f, sp) {
+    const v = Math.max(this.speed, 0);
+    const freq = this.stride;
+    const duty = freq > 0 ? clamp((STRIDE.reach * freq) / Math.max(v, 1e-3), STRIDE.minContact * freq, STRIDE.maxDuty) : STRIDE.maxDuty;
+    const span = freq > 0 ? Math.min(STRIDE.reach, (v * duty) / freq) : 0;
+    const zTD = STRIDE.ballZ - span / 2;
+    const ballH = ANKLE_H - TOE_D;
+    // this pose's hips, to bring the targets into hip space
+    _eul.set(-r[C.hipPitch], r[C.hipYaw], r[C.hipRoll]);
+    _hips.compose(_v3.set(r[C.hipX], r[C.hipY], 0), _qh.setFromEuler(_eul), _one);
+    _hipsInv.copy(_hips).invert();
+    const hipTilt = -r[C.hipPitch];
+    for (let side = 0; side < 2; side++) {
+      const sx = side === 0 ? -1 : 1;
+      const ph = f + side * Math.PI;
+      // u: 0 at touchdown; the contact is centred on mid-stance (ph = pi)
+      let u = (ph - Math.PI + Math.PI * duty) / TAU;
+      u -= Math.floor(u);
+      let ax, ay, az, pitch, toe;
+      if (u < duty) {
+        const c = u / duty;
+        const lift = STRIDE.heelLift * Math.pow(smooth(0.3, 1, c), 1.3);
+        const bz = zTD + span * c;
+        // the ankle swings up over the planted ball as the heel lifts
+        ay = ballH + TOE_D * Math.cos(lift) + TOE_F * Math.sin(lift);
+        az = bz + TOE_F * Math.cos(lift) - TOE_D * Math.sin(lift);
+        ax = sx * STRIDE.trackX;
+        pitch = -lift;
+        toe = lift;
+        this.solveLeg(r, side, sx, ax, ay, az, pitch, hipTilt, null);
+      } else {
+        const c = (u - duty) / (1 - duty);
+        const lift = STRIDE.heelLift;
+        const toY = ballH + TOE_D * Math.cos(lift) + TOE_F * Math.sin(lift);
+        const toZ = zTD + span + TOE_F * Math.cos(lift) - TOE_D * Math.sin(lift);
+        const n = SWING.length;
+        _st[0] = 0;
+        _sz[0] = toZ;
+        _sy[0] = toY;
+        for (let k = 0; k < n; k++) {
+          const K = SWING[k];
+          _st[k + 1] = K[0];
+          _sz[k + 1] = K[1] + K[3] * sp;
+          _sy[k + 1] = K[2] + K[4] * sp;
+        }
+        _st[n + 1] = 1;
+        _sz[n + 1] = zTD + TOE_F;
+        _sy[n + 1] = ANKLE_H;
+        // leaving the ground rising and still travelling back; arriving
+        // steeply, pawing back toward the ground's own motion
+        az = hermite(_st, _sz, 0.6, 1.2, c);
+        ay = hermite(_st, _sy, 1.2, -1.4, c);
+        ax = sx * (STRIDE.trackX + (STRIDE.swingX - STRIDE.trackX) * Math.sin(Math.PI * c));
+        // the foot trails off the toe, hangs from the shin, then levels out,
+        // toe up, to meet the ground
+        toe = lift * (1 - smooth(0, 0.3, c));
+        this.solveLeg(r, side, sx, ax, ay, az, 0, hipTilt, c);
+      }
+      r[side === 0 ? C.toL : C.toR] = toe;
+    }
+  }
+
+  // Two-bone solve of one leg for an ankle target (root space). The thigh's
+  // splay puts the knee's plane through the target; the knee bends forward.
+  // c = null: planted, the foot held at pitch; else the swing's progress.
+  solveLeg(r, side, sx, ax, ay, az, pitch, hipTilt, c) {
+    const d = _v.set(ax, ay, az).applyMatrix4(_hipsInv);
+    d.x -= sx * HIP_JOINT.x;
+    d.y -= HIP_JOINT.y - HIP_Y;
+    // turn the leg against the pelvis's swing (plus a touch of toe-out), then
+    // solve in the leg's own frame
+    const yaw = -r[C.hipYaw] - sx * STRIDE.toeOut;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    d.set(d.x * cy - d.z * sy, d.y, d.x * sy + d.z * cy);
+    const reach = THIGH + SHIN;
+    let L = d.length();
+    L = clamp(L, Math.abs(THIGH - SHIN) + 0.02, reach - 0.003);
+    const kn = Math.PI - Math.acos(clamp((THIGH * THIGH + SHIN * SHIN - L * L) / (2 * THIGH * SHIN), -1, 1));
+    // the ankle in the leg's own plane, before splay and pitch
+    const ly = -THIGH - SHIN * Math.cos(kn);
+    const lz = SHIN * Math.sin(kn);
+    const ll = Math.hypot(ly, lz);
+    const tz = Math.asin(clamp(-d.x / (Math.hypot(d.y, d.z, d.x) * (ly / ll)), -0.9, 0.9));
+    const tx = Math.atan2(d.z, d.y) - Math.atan2(lz / ll, (Math.cos(tz) * ly) / ll);
+    const thx = wrapAngle(tx);
+    const shin = hipTilt + thx - kn;
+    let pt = pitch;
+    if (c !== null) {
+      const hang = shin - 0.3;
+      pt = -STRIDE.heelLift + (hang + STRIDE.heelLift) * smooth(0, 0.3, c);
+      pt += (0.16 * (1 - smooth(0.9, 1, c)) - pt) * smooth(0.6, 0.94, c);
+    }
+    if (side === 0) {
+      r[C.thLx] = thx;
+      r[C.thLy] = yaw;
+      r[C.thLz] = -tz;
+      r[C.knL] = kn;
+      r[C.anL] = pt - shin;
+    } else {
+      r[C.thRx] = thx;
+      r[C.thRy] = -yaw;
+      r[C.thRz] = tz;
+      r[C.knR] = kn;
+      r[C.anR] = pt - shin;
+    }
   }
 
   // Leap on the way up (lead leg alternates), reaching for the ground on the
@@ -1054,8 +949,8 @@ export class Player {
     id[C.shRx] = 0.02;
     id[C.shLy] = 0;
     id[C.shRy] = 0;
-    id[C.shLz] = 0.14;
-    id[C.shRz] = 0.14;
+    id[C.shLz] = 0.42;
+    id[C.shRz] = 0.42;
     id[C.elL] = 0.3 + br * 0.03;
     id[C.elR] = 0.24;
     id[C.clL] = br * 0.015;
@@ -1091,8 +986,8 @@ export class Player {
     b.foreR.rotation.x = Pz[C.elR];
     b.handL.rotation.set(Pz[C.wrL], 0, -Pz[C.wrLz]);
     b.handR.rotation.set(Pz[C.wrR], 0, Pz[C.wrRz]);
-    b.thighL.rotation.set(Pz[C.thLx], 0, -Pz[C.thLz]);
-    b.thighR.rotation.set(Pz[C.thRx], 0, Pz[C.thRz]);
+    b.thighL.rotation.set(Pz[C.thLx], Pz[C.thLy], -Pz[C.thLz]);
+    b.thighR.rotation.set(Pz[C.thRx], -Pz[C.thRy], Pz[C.thRz]);
     b.shinL.rotation.x = -Pz[C.knL];
     b.shinR.rotation.x = -Pz[C.knR];
     b.footL.rotation.x = Pz[C.anL];
@@ -1101,11 +996,9 @@ export class Player {
     b.toeR.rotation.x = Pz[C.toR];
   }
 
-  // --- secondary motion: scarf, coat, satchel, hair ------------------------------
+  // --- secondary motion: curls, mantle, pouch, cape -------------------------------
   secondary(dt, sp) {
     if (dt <= 0) return;
-    const b = this.b;
-    const t = this.time;
     // Bone transforms in root space (the renderer recomputes true world
     // matrices later in the frame).
     this.root.matrixWorld.identity();
@@ -1113,6 +1006,7 @@ export class Player {
 
     // Motion of the root through the world -> inertial acceleration, and the
     // air streaming past (plus a gusty breeze so he's never quite still).
+    const t = this.time;
     const vel = _v.set(this.vx, this.grounded ? 0 : this.vy, -this.speed);
     const acc = _v2.subVectors(vel, this.frameVel).divideScalar(Math.max(dt, 1 / 240));
     this.frameVel.copy(vel);
@@ -1124,236 +1018,266 @@ export class Player {
     this.air.set(-vel.x + 0.5 * Math.sin(t * 0.37) * gust, -vel.y + 0.15 * gust, -vel.z + 0.7 * gust).applyQuaternion(this.invQ);
     this.accLocal.copy(this.frameAcc).applyQuaternion(this.invQ);
     const airSpeed = this.air.length();
-
-    // collision spheres: chest, hips (coat skirt), head
-    const [sc, sh, sd] = this.spheres;
-    _v.set(0, 0.03, 0.0).applyMatrix4(b.chest.matrixWorld);
-    sc.set(_v.x, _v.y, _v.z, 0.165);
-    _v.set(0, -0.06, 0.0).applyMatrix4(b.hips.matrixWorld);
-    sh.set(_v.x, _v.y, _v.z, 0.215);
-    _v.set(0, 0.15, 0.0).applyMatrix4(b.head.matrixWorld);
-    sd.set(_v.x, _v.y, _v.z, 0.165);
-    const floor = (this.groundY || 0) - this.y + 0.015;
-
-    // fixed sub-steps keep the chains stable at any frame rate
+    const spd = clamp(airSpeed / 24, 0, 1.2);
     const steps = Math.min(8, Math.max(1, Math.ceil(dt / (1 / 120))));
-    const h = dt / steps;
-    for (const tail of this.tails) {
-      this.anchor.copy(tail.local).applyMatrix4(b.chest.matrixWorld);
-      const { n, seg } = tail.spec;
-      const pts = tail.pts;
-      const prv = tail.prv;
-      if (!this.simReady) {
-        for (let i = 0; i <= n; i++) {
-          pts[i * 3] = prv[i * 3] = this.anchor.x;
-          pts[i * 3 + 1] = prv[i * 3 + 1] = this.anchor.y - i * seg;
-          pts[i * 3 + 2] = prv[i * 3 + 2] = this.anchor.z + i * 0.02;
-        }
-      }
-      for (let st = 0; st < steps; st++) {
-        pts[0] = prv[0] = this.anchor.x;
-        pts[1] = prv[1] = this.anchor.y;
-        pts[2] = prv[2] = this.anchor.z;
-        for (let i = 1; i <= n; i++) {
-          const o = i * 3;
-          const px = pts[o], py = pts[o + 1], pz = pts[o + 2];
-          const vx = (px - prv[o]) / h, vy = (py - prv[o + 1]) / h, vz = (pz - prv[o + 2]) / h;
-          const tip = i / n;
-          const drag = 0.85;
-          const flap = Math.min(airSpeed, 26) * 0.8 * tip;
-          const drift = tail.spec.drift * Math.min(1, airSpeed / 10);
-          let ax = this.gravity.x + drag * (this.air.x + drift - vx) - this.accLocal.x * 0.55;
-          // (the game's gravity is ~3x real, so only part of the jump's
-          // vertical acceleration reaches the cloth: it floats, not flags)
-          let ay = this.gravity.y + drag * (this.air.y - vy) - this.accLocal.y * 0.3;
-          let az = this.gravity.z + drag * (this.air.z - vz) - this.accLocal.z * 0.55;
-          // a travelling wave from knot to tip
-          ax += Math.sin(t * 12 - i * 1.1 + tail.phase) * flap;
-          ay += Math.cos(t * 9.5 - i * 0.9 + tail.phase) * flap * 0.7;
-          prv[o] = px;
-          prv[o + 1] = py;
-          prv[o + 2] = pz;
-          pts[o] = px + vx * h * 0.995 + ax * h * h;
-          pts[o + 1] = py + vy * h * 0.995 + ay * h * h;
-          pts[o + 2] = pz + vz * h * 0.995 + az * h * h;
-        }
-        for (let it = 0; it < 3; it++) {
-          for (let i = 0; i < n; i++) {
-            const a = i * 3;
-            const c2 = a + 3;
-            const dx = pts[c2] - pts[a], dy = pts[c2 + 1] - pts[a + 1], dz = pts[c2 + 2] - pts[a + 2];
-            const d = Math.hypot(dx, dy, dz) || 1e-6;
-            const diff = (d - seg) / d;
-            if (i === 0) {
-              pts[c2] -= dx * diff;
-              pts[c2 + 1] -= dy * diff;
-              pts[c2 + 2] -= dz * diff;
-            } else {
-              pts[a] += dx * diff * 0.5;
-              pts[a + 1] += dy * diff * 0.5;
-              pts[a + 2] += dz * diff * 0.5;
-              pts[c2] -= dx * diff * 0.5;
-              pts[c2 + 1] -= dy * diff * 0.5;
-              pts[c2 + 2] -= dz * diff * 0.5;
-            }
-          }
-          for (let i = 1; i <= n; i++) {
-            const o = i * 3;
-            for (const s of this.spheres) {
-              const dx = pts[o] - s.x, dy = pts[o + 1] - s.y, dz = pts[o + 2] - s.z;
-              const d2 = dx * dx + dy * dy + dz * dz;
-              if (d2 < s.w * s.w) {
-                const d = Math.sqrt(d2) || 1e-6;
-                const k2 = s.w / d;
-                pts[o] = s.x + dx * k2;
-                pts[o + 1] = s.y + dy * k2;
-                pts[o + 2] = s.z + dz * k2;
-              }
-            }
-            if (pts[o + 1] < floor) pts[o + 1] = floor;
-          }
-        }
-      }
-      // pose the chain bones along the particles
-      for (let i = 0; i < n; i++) {
-        const bone = tail.bones[i];
-        const o = i * 3;
-        bone.position.set(pts[o], pts[o + 1], pts[o + 2]);
-        _v.set(pts[o + 3] - pts[o], pts[o + 4] - pts[o + 1], pts[o + 5] - pts[o + 2]).normalize();
-        bone.quaternion.setFromUnitVectors(DOWN, _v);
-      }
-    }
 
-    // satchel: a pendulum hung from the hip, kept outside the coat
-    {
-      const bs = this.bagSim;
-      const pivot = this.anchor.copy(bs.local).applyMatrix4(b.hips.matrixWorld);
-      if (!this.simReady) {
-        bs.p.set(pivot.x + 0.02, pivot.y - bs.len, pivot.z + 0.01);
-        bs.q.copy(bs.p);
-      }
-      this.hipsInv.copy(b.hips.matrixWorld).invert();
-      const vyPrev = bs.vy;
-      for (let st = 0; st < steps; st++) {
-        const vx = (bs.p.x - bs.q.x) / h, vy = (bs.p.y - bs.q.y) / h, vz = (bs.p.z - bs.q.z) / h;
-        const ax = this.gravity.x + 0.6 * (this.air.x - vx) * 0.15 - this.accLocal.x;
-        const ay = this.gravity.y + 0.6 * (this.air.y - vy) * 0.15 - this.accLocal.y;
-        const az = this.gravity.z + 0.6 * (this.air.z - vz) * 0.15 - this.accLocal.z;
-        bs.q.copy(bs.p);
-        bs.p.x += vx * h * 0.985 + ax * h * h;
-        bs.p.y += vy * h * 0.985 + ay * h * h;
-        bs.p.z += vz * h * 0.985 + az * h * h;
-        // rope length
-        _v.subVectors(bs.p, pivot);
-        const d = _v.length() || 1e-6;
-        bs.p.copy(pivot).addScaledVector(_v, bs.len / d);
-        // stay outside the coat (ellipse around the hips)
-        _v2.copy(bs.p).applyMatrix4(this.hipsInv);
-        const ex = _v2.x / 0.25, ez = _v2.z / 0.215;
-        const e = Math.hypot(ex, ez);
-        if (e < 1 && _v2.y < 0.15) {
-          _v2.x /= e;
-          _v2.z /= e;
-          bs.p.copy(_v2.applyMatrix4(b.hips.matrixWorld));
-        }
-      }
-      bs.vy = (bs.p.y - bs.q.y) / h;
-      const bag = b.bag;
-      bag.position.copy(pivot);
-      _v.subVectors(bs.p, pivot).normalize();
-      _q.setFromUnitVectors(DOWN, _v);
-      _v2.set(0, 0, 1).transformDirection(b.hips.matrixWorld);
-      _q2.setFromAxisAngle(UP, Math.atan2(_v2.x, _v2.z));
-      bag.quaternion.copy(_q).multiply(_q2);
-      // lid flaps up when the bag is jolted
-      const jolt = (bs.vy - vyPrev) / dt;
-      this.lid.v += Math.abs(clamp(jolt, -80, 80)) * 0.0015;
-      const lid = this.lid.step(0, 4.5, 0.25, dt);
-      b.bagLid.rotation.x = -clamp(Math.abs(lid) + 0.15 * sp * Math.max(0, Math.sin(t * 17)) * this.w.run, 0, 0.9);
-    }
-
-    // hair tufts bounce with the head
-    {
-      _v.set(0, 0.15, 0).applyMatrix4(b.head.matrixWorld);
-      if (!this.simReady) this.headPos.copy(_v);
-      _v2.subVectors(_v, this.headPos).divideScalar(dt);
-      this.headPos.copy(_v);
-      const accY = (_v2.y - this.headVel.y) / dt + this.accLocal.y;
-      const accX = (_v2.x - this.headVel.x) / dt + this.accLocal.x;
-      this.headVel.copy(_v2);
-      this.headAcc.x = damp(this.headAcc.x, clamp(accX, -60, 60), 25, dt);
-      this.headAcc.y = damp(this.headAcc.y, clamp(accY, -60, 60), 25, dt);
-      for (let i = 0; i < 3; i++) {
-        const hs = this.hair[i];
-        const wind = 0.25 * clamp(airSpeed / 25, 0, 1);
-        const rx = hs.x.step(wind + this.headAcc.y * 0.006, 3.4 + i * 0.4, 0.22, dt);
-        const rz = hs.z.step(-this.headAcc.x * 0.004, 3 + i * 0.3, 0.25, dt);
-        const bone = b['hair' + i];
-        bone.rotation.x = clamp(rx, -0.6, 0.7);
-        bone.rotation.z = clamp(rz, -0.5, 0.5);
-      }
-    }
-
-    // coat skirt: wind flare at the back, lift when falling, puff on landing,
-    // swing with sideways moves — and never let a leg poke through
-    {
-      const spd = clamp(airSpeed / 24, 0, 1.2);
-      const fall = clamp(-(this.grounded ? 0 : this.vy) * 0.06, -0.15, 0.5);
-      const puff = this.springs.land.x * 0.35;
-      const lat = this.accLocal.x;
-      const legs = this.legOffsets();
-      for (let k = 0; k < SKIRT_PANELS; k++) {
-        const th = this.panelAngle[k];
-        const sn = Math.sin(th);
-        const cs = Math.cos(th);
-        let target = 0.06;
-        target += (0.12 + 0.32 * spd) * Math.pow(Math.max(0, cs), 1.5) * (0.6 + 0.4 * this.w.run);
-        target -= 0.07 * spd * Math.max(0, -cs);
-        target += fall + puff;
-        target += clamp(-lat * sn * 0.012, -0.2, 0.3);
-        const flare = this.skirt[k].step(target, 3.6, 0.32, dt);
-        // leg clearance
-        let req = -1;
-        for (const L of legs) {
-          const close = Math.cos(th - L.th);
-          if (close < 0.55) continue;
-          const need = L.r + 0.085;
-          const fr = Math.asin(clamp((need - SKIRT_HINGE_R) / 0.33, -1, 1)) - 0.17;
-          req = Math.max(req, fr * smooth(0.55, 0.92, close));
-        }
-        const up = Math.max(flare, req);
-        const flutter = 0.07 * spd * Math.max(0, cs) * Math.sin(t * 15 + k * 1.9) + 0.03 * Math.sin(t * 2.3 + k);
-        b['skU' + k].rotation.x = -up;
-        b['skU' + k].rotation.z = 0;
-        b['skL' + k].rotation.x = -(0.35 * (flare - 0.06) + flutter);
-      }
-    }
-
+    this.hairSim(dt, airSpeed);
+    this.mantleSim(dt, spd);
+    this.pouchStep(dt, steps, sp);
+    this.capeSim(dt, gust);
     this.simReady = true;
   }
 
-  // Where each thigh crosses the coat's hem height, in hips space: angle around
-  // the body and elliptical radius.
-  legOffsets() {
+  // Curls: each clump swings toward the push of the air streaming back over
+  // the head and away from the head's own acceleration — bouncing on every
+  // footfall, floating up through a jump.
+  hairSim(dt, airSpeed) {
     const b = this.b;
-    this.hipsInv.copy(b.hips.matrixWorld).invert();
-    const res = this._legs || (this._legs = [{ th: 0, r: 0 }, { th: 0, r: 0 }]);
-    const hemY = 0.545 - HIP_Y;
-    let i = 0;
-    for (const side of ['L', 'R']) {
-      const H = _v.setFromMatrixPosition(b['thigh' + side].matrixWorld).applyMatrix4(this.hipsInv);
-      const K = _v2.setFromMatrixPosition(b['shin' + side].matrixWorld).applyMatrix4(this.hipsInv);
-      const dy = K.y - H.y;
-      const tt = dy < -0.02 ? clamp((hemY - H.y) / dy, 0, 1.25) : 1;
-      const x = H.x + (K.x - H.x) * tt;
-      const z = (H.z + (K.z - H.z) * tt) / SKIRT_EZ;
-      res[i].th = Math.atan2(x, z);
-      res[i].r = Math.hypot(x, z);
-      i++;
+    _v.set(0, 0.12, 0).applyMatrix4(b.head.matrixWorld);
+    if (!this.simReady) this.headPos.copy(_v);
+    _v2.subVectors(_v, this.headPos).divideScalar(dt);
+    this.headPos.copy(_v);
+    _v3.subVectors(_v2, this.headVel).divideScalar(dt).add(this.accLocal);
+    this.headVel.copy(_v2);
+    if (!this.simReady) _v3.set(0, 0, 0);
+    this.headAcc.x = damp(this.headAcc.x, clamp(_v3.x, -60, 60), 25, dt);
+    this.headAcc.y = damp(this.headAcc.y, clamp(_v3.y, -60, 60), 25, dt);
+    this.headAcc.z = damp(this.headAcc.z, clamp(_v3.z, -60, 60), 25, dt);
+    // (decompose rather than getWorldQuaternion: that would pull the root's
+    // world transform back into these root-space matrices)
+    b.head.matrixWorld.decompose(_v3, _q, _v2);
+    _q.invert();
+    const wind = 0.05 + 0.3 * clamp(airSpeed / 25, 0, 1);
+    const push = _v.set(-this.headAcc.x * 0.004, -this.headAcc.y * 0.005, wind - this.headAcc.z * 0.003).applyQuaternion(_q);
+    for (let i = 0; i < this.hairBones.length; i++) {
+      const d = this.hairBones[i].dir;
+      const s = this.hair[i];
+      const f = 3.1 + i * 0.22;
+      const rx = s.x.step(d.y * push.z - d.z * push.y, f, 0.22, dt);
+      const ry = s.y.step(d.z * push.x - d.x * push.z, f, 0.22, dt);
+      const rz = s.z.step(d.x * push.y - d.y * push.x, f, 0.22, dt);
+      b[this.hairBones[i].name].rotation.set(clamp(rx, -0.45, 0.45), clamp(ry, -0.45, 0.45), clamp(rz, -0.45, 0.45));
     }
-    return res;
   }
 
+  // Mantle panels: wind flare at the back, lift when falling, puff on landing,
+  // swing with sideways moves — and shouldered out of the way by the arms.
+  mantleSim(dt, spd) {
+    const b = this.b;
+    const t = this.time;
+    const fall = clamp(-(this.grounded ? 0 : this.vy) * 0.05, -0.12, 0.45);
+    const puff = this.springs.land.x * 0.3;
+    const lat = this.accLocal.x;
+    const arms = this.armOffsets();
+    for (let k = 0; k < MANTLE.panels; k++) {
+      const th = this.panelAngle[k];
+      const sn = Math.sin(th);
+      const cs = Math.cos(th);
+      // (the front stands a little off the jacket while running: the chest
+      // twists over the belly beneath it)
+      let target = 0.02 + 0.03 * Math.max(0, -cs) * this.w.run;
+      // (gently at the back: the cape hangs from those panels, and a pumping
+      // hem would fling it about)
+      target += (0.04 + 0.1 * spd) * Math.pow(Math.max(0, cs), 1.5) * (0.6 + 0.4 * this.w.run);
+      target -= 0.015 * spd * Math.max(0, -cs); // (pressed only lightly: the jacket is right beneath)
+      target += fall + puff;
+      target += clamp(-lat * sn * 0.01, -0.15, 0.25);
+      const flare = this.mantle[k].step(target, 3.4, 0.3, dt);
+      let req = -1;
+      for (const A of arms) {
+        const close = Math.cos(th - A.th);
+        if (close < 0.35) continue;
+        // tip the panel out (or up and over, for an arm raised past the
+        // hinge) until it clears the sleeve's padded surface plus the
+        // mantle's own thickness
+        const dr = A.r - MANTLE.hingeR;
+        const fr = Math.atan2(dr, A.drop) + Math.asin(clamp(0.095 / Math.hypot(dr, A.drop), 0, 1)) - MANTLE.rest;
+        req = Math.max(req, Math.min(fr, 2.3) * smooth(0.35, 0.88, close));
+      }
+      const up = Math.max(flare, req, 0.01);
+      // the hem only ever flutters outward, off the jacket
+      const flutter = 0.05 * spd * Math.max(0, -cs) * (0.5 + 0.5 * Math.sin(t * 16 + k * 1.9)) + 0.015 * (0.5 + 0.5 * Math.sin(t * 2.1 + k));
+      b['mtU' + k].rotation.x = -up;
+      b['mtL' + k].rotation.x = -(0.4 * (flare - 0.02) + flutter);
+    }
+    b.chest.updateWorldMatrix(false, true);
+  }
+
+  // Points along each upper arm under the mantle, in chest space: angle
+  // around the body, elliptical radius and depth below the panels' hinge
+  // (points below the hem count where the arm crosses the hem).
+  armOffsets() {
+    const b = this.b;
+    this.chestInv.copy(b.chest.matrixWorld).invert();
+    const hingeY = MANTLE.hinge - CHEST_Y;
+    const hemY = MANTLE.hem + 0.012 - CHEST_Y;
+    let i = 0;
+    for (const side of ['L', 'R']) {
+      const S = _v.setFromMatrixPosition(b['arm' + side].matrixWorld).applyMatrix4(this.chestInv);
+      const E = _v2.setFromMatrixPosition(b['fore' + side].matrixWorld).applyMatrix4(this.chestInv);
+      const dy = E.y - S.y;
+      const tHem = dy < -0.02 ? clamp((hemY - S.y) / dy, 0, 1.3) : 1;
+      for (const t of ARM_SAMPLES) {
+        const tt = Math.min(t, tHem);
+        const y = S.y + dy * tt;
+        const ez = mantleEZ(clamp(y + CHEST_Y, MANTLE.hem, MANTLE.hinge));
+        const x = S.x + (E.x - S.x) * tt;
+        const z = (S.z + (E.z - S.z) * tt) / ez;
+        const A = this._arms[i++];
+        A.th = Math.atan2(x, z);
+        A.r = Math.hypot(x, z);
+        A.drop = hingeY - y;
+      }
+    }
+    return this._arms;
+  }
+
+  // Hip pouch: a pendulum hung from the belt, kept outside the hips, its flap
+  // jolting open.
+  pouchStep(dt, steps, sp) {
+    const b = this.b;
+    const t = this.time;
+    const h = dt / steps;
+    const ps = this.pouchSim;
+    const pivot = this.anchor.copy(ps.local).applyMatrix4(b.hips.matrixWorld);
+    if (!this.simReady) {
+      ps.p.set(pivot.x - 0.01, pivot.y - ps.len, pivot.z);
+      ps.q.copy(ps.p);
+    }
+    this.hipsInv.copy(b.hips.matrixWorld).invert();
+    const vyPrev = ps.vy;
+    for (let st = 0; st < steps; st++) {
+      const vx = (ps.p.x - ps.q.x) / h, vy = (ps.p.y - ps.q.y) / h, vz = (ps.p.z - ps.q.z) / h;
+      const ax = this.gravity.x + 0.09 * (this.air.x - vx) - this.accLocal.x;
+      const ay = this.gravity.y + 0.09 * (this.air.y - vy) - this.accLocal.y * 0.6;
+      const az = this.gravity.z + 0.09 * (this.air.z - vz) - this.accLocal.z;
+      ps.q.copy(ps.p);
+      ps.p.x += vx * h * 0.985 + ax * h * h;
+      ps.p.y += vy * h * 0.985 + ay * h * h;
+      ps.p.z += vz * h * 0.985 + az * h * h;
+      _v.subVectors(ps.p, pivot);
+      ps.p.copy(pivot).addScaledVector(_v, ps.len / (_v.length() || 1e-6));
+      _v2.copy(ps.p).applyMatrix4(this.hipsInv);
+      const e = Math.hypot(_v2.x / 0.215, _v2.z / 0.18);
+      if (e < 1 && _v2.y < 0.15) {
+        _v2.x /= e;
+        _v2.z /= e;
+        ps.p.copy(_v2.applyMatrix4(b.hips.matrixWorld));
+      }
+    }
+    ps.vy = (ps.p.y - ps.q.y) / h;
+    const pouch = b.pouch;
+    pouch.position.copy(pivot);
+    _v.subVectors(ps.p, pivot).normalize();
+    _q.setFromUnitVectors(DOWN, _v);
+    _v2.set(0, 0, 1).transformDirection(b.hips.matrixWorld);
+    _q2.setFromAxisAngle(UP, Math.atan2(_v2.x, _v2.z));
+    pouch.quaternion.copy(_q).multiply(_q2);
+    const jolt = (ps.vy - vyPrev) / dt;
+    this.lid.v += Math.abs(clamp(jolt, -80, 80)) * 0.0012;
+    const lid = this.lid.step(0, 5, 0.25, dt);
+    b.pouchLid.rotation.z = -clamp(Math.abs(lid) + 0.12 * sp * Math.max(0, Math.sin(t * 17)) * this.w.run, 0, 0.8);
+    pouch.updateMatrix();
+    pouch.matrixWorld.copy(pouch.matrix);
+    b.pouchLid.updateMatrix();
+    b.pouchLid.matrixWorld.multiplyMatrices(pouch.matrixWorld, b.pouchLid.matrix);
+  }
+
+  // The cape. Simulation space has world axes and its origin at the runner:
+  // turning and leaning swing the cape instead of carrying it. The air is the
+  // runner's own speed (the cape's angle grows with it) plus a slow side-to-
+  // side drift; the turbulence that sets it flapping strengthens and quickens
+  // with speed.
+  capeSim(dt, gust) {
+    const cl = this.cloth;
+    const Q = this.root.quaternion;
+    const t = this.time;
+    const W = this.speed;
+    // pins, skinned to the mantle like the hem they hang from
+    for (let i = 0; i < this.pins.length; i++) {
+      const pin = this.pins[i];
+      _v.set(0, 0, 0);
+      for (const [id, w] of pin.w) {
+        _m.multiplyMatrices(this.bones[id].matrixWorld, this.skeleton.boneInverses[id]);
+        _v.addScaledVector(_v2.copy(pin.p).applyMatrix4(_m), w);
+      }
+      _v.applyQuaternion(Q).toArray(cl.pinB, i * 3);
+    }
+    // colliders into simulation space
+    for (let k = 0; k < this.colliders.length; k++) {
+      const d = this.colliders[k];
+      const c = cl.colliders[k];
+      const M = d.bone.matrixWorld;
+      _v.copy(d.a).applyMatrix4(M).applyQuaternion(Q);
+      _v2.copy(d.b).applyMatrix4(M).applyQuaternion(Q);
+      c.ax = _v.x; c.ay = _v.y; c.az = _v.z;
+      c.bx = _v2.x; c.by = _v2.y; c.bz = _v2.z;
+      c.cx = (_v.x + _v2.x) / 2; c.cy = (_v.y + _v2.y) / 2; c.cz = (_v.z + _v2.z) / 2;
+      const R = _v.distanceTo(_v2) / 2 + Math.max(d.r, d.rz) + 0.02;
+      c.R2 = R * R;
+      c.r = d.r;
+      c.rz = d.rz;
+      c.ell = d.rz > 0;
+      if (c.ell) {
+        _v3.setFromMatrixColumn(M, 0).normalize().applyQuaternion(Q);
+        c.ex[0] = _v3.x; c.ex[1] = _v3.y; c.ex[2] = _v3.z;
+        _v3.setFromMatrixColumn(M, 2).normalize().applyQuaternion(Q);
+        c.ez[0] = _v3.x; c.ez[1] = _v3.y; c.ez[2] = _v3.z;
+      }
+    }
+    // forces: gravity, a share of the runner's own acceleration (the game's
+    // gravity is ~3x real, so only part of a jump's reaches the cloth: it
+    // floats rather than flags), and the air
+    const f = this.wind;
+    f.gx = -this.frameAcc.x * 0.22;
+    f.gy = -9.8 - this.frameAcc.y * 0.3;
+    f.gz = -this.frameAcc.z * 0.5;
+    // The headwind the cape feels grows slower than the run speed: it trails
+    // back further as the pace rises, rippling in long, slow waves — weighty
+    // wool, not a flag — and never lifts over the shoulders.
+    const drift = Math.sin(t * 0.53 + Math.sin(t * 0.21) * 2) * gust;
+    f.ax = clamp(-this.vx * 0.3, -5, 5) + (0.2 + 0.05 * W) * drift;
+    f.ay = -(this.grounded ? 0 : this.vy) * 0.6;
+    f.az = Math.max(0, 0.5 * W - 1) + 0.6 + 0.6 * gust;
+    f.turb = 0.15 + 0.03 * W;
+    f.freq = 0.5 + 0.06 * W;
+    f.wave = 0.6 + 0.015 * W;
+    f.kn = 1.4;
+    f.kt = 0.25;
+    f.damp = 1.6;
+    f.floor = (this.groundY || 0) - this.y + 0.012;
+    f.lift = 0.05;
+    f.t = t;
+    // Carry the cloth along with most of the body's own bob and sway: the
+    // stride bounces the shoulders at several g, which a real mantle's hem
+    // would soak up — passed on in full it whips the cape about and robs
+    // it of lift.
+    _v.setFromMatrixPosition(this.b.chest.matrixWorld).applyQuaternion(Q);
+    if (this.simReady) cl.shift((_v.x - this.chestPrev.x) * 0.9, (_v.y - this.chestPrev.y) * 0.9, (_v.z - this.chestPrev.z) * 0.9);
+    this.chestPrev.copy(_v);
+    if (!this.simReady) {
+      // start from the rest shape and let it settle under gravity
+      cl.place((v) => v.applyQuaternion(Q));
+      cl.pinA.set(cl.pinB);
+      f.t = t - 0.75;
+      for (let i = 0; i < 45; i++) {
+        f.t += 1 / 60;
+        cl.step(1 / 60, f);
+      }
+    } else {
+      cl.step(dt, f);
+    }
+    // one bone per particle, oriented to the cloth surface
+    const { cols, rows } = CAPE;
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        const k = j * cols + i;
+        const bone = this.capeBones[k];
+        bone.position.fromArray(cl.p, k * 3).applyQuaternion(this.invQ);
+        Cloth.frame(cl.p, cols, rows, i, j, bone.quaternion).premultiply(this.invQ);
+      }
+    }
+  }
   place(z) {
     this.root.position.set(this.x, this.y, z);
     const h = Math.max(0, this.y - (this.groundY || 0));

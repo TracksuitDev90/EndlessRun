@@ -1,7 +1,7 @@
 # EndlessRun
 
-An endless runner through worlds within worlds. A boy in a bright orange coat
-runs into the screen through a storybook world that never stops changing:
+An endless runner through worlds within worlds. A young wayfarer in a puffer
+jacket and a crimson hooded cape runs into the screen through a storybook world that never stops changing:
 scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
 next world, nested inside this one. Run through, and you're in it. Keep
@@ -121,12 +121,11 @@ Append to the URL:
   doors swinging, foliage swaying, wings and book covers flapping, drifting
   props and the curved-world bend are all done in the vertex shader from
   distance and time — no per-object CPU updates.
-- **One skinned runner.** The boy is a single skinned mesh (plus its ink hull)
-  on a ~60-bone skeleton — two draw calls. Keyframed run / jump / slide poses
-  are layered with springs (follow-through on the head, wrists and hair), a
-  hinged coat skirt pushed aside by his legs, verlet scarf tails in the air
-  stream and a pendulum satchel; the whole simulation costs a fraction of a
-  millisecond.
+- **One skinned runner.** The wayfarer is a single skinned mesh (plus its ink
+  hull) — two draw calls, ~23k sculpted triangles plus the cape. Legs are
+  placed by IK, the cape is a small cloth simulation and the mantle, curls and
+  hip pouch are springs; animation and simulation together take about half a
+  millisecond (see [The runner](#the-runner)).
 - **Cheap, painterly shading.** Hand-written toon shader with a per-world
   lighting model: terminator softness and wrap (harsh vs soft worlds), rim /
   back light, low-lying mist, leaf dapple, an analytic wall shadow, colour
@@ -144,6 +143,65 @@ current world draws normally with the doorway "plugged" in the depth buffer,
 so the old world continues around the door frame while the new one shows
 through it.
 
+## The runner
+
+![The wayfarer: front, three-quarter, side, back and mid-stride](docs/runner.jpg)
+
+**Modelled as continuous surfaces, not assembled from parts.**
+`tools/runner/build.py` sculpts the character offline the way a sculptor
+blocks out a figure: each garment (head, hair, puffer, shorts, legs, boots,
+hands, mantle, pouch) is one signed-distance field made of volumes blended
+smoothly into each other, so shoulders flow into the sleeves, limbs taper and
+the shorts wrap the hips. The fields are polygonised (marching cubes),
+simplified, and given exact smooth normals from the field; skin weights come
+from which volume "owns" each point of the surface, so the mesh bends where the
+shapes blend. Proportions follow the reference illustration: about six heads
+tall (the head and hair are sculpted in their own space and placed scaled on
+the neck), knee a little under a third of the height, high socks and chunky
+mid-cut hiking boots with a thick sole and a collar that dips at the front.
+Fine linework — quilting seams, laces, the face, trims, the cape's crest — is
+not modelled: each vertex carries a few smooth coordinates and the character
+shader draws those lines crisply at any distance. Shading is one broad, crisp
+shadow shape per surface in a warm shadow tone, a restrained hair highlight
+and a thin dark contour tinted by the material under it.
+
+The build writes `assets/runner/runner.json` (skeleton, rig constants, parts)
+and `runner.bin` (vertex data), loaded once at boot. To change the character,
+edit `build.py` and regenerate (about ten seconds):
+
+```sh
+pip install numpy scipy scikit-image fast-simplification
+python3 tools/runner/build.py
+```
+
+**Animation.** The running legs are placed, not keyed: while a foot is down
+the ball of the boot is pinned to the ground and carried back at exactly the
+ground speed as the heel peels up over it; in the air the ankle follows a
+designed path (heel kicks up under the hips, the knee drives through, the foot
+reaches and paws back down), and a two-bone solve turns that into thigh and
+knee angles — the knee always bends forward, the pelvis sinks into each
+contact, the thighs turn against the pelvis's swing so a planted foot never
+twists, and the arms swing against the legs with bent elbows. A 0.6 m leg can
+only stay planted for ~0.58 m of ground, which at the game's 12–28 m/s is a few
+hundredths of a second: at the starting pace contact has no slip at all; at
+higher speeds contact is held for a minimum of ~2.4 frames so the planted pose
+reaches the screen, and the leftover slip is straight back along the run inside
+those frames (no sinking, floating or sideways skid). Jump, slide and idle
+remain keyed poses, blended with springs.
+
+Secondary motion is deliberately restrained: the cape (a 13×13 particle cloth
+hung inside the mantle's hem, kept off the body by capsule colliders) trails
+and ripples in long slow waves rather than flagging; the mantle is twelve
+hinged panels that the arms tip up and over; curls and the hip pouch lag on
+springs.
+
+**Third-party assets.** None. Free bases and animation (Kenney, Quaternius /
+Poly Pizza, OpenGameArt, Sketchfab, Mixamo, Poly Haven) were considered, but the
+environment this was built in could not reach any of those hosts, so nothing
+was downloaded or evaluated; the character, rig, animation and shading here are
+all original. A suitable base mesh could still be adopted later: the game only
+needs a skinned mesh whose bones are named like the ones `build.py` writes.
+
 ## Project layout
 
 ```
@@ -155,9 +213,11 @@ src/render/                   shaders, geometry kit, instanced batches, textures
 src/world/                    world runtime + one file per world (art, lighting, lap
                               variations, layout, obstacles, doorway); whimsy.js holds
                               the shared later-lap props and light volumes
-src/game/                     game loop, player (model + animation + movement),
-                              camera, course (world order), chunk streaming,
-                              obstacle director, portal
+src/game/                     game loop, player (animation, IK legs, secondary
+                              motion, movement), outfit (palette, cape), cloth,
+                              runner asset loader, camera, course (world order),
+                              chunk streaming, obstacle director, portal
+tools/runner/build.py         offline sculpt of the runner -> assets/runner/
 vendor/three/                 three.js r185 (MIT)
 ```
 
