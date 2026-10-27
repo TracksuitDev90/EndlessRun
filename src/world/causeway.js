@@ -2,10 +2,16 @@ import {
   P, part, merge,
   cloudParts, rockParts, roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
+import { birdParts, whaleParts } from './whimsy.js';
 import { groundStrip } from '../render/geo.js';
+import { CONFIG } from '../config.js';
 
 // V · The Sky Road — a sandstone causeway over a sea of amber cloud, low
 // rolling ridges, floating islands and a huge low sun straight ahead.
+// Harsh backlight: the sun sits dead ahead, so everything facing you falls
+// into warm silhouette with a blazing golden rim, rays fan out of the sun and
+// shadows stream back toward you. Returns bring flocks of birds, a ringed
+// planet in a pink sky, then whales swimming through the clouds.
 
 const C = {
   ridgeLo: '#c4602f',
@@ -115,19 +121,26 @@ function stoneBlockGeo(width) {
   return merge(parts).translate(0, 0, -0.3);
 }
 
-function floatRockGeo() {
-  const parts = [...rockParts({ r: 0.62, lo: C.rockLo, hi: C.rockHi, sx: 1.55, sy: 0.75, sz: 0.85, seed: 7 })].map((g) => g.translate(0, 1.2, 0));
-  parts.push(part(P.sphere(0.13, 6, 4), C.gold, { x: 0.8, y: 1.75, z: 0.4, emit: 0.8, outline: 0.5 }));
-  return merge(parts).translate(0, 0, -0.45);
-}
-
-function archWideGeo() {
+// Stone lintel on two posts: a heavy beam whose underside is the duck line,
+// open road beneath. Used for both the one-lane and full-width versions.
+function lintelGeo(half) {
+  const D = CONFIG.duckLine;
+  const beamH = 0.66;
+  const top = D + beamH;
   const parts = [];
-  for (const s of [-1, 1]) parts.push(part(P.box(0.8, 2.7, 0.9), C.stone, { x: s * 4.0, y: 1.35 }));
-  parts.push(part(P.box(8.8, 1.2, 0.9), C.stone, { y: 1.95 }));
-  parts.push(part(P.box(9.2, 0.25, 1.1), C.stoneDark, { y: 2.65 }));
-  for (let i = 0; i < 5; i++) parts.push(part(P.cyl(0.2, 0.2, 0.08, 12), C.gold, { x: -3.2 + i * 1.6, y: 1.95, z: 0.47, rx: Math.PI / 2, emit: 0.6, outline: 0.5 }));
-  return merge(parts).translate(0, 0, -0.45);
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.5, top, 0.7), C.stone, { x: s * half, y: top / 2 }));
+    parts.push(part(P.box(0.66, 0.3, 0.86), C.stoneDark, { x: s * half, y: 0.15 }));
+  }
+  parts.push(part(P.box(half * 2 + 0.7, beamH, 0.72), C.stone, { y: D + beamH / 2 }));
+  parts.push(part(P.box(half * 2 + 0.9, 0.16, 0.86), C.stoneDark, { y: top + 0.08 }));
+  parts.push(part(P.box(half * 2 + 0.5, 0.08, 0.76), C.stoneDark, { y: D + 0.04, outline: 0.5 }));
+  const n = Math.max(1, Math.round(half * 1.3));
+  for (let i = 0; i < n; i++) {
+    const x = n === 1 ? 0 : -half + 0.5 + ((half * 2 - 1) * i) / (n - 1);
+    parts.push(part(P.cyl(0.19, 0.19, 0.08, 14), C.gold, { x, y: D + beamH / 2, z: 0.38, rx: Math.PI / 2, emit: 0.7, outline: 0.5 }));
+  }
+  return merge(parts).translate(0, 0, -0.36);
 }
 
 function pillarGeo() {
@@ -172,17 +185,52 @@ export default {
   doorColor: '#f0843a',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   env: {
-    sky: ['#5a1e10', '#f8b54a', '#f39a40'],
+    sky: ['#4a1a10', '#ffb84a', '#f39a40'],
     sun: { dir: [0, 0.1, -1], glow: '#ffcf70', disc: '#fff4c8', size: 0.07 },
     stars: 0.35,
-    light: { dir: [0.35, 0.66, 0.3], shadow: [0.8, 0.54, 0.5], hi: [1.08, 1.03, 0.9] },
+    skyFx: { rays: 0.9, clouds: 0.42 },
+    // harsh: hard terminator, light straight at you, golden rims
+    light: { dir: [0.05, 0.32, -1], shadow: [0.66, 0.42, 0.5], hi: [1.1, 1.0, 0.85], soft: 0.012, wrap: 0, hiAmt: 0, lift: 0.7 },
+    rim: [1.0, 0.72, 0.3, 0.4],
+    mist: { color: '#ffb060', amount: 0.6, top: -1, fade: 10, near: 18, far: 90 },
+    grade: { sat: 1.15, contrast: 1.1, vignette: 0.42, exposure: 1.03, tint: '#4a1206' },
     ink: '#4a1a0a',
     fog: [55, 205],
     ground: ['#eaa96b', '#fbe0b4', '#c97f4c'],
-    shadowDecal: [0.75, 0.52, 0.44],
+    shadowDecal: [0.7, 0.46, 0.42],
+    cast: [-0.1, 1.5],
     glowGain: 0.6,
     particles: { color: '#ffd890', size: 1.9, drift: [0.05, 0.4, 0], opacity: 0.8 },
   },
+
+  visits: [
+    { env: { sun: { glow: '#ffb060' }, skyFx: { rays: 1.0, clouds: 0.5 } } },
+    {
+      env: {
+        sky: ['#2a1040', '#ff9a7a', '#c86a8a'],
+        sun: { dir: [0.15, 0.08, -1], glow: '#ff9aa0', disc: '#ffe8e0' },
+        stars: 0.7,
+        moon: { dir: [-0.32, 0.36, -1], color: '#f6a8c8', size: 0.1 },
+        skyFx: { ring: 1 },
+        rim: [1.0, 0.6, 0.6, 0.42],
+        light: { shadow: [0.6, 0.42, 0.62] },
+        mist: { color: '#ff9ab0' },
+        ground: ['#e8a08a', '#ffd8c8', '#b86a6a'],
+        grade: { tint: '#3a0a30' },
+        particles: { color: '#ffd0e0', size: 2.2, drift: [0.1, 0.3, 0], opacity: 0.85 },
+      },
+    },
+    {
+      env: {
+        sky: ['#120a30', '#e87a6a', '#6a4a9a'],
+        sun: { glow: '#ff7a9a' },
+        stars: 1,
+        skyFx: { rays: 0.7, clouds: 0.5, aurora: 0.2 },
+        mist: { color: '#b07ad0' },
+        trip: [0.08, 0.35, 0.12],
+      },
+    },
+  ],
 
   build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 5);
@@ -197,12 +245,14 @@ export default {
     b.toon('lantern', merge(lanternPostParts({ h: 2.4, pole: '#5a2a16', glass: C.lantern, cap: '#5a2a16' })), { cap: 40, anim: 'pop' });
     b.glow('glow', { cap: 60, anim: 'pop' });
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    b.toon('bird', merge(birdParts({ color: '#4a1a10' })), { cap: 160, anim: 'lift', fly: [0.85, 7.5, 1.2, 0.5], ink: 0.02 });
+    b.toon('whale', merge(whaleParts()), { cap: 24, anim: 'liftFar', fly: [0, 0, 4, 0.06], wobble: [0, 0.8, 0.25, 0] });
 
     b.toon('rockPile', rockPileGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('stoneBlock', stoneBlockGeo(1.9), { cap: 24, anim: 'popEarly' });
     b.toon('stoneWall', stoneBlockGeo(7.6), { cap: 10, anim: 'popEarly' });
-    b.toon('floatRock', floatRockGeo(), { cap: 24, anim: 'popEarly', wobble: [0, 0.05, 2.2, 0] });
-    b.toon('archWide', archWideGeo(), { cap: 10, anim: 'popEarly' });
+    b.toon('lintel', lintelGeo(0.95), { cap: 24, anim: 'popEarly' });
+    b.toon('archWide', lintelGeo(4.0), { cap: 10, anim: 'popEarly' });
     b.toon('pillar', pillarGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('spire', spireGeo(), { cap: 24, anim: 'popEarly' });
 
@@ -212,10 +262,10 @@ export default {
 
   obstacles: {
     L: [{ name: 'rockPile', len: 1.0 }, { name: 'stoneBlock', len: 0.6 }],
-    H: [{ name: 'floatRock', len: 0.9 }],
+    H: [{ name: 'lintel', len: 0.72 }],
     W: [{ name: 'pillar', len: 1.5 }, { name: 'spire', len: 1.8 }],
     LW: { name: 'stoneWall', len: 0.6 },
-    HW: { name: 'archWide', len: 0.9 },
+    HW: { name: 'archWide', len: 0.72 },
   },
 
   chunk(ctx) {
@@ -240,6 +290,20 @@ export default {
         ctx.put(rng.chance(0.5) ? 'island' : 'islandB', s * rng.float(16, 60), rng.float(-4, 14), rng.float(0, 16), { s: rng.float(0.6, 1.4), ry: rng.float(0, 6.28) });
       }
       if (rng.chance(0.18)) ctx.put('mesa', s * rng.float(80, 140), rng.float(-10, 4), rng.float(0, 16), { s: rng.float(0.8, 1.6), ry: rng.float(0, 6.28) });
+      // later laps: flocks wheeling over the clouds, then whales
+      if (ctx.visit >= 1 && rng.chance(0.55)) {
+        const fx = s * rng.float(9, 40);
+        const fy = rng.float(4, 16);
+        const fz = rng.float(0, 16);
+        const heading = rng.chance(0.5) ? 0 : Math.PI;
+        for (let i = 0; i < rng.int(3, 6); i++) {
+          ctx.put('bird', fx + rng.float(-3, 3), fy + rng.float(-1.2, 1.2), fz + rng.float(-3, 3), { ry: heading + rng.float(-0.3, 0.3), s: rng.float(0.9, 1.4), p0: rng.float(0, 6.28) });
+        }
+      }
+      if (ctx.visit >= 3 && ctx.index % 4 === (s > 0 ? 1 : 3)) {
+        ctx.put('whale', s * rng.float(28, 60), rng.float(-4, 12), rng.float(0, 16), { s: rng.float(1.2, 2.0), ry: rng.chance(0.5) ? 0.3 : Math.PI - 0.3, c: [1, 1, 1] });
+      }
     }
+
   },
 };

@@ -19,8 +19,30 @@ export const CONFIG = {
   // Speed in m/s eases from start toward max: v = max - (max - start) * e^(-t / ramp)
   speed: { start: 12, max: 28, ramp: 220 },
 
+  // Obstacle pacing. Spacing is measured in seconds of running, so it stays
+  // fair as speed climbs. Difficulty = 1 - e^(-runTime / ramp): ~25% after a
+  // minute, ~60% after three, ~85% after seven.
+  obstacles: {
+    firstAt: 125, // meters of open road before the first obstacle
+    firstAtTutorial: 95,
+    ramp: 210,
+    gapEasy: 3.1, // seconds between patterns at the very start...
+    gapHard: 1.05, // ...and once fully ramped
+    gapJitter: [0.88, 1.22],
+    rowGapEasy: 1.25, // seconds between rows inside one pattern
+    rowGapHard: 0.62,
+    minAfterVertical: 0.92, // after a row you must jump/slide (airtime 0.64 s, slide 0.72 s)
+    minAfterLane: 0.55, // after a row you only steer around
+    breatherEvery: [5, 8], // patterns between longer rests
+    breatherMul: 1.9,
+    tutorialGap: 3.3,
+  },
+
   jump: { height: 1.6, time: 0.64 }, // apex height (m), total airtime (s)
   slide: { time: 0.72 },
+  // Rendered figure for the obstacle kinds (see obstacles.js): H obstacles hang
+  // no lower than duckLine so the gap under them always reads as passable.
+  duckLine: 1.14,
   fastFall: 22, // downward velocity when swiping down in the air
   laneRate: 16, // lane-change responsiveness (higher = snappier)
   inputBuffer: 0.16, // seconds a jump pressed in mid-air is remembered

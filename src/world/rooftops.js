@@ -2,11 +2,16 @@ import {
   P, part, merge, mix, scaleColor,
   roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
+import { skyLanternParts, balloonParts, lampConeParts } from './whimsy.js';
 import { groundStrip } from '../render/geo.js';
+import { CONFIG } from '../config.js';
 
 // II · The Night Rooftops — a slate walkway across the roofs of a sleeping
 // city: navy houses with warm windows, chimney pots, a crescent moon, stars
-// and strings of little lights.
+// and strings of little lights. High-contrast night: hard moonlight from
+// ahead rims every silhouette, lamps pour warm cones onto the slates, and fog
+// pools in the streets below. Returns bring sky lanterns, a huge moon, and a
+// purple night of drifting balloons.
 
 const C = {
   roofLo: '#2a3f70',
@@ -177,31 +182,43 @@ function chimneyPotsGeo() {
 }
 
 function laundryGeo(half, count, seed) {
+  // Washing line between two poles. Every garment hangs to the duck line so the
+  // laundry reads as one band to slide under, with the slates showing beneath.
   const rnd = seeded(seed);
+  const D = CONFIG.duckLine;
+  const line = 2.35;
   const parts = [];
   for (const s of [-1, 1]) {
-    parts.push(part(P.box(0.12, 2.6, 0.12), C.pole, { x: s * half, y: 1.3 }));
-    parts.push(part(P.box(0.4, 0.08, 0.08), C.pole, { x: s * (half - 0.12), y: 2.45 }));
+    parts.push(part(P.box(0.12, line + 0.3, 0.12), C.pole, { x: s * half, y: (line + 0.3) / 2 }));
+    parts.push(part(P.box(0.4, 0.08, 0.08), C.pole, { x: s * (half - 0.12), y: line + 0.15 }));
   }
-  parts.push(part(P.box(half * 2, 0.03, 0.03), '#e8e2d0', { y: 2.3, outline: 0 }));
-  const span = half * 2 - 0.5;
+  parts.push(part(P.box(half * 2, 0.03, 0.03), '#e8e2d0', { y: line, outline: 0 }));
+  const span = half * 2 - 0.4;
+  const slot = span / count;
   for (let i = 0; i < count; i++) {
-    const x = -span / 2 + (span * (i + 0.5)) / count;
+    const x = -span / 2 + slot * (i + 0.5);
     const col = CLOTHES[Math.floor(rnd() * CLOTHES.length)];
     const kind = rnd();
-    if (kind < 0.45) {
-      // shirt
-      parts.push(part(P.box(0.5, 0.62, 0.05), col, { x, y: 1.95 }));
-      parts.push(part(P.box(0.78, 0.2, 0.05), col, { x, y: 2.16 }));
+    const w = Math.min(0.8, slot * 0.92);
+    const bottom = D + rnd() * 0.05;
+    const top = line - 0.04;
+    if (kind < 0.4) {
+      // long nightshirt with sleeves
+      parts.push(part(P.box(w * 0.72, top - 0.08 - bottom, 0.05), col, { x, y: (top - 0.08 + bottom) / 2 }));
+      parts.push(part(P.box(w, 0.22, 0.05), col, { x, y: top - 0.12 }));
     } else if (kind < 0.8) {
-      // sheet
-      parts.push(part(P.box(0.7, 0.98, 0.04), col, { x, y: 1.8 }));
+      // sheet, with a darker hem stripe
+      parts.push(part(P.box(w, top - bottom, 0.04), col, { x, y: (top + bottom) / 2 }));
+      parts.push(part(P.box(w + 0.01, 0.07, 0.05), scaleColor(col, 0.78), { x, y: bottom + 0.09, outline: 0 }));
     } else {
-      // trousers
-      parts.push(part(P.box(0.2, 0.86, 0.05), col, { x: x - 0.12, y: 1.86 }));
-      parts.push(part(P.box(0.2, 0.86, 0.05), col, { x: x + 0.12, y: 1.86 }));
+      // long johns
+      const lw = w * 0.36;
+      parts.push(part(P.box(w * 0.8, 0.26, 0.05), col, { x, y: top - 0.13 }));
+      parts.push(part(P.box(lw, top - 0.2 - bottom, 0.05), col, { x: x - w * 0.2, y: (top - 0.2 + bottom) / 2 }));
+      parts.push(part(P.box(lw, top - 0.2 - bottom, 0.05), col, { x: x + w * 0.2, y: (top - 0.2 + bottom) / 2 }));
     }
-    parts.push(part(P.box(0.05, 0.08, 0.06), '#c8a070', { x, y: 2.29, outline: 0 }));
+    parts.push(part(P.box(0.05, 0.1, 0.07), '#c8a070', { x: x - w * 0.3, y: line - 0.02, outline: 0 }));
+    parts.push(part(P.box(0.05, 0.1, 0.07), '#c8a070', { x: x + w * 0.3, y: line - 0.02, outline: 0 }));
   }
   return merge(parts).translate(0, 0, -0.1);
 }
@@ -278,18 +295,53 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   continuation: false, // the facade hides everything behind the door
   env: {
-    sky: ['#081230', '#2b4280', '#0b1636'],
+    sky: ['#060e2a', '#26407a', '#0a1430'],
     sun: { dir: [0.5, 0.42, -1], glow: '#3c4c94' },
     moon: { dir: [0.5, 0.42, -1], color: '#fbe9b0', size: 0.05 },
     stars: 1,
-    light: { dir: [0.55, 0.72, 0.42], shadow: [0.5, 0.56, 0.86], hi: [1.12, 1.12, 1.22] },
+    skyFx: { clouds: 0.16 },
+    // harsh moonlight from ahead: faces toward you fall into deep blue
+    light: { dir: [0.45, 0.62, -0.65], shadow: [0.44, 0.5, 0.82], hi: [1.2, 1.2, 1.35], soft: 0.01, wrap: 0, hiAmt: 0.75, lift: 0.8 },
+    rim: [0.55, 0.68, 1.0, 0.34],
+    mist: { color: '#16285a', amount: 0.8, top: -1.5, fade: 9, near: 14, far: 70 },
+    grade: { sat: 1.12, contrast: 1.1, vignette: 0.5, exposure: 1.04, tint: '#030820' },
+    beam: { color: '#ffc870', amount: 0.34 },
+    pool: '#ffa040',
     ink: '#060b22',
     fog: [36, 185],
-    ground: ['#3d4d7e', '#34446f', '#1e2a50'],
-    shadowDecal: [0.5, 0.55, 0.75],
+    ground: ['#2e3c68', '#27345c', '#151d3c'],
+    shadowDecal: [0.46, 0.5, 0.72],
+    cast: [-0.7, 1.0],
     glowGain: 1.0,
     particles: { color: '#cfd9ff', size: 1.8, drift: [0.15, -0.35, 0], opacity: 0.7 },
   },
+
+  visits: [
+    { env: { skyFx: { aurora: 0.22 }, glowGain: 1.15 } },
+    {
+      env: {
+        sky: ['#0a1838', '#3a5a9a', '#0e1a3a'],
+        moon: { dir: [0.35, 0.3, -1], color: '#ffe6b0', size: 0.15 },
+        sun: { dir: [0.35, 0.3, -1], glow: '#8a8ad0' },
+        rim: [0.8, 0.85, 1.0, 0.36],
+        skyFx: { aurora: 0.5, clouds: 0.22 },
+        particles: { color: '#ffe6a8', size: 2.2, drift: [0.1, 0.4, 0], opacity: 0.85 },
+      },
+    },
+    {
+      env: {
+        sky: ['#170830', '#7a3aa0', '#120624'],
+        sun: { glow: '#c060c0' },
+        moon: { color: '#ffd0f0' },
+        light: { shadow: [0.5, 0.4, 0.82], hi: [1.25, 1.15, 1.35] },
+        rim: [0.95, 0.6, 1.0, 0.36],
+        mist: { color: '#3a1a5a' },
+        grade: { tint: '#14042a' },
+        skyFx: { aurora: 0.6 },
+        trip: [0.06, 0.3, 0.12],
+      },
+    },
+  ],
 
   build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 2);
@@ -305,11 +357,15 @@ export default {
     b.toon('lights', lightsGeo(), { cap: 24, anim: 'popLate', ink: 0.02 });
     b.glow('glow', { cap: 120, anim: 'pop' });
     b.shadow('shadow', { cap: 200, anim: 'pop' });
+    b.beam('lampCone', merge(lampConeParts({ top: 4.2, r0: 0.16, r1: 1.9 })), { cap: 40, anim: 'pop' });
+    b.pool('pool', { cap: 40, anim: 'pop' });
+    b.toon('skyLantern', merge(skyLanternParts()), { cap: 200, anim: 'lift', fly: [0, 0, 1.4, 0.22], ink: 0.03 });
+    b.toon('balloon', merge(balloonParts()), { cap: 30, anim: 'liftFar', fly: [0, 0, 2.5, 0.12] });
 
     b.toon('skylight', skylightGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('chimneyPots', chimneyPotsGeo(), { cap: 24, anim: 'popEarly' });
-    b.toon('laundry', laundryGeo(0.98, 3, 4), { cap: 24, anim: 'popEarly' });
-    b.toon('laundryWide', laundryGeo(3.95, 10, 8), { cap: 10, anim: 'popEarly' });
+    b.toon('laundry', laundryGeo(0.98, 2, 4), { cap: 24, anim: 'popEarly' });
+    b.toon('laundryWide', laundryGeo(3.95, 9, 8), { cap: 10, anim: 'popEarly' });
     b.toon('parapetWall', parapetWallGeo(), { cap: 10, anim: 'popEarly' });
     b.toon('chimneyStack', chimneyStackGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('waterTank', waterTankGeo(), { cap: 24, anim: 'popEarly' });
@@ -341,6 +397,18 @@ export default {
       if ((ctx.index + (s > 0 ? 1 : 0)) % 2 === 0) {
         ctx.put('lamp', s * 4.62, 0.75, 12);
         ctx.put('glow', s * 4.62, 4.4, 12, { s: 3.2, c: [1, 0.72, 0.38] });
+        ctx.put('lampCone', s * 4.62, 0.05, 12, { c: [0.9, 0.9, 0.9] });
+        ctx.put('pool', s * 3.5, 0.03, 12, { sx: 5.0, sz: 6.0, c: [0.85, 1, 1] });
+      }
+      // later laps: paper lanterns drift up over the city, then balloons
+      if (ctx.visit >= 1) {
+        const n = rng.int(1, ctx.visit >= 2 ? 4 : 3);
+        for (let i = 0; i < n; i++) {
+          ctx.put('skyLantern', s * rng.float(7, 40), rng.float(1, 16), rng.float(0, 16), { s: rng.float(0.8, 1.5), p0: rng.float(0, 6.28) });
+        }
+      }
+      if (ctx.visit >= 3 && rng.chance(0.25)) {
+        ctx.put('balloon', s * rng.float(24, 60), rng.float(4, 18), rng.float(0, 16), { c: rng.pick(['#f2a7a0', '#9fd3e6', '#f7d36b', '#b8e0a6', '#e9b8f0']), s: rng.float(1.2, 2.2) });
       }
       // near row of houses
       let dz = rng.float(0, 3);

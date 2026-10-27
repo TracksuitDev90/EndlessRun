@@ -51,7 +51,7 @@ export function cloudParts({ r = 3, lo = '#c9def0', hi = '#ffffff' } = {}) {
     [1.9, -0.45, -0.2, 0.5],
   ];
   return puffs.map(([x, y, z, s]) =>
-    part(P.sphere(r * s, 12, 9), null, { x: x * r, y: y * r, z: z * r, sy: 0.82, grad: [lo, hi, -r, r * 0.9] })
+    part(P.sphere(r * s, 10, 7), null, { x: x * r, y: y * r, z: z * r, sy: 0.82, grad: [lo, hi, -r, r * 0.9] })
   );
 }
 
