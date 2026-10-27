@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#3d8a36" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="An endless runner through worlds within worlds." />
+    <title>EndlessRun</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <canvas id="game" aria-label="Game view"></canvas>
+    <div id="ink"></div>
+
+    <div id="ui">
+      <div id="loading" class="screen show">
+        <div class="loader-title">unfolding…</div>
+      </div>
+
+      <div id="title" class="screen">
+        <div class="title-top">
+          <h1 id="logo" class="logo">EndlessRun</h1>
+          <p class="tagline">a run through worlds within worlds</p>
+        </div>
+        <div class="title-bottom">
+          <div class="howto">
+            <div class="howto-item"><span class="glyph">↑</span><span>jump</span></div>
+            <div class="howto-item"><span class="glyph">↓</span><span>slide</span></div>
+            <div class="howto-item"><span class="glyph">← →</span><span>dodge</span></div>
+          </div>
+          <div class="begin"><span class="touch-only">tap or swipe to begin</span><span class="mouse-only">click, swipe or press a key to begin</span></div>
+          <button id="btn-sound-2" class="pill sound-toggle" aria-label="Toggle sound"><span class="ic-sound"></span><span id="sound-label">Sound on</span></button>
+        </div>
+      </div>
+
+      <div id="hud">
+        <button id="btn-pause" class="round" aria-label="Pause"><span class="ic-pause"></span></button>
+        <button id="btn-sound" class="round sound-toggle" aria-label="Toggle sound"><span class="ic-sound"></span></button>
+      </div>
+
+      <div id="toast"><span class="num"></span><span class="name"></span></div>
+
+      <div id="hint">
+        <div class="hint-icon"></div>
+        <div class="hint-text"></div>
+      </div>
+
+      <div id="pause" class="screen modal">
+        <div class="card">
+          <h2>Paused</h2>
+          <button id="btn-resume" class="btn primary">Resume</button>
+          <button id="btn-restart" class="btn">Start over</button>
+        </div>
+      </div>
+
+      <div id="crash" class="screen modal">
+        <div class="card">
+          <h2>Oof.</h2>
+          <p class="sub">Dust off and keep going?</p>
+          <button id="btn-continue" class="btn primary">Continue <small id="continue-count">1 left</small></button>
+          <button id="btn-again" class="btn">Run again</button>
+        </div>
+      </div>
+
+      <pre id="stats"></pre>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

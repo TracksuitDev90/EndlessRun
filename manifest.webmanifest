@@ -1,0 +1,12 @@
+{
+  "name": "EndlessRun",
+  "short_name": "EndlessRun",
+  "description": "An endless runner through worlds within worlds.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#3d8a36",
+  "theme_color": "#3d8a36",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
