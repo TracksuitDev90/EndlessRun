@@ -13,18 +13,27 @@ export const shared = {
   uMarks: { value: null },
   uNoise: { value: null },
   uPixelRatio: { value: 1 },
+  uResolution: { value: new THREE.Vector2(1, 1) },
 };
 
 const COMMON = /* glsl */ `
 uniform vec3 uCamPos;
 uniform float uTime;
 uniform vec4 uBend;
+uniform vec4 uTrip; // x hue shift, y far-world undulation, z hue drift
 vec3 bendPos(vec3 wp) {
   float a = uCamPos.z - wp.z;
   float d = clamp(a - uBend.w, 0.0, 320.0);
   float d2 = d * d;
   wp.y -= uBend.x * d2;
   wp.x += uBend.y * d2;
+  if (uTrip.y != 0.0) {
+    // the distant world breathes in slow waves rolling toward you
+    float k = d * 0.0125;
+    k *= k;
+    wp.y += sin(a * 0.045 - uTime * 0.7) * uTrip.y * k * 5.0;
+    wp.x += sin(a * 0.028 + uTime * 0.45) * uTrip.y * k * 8.0;
+  }
   return wp;
 }
 float hash13(vec3 p) {
@@ -40,6 +49,26 @@ uniform vec3 uSkyHorizon;
 uniform vec3 uSkyBottom;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
+uniform vec4 uGrade; // x saturation, y contrast, z vignette, w exposure
+uniform vec3 uVignette;
+uniform vec2 uResolution;
+vec3 hueRot(vec3 c, float a) {
+  const vec3 k = vec3(0.57735);
+  float ca = cos(a);
+  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
+// Per-world color grade + tinted vignette, applied to everything opaque.
+vec3 grade(vec3 c, vec4 trip) {
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  c = mix(vec3(l), c, uGrade.x);
+  c = (c - 0.5) * uGrade.y + 0.5;
+  c *= uGrade.w;
+  float h = trip.x + trip.z * sin(uTime * 0.13);
+  if (h != 0.0) c = hueRot(c, h);
+  vec2 q = gl_FragCoord.xy / uResolution - 0.5;
+  float vg = smoothstep(0.42, 0.95, length(q) * 1.414) * uGrade.z;
+  return mix(c, c * uVignette, vg);
+}
 vec3 skyColor(vec3 dir) {
   float h = dir.y;
   vec3 upC = mix(uSkyHorizon, uSkyTop, smoothstep(0.0, 0.62, pow(max(h, 0.0), 0.8)));
@@ -59,6 +88,7 @@ vec3 skyColor(vec3 dir) {
 const VS_OBJECT = COMMON + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uWobble;
+uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
 attribute vec3 fx;
 #ifdef OUTLINE
 uniform float uOutline;
@@ -114,6 +144,17 @@ void main() {
       lo = rotY(lo, ang);
     #endif
   }
+  if (uFly.x != 0.0) {
+    // wings / book covers hinge on the local z axis and beat
+    float side = lp.x < 0.0 ? -1.0 : 1.0;
+    float ang = side * (0.15 + (0.5 + 0.5 * sin(uTime * uFly.y + phase * 3.0)) * uFly.x) * smoothstep(0.015, 0.09, abs(lp.x));
+    float fc = cos(ang), fs = sin(ang);
+    lp.xy = vec2(lp.x * fc - lp.y * fs, lp.x * fs + lp.y * fc);
+    ln.xy = vec2(ln.x * fc - ln.y * fs, ln.x * fs + ln.y * fc);
+    #ifdef OUTLINE
+      lo.xy = vec2(lo.x * fc - lo.y * fs, lo.x * fs + lo.y * fc);
+    #endif
+  }
   if (uWobble.x != 0.0) {
     float h = abs(lp.y);
     lp.x += sin(uTime * uWobble.z + phase) * uWobble.x * h * h;
@@ -127,6 +168,12 @@ void main() {
   #ifdef OUTLINE
     vec3 wo = mat3(M) * lo;
   #endif
+  if (uFly.z != 0.0) {
+    float ft = uTime * uFly.w + phase * 5.0;
+    vec3 off = vec3(sin(ft), 0.45 * sin(ft * 1.7 + 1.0), cos(ft * 0.8)) * uFly.z;
+    wp += off;
+    pivot += off;
+  }
 
   if (mode == 1) {
     // Pop-up book: lies flat (folded away from camera) when far, stands up as it nears.
@@ -170,22 +217,95 @@ void main() {
 }
 `;
 
-const FS_HEAD = /* glsl */ `
-uniform vec3 uCamPos;
-uniform float uTime;
-uniform vec4 uFog;
+// ---------------------------------------------------------------------------
+// Skinned characters: one continuous mesh deformed by a skeleton (three.js
+// supplies the bone texture), with the ink-outline normals skinned as well.
+// ---------------------------------------------------------------------------
+const VS_SKIN = COMMON + /* glsl */ `
+#include <skinning_pars_vertex>
+attribute vec3 fx;
+#ifdef OUTLINE
+uniform float uOutline;
+attribute vec3 onrm;
+#endif
 varying vec3 vColor;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying vec3 vPos;
 varying vec2 vUv;
 varying vec3 vFx;
-` + SKY_FN;
+
+void main() {
+  vec3 lp = position;
+  vec3 ln = normal;
+  #ifdef OUTLINE
+    vec3 lo = onrm;
+  #endif
+  #ifdef USE_SKINNING
+    mat4 skinM = skinWeight.x * getBoneMatrix(skinIndex.x)
+      + skinWeight.y * getBoneMatrix(skinIndex.y)
+      + skinWeight.z * getBoneMatrix(skinIndex.z)
+      + skinWeight.w * getBoneMatrix(skinIndex.w);
+    skinM = bindMatrixInverse * skinM * bindMatrix;
+    lp = (skinM * vec4(lp, 1.0)).xyz;
+    ln = mat3(skinM) * ln;
+    #ifdef OUTLINE
+      lo = mat3(skinM) * lo;
+    #endif
+  #endif
+  vec3 wp = (modelMatrix * vec4(lp, 1.0)).xyz;
+  vec3 wn = normalize(mat3(modelMatrix) * ln);
+  vPos = wp;
+  #ifdef OUTLINE
+    float w = length(onrm);
+    if (w > 0.0001) {
+      float dist = length(wp - uCamPos);
+      wp += normalize(mat3(modelMatrix) * lo) * (w * uOutline * (1.0 + dist * 0.011));
+    }
+  #endif
+  wp = bendPos(wp);
+  vWorld = wp;
+  vNormal = wn;
+  vUv = uv;
+  vFx = fx;
+  vColor = color;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+
+const FS_HEAD = /* glsl */ `
+uniform vec3 uCamPos;
+uniform float uTime;
+uniform vec4 uFog;
+uniform vec4 uMist;  // rgb, amount
+uniform vec4 uMistH; // x top height, y thickness, z near, w far
+uniform vec4 uTrip;
+varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec2 vUv;
+varying vec3 vFx;
+` + SKY_FN + /* glsl */ `
+// Low-lying mist by true height, then distance fog into the sky color.
+vec3 atmos(vec3 col, vec3 v, float dist, float emissive) {
+  float mh = 1.0 - smoothstep(uMistH.x - uMistH.y, uMistH.x, vPos.y);
+  float md = smoothstep(uMistH.z, uMistH.w, dist);
+  col = mix(col, uMist.rgb, mh * md * uMist.a * (1.0 - emissive * 0.6));
+  float f = smoothstep(uFog.x, uFog.y, dist);
+  f *= 1.0 - emissive * uFog.z;
+  return mix(col, skyColor(v / dist), f);
+}
+`;
 
 const FS_TOON = FS_HEAD + /* glsl */ `
 uniform vec3 uLightDir;
 uniform vec3 uShadowTint;
 uniform vec3 uHiTint;
+uniform vec4 uLightK; // x terminator softness, y wrap, z highlight amount, w sky fill on upward faces
+uniform vec4 uRim;    // rgb back-light color, w band width
+uniform vec4 uDapple; // x amount, y scale, z drift
+uniform vec4 uWall;   // wall-cast shadow: x wall x (signed), y wall top, z run per meter of drop, w strength
 uniform sampler2D uMarks;
 uniform sampler2D uNoise;
 uniform vec2 uMarkRepeat;
@@ -279,23 +399,48 @@ void main() {
   float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
   base = mix(base, base * 0.64, m);
 
+  vec3 V = v / dist;
   float ndl = dot(n, uLightDir);
-  float lit = smoothstep(-0.04, 0.06, ndl);
-  float hi = smoothstep(0.62, 0.7, ndl);
+  float wl = (ndl + uLightK.y) / (1.0 + uLightK.y);
+  float lit = smoothstep(-uLightK.x, uLightK.x + 0.03, wl);
+  if (uWall.w > 0.0) {
+    // everything between a tall wall and the line its top casts is in shade
+    float side = uWall.x > 0.0 ? 1.0 : -1.0;
+    float wx = abs(uWall.x);
+    float edge = wx - (uWall.y - vPos.y) * uWall.z;
+    float px = vPos.x * side;
+    float inSh = smoothstep(edge - 0.015, edge + 0.015, px) * (1.0 - step(wx + 0.4, px)) * step(vPos.y, uWall.y);
+    lit *= 1.0 - inSh * uWall.w;
+  }
+  float hi = smoothstep(0.62, 0.68 + uLightK.x, ndl) * uLightK.z * lit;
   float up = clamp(n.y, 0.0, 1.0);
-  vec3 sh = mix(uShadowTint, mix(uShadowTint, vec3(1.0), 0.35), up);
+  vec3 sh = mix(uShadowTint, mix(uShadowTint, vec3(1.0), 0.35), up * uLightK.w);
   vec3 shade = mix(sh, vec3(1.0), lit);
   shade = mix(shade, uHiTint, hi);
+  #ifdef GROUND
+    if (uDapple.x > 0.0) {
+      // sunlight dappled through leaves / glazing bars, drifting slowly
+      vec2 dq = vPos.xz * uDapple.y + vec2(uTime * uDapple.z, uTime * uDapple.z * 0.6);
+      float dp = texture2D(uNoise, dq).g * 0.6 + texture2D(uNoise, dq * 2.3 + 0.37).g * 0.4;
+      shade *= 1.0 + (smoothstep(0.42, 0.62, dp) - 0.45) * uDapple.x;
+    }
+  #endif
   vec3 col = mix(base * shade, base, vFx.y);
+
+  #ifndef GROUND
+    // back light: silhouettes catch the light when it's behind them
+    float fres = 1.0 - abs(dot(n, V));
+    float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
+    float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y));
+    col += uRim.rgb * (0.45 + 0.55 * base) * rim * (1.0 - vFx.y);
+  #endif
 
   float g = texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5;
   float wash = texture2D(uNoise, vPos.xz * (1.0 / 64.0)).g - 0.5;
   col *= 1.0 + g * 0.05 + wash * 0.09;
 
-  float f = smoothstep(uFog.x, uFog.y, dist);
-  f *= 1.0 - vFx.y * uFog.z;
-  col = mix(col, skyColor(v / dist), f);
-  gl_FragColor = vec4(col, 1.0);
+  col = atmos(col, v, dist, vFx.y);
+  gl_FragColor = vec4(grade(col, uTrip), 1.0);
 }
 `;
 
@@ -305,8 +450,7 @@ void main() {
   vec3 ink = mix(uInk, vColor * 0.3, 0.42);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
-  float f = smoothstep(uFog.x, uFog.y, dist);
-  gl_FragColor = vec4(mix(ink, skyColor(v / dist), f), 1.0);
+  gl_FragColor = vec4(grade(atmos(ink, v, dist, 0.0), uTrip), 1.0);
 }
 `;
 
@@ -322,7 +466,7 @@ void main() {
   vec3 c = uGlass.rgb * vColor + streak * 0.45 + fres * 0.18;
   float a = uGlass.a + fres * 0.22 + streak * 0.35;
   float f = smoothstep(uFog.x, uFog.y, dist);
-  c = mix(c, skyColor(v / dist), f);
+  c = grade(atmos(c, v, dist, 0.0), uTrip);
   gl_FragColor = vec4(c, a * (1.0 - f * 0.7));
 }
 `;
@@ -395,9 +539,44 @@ uniform vec3 uShadowColor;
 varying vec2 vUv;
 varying float vFade;
 void main() {
-  float r = length(vUv - 0.5) * 2.0;
-  float a = (1.0 - smoothstep(0.3, 1.0, r)) * vFade;
+  #ifdef HARD
+    // crisp-edged cast shadow (harsh light)
+    vec2 e = abs(vUv - 0.5) * 2.0;
+    float aa = fwidth(e.x) + fwidth(e.y);
+    float a = (1.0 - smoothstep(1.0 - aa * 2.0, 1.0, max(e.x, e.y))) * vFade;
+  #else
+    float r = length(vUv - 0.5) * 2.0;
+    float a = (1.0 - smoothstep(0.3, 1.0, r)) * vFade;
+  #endif
   gl_FragColor = vec4(mix(vec3(1.0), uShadowColor, a), 1.0);
+}
+`;
+
+// --- Light shafts and lamp cones (additive, soft-edged volumes) -------------
+const FS_BEAM = FS_HEAD + /* glsl */ `
+uniform vec4 uBeam; // rgb, intensity
+void main() {
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 n = normalize(vNormal);
+  float facing = abs(dot(n, v / dist));
+  float core = facing * facing;
+  float along = smoothstep(0.0, 0.35, vUv.y) * (1.0 - smoothstep(0.75, 1.0, vUv.y));
+  float shimmer = 0.8 + 0.2 * sin(uTime * 0.9 + vPos.x * 0.7 + vPos.z * 0.3);
+  float fade = (1.0 - smoothstep(uFog.x, uFog.y, dist)) * smoothstep(1.5, 7.0, dist);
+  gl_FragColor = vec4(uBeam.rgb * vColor * core * along * shimmer * fade * uBeam.a, 1.0);
+}
+`;
+
+// Additive pool of light on the ground under a lamp.
+const FS_POOL = /* glsl */ `
+uniform vec3 uPool;
+varying vec2 vUv;
+varying float vFade;
+void main() {
+  float r = length(vUv - 0.5) * 2.0;
+  float a = pow(max(1.0 - r, 0.0), 1.6);
+  gl_FragColor = vec4(uPool * a * vFade, 1.0);
 }
 `;
 
@@ -412,6 +591,8 @@ void main() {
 const FS_SKY = /* glsl */ `
 uniform float uTime;
 uniform vec4 uSkyFx; // x stars, y sun disc cos, z moon cos
+uniform vec4 uSkyFx2; // x sun rays, y cloud bands, z aurora, w planet ring (moon drawn full)
+uniform vec4 uTrip;
 uniform vec3 uSunDisc;
 uniform vec3 uMoonDir;
 uniform vec3 uMoonColor;
@@ -435,7 +616,23 @@ void main() {
     vec3 off = normalize(uMoonDir + vec3(0.026, 0.014, 0.0));
     float cut = smoothstep(uSkyFx.z - 0.00012, uSkyFx.z + 0.00012, dot(d, off));
     c += uMoonColor * pow(max(md, 0.0), 900.0) * 0.35;
-    c = mix(c, uMoonColor, disc * (1.0 - cut));
+    if (uSkyFx2.w > 0.0) {
+      // a ringed planet instead of a crescent: shaded full disc + tilted ring
+      vec3 mr = normalize(cross(uMoonDir, vec3(0.0, 1.0, 0.0)));
+      vec3 mu = cross(mr, uMoonDir);
+      vec2 pq = vec2(dot(d, mr), dot(d, mu));
+      float R = sqrt(max(1.0 - uSkyFx.z * uSkyFx.z, 0.0));
+      float tl = 0.35;
+      vec2 rq = vec2(pq.x * cos(tl) + pq.y * sin(tl), -pq.x * sin(tl) + pq.y * cos(tl));
+      float rr = length(vec2(rq.x, rq.y * 3.6)) / R;
+      float ring = smoothstep(1.45, 1.5, rr) * (1.0 - smoothstep(2.15, 2.2, rr)) * (0.75 + 0.25 * sin(rr * 40.0));
+      float behind = step(0.0, rq.y) * disc;
+      float shade = 0.55 + 0.45 * smoothstep(-R, R, pq.x - pq.y);
+      c = mix(c, uMoonColor * shade, disc);
+      c = mix(c, mix(uMoonColor, vec3(1.0, 0.92, 0.75), 0.6), ring * (1.0 - behind) * uSkyFx2.w);
+    } else {
+      c = mix(c, uMoonColor, disc * (1.0 - cut));
+    }
   }
   if (uSkyFx.x > 0.0) {
     vec3 p = d * 150.0;
@@ -449,8 +646,36 @@ void main() {
       c += vec3(1.0, 0.95, 0.85) * s * tw * uSkyFx.x * smoothstep(0.02, 0.3, d.y);
     }
   }
+  float az = atan(d.x, -d.z);
+  if (uSkyFx2.x > 0.0) {
+    // crepuscular rays fanning out from the sun
+    vec3 rt = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
+    vec3 upv = cross(rt, uSunDir);
+    float ang = atan(dot(d, upv), dot(d, rt));
+    float r1 = texture2D(uNoise, vec2(ang * 0.55 + uTime * 0.004, 0.31)).g;
+    float r2 = texture2D(uNoise, vec2(ang * 1.3 - uTime * 0.003, 0.73)).g;
+    float rays = smoothstep(0.42, 0.78, r1 * 0.65 + r2 * 0.45);
+    float near = pow(max(sd, 0.0), 5.0);
+    c += uSunColor * rays * near * uSkyFx2.x * smoothstep(-0.05, 0.08, d.y);
+  }
+  if (uSkyFx2.y > 0.0) {
+    // long soft cloud bands above the horizon, drifting
+    float n1 = texture2D(uNoise, vec2(az * 0.9 + uTime * 0.002, d.y * 2.2)).g;
+    float n2 = texture2D(uNoise, vec2(az * 2.1 - uTime * 0.0015, d.y * 5.0 + 0.4)).g;
+    float band = smoothstep(0.5, 0.78, n1 * 0.7 + n2 * 0.4) * smoothstep(0.0, 0.08, d.y) * (1.0 - smoothstep(0.18, 0.5, d.y));
+    vec3 cc = mix(uSkyHorizon, vec3(1.0), 0.55) + uSunColor * pow(max(sd, 0.0), 3.0) * 0.6;
+    c = mix(c, cc, band * uSkyFx2.y);
+  }
+  if (uSkyFx2.z > 0.0) {
+    // aurora curtains
+    float wv = sin(az * 3.0 + sin(az * 7.0 + uTime * 0.21) * 0.8 + uTime * 0.05);
+    float curtain = smoothstep(0.55, 1.0, wv * 0.5 + 0.5) * smoothstep(0.12, 0.3, d.y) * (1.0 - smoothstep(0.45, 0.8, d.y));
+    float streak = 0.6 + 0.4 * texture2D(uNoise, vec2(az * 6.0, uTime * 0.01)).g;
+    vec3 ac = mix(vec3(0.25, 1.0, 0.65), vec3(0.85, 0.35, 0.95), smoothstep(0.2, 0.5, d.y));
+    c += ac * curtain * streak * uSkyFx2.z;
+  }
   c += (texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5) * 0.02;
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(grade(c, uTrip), 1.0);
 }
 `;
 
@@ -494,37 +719,74 @@ void main() {
 // ---------------------------------------------------------------------------
 const color = (v) => (Array.isArray(v) ? new THREE.Color(v[0], v[1], v[2]) : new THREE.Color(v));
 const dir = (v) => new THREE.Vector3(v[0], v[1], v[2]).normalize();
+const setColor = (c, v) => (Array.isArray(v) ? c.setRGB(v[0], v[1], v[2]) : c.set(v));
 
+// Uniform layout shared by every world environment (and the player, who
+// carries a blend of two). Optional env fields fall back to neutral values.
 export function makeEnvUniforms(env) {
-  return {
-    uSkyTop: { value: color(env.sky[0]) },
-    uSkyHorizon: { value: color(env.sky[1]) },
-    uSkyBottom: { value: color(env.sky[2]) },
-    uSunDir: { value: dir(env.sun.dir) },
-    uSunColor: { value: color(env.sun.glow) },
-    uSunDisc: { value: color(env.sun.disc || '#ffffff') },
-    uMoonDir: { value: dir(env.moon ? env.moon.dir : [0, 1, 0]) },
-    uMoonColor: { value: color(env.moon ? env.moon.color : '#ffffff') },
-    uSkyFx: {
-      value: new THREE.Vector4(
-        env.stars || 0,
-        env.sun.size ? Math.cos(env.sun.size) : 2,
-        env.moon ? Math.cos(env.moon.size) : 2,
-        0
-      ),
-    },
-    uLightDir: { value: dir(env.light.dir) },
-    uShadowTint: { value: color(env.light.shadow) },
-    uHiTint: { value: color(env.light.hi) },
-    uInk: { value: color(env.ink) },
-    uFog: { value: new THREE.Vector4(env.fog[0], env.fog[1], 0.65, 0) },
-    uGroundA: { value: color(env.ground[0]) },
-    uGroundB: { value: color(env.ground[1]) },
-    uGroundC: { value: color(env.ground[2]) },
-    uShadowColor: { value: color(env.shadowDecal) },
-    uGlass: { value: new THREE.Vector4(...color(env.glass ? env.glass[0] : '#ffffff').toArray(), env.glass ? env.glass[1] : 0.2) },
-    uGlowGain: { value: env.glowGain ?? 1 },
+  const v3 = () => ({ value: new THREE.Vector3() });
+  const v4 = () => ({ value: new THREE.Vector4() });
+  const c = () => ({ value: new THREE.Color() });
+  const u = {
+    uSkyTop: c(), uSkyHorizon: c(), uSkyBottom: c(),
+    uSunDir: v3(), uSunColor: c(), uSunDisc: c(),
+    uMoonDir: v3(), uMoonColor: c(),
+    uSkyFx: v4(), uSkyFx2: v4(),
+    uLightDir: v3(), uShadowTint: c(), uHiTint: c(), uLightK: v4(), uRim: v4(), uDapple: v4(), uWall: v4(),
+    uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
+    uGroundA: c(), uGroundB: c(), uGroundC: c(),
+    uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
+    uBeam: v4(), uPool: c(),
   };
+  writeEnvUniforms(u, env);
+  return u;
+}
+
+export function writeEnvUniforms(u, env) {
+  const L = env.light;
+  setColor(u.uSkyTop.value, env.sky[0]);
+  setColor(u.uSkyHorizon.value, env.sky[1]);
+  setColor(u.uSkyBottom.value, env.sky[2]);
+  u.uSunDir.value.copy(dir(env.sun.dir));
+  setColor(u.uSunColor.value, env.sun.glow);
+  setColor(u.uSunDisc.value, env.sun.disc || '#ffffff');
+  u.uMoonDir.value.copy(dir(env.moon ? env.moon.dir : [0, 1, 0]));
+  setColor(u.uMoonColor.value, env.moon ? env.moon.color : '#ffffff');
+  u.uSkyFx.value.set(env.stars || 0, env.sun.size ? Math.cos(env.sun.size) : 2, env.moon ? Math.cos(env.moon.size) : 2, 0);
+  const sk = env.skyFx || {};
+  u.uSkyFx2.value.set(sk.rays || 0, sk.clouds || 0, sk.aurora || 0, sk.ring || 0);
+  u.uLightDir.value.copy(dir(L.dir));
+  setColor(u.uShadowTint.value, L.shadow);
+  setColor(u.uHiTint.value, L.hi);
+  u.uLightK.value.set(L.soft ?? 0.05, L.wrap ?? 0, L.hiAmt ?? 1, L.lift ?? 1);
+  const rim = env.rim || [0, 0, 0, 0.3];
+  u.uRim.value.set(rim[0], rim[1], rim[2], rim[3]);
+  const dp = env.dapple || [0, 0.05, 0];
+  u.uDapple.value.set(dp[0], dp[1], dp[2], 0);
+  const ws = env.wallShadow || [0, 0, 0, 0];
+  u.uWall.value.set(ws[0], ws[1], ws[2], ws[3]);
+  setColor(u.uInk.value, env.ink);
+  u.uFog.value.set(env.fog[0], env.fog[1], 0.65, 0);
+  const mist = env.mist || { color: '#ffffff', amount: 0 };
+  const mc = color(mist.color);
+  u.uMist.value.set(mc.r, mc.g, mc.b, mist.amount);
+  u.uMistH.value.set(mist.top ?? 2, mist.fade ?? 4, mist.near ?? 12, mist.far ?? 90);
+  const gr = env.grade || {};
+  u.uGrade.value.set(gr.sat ?? 1, gr.contrast ?? 1, gr.vignette ?? 0, gr.exposure ?? 1);
+  setColor(u.uVignette.value, gr.tint || '#000000');
+  const tr = env.trip || [0, 0, 0];
+  u.uTrip.value.set(tr[0], tr[1], tr[2], 0);
+  setColor(u.uGroundA.value, env.ground[0]);
+  setColor(u.uGroundB.value, env.ground[1]);
+  setColor(u.uGroundC.value, env.ground[2]);
+  setColor(u.uShadowColor.value, env.shadowDecal);
+  const gc = color(env.glass ? env.glass[0] : '#ffffff');
+  u.uGlass.value.set(gc.r, gc.g, gc.b, env.glass ? env.glass[1] : 0.2);
+  u.uGlowGain.value = env.glowGain ?? 1;
+  const bm = env.beam || { color: '#ffffff', amount: 0 };
+  const bc = color(bm.color);
+  u.uBeam.value.set(bc.r, bc.g, bc.b, bm.amount);
+  setColor(u.uPool.value, env.pool || '#000000');
 }
 
 // Blend environment uniforms (used for the player, who carries light between worlds).
@@ -573,6 +835,7 @@ export function makeToonMaterial(env, o = {}) {
   const uniforms = withShared(env, {
     uAnim: { value: animVector(o.anim) },
     uWobble: { value: new THREE.Vector4(...(o.wobble || [0, 0, 1, 0])) },
+    uFly: { value: new THREE.Vector4(...(o.fly || [0, 0, 0, 0])) },
     uMarkRepeat: { value: new THREE.Vector2(...(o.marks || [3, 3])) },
   });
   const defines = {};
@@ -580,7 +843,7 @@ export function makeToonMaterial(env, o = {}) {
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
-    vertexShader: VS_OBJECT,
+    vertexShader: o.skinned ? VS_SKIN : VS_OBJECT,
     fragmentShader: FS_TOON,
     vertexColors: true,
     side: o.side ?? THREE.FrontSide,
@@ -592,7 +855,7 @@ export function makeInkMaterial(toon, width) {
   return new THREE.ShaderMaterial({
     uniforms,
     defines: { OUTLINE: '' },
-    vertexShader: VS_OBJECT,
+    vertexShader: toon.vertexShader,
     fragmentShader: FS_INK,
     vertexColors: true,
     side: THREE.BackSide,
@@ -603,6 +866,7 @@ export function makeGlassMaterial(env, o = {}) {
   const uniforms = withShared(env, {
     uAnim: { value: animVector(o.anim) },
     uWobble: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uFly: { value: new THREE.Vector4() },
   });
   return new THREE.ShaderMaterial({
     uniforms,
@@ -627,10 +891,41 @@ export function makeGlowMaterial(env, o = {}) {
   });
 }
 
+export function makeBeamMaterial(env, o = {}) {
+  const uniforms = withShared(env, {
+    uAnim: { value: animVector(o.anim) },
+    uWobble: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uFly: { value: new THREE.Vector4() },
+  });
+  return new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: VS_OBJECT,
+    fragmentShader: FS_BEAM,
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
+export function makePoolMaterial(env, o = {}) {
+  const uniforms = withShared(env, { uAnim: { value: animVector(o.anim) } });
+  return new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: VS_SHADOW,
+    fragmentShader: FS_POOL,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
 export function makeShadowMaterial(env, o = {}) {
   const uniforms = withShared(env, { uAnim: { value: animVector(o.anim) } });
   return new THREE.ShaderMaterial({
     uniforms,
+    defines: o.hard ? { HARD: '' } : {},
     vertexShader: VS_SHADOW,
     fragmentShader: FS_SHADOW,
     transparent: true,
@@ -657,6 +952,8 @@ export function makePortalMaterial(mode) {
   const uniforms = withShared({}, {
     uAnim: { value: animVector('none') },
     uWobble: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uFly: { value: new THREE.Vector4() },
+    uTrip: { value: new THREE.Vector4() },
   });
   const m = new THREE.ShaderMaterial({
     uniforms,

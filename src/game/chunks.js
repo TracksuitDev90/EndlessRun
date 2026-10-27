@@ -18,6 +18,7 @@ export class ChunkStreamer {
       L: CONFIG.chunkLength,
       index: 0,
       toEnd: 0,
+      visit: 0, // how many times this world has been run through before
       continuation: false,
       chunk: null,
       world: null,
@@ -91,6 +92,7 @@ export class ChunkStreamer {
     ctx.d0 = d0;
     ctx.index = Math.round((d0 - seg.start) / L);
     ctx.toEnd = seg.end - d0;
+    ctx.visit = seg.visit || 0;
     ctx.continuation = continuation;
     ctx.chunk = chunk;
     ctx.world = world;

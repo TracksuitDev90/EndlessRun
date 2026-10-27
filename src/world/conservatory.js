@@ -3,11 +3,15 @@ import {
   P, part, merge,
   cypressParts, roundTreeParts, bushParts, potParts, lanternPostParts, gateFrameParts, gateLeafParts,
 } from './shapes.js';
+import { shaftParts, butterflyParts, giantFlowerParts } from './whimsy.js';
 import { groundStrip, doorShape } from '../render/geo.js';
+import { CONFIG } from '../config.js';
 
 // IV · The Glasshouse — a white-ribbed greenhouse tunnel full of monstera,
 // ferns, potted cypress, hanging vines with white blossom and orange trees,
-// glowing in warm late light.
+// glowing in warm late light. The softest world: backlit, humid haze,
+// sunbeams slanting through the glazing and leaf-dappled floors. Returns bring
+// butterflies, then giant blooms at dusk, then a bioluminescent night.
 
 const C = {
   iron: '#eef6f0',
@@ -28,9 +32,12 @@ const C = {
   woodDark: '#7a5432',
   lawn: '#3f7a52',
   lantern: '#ffd27a',
+  frameDark: '#24453c',
 };
 
 const OPENING = { halfW: 4.4, rectH: 5.6, arch: true };
+const SUN = [0.2, 0.75, -0.6];
+const WINGS = ['#ffb347', '#8fd6ff', '#ffe36a', '#ff8ac0', '#b8a0ff', '#ffffff'];
 const GATE_DEPTH = 0.9;
 const R = 7; // tunnel radius
 const POST_H = 4;
@@ -158,16 +165,40 @@ function planterBoxGeo(width) {
 }
 
 function hangingBasketGeo(half, baskets) {
+  // Big hanging baskets on an iron frame. Bowls and trailing leaves form one
+  // band whose lowest leaves sit on the duck line, open floor beneath.
+  const D = CONFIG.duckLine;
+  const bar = 2.75;
   const parts = [];
-  for (const s of [-1, 1]) parts.push(part(P.box(0.1, 2.8, 0.1), C.iron, { x: s * half, y: 1.4 }));
-  parts.push(part(P.box(half * 2 + 0.2, 0.1, 0.1), C.iron, { y: 2.75 }));
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.16, bar + 0.1, 0.16), C.frameDark, { x: s * half, y: (bar + 0.1) / 2 }));
+    parts.push(part(P.box(0.36, 0.22, 0.36), C.planter, { x: s * half, y: 0.11 }));
+    parts.push(part(P.torus(0.26, 0.045, 3, 8, Math.PI / 2), C.frameDark, { x: s * (half - 0.26), y: bar - 0.26, rz: s > 0 ? 0 : Math.PI / 2 }));
+  }
+  parts.push(part(P.box(half * 2 + 0.24, 0.16, 0.16), C.frameDark, { y: bar }));
+  // leafy garland along the bar
+  for (let i = 0; i <= Math.round(half * 4); i++) {
+    const x = -half + (half * 2 * i) / Math.round(half * 4);
+    parts.push(part(P.sphere(0.13, 7, 5), null, { x, y: bar + 0.02, z: 0.05, sy: 0.7, grad: [C.leafDeep, C.leafHi, bar - 0.1, bar + 0.12] }));
+  }
+  const slot = (half * 2) / baskets;
+  const r = Math.min(0.38, slot * 0.4);
+  const rimY = D + 0.5;
   for (let i = 0; i < baskets; i++) {
-    const x = -half + (half * 2 * (i + 0.5)) / baskets;
-    parts.push(part(P.cyl(0.01, 0.01, 0.6, 3), '#2a3a34', { x, y: 2.45, outline: 0 }));
-    parts.push(part(P.sphere(0.3, 10, 6, 0), C.terracotta, { x, y: 2.05, sy: 0.6 }));
-    parts.push(...vineGeo(0.75, 3 + i).map((g) => g.translate(x - 0.15, 2.05, 0.05)));
-    parts.push(...vineGeo(0.65, 11 + i).map((g) => g.translate(x + 0.17, 2.05, -0.05)));
-    parts.push(part(P.sphere(0.32, 8, 6), null, { x, y: 2.2, sy: 0.6, grad: [C.leafDeep, C.leafHi, 2.0, 2.4] }));
+    const x = -half + slot * (i + 0.5);
+    parts.push(part(P.cyl(0.012, 0.012, bar - rimY, 3), '#2a3a34', { x, y: (bar + rimY) / 2, outline: 0 }));
+    parts.push(part(P.sphere(r, 10, 6), C.terracotta, { x, y: rimY - r * 0.1, sy: 0.62 }));
+    parts.push(part(P.torus(r * 0.98, 0.035, 4, 12), C.rim, { x, y: rimY + r * 0.05, rx: Math.PI / 2, outline: 0.5 }));
+    parts.push(part(P.sphere(r * 1.02, 9, 6), null, { x, y: rimY + r * 0.3, sy: 0.55, grad: [C.leafDeep, C.leafHi, rimY, rimY + r * 0.8] }));
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2 + i;
+      const vx = x + Math.cos(a) * r * 0.85;
+      const vz = Math.sin(a) * r * 0.85;
+      const len = rimY - D - 0.08 - (k % 2) * 0.12;
+      parts.push(...vineGeo(len, 3 + i * 5 + k).map((g) => g.translate(vx, rimY, vz)));
+    }
+    parts.push(part(P.sphere(0.07, 6, 4), C.blossom, { x: x - r * 0.3, y: rimY + r * 0.55, z: 0.1, outline: 0.5 }));
+    parts.push(part(P.sphere(0.07, 6, 4), '#ffb3c8', { x: x + r * 0.35, y: rimY + r * 0.5, z: -0.05, outline: 0.5 }));
   }
   return merge(parts).translate(0, 0, -0.2);
 }
@@ -223,18 +254,62 @@ export default {
   doorColor: '#2fa39a',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   env: {
-    sky: ['#2f7f88', '#f6dfa0', '#4f8f74'],
+    sky: ['#2f7f88', '#ffe6a8', '#4f8f74'],
     sun: { dir: [0.25, 0.22, -1], glow: '#ffe2a0', disc: '#fff6d8', size: 0.045 },
     stars: 0,
-    light: { dir: [0.35, 0.78, 0.45], shadow: [0.55, 0.74, 0.72], hi: [1.1, 1.08, 0.94] },
+    skyFx: { rays: 0.5, clouds: 0.22 },
+    // the softest light: deep wrap, pale shadows, glowing back-light
+    light: { dir: SUN, shadow: [0.74, 0.86, 0.8], hi: [1.08, 1.05, 0.95], soft: 0.45, wrap: 0.5, hiAmt: 0.3, lift: 1 },
+    rim: [1.0, 0.9, 0.62, 0.42],
+    mist: { color: '#fff0c8', amount: 0.42, top: 2.5, fade: 4, near: 10, far: 70 },
+    dapple: [0.32, 0.09, 0.02],
+    grade: { sat: 0.98, contrast: 0.92, vignette: 0.3, exposure: 1.05, tint: '#2a5a3a' },
+    beam: { color: '#fff2c8', amount: 0.22 },
     ink: '#0d3532',
     fog: [40, 185],
     ground: ['#dde8dc', '#c2dccf', '#86ad9c'],
     shadowDecal: [0.55, 0.7, 0.64],
+    cast: [-0.27, 0.8],
     glass: ['#a8eadf', 0.12],
     glowGain: 0.7,
     particles: { color: '#ffffff', size: 2.0, drift: [0.12, -0.15, 0], opacity: 0.75 },
   },
+
+  visits: [
+    { env: { particles: { color: '#ffd6e8', size: 2.4, drift: [0.4, -0.2, 0], opacity: 0.85 }, beam: { amount: 0.2 } } },
+    {
+      env: {
+        sky: ['#4a5aa8', '#ffb890', '#2f5f5a'],
+        sun: { dir: [0.35, 0.08, -1], glow: '#ff9a70', disc: '#ffe0c0' },
+        light: { shadow: [0.74, 0.7, 0.84], hi: [1.12, 1.0, 0.9] },
+        rim: [1.0, 0.7, 0.55, 0.44],
+        mist: { color: '#ffd0c0' },
+        glass: ['#ffb8d8', 0.14],
+        grade: { tint: '#4a2a4a' },
+        beam: { color: '#ffc8a0' },
+        glowGain: 1.1,
+        particles: { color: '#fff6a0', size: 2.8, drift: [0.1, 0.25, 0], opacity: 1 },
+      },
+    },
+    {
+      env: {
+        sky: ['#04141f', '#0f5a60', '#06201f'],
+        sun: { dir: [0.25, 0.3, -1], glow: '#2ad0c0', disc: '#c8fff0', size: 0.03 },
+        stars: 1,
+        skyFx: { rays: 0.2, aurora: 0.35 },
+        light: { dir: [0.2, 0.75, -0.6], shadow: [0.36, 0.52, 0.6], hi: [0.9, 1.15, 1.15] },
+        rim: [0.3, 1.0, 0.85, 0.46],
+        mist: { color: '#0a6a6a', amount: 0.55 },
+        dapple: [0.4, 0.09, 0.03],
+        glass: ['#40ffd8', 0.1],
+        grade: { sat: 1.15, contrast: 1.05, exposure: 1.1, tint: '#00141a', vignette: 0.45 },
+        beam: { color: '#60ffe0', amount: 0.18 },
+        glowGain: 1.6,
+        particles: { color: '#7affe6', size: 2.8, drift: [0.05, 0.3, 0], opacity: 1 },
+        trip: [0, 0.25, 0.1],
+      },
+    },
+  ],
 
   build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 4);
@@ -253,12 +328,16 @@ export default {
     b.toon('lantern', merge(lanternPostParts({ h: 2.6, pole: '#24453c', glass: C.lantern, cap: '#24453c' })), { cap: 40, anim: 'pop' });
     b.glow('glow', { cap: 80, anim: 'pop' });
     b.shadow('shadow', { cap: 220, anim: 'pop' });
+    b.beam('shaft', merge(shaftParts({ len: 13, r0: 0.5, r1: 1.2, dir: SUN })), { cap: 60, anim: 'pop' });
+    b.toon('butterfly', merge(butterflyParts()), { cap: 120, anim: 'pop', fly: [1.1, 16, 0.7, 0.9], ink: 0.02 });
+    b.toon('giantBloom', merge(giantFlowerParts({ h: 4.2, kind: 'daisy', stem: '#2f7a4a' })), { cap: 60, anim: 'popEarly', wobble: [0.003, 0, 0.9, 0] });
+    b.toon('giantTulip', merge(giantFlowerParts({ h: 3.4, kind: 'tulip', stem: '#2f7a4a' })), { cap: 60, anim: 'popEarly', wobble: [0.004, 0, 1.0, 0] });
 
     b.toon('potRow', potRowGeo(), { cap: 24, anim: 'popEarly', marks: [2, 1.6] });
     b.toon('planterBox', planterBoxGeo(1.9), { cap: 24, anim: 'popEarly' });
     b.toon('planterLong', planterBoxGeo(7.6), { cap: 10, anim: 'popEarly' });
-    b.toon('hangingBasket', hangingBasketGeo(0.98, 2), { cap: 24, anim: 'popEarly', wobble: [0.01, 0, 1.3, 0] });
-    b.toon('vineCurtain', hangingBasketGeo(3.95, 7), { cap: 10, anim: 'popEarly', wobble: [0.01, 0, 1.3, 0] });
+    b.toon('hangingBasket', hangingBasketGeo(0.98, 2), { cap: 24, anim: 'popEarly' });
+    b.toon('vineCurtain', hangingBasketGeo(3.95, 6), { cap: 10, anim: 'popEarly' });
     b.toon('bigMonstera', bigMonsteraGeo(), { cap: 24, anim: 'popEarly', wobble: [0.006, 0, 1.2, 0] });
     b.toon('bigOrange', merge(orangeTreeParts({ potR: 0.72, canopy: 1.2, trunk: 1.3 })).translate(0, 0, -0.75), { cap: 24, anim: 'popEarly', marks: [2.2, 2] });
     b.toon('pottingBench', pottingBenchGeo(), { cap: 24, anim: 'popEarly' });
@@ -295,6 +374,18 @@ export default {
         if (rng.chance(0.5)) ctx.put('potCypress', s * 5.4, 0.72, rng.float(2, 14), { s: rng.float(0.85, 1.1) });
         if ((ctx.index + (s > 0 ? 2 : 0)) % 4 === 1) {
           ctx.put('orangeTree', s * 5.4, 0.72, 8, { s: 0.9 });
+        }
+        // sunbeams through the glass
+        if (rng.chance(0.6)) ctx.put('shaft', s * rng.float(1.5, 5.2), 5.4, rng.float(1, 15), { c: [rng.float(0.6, 1), 1, 1], s: rng.float(0.85, 1.2) });
+        // later laps: butterflies, then giant blooms in the beds
+        if (ctx.visit >= 1) {
+          for (let i = 0; i < rng.int(1, 3); i++) {
+            // over the beds, never across the lanes where they'd read as obstacles
+            ctx.put('butterfly', s * rng.float(4.2, 6.4), rng.float(1.4, 5), rng.float(0, 16), { c: rng.pick(WINGS), s: rng.float(1.1, 1.8), ry: rng.float(0, 6.28), p0: rng.float(0, 6.28) });
+          }
+        }
+        if (ctx.visit >= 2 && rng.chance(0.55)) {
+          ctx.put(rng.chance(0.5) ? 'giantBloom' : 'giantTulip', s * rng.float(5.1, 5.7), 0.7, rng.float(1, 15), { c: rng.pick(WINGS), s: rng.float(0.8, 1.15), ry: s > 0 ? -0.5 : 0.5 });
         }
         // vines hang from the arches
         for (let i = 0; i < 3; i++) {

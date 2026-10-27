@@ -5,8 +5,11 @@ import { rgb } from '../render/geo.js';
 // ahead of the player and answers collision queries.
 //
 // Kinds: L = low (jump), H = high (slide), W = wall (change lane).
+// Every world draws them with the same visual grammar: L is low and solid to
+// the ground, H is a frame or overhang with clear floor showing beneath it
+// (nothing lower than CONFIG.duckLine), W is tall and solid.
 
-const KIND_Y = { L: [0, 0.95], H: [1.2, 3.4], W: [0, 6] };
+const KIND_Y = { L: [0, 0.95], H: [1.1, 3.4], W: [0, 6] };
 
 const single = (r) => {
   const lanes = [null, null, null];
@@ -20,15 +23,31 @@ const twoWalls = (r, freeKind = null) => {
   return { lanes };
 };
 
+// min: difficulty (0..1) at which a pattern unlocks. Early runs only see
+// single obstacles and full-width hop/duck bars; combinations arrive later.
 const PATTERNS = [
   { min: 0, w: 4, make: (r) => [single(r)] },
-  { min: 0, w: 3, make: (r) => [twoWalls(r)] },
-  { min: 0.04, w: 1.6, make: () => [{ wide: 'L' }] },
-  { min: 0.04, w: 1.6, make: () => [{ wide: 'H' }] },
-  { min: 0.12, w: 2, make: (r) => [twoWalls(r, 'L')] },
-  { min: 0.12, w: 2, make: (r) => [twoWalls(r, 'H')] },
+  { min: 0.02, w: 1.4, make: () => [{ wide: 'L' }] },
+  { min: 0.05, w: 1.4, make: () => [{ wide: 'H' }] },
+  { min: 0.09, w: 2.6, make: (r) => [twoWalls(r)] },
   {
-    min: 0.18, w: 2.4,
+    min: 0.16, w: 1.6,
+    make: (r) => {
+      // two single obstacles in different lanes, a beat apart
+      const a = r.int(0, 2);
+      const b = (a + r.int(1, 2)) % 3;
+      const row = (lane) => {
+        const lanes = [null, null, null];
+        lanes[lane] = r.weighted([['L', 1], ['H', 1], ['W', 1.4]]);
+        return lanes;
+      };
+      return [{ lanes: row(a) }, { lanes: row(b), gap: 1.1 }];
+    },
+  },
+  { min: 0.22, w: 1.8, make: (r) => [twoWalls(r, 'L')] },
+  { min: 0.22, w: 1.8, make: (r) => [twoWalls(r, 'H')] },
+  {
+    min: 0.3, w: 2.2,
     make: (r) => {
       // every lane busy with something, at least one passable
       const pool = ['L', 'H', 'W', null];
@@ -38,7 +57,7 @@ const PATTERNS = [
     },
   },
   {
-    min: 0.25, w: 2,
+    min: 0.36, w: 1.8,
     make: (r) => {
       // zigzag: the open lane steps one lane per row
       let free = r.int(0, 2);
@@ -47,16 +66,16 @@ const PATTERNS = [
       for (let i = 0; i < n; i++) {
         const lanes = ['W', 'W', 'W'];
         lanes[free] = null;
-        rows.push({ lanes, gap: 0.8 });
+        rows.push({ lanes, gap: 0.85 });
         free = free === 0 ? 1 : free === 2 ? 1 : r.pick([0, 2]);
       }
       return rows;
     },
   },
-  { min: 0.3, w: 1.4, make: () => [{ wide: 'L' }, { wide: 'H', gap: 0.9 }] },
-  { min: 0.3, w: 1.4, make: () => [{ wide: 'H' }, { wide: 'L', gap: 0.9 }] },
+  { min: 0.42, w: 1.3, make: () => [{ wide: 'L' }, { wide: 'H', gap: 1 }] },
+  { min: 0.42, w: 1.3, make: () => [{ wide: 'H' }, { wide: 'L', gap: 1 }] },
   {
-    min: 0.35, w: 1.5,
+    min: 0.5, w: 1.4,
     make: (r) => {
       // tunnel: one open lane between walls, with a hop or duck inside
       const free = r.int(0, 2);
@@ -64,30 +83,33 @@ const PATTERNS = [
       for (let i = 0; i < 3; i++) {
         const lanes = ['W', 'W', 'W'];
         lanes[free] = i === 1 ? r.pick(['L', 'H']) : null;
-        rows.push({ lanes, gap: 0.55 });
+        rows.push({ lanes, gap: 0.6 });
       }
       return rows;
     },
   },
   {
-    min: 0.45, w: 1.3,
+    min: 0.58, w: 1.2,
     make: (r) => {
       // staggered single walls sweeping across
       const order = r.chance(0.5) ? [0, 1, 2] : [2, 1, 0];
       return order.map((lane) => {
         const lanes = [null, null, null];
         lanes[lane] = 'W';
-        return { lanes, gap: 0.55 };
+        return { lanes, gap: 0.62 };
       });
     },
   },
 ];
 
 const TUTORIAL = [
-  { wide: 'L', hint: 'up', gap: 1.8 },
-  { wide: 'H', hint: 'down', gap: 1.8 },
-  { lanes: [null, 'W', null], hint: 'side', gap: 1.6 },
+  { wide: 'L', hint: 'up' },
+  { wide: 'H', hint: 'down' },
+  { lanes: [null, 'W', null], hint: 'side' },
 ];
+
+const needsVertical = (row) => !!row.wide || row.lanes.some((k) => k === 'L' || k === 'H');
+const lerp = (a, b, t) => a + (b - a) * t;
 
 export class ObstacleField {
   constructor(game) {
@@ -100,8 +122,15 @@ export class ObstacleField {
   reset(rng, startD, tutorial) {
     this.clear();
     this.rng = rng;
-    this.nextD = startD + (tutorial ? 80 : 110);
+    const o = CONFIG.obstacles;
+    this.nextD = startD + (tutorial ? o.firstAtTutorial : o.firstAt);
     this.tutorial = tutorial ? TUTORIAL.slice() : [];
+    this.untilBreather = rng.int(o.breatherEvery[0], o.breatherEvery[1]);
+  }
+
+  // 0 at the start of a run, easing toward 1 over several minutes.
+  difficultyAt(t) {
+    return 1 - Math.exp(-Math.max(0, t) / CONFIG.obstacles.ramp);
   }
 
   clear() {
@@ -144,6 +173,8 @@ export class ObstacleField {
   spawnNext(dist, runTime) {
     const game = this.game;
     const course = game.course;
+    const o = CONFIG.obstacles;
+    const r = this.rng;
     let d = this.nextD;
     const b = course.boundaryAfter(d - CONFIG.doorClearAfter);
     if (b && d > b.d - CONFIG.doorClearBefore) {
@@ -152,19 +183,35 @@ export class ObstacleField {
     }
     const eta = runTime + (d - dist) / Math.max(game.speed, 6);
     const v = game.speedAt(eta);
-    const diff = Math.min(1, Math.max(0, (v - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start)));
-    const rows = this.tutorial.length ? [this.tutorial.shift()] : this.pick(diff);
-    const gapT = 1.3 + (0.72 - 1.3) * diff;
-    for (const row of rows) {
+    const diff = this.difficultyAt(eta);
+    const tutorial = this.tutorial.length > 0;
+    const rows = tutorial ? [this.tutorial.shift()] : this.pick(diff);
+    const rowGap = lerp(o.rowGapEasy, o.rowGapHard, diff);
+    let last = null;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
       if (b && d > b.d - CONFIG.doorClearBefore) {
         d = b.d + CONFIG.doorClearAfter;
+        last = null;
         break;
       }
       const world = course.segAt(d).world;
       const len = this.placeRow(world, d, row);
-      d += len + Math.max(11, v * gapT * (row.gap ?? 1));
+      d += len;
+      last = row;
+      if (i < rows.length - 1) {
+        const min = needsVertical(row) ? o.minAfterVertical : o.minAfterLane;
+        d += Math.max(11, v * Math.max(min, rowGap * (rows[i + 1].gap ?? 1)));
+      }
     }
-    this.nextD = d;
+    // rest before the next pattern: long at first, tightening with the run
+    let gap = tutorial ? o.tutorialGap : lerp(o.gapEasy, o.gapHard, diff) * r.float(o.gapJitter[0], o.gapJitter[1]);
+    if (!tutorial && --this.untilBreather <= 0) {
+      gap *= o.breatherMul;
+      this.untilBreather = r.int(o.breatherEvery[0], o.breatherEvery[1]);
+    }
+    if (last) gap = Math.max(gap, needsVertical(last) ? o.minAfterVertical : o.minAfterLane);
+    this.nextD = d + Math.max(12, v * gap);
   }
 
   pick(diff) {
@@ -181,7 +228,7 @@ export class ObstacleField {
       const spec = row.wide === 'L' ? defs.LW : defs.HW;
       const group = this.group(world, d, spec.len, row.hint);
       world.put(group, spec.name, 0, 0, d, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
-      this.shadow(world, group, 0, d, spec.len, 8.6);
+      this.shadow(world, group, 0, d, spec.len, 8.6, row.wide === 'L' ? 0.9 : 2.2);
       for (let lane = 0; lane < 3; lane++) this.record(group, lane, d, spec.len, row.wide);
       return spec.len;
     }
@@ -202,7 +249,7 @@ export class ObstacleField {
         ry: spec.flip && r.chance(0.5) ? Math.PI : 0,
         p0: r.float(0, 6.28),
       });
-      this.shadow(world, group, x, d, spec.len, 2.4);
+      this.shadow(world, group, x, d, spec.len, 2.4, kind === 'L' ? 0.9 : kind === 'H' ? 2.2 : 3);
       this.record(group, lane, d, spec.len, kind);
       maxLen = Math.max(maxLen, spec.len);
     }
@@ -225,8 +272,14 @@ export class ObstacleField {
     return g;
   }
 
-  shadow(world, group, x, d, len, width) {
-    if (world.has('shadow')) world.put(group, 'shadow', x, 0.035, d + len / 2, { sx: width, sz: len + 1.4, c: [0.9, 1, 1] });
+  // Contact shadow, thrown along the world's light (env.cast: meters of
+  // shadow per meter of height, [sideways, toward the camera]).
+  shadow(world, group, x, d, len, width, h) {
+    if (!world.has('shadow')) return;
+    const cast = world.env.cast || [0, 0];
+    const cx = cast[0] * h;
+    const cz = cast[1] * h;
+    world.put(group, 'shadow', x + cx * 0.5, 0.035, d + len / 2 - cz * 0.5, { sx: width + Math.abs(cx), sz: len + 1.4 + Math.abs(cz), c: [0.9, 1, 1] });
   }
 
   record(group, lane, d, len, kind) {

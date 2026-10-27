@@ -72,7 +72,7 @@ export class Game {
     this.next = null;
     this.door = null;
 
-    this.course.reset(new RNG(seed ^ 0x5bd1e995), this.params.world);
+    this.course.reset(new RNG(seed ^ 0x5bd1e995), this.params.world, this.params.visit || 0);
     this.dist = 0;
     this.prevDist = 0;
     this.origin = 0;
@@ -86,13 +86,14 @@ export class Game {
 
     this.course.ensure(0, CONFIG.speed.start);
     this.current = this.course.segAt(0).world;
+    this.current.applyVisit(this.course.segAt(0).visit);
     this.sceneMain.add(this.current.root);
     this.chunks.reset(seed, 0);
     this.obstacles.reset(this.rng, 0, !this.tutorialDone && !this.params.world);
 
     this.player.reset();
     copyEnvUniforms(this.player.u, this.current.u);
-    const pd = this.current.def.env.particles;
+    const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
 
     this.chunks.update(0);
@@ -239,6 +240,7 @@ export class Game {
       const b = this.course.boundaryAfter(this.camDist());
       if (b && b.from.world === this.current && b.d - this.dist < CONFIG.viewAhead + 24) {
         this.next = b.to.world;
+        this.next.applyVisit(b.to.visit);
         this.door = { d: b.d, quadD: b.d + this.current.def.gate.depth / 2, seg: b.to };
         this.portal.setShape(this.current.def.gate);
         this.portal.active = true;
@@ -251,7 +253,7 @@ export class Game {
       this.portal.place(-(door.quadD - this.origin));
       const t = smooth01(55, 0, door.quadD - this.dist);
       lerpEnvUniforms(this.player.u, this.current.u, this.next.u, t);
-      this.particles.set(this.current.def.env.particles, this.next.def.env.particles, t);
+      this.particles.set(this.current.env.particles, this.next.env.particles, t);
       if (this.camDist() >= door.quadD - 0.45) this.crossDoor();
     }
   }
@@ -270,7 +272,7 @@ export class Game {
     this.sceneMain.add(this.current.root);
     this.portal.active = false;
     copyEnvUniforms(this.player.u, this.current.u);
-    const pd = this.current.def.env.particles;
+    const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
     this.announceWorld(this.door.seg);
     this.audio.door();
@@ -293,11 +295,12 @@ export class Game {
     this.origin = Math.floor(d / CONFIG.rebaseStep) * CONFIG.rebaseStep;
     this.course.ensure(d, Math.max(this.speed, CONFIG.speed.start));
     this.current = this.course.segAt(d).world;
+    this.current.applyVisit(this.course.segAt(d).visit);
     this.sceneMain.add(this.current.root);
     this.chunks.reset(this.seed, d);
     this.obstacles.reset(this.rng, d, false);
     copyEnvUniforms(this.player.u, this.current.u);
-    const pd = this.current.def.env.particles;
+    const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
   }
 

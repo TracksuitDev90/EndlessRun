@@ -2,11 +2,16 @@ import {
   P, part, merge, mix,
   cloudParts, wallDoorParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
+import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.js';
 import { groundStrip } from '../render/geo.js';
+import { CONFIG } from '../config.js';
 
 // III · The Hall of Doors — a coral corridor with a checkerboard floor,
 // open to the sky, lined with doors of every color. Nested door frames
 // recede ahead; doors and armchairs float among the clouds outside.
+// Lit like a de Chirico piazza: hard, low, raking sun and razor-edged
+// shadows. Each return gets stranger — books take flight, a tea party drifts
+// past at dusk, then clocks float through a violet night.
 
 const C = {
   wall: '#e27b5e',
@@ -134,36 +139,63 @@ function booksGeo() {
   return merge(parts).translate(0, 0, -0.3);
 }
 
-function lowDoorwayGeo() {
+// Velvet valance on a frame: pleats run from the rod down to a scalloped,
+// tasselled hem that sits exactly on the duck line, open floor below.
+function valanceGeo(half, framed) {
+  const D = CONFIG.duckLine;
+  const rod = 2.72;
   const parts = [];
-  for (const s of [-1, 1]) parts.push(part(P.box(0.22, 3.3, 0.36), C.cream, { x: s * 0.98, y: 1.65 }));
-  parts.push(part(P.box(2.2, 0.26, 0.42), C.cream, { y: 3.35 }));
-  parts.push(part(P.box(1.74, 1.98, 0.16), '#ffffff', { y: 2.24, tint: 1 }));
-  parts.push(part(P.box(1.9, 0.14, 0.3), C.creamDark, { y: 1.27 }));
-  parts.push(part(P.cyl(0.3, 0.3, 0.2, 16), C.lit, { y: 2.3, rx: Math.PI / 2, emit: 1, outline: 0.5 }));
-  parts.push(part(P.torus(0.3, 0.05, 6, 16), C.cream, { y: 2.3, z: 0.1 }));
-  return merge(parts).translate(0, 0, -0.18);
-}
-
-function curtainGeo() {
-  const parts = [];
-  for (const s of [-1, 1]) parts.push(part(P.box(0.28, 3.4, 0.28), C.gold, { x: s * 3.95, y: 1.7 }));
-  parts.push(part(P.cyl(0.08, 0.08, 8.2, 8), C.gold, { y: 3.0, rz: Math.PI / 2 }));
-  const n = 14;
-  for (let i = 0; i < n; i++) {
-    const x = -3.6 + (7.2 * (i + 0.5)) / n;
-    parts.push(part(P.cyl(0.29, 0.26, 1.45, 8), i % 2 ? C.velvet : C.velvetDark, { x, y: 2.25 }));
-    parts.push(part(P.sphere(0.27, 8, 6), C.velvet, { x, y: 1.53, sy: 0.5 }));
-    parts.push(part(P.sphere(0.06, 6, 4), C.gold, { x, y: 1.35, outline: 0.5 }));
+  const postC = framed ? C.cream : C.gold;
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.28, rod + 0.3, 0.32), postC, { x: s * half, y: (rod + 0.3) / 2 }));
+    parts.push(part(P.box(0.4, 0.24, 0.42), C.creamDark, { x: s * half, y: 0.12 }));
   }
+  if (framed) {
+    parts.push(part(P.box(half * 2 + 0.6, 0.3, 0.44), C.cream, { y: rod + 0.3 }));
+    parts.push(part(P.box(half * 2 + 0.8, 0.12, 0.52), C.creamDark, { y: rod + 0.48 }));
+  }
+  parts.push(part(P.cyl(0.07, 0.07, half * 2 + 0.2, 8), C.gold, { y: rod, z: 0.05, rz: Math.PI / 2 }));
+  const inner = half * 2 - 0.24;
+  const n = Math.max(4, Math.round(inner * 1.85));
+  const step = inner / n;
+  const r = step * 0.56;
+  const bot = D + r * 0.55 + 0.04;
+  for (let i = 0; i < n; i++) {
+    const x = -inner / 2 + step * (i + 0.5);
+    parts.push(part(P.cyl(r, r * 0.92, rod - bot, 8), i % 2 ? C.velvet : C.velvetDark, { x, y: (rod + bot) / 2 }));
+    parts.push(part(P.sphere(r * 0.98, 8, 6), C.velvet, { x, y: bot, sy: 0.5 }));
+    parts.push(part(P.sphere(0.055, 6, 4), C.gold, { x, y: D + 0.055, outline: 0.5 }));
+  }
+  // gold braid across the hem
+  parts.push(part(P.box(inner, 0.06, r * 2.1), C.gold, { y: bot + 0.1, outline: 0.5 }));
   return merge(parts).translate(0, 0, -0.2);
 }
 
-function standingDoorGeo() {
-  return merge([
-    ...wallDoorParts({ w: 1.6, h: 3.1, depth: 0.3, frameW: 0.22 }),
-    part(P.box(2.3, 0.2, 0.7), C.creamDark, { y: 0.1 }),
-  ]).translate(0, 0, -0.35);
+// A tall painted wardrobe: unmistakably solid, door-covered and in the way.
+function wardrobeGeo() {
+  const W = 1.95;
+  const H = 3.0;
+  const Dp = 0.8;
+  const parts = [
+    part(P.box(W, H - 0.3, Dp), C.wood, { y: 0.16 + (H - 0.3) / 2 }),
+    part(P.box(W + 0.22, 0.24, Dp + 0.18), C.woodDark, { y: H - 0.02 }),
+    part(P.box(W + 0.1, 0.1, Dp + 0.1), C.wood, { y: H - 0.19 }),
+    part(P.prism(W * 0.5, 0.36, 0.2), C.woodDark, { y: H + 0.1, z: Dp / 2 - 0.05 }),
+    part(P.box(W - 0.16, 0.34, 0.06), C.woodDark, { y: 0.4, z: Dp / 2 + 0.02 }),
+    part(P.sphere(0.05, 6, 4), C.gold, { y: 0.4, z: Dp / 2 + 0.07 }),
+  ];
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    parts.push(part(P.cyl(0.08, 0.05, 0.16, 8), C.woodDark, { x: x * (W / 2 - 0.12), y: 0.08, z: z * (Dp / 2 - 0.1) }));
+  }
+  const dh = H - 0.95;
+  const dy = 0.62 + dh / 2;
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(W / 2 - 0.1, dh, 0.06), '#ffffff', { x: s * (W / 4), y: dy, z: Dp / 2 + 0.02, tint: 1 }));
+    parts.push(part(P.box(W / 2 - 0.36, dh * 0.36, 0.08), [0.82, 0.82, 0.82], { x: s * (W / 4), y: dy + dh * 0.22, z: Dp / 2 + 0.03, tint: 1, outline: 0.5 }));
+    parts.push(part(P.box(W / 2 - 0.36, dh * 0.3, 0.08), [0.82, 0.82, 0.82], { x: s * (W / 4), y: dy - dh * 0.26, z: Dp / 2 + 0.03, tint: 1, outline: 0.5 }));
+    parts.push(part(P.sphere(0.06, 8, 6), C.gold, { x: s * 0.12, y: dy, z: Dp / 2 + 0.09 }));
+  }
+  return merge(parts).translate(0, 0, -Dp / 2);
 }
 
 function bookshelfGeo() {
@@ -244,17 +276,59 @@ export default {
   doorColor: '#d8553a',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   env: {
-    sky: ['#4f93d6', '#d6eaf8', '#f4f8fb'],
-    sun: { dir: [-0.3, 0.55, -1], glow: '#fff4d6' },
+    sky: ['#2e6cc4', '#f6e9c8', '#f4f8fb'],
+    sun: { dir: [0.45, 0.55, -0.7], glow: '#fff1c8' },
     stars: 0,
-    light: { dir: [-0.4, 0.82, 0.42], shadow: [0.74, 0.62, 0.7], hi: [1.06, 1.04, 1.0] },
+    skyFx: { clouds: 0.45 },
+    // harsh: razor terminator, no wrap, deep cool shadows
+    light: { dir: [0.5, 0.8, -0.3], shadow: [0.5, 0.44, 0.66], hi: [1.06, 1.04, 1.0], soft: 0.006, wrap: 0, hiAmt: 0.5, lift: 0.3 },
+    // the sunlit wall's shadow falls across the right of the hall
+    wallShadow: [WALL_X, WALL_H, 0.5 / 0.8, 1],
     ink: '#3a1410',
-    fog: [46, 200],
+    fog: [52, 210],
+    grade: { sat: 1.12, contrast: 1.14, vignette: 0.3, exposure: 1.04, tint: '#6a3a70' },
     ground: ['#efe7d6', '#2a2530', '#7a2e22'],
-    shadowDecal: [0.62, 0.5, 0.52],
+    shadowDecal: [0.5, 0.43, 0.58],
+    cast: [-0.62, 0.37],
     glowGain: 0.7,
     particles: { color: '#fff1d0', size: 1.7, drift: [0.05, 0.08, 0], opacity: 0.7 },
   },
+
+  // Each return to the hall, layered on the last.
+  visits: [
+    { env: { skyFx: { clouds: 0.6 }, particles: { color: '#fff6dc', size: 2.0, drift: [0.4, 0.3, 0], opacity: 0.8 } } },
+    {
+      env: {
+        sky: ['#6a4aa8', '#ffc49a', '#f6e0d6'],
+        sun: { dir: [0.45, 0.32, -0.8], glow: '#ffb070' },
+        light: { shadow: [0.56, 0.4, 0.62], hi: [1.12, 1.0, 0.9] },
+        ground: ['#f4e6d2', '#1f6f78', '#7a2e22'],
+        grade: { sat: 1.18, exposure: 1.02, tint: '#5a2a60' },
+        glowGain: 1.0,
+        skyFx: { clouds: 0.7, rays: 0.25 },
+        trip: [0.12, 0, 0.05],
+      },
+    },
+    {
+      env: {
+        sky: ['#160c3a', '#6a4aa0', '#2a1a4a'],
+        sun: { dir: [-0.4, 0.5, -1], glow: '#6a5ac0' },
+        moon: { dir: [-0.4, 0.5, -1], color: '#fff2c8', size: 0.07 },
+        stars: 1,
+        light: { dir: [-0.5, 0.8, -0.3], shadow: [0.36, 0.34, 0.62], hi: [1.15, 1.15, 1.3] },
+        wallShadow: [-WALL_X, WALL_H, 0.5 / 0.8, 1],
+        rim: [0.5, 0.55, 1.0, 0.3],
+        ground: ['#d8d0e8', '#2a2040', '#4a2a5a'],
+        shadowDecal: [0.42, 0.38, 0.6],
+        cast: [0.62, 0.37],
+        grade: { sat: 1.1, contrast: 1.1, exposure: 1.05, tint: '#1a0a40', vignette: 0.45 },
+        glowGain: 1.6,
+        skyFx: { clouds: 0.25, aurora: 0.35 },
+        particles: { color: '#ffe6a0', size: 2.4, drift: [0.05, 0.3, 0], opacity: 0.9 },
+        trip: [0, 0.25, 0.12],
+      },
+    },
+  ],
 
   build(b) {
     b.ground('ground', groundStrip(11.2, 16, '#ffffff', 8), 3);
@@ -270,13 +344,18 @@ export default {
     b.toon('floatDoor', floatingDoorGeo(), { cap: 60, anim: 'liftFar', wobble: [0, 0.4, 0.6, 0] });
     b.toon('floatChair', armchairGeo(1.6), { cap: 30, anim: 'liftFar', wobble: [0, 0.5, 0.45, 0] });
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    b.shadow('hardShadow', { cap: 80, anim: [0, 64, 122, 0], hard: true, order: 1 });
+    b.toon('book', merge(flyingBookParts()), { cap: 160, anim: 'lift', fly: [0.95, 8.5, 0.9, 0.55], ink: 0.035 });
+    b.toon('teacup', merge(teacupParts()), { cap: 60, anim: 'liftFar', wobble: [0, 0.35, 0.7, 0], fly: [0, 0, 1.6, 0.25] });
+    b.toon('teapot', merge(teapotParts()), { cap: 30, anim: 'liftFar', wobble: [0, 0.35, 0.6, 0], fly: [0, 0, 1.8, 0.2] });
+    b.toon('clock', merge(clockParts()), { cap: 40, anim: 'liftFar', wobble: [0, 0.4, 0.5, 0], fly: [0, 0, 1.4, 0.18] });
 
     b.toon('armchair', armchairGeo(1.8), { cap: 24, anim: 'popEarly' });
     b.toon('books', booksGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('settee', armchairGeo(7.6), { cap: 10, anim: 'popEarly' });
-    b.toon('lowDoorway', lowDoorwayGeo(), { cap: 24, anim: 'popEarly' });
-    b.toon('curtain', curtainGeo(), { cap: 10, anim: 'popEarly' });
-    b.toon('standingDoor', standingDoorGeo(), { cap: 24, anim: 'popEarly' });
+    b.toon('lowDoorway', valanceGeo(0.98, true), { cap: 24, anim: 'popEarly' });
+    b.toon('curtain', valanceGeo(3.95, false), { cap: 10, anim: 'popEarly' });
+    b.toon('wardrobe', wardrobeGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('bookshelf', bookshelfGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('swingDoor', swingDoorGeo(), { cap: 16, anim: [3, 42, 88, Math.PI / 2] });
     b.toon('doorway', doorwayGeo(), { cap: 16, anim: 'none', ink: 0.03 });
@@ -288,7 +367,7 @@ export default {
   obstacles: {
     L: [{ name: 'armchair', len: 1.0 }, { name: 'books', len: 0.6 }],
     H: [{ name: 'lowDoorway', len: 0.4 }],
-    W: [{ name: 'standingDoor', len: 0.7 }, { name: 'bookshelf', len: 0.8 }],
+    W: [{ name: 'wardrobe', len: 0.8, tints: DOOR_TINTS }, { name: 'bookshelf', len: 0.8 }],
     LW: { name: 'settee', len: 1.0 },
     HW: { name: 'curtain', len: 0.4 },
     // Side doors that swing out across an outer lane as you approach.
@@ -329,10 +408,40 @@ export default {
           }
         }
       }
+      // raking sun: the wall shadow itself is analytic (env.wallShadow); each
+      // frame's lintel throws a crisp bar across the sunlit part of the floor
+      const L = ctx.world.env.light.dir;
+      const k = Math.abs(L[0]) / L[1];
+      const side = L[0] > 0 ? 1 : -1;
+      const band = WALL_H * k;
+      if (ctx.index % 2 === 0 && !nearGate && ctx.index > 0) {
+        const off = (7.6 * Math.abs(L[2])) / L[1];
+        const w = WALL_X * 2 - band;
+        ctx.put('hardShadow', -side * band / 2, 0.041, 1 - off, { sx: w, sz: 1.25 });
+      }
     } else {
       ctx.put('ground', 0, 0, 0);
     }
     ctx.put('cloudSea', 0, 0, 0);
+    // later laps: books take wing, then a tea party, then clocks adrift
+    if (ctx.visit >= 1) {
+      const n = rng.int(2, 5);
+      for (let i = 0; i < n; i++) {
+        const out = rng.chance(0.55);
+        const x = out ? rng.sign() * rng.float(7, 22) : rng.float(-4, 4);
+        const y = out ? rng.float(3, 14) : rng.float(9, 13);
+        ctx.put('book', x, y, rng.float(0, 16), { ry: rng.float(-0.6, 0.6) + (rng.chance(0.3) ? Math.PI : 0), c: rng.pick(BOOKS), s: rng.float(1.0, 1.7), p0: rng.float(0, 6.28) });
+      }
+    }
+    if (ctx.visit >= 2) {
+      for (const s of [-1, 1]) {
+        if (rng.chance(0.5)) ctx.put('teacup', s * rng.float(9, 26), rng.float(3, 12), rng.float(0, 16), { c: rng.pick(['#ffffff', '#f6d0e0', '#bfe7e0', '#f6e6a8']), s: rng.float(2.2, 3.6), ry: rng.float(0, 6.28) });
+        if (rng.chance(0.15)) ctx.put('teapot', s * rng.float(12, 30), rng.float(5, 14), rng.float(0, 16), { c: rng.pick(['#ffffff', '#f6d0e0', '#bfe7e0']), s: rng.float(2.4, 3.6), ry: rng.float(0, 6.28) });
+      }
+    }
+    if (ctx.visit >= 3 && rng.chance(0.6)) {
+      ctx.put('clock', rng.sign() * rng.float(9, 28), rng.float(4, 14), rng.float(0, 16), { s: rng.float(1.4, 2.6), ry: rng.float(-0.8, 0.8) });
+    }
     // Outside: clouds, floating doors and the odd floating armchair.
     for (const s of [-1, 1]) {
       for (let i = 0; i < 3; i++) {

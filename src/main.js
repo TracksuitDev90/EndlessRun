@@ -8,13 +8,14 @@ import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
 
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
-// ?seed=<n>, ?dpr=<n>, ?god
+// ?visit=<n> (start on a later lap's look), ?seed=<n>, ?dpr=<n>, ?god
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
   return {
     debug: q.has('debug'),
     world: q.get('world') || undefined,
+    visit: num('visit'),
     seed: num('seed'),
     dpr: num('dpr'),
     god: q.has('god'),
@@ -62,6 +63,7 @@ async function boot() {
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     shared.uPixelRatio.value = dpr;
+    shared.uResolution.value.set(Math.max(1, w * dpr), Math.max(1, h * dpr));
     game.resize(w, h);
   }
   window.addEventListener('resize', resize);

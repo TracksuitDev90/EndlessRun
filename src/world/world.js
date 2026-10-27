@@ -2,11 +2,14 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { Batch, makeItem } from '../render/batch.js';
 import {
   makeEnvUniforms,
+  writeEnvUniforms,
   makeToonMaterial,
   makeInkMaterial,
   makeGlassMaterial,
   makeGlowMaterial,
   makeShadowMaterial,
+  makeBeamMaterial,
+  makePoolMaterial,
   makeSkyMaterial,
 } from '../render/shaders.js';
 import { P, part, merge, rgb } from '../render/geo.js';
@@ -14,6 +17,32 @@ import { P, part, merge, rgb } from '../render/geo.js';
 // A World owns its palette/lighting uniforms, its sky dome and every prop
 // batch it can place. World *definitions* (village.js etc.) describe the art;
 // this class is the runtime container the streaming systems talk to.
+//
+// Worlds come back around as you keep running. Each return ("visit") can
+// re-light the world: def.visits[i].env is merged over the base env for the
+// (i+1)-th return, and once the list runs out the last look keeps getting a
+// little stranger (hue drift, the far world breathing).
+
+const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+function deepMerge(a, b) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b || {})) out[k] = isObj(v) && isObj(a[k]) ? deepMerge(a[k], v) : v;
+  return out;
+}
+
+export function envForVisit(def, visit) {
+  const list = def.visits || [];
+  if (!visit || !list.length) return def.env;
+  const i = Math.min(visit, list.length) - 1;
+  let env = def.env;
+  for (let k = 0; k <= i; k++) env = deepMerge(env, list[k].env);
+  const extra = visit - list.length;
+  if (extra > 0) {
+    const t = env.trip || [0, 0, 0];
+    env = { ...env, trip: [t[0] + 0.18 * extra, Math.min(0.9, t[1] + 0.15 * extra), Math.min(0.6, t[2] + 0.12 * extra)] };
+  }
+  return env;
+}
 
 const quadGeo = () => {
   const g = new THREE.PlaneGeometry(1, 1);
@@ -27,6 +56,8 @@ export class World {
     this.name = def.name;
     this.root = new THREE.Group();
     this.root.name = `world:${def.id}`;
+    this.env = def.env;
+    this.visit = 0;
     this.u = makeEnvUniforms(def.env);
     this.batches = new Map();
     this.allMaterials = [];
@@ -40,6 +71,14 @@ export class World {
     this.track(skyMat, true);
 
     def.build(new WorldBuilder(this));
+  }
+
+  // Re-light for the n-th return to this world (0 = first time).
+  applyVisit(visit) {
+    if (visit === this.visit) return;
+    this.visit = visit;
+    this.env = envForVisit(this.def, visit);
+    writeEnvUniforms(this.u, this.env);
   }
 
   track(mat, stencil = true) {
@@ -173,10 +212,30 @@ class WorldBuilder {
     return this.world.addBatch(name, b);
   }
 
+  // Ground shadow decal (multiply). o.hard: crisp rectangle instead of a blob.
   shadow(name, o = {}) {
     const g = part(P.plane(1, 1), '#ffffff', { rx: -Math.PI / 2, outline: 0 });
     const mat = makeShadowMaterial(this.u, o);
     const b = new Batch(name, g, mat, null, o.cap ?? 256);
+    if (o.order) b.renderOrder = o.order;
+    return this.world.addBatch(name, b);
+  }
+
+  // Additive light volume (sun shaft, lamp cone). Geometry uv.y runs 0..1
+  // along the beam; give parts tint: 1 so instance color scales brightness.
+  beam(name, geometry, o = {}) {
+    const mat = makeBeamMaterial(this.u, o);
+    const b = new Batch(name, geometry, mat, null, o.cap ?? 64);
+    b.renderOrder = o.order ?? 6;
+    return this.world.addBatch(name, b);
+  }
+
+  // Additive pool of light on the ground (instance color .r = brightness).
+  pool(name, o = {}) {
+    const g = part(P.plane(1, 1), '#ffffff', { rx: -Math.PI / 2, outline: 0 });
+    const mat = makePoolMaterial(this.u, o);
+    const b = new Batch(name, g, mat, null, o.cap ?? 64);
+    b.renderOrder = 1;
     return this.world.addBatch(name, b);
   }
 

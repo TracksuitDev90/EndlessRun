@@ -10,16 +10,26 @@ export class Course {
     this.segments = [];
   }
 
-  reset(rng, startId) {
+  // startVisit lets debug runs (?visit=n) begin on a later lap's look.
+  reset(rng, startId, startVisit = 0) {
     this.rng = rng;
     this.segments.length = 0;
+    this.startVisit = startVisit;
+    this.visits = new Map();
     const ids = this.worlds.map((w) => w.id);
     const startIdx = Math.max(0, ids.indexOf(startId || ids[0]));
     // First lap: the authored order, beginning at the start world.
     this.queue = ids.slice(startIdx).concat(ids.slice(0, startIdx)).slice(1);
     this.lastId = ids[startIdx];
     const L = CONFIG.chunkLength;
-    this.segments.push({ world: this.byId.get(this.lastId), start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1 });
+    this.segments.push({ world: this.byId.get(this.lastId), start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1, visit: this.nextVisit(this.lastId) });
+  }
+
+  // How many times this world has already been run through this run.
+  nextVisit(id) {
+    const v = this.visits.has(id) ? this.visits.get(id) : this.startVisit;
+    this.visits.set(id, v + 1);
+    return v;
   }
 
   nextWorldId() {
@@ -39,7 +49,8 @@ export class Course {
       let len = speed * CONFIG.worldSeconds;
       len = Math.min(CONFIG.worldMax, Math.max(CONFIG.worldMin, len));
       len = Math.round(len / L) * L;
-      this.segments.push({ world: this.byId.get(this.nextWorldId()), start: last.end, end: last.end + len, ordinal: last.ordinal + 1 });
+      const id = this.nextWorldId();
+      this.segments.push({ world: this.byId.get(id), start: last.end, end: last.end + len, ordinal: last.ordinal + 1, visit: this.nextVisit(id) });
     }
     // forget segments far behind
     while (this.segments.length > 2 && this.segments[1].end < d - 600) this.segments.shift();
