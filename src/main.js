@@ -3,6 +3,7 @@ import { CONFIG } from './config.js';
 import { shared } from './render/shaders.js';
 import { makeMarksTexture, makeNoiseTexture } from './render/textures.js';
 import { Game } from './game/game.js';
+import { loadRunner } from './game/runner-asset.js';
 import { Input } from './core/input.js';
 import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
@@ -48,6 +49,7 @@ async function boot() {
   shared.uMarks.value = makeMarksTexture();
   shared.uNoise.value = makeNoiseTexture();
 
+  await loadRunner();
   const audio = new Ambient();
   const game = new Game({ renderer, ui, audio, params });
   window.__game = game;
