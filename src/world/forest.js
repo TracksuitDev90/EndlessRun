@@ -519,6 +519,7 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   env: {
     sky: ['#0a1d18', '#3a6446', '#0c2219'],
+    bloom: ['#6ab83a', '#e2ff86', '#ffae4a'], // the colours its doorway bloom is made of
     sun: { dir: [0.2, 0.5, -1], glow: '#b8d888' },
     stars: 0,
     skyFx: { rays: 0.22, clouds: 0 },
@@ -544,6 +545,7 @@ export default {
       // firefly night: moonlight through the leaves, spirits on the roots
       env: {
         sky: ['#040a18', '#1a3656', '#050e18'],
+        bloom: ['#5a8aff', '#c8ff7a', '#eef6ff'],
         sun: { dir: [-0.3, 0.5, -1], glow: '#9ac4ff' },
         moon: { dir: [-0.3, 0.5, -1], color: '#eef6ff', size: 0.05 },
         stars: 0.7,
@@ -562,6 +564,7 @@ export default {
       // the toadstool dusk: violet haze, spores drifting up
       env: {
         sky: ['#1a0a2a', '#7a3a6a', '#1a0c1f'],
+        bloom: ['#c060c0', '#ff8ac0', '#ffb0e8'],
         sun: { dir: [0.3, 0.2, -1], glow: '#ff8ac0' },
         moon: undefined,
         stars: 0.4,
@@ -581,6 +584,7 @@ export default {
       // the dreaming wood: rainbow bark, jellyfish, aurora through the leaves
       env: {
         sky: ['#04121e', '#1a7a7a', '#06141a'],
+        bloom: ['#2fe0c0', '#7affe0', '#ff9ae0'],
         sun: { dir: [0.0, 0.4, -1], glow: '#7affe0' },
         stars: 1,
         skyFx: { rays: 0.3, aurora: 0.45 },

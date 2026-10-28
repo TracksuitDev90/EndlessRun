@@ -6,8 +6,8 @@ scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
 next world, nested inside this one. Run through, and you're in it. Keep
 running and the worlds come back around, each time a little stranger — and
-the deeper you go, the less they hold their shape: roads corkscrew, forests
-melt, skies swirl like wet paint. Every doorway also raises your score
+once you're deep enough they stop holding their shape: slowly at first, then
+roads corkscrew, forests melt, skies swirl like wet paint. Every doorway also raises your score
 multiplier, so the strangest stretches are the ones worth the most.
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
@@ -52,29 +52,47 @@ rolls in slow waves:
 ### Dream depth
 
 On top of the per-world looks, every doorway takes you one world *deeper*, and
-the deeper you are the less the worlds hold their shape. The first world is
-always untouched; from the second on, each stretch of the course is dealt its
-own seeded *dream recipe* — a handful of distortions, more of them and stronger
-the deeper it lies — so no two passes through the same world ever look alike.
-A recipe blends into the next as you run up to each doorway, so the world
-morphs around you on the approach, and coming through a doorway sends a bloom
-of colour out from the centre of the screen and a swell racing down the road.
+deep enough, the worlds stop holding their shape. It comes on slowly, in three
+movements:
 
-| Distortion | What happens |
-|---|---|
-| twist | the road ahead corkscrews about its own axis |
-| waves | slow swells roll through the far world |
-| melt | the far world wobbles like jelly, the tall things most |
-| breathe | props in the distance swell and settle like living things |
-| rings | rings of hue roll toward you through the world |
-| swirl | the sky stirs like wet paint, banded in rainbow |
-| neon | ink lines burn in cycling neon |
-| palette | the whole world turns to new hues |
+1. **The real worlds.** The first three worlds (about two minutes) are exactly
+   as painted.
+2. **The morph.** From the fourth, the far distance quietly starts to misbehave:
+   props far off breathe, slow swells roll through the far road, and a world
+   or two later tall things far away go soft like jelly. Easy to miss at first.
+3. **The trip.** Only from the eighth world (about four minutes in, early in
+   the second lap) does the dream start to colour things — first a stir in
+   the sky, then rings of hue, a turned palette, neon ink and finally a
+   corkscrewing road — each effect joining at its own depth and growing over
+   several worlds; everything is in by about the eighteenth.
 
-It creeps in gently over the first lap (a little breathing, a sky starting to
-swirl), is unmistakable by the second, and is in full flight by the third. Every
-so often a deeper world comes up *lucid* — calm, a breather — before it gets
-strange again. Past ~0.35 depth the camera starts to sway a little, too.
+Each stretch of the course is dealt its own seeded *dream recipe* from whatever
+has joined by then — a few effects, more of them and stronger the deeper it
+lies (once the trip has begun, always at least one of its colours) — so no two
+passes through the same world look alike. A recipe blends into the next as you
+run up to each doorway, so the world morphs around you on the approach.
+
+| Distortion | Joins in world | Full by | What happens |
+|---|---|---|---|
+| breathe | 4 | 13 | props in the distance swell and settle like living things |
+| waves | 4 | 14 | slow swells roll through the far world |
+| melt | 6 | 16 | the far world wobbles like jelly, the tall things most |
+| swirl | 8 | 16 | the sky stirs like wet paint, banded in rainbow |
+| rings | 9 | 17 | rings of hue roll toward you through the world |
+| palette | 10 | 18 | the whole world turns to new hues |
+| neon | 11 | 18 | ink lines burn in cycling neon |
+| twist | 12 | 19 | the road ahead corkscrews about its own axis |
+
+**The doorway bloom** is there from the very first door: coming through sends
+bands of colour out from the centre of the screen (and a swell racing down the
+road) — the colours of the world you're entering, its `env.bloom` (the
+Deepwood's moss, firefly and lantern; the rooftops' night blue, window gold and
+lamp red...), laid over the picture's own light and shade. As the trip takes
+over, the bloom turns more and more to rainbow.
+
+Every so often a deeper world comes up *lucid* — as calm as one several doors
+shallower, a breather — before it gets strange again. Once the trip is a third
+of the way in, the camera starts to sway a little, too.
 
 Two rules keep it fair and readable: every shape distortion grows with distance
 from the camera, so the stretch of road you're actually reacting to — and every
@@ -82,9 +100,10 @@ obstacle on it — is always exactly where it looks (things far off firm up into
 their true shape as they approach); and the runner keeps their own colours
 however far the palette shifts, so you never lose yourself. If your system asks
 for reduced motion, the shape warps and camera sway are scaled right down (the
-colour is left alone). Tunables live in `CONFIG.dream`.
+colour is left alone). Tunables (including when each effect joins) live in
+`CONFIG.dream`.
 
-![The dream deepening: worlds 3, 6, 10, 13 and 20 — the last three panels are all the Sky Road](docs/dream.jpg)
+![The dream deepening: worlds 3, 6, 10, 14 and 18 of one run — untouched, a quiet morph in the distance, the first stir in the sky, then the colours turning](docs/dream.jpg)
 
 ## Score
 
@@ -164,7 +183,7 @@ Append to the URL:
 | `?debug` | FPS, draw calls, triangles, pixel ratio, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
 | `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
-| `?dream=1` | pin every world to one dream depth (0 = off, ~1.35 = the deepest); each world still deals its own recipe |
+| `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
@@ -185,11 +204,14 @@ Append to the URL:
   doors swinging, foliage swaying, wings and book covers flapping, drifting
   props and the curved-world bend are all done in the vertex shader from
   distance and time — no per-object CPU updates.
-- **One skinned runner.** The wayfarer is a single skinned mesh (plus its ink
-  hull) — two draw calls, ~23k sculpted triangles plus the cape. Legs are
-  placed by IK, the body rides on spring follow-through, the cape is a small
-  cloth simulation and the mantle, curls and hip pouch are springs; animation
-  and simulation together take about 0.6 ms (see [The runner](#the-runner)).
+- **One skinned runner and a cape.** The wayfarer is a single skinned mesh
+  and the cape one more, each with its ink hull — four draw calls, ~22k
+  sculpted triangles plus ~9k for the cape. Legs are placed by IK, the body
+  rides on spring follow-through, the cape is a 19×19 cloth simulation whose
+  surface the GPU rebuilds from a 19×19 texture of particle positions (the
+  only thing uploaded per frame), and the curls and hip pouch are springs;
+  animation and simulation together take about 1 ms on a desktop (see
+  [The runner](#the-runner)).
 - **Cheap, painterly shading.** Hand-written toon shader with a per-world
   lighting model: terminator softness and wrap (harsh vs soft worlds), rim /
   back light, low-lying mist, leaf dapple, an analytic wall shadow, colour
@@ -214,7 +236,7 @@ through it.
 **Modelled as continuous surfaces, not assembled from parts.**
 `tools/runner/build.py` sculpts the character offline the way a sculptor
 blocks out a figure: each garment (head, hair, puffer, shorts, legs, boots,
-hands, mantle, pouch) is one signed-distance field made of volumes blended
+hands, hood and collar, pouch) is one signed-distance field made of volumes blended
 smoothly into each other, so shoulders flow into the sleeves, limbs taper and
 the shorts wrap the hips. The fields are polygonised (marching cubes),
 simplified, and given exact smooth normals from the field; skin weights come
@@ -223,7 +245,7 @@ shapes blend. Proportions follow the reference illustration: about six heads
 tall (the head and hair are sculpted in their own space and placed scaled on
 the neck), knee a little under a third of the height, high socks and chunky
 mid-cut hiking boots with a thick sole and a collar that dips at the front.
-Fine linework — quilting seams, laces, the face, trims, the cape's crest — is
+Fine linework — quilting seams, laces, the face, trims, the hood's seam — is
 not modelled: each vertex carries a few smooth coordinates and the character
 shader draws those lines crisply at any distance. Shading is one broad, crisp
 shadow shape per surface in a warm shadow tone, a restrained hair highlight
@@ -265,21 +287,53 @@ swing back through; a take-off folds the body, the flight lets it float open
 with the arms rising, and a landing folds it again before it springs up. Arms,
 elbows, spine and head also trail their own posed motion on springs, so they
 lag and overshoot at every reversal, and the lean into a lane change settles
-with a soft overshoot.
+with a soft overshoot. With each stride the chest turns against the hips and
+the shoulders roll forward and back with the arms (the collarbones carry the
+puffer's rounded shoulder caps, so the sleeves swing out of the shoulders
+rather than hinging under them), while the head counter-turns and stays
+steady.
 
-**Fabric.** The cape is a 13×13 particle cloth of a light, floaty wool, hung
-inside the mantle's hem and kept off the body by capsule colliders. The
-headwind streams it back further as the pace rises (about 40° at the starting
-pace, 55° at full tilt), long slow waves roll from the shoulders to the hem,
-and very little air damping lets every bounce, lane change, take-off and
-landing carry on through the cloth. A soft breeze — slow swells from a
-wandering direction, with occasional gusts — sways it when he stands still and
-keeps working on it while he runs. A soft ceiling stops it from flipping
-forward over the shoulders but slopes up behind, so it can billow up and back
-when he falls from a jump. The mantle is twelve hinged panels: the arms tip
-them up and over, the breeze lifts them, and the hem bobs a beat behind each
-footfall. Curls lag and bounce on springs and play in the breeze; the hip
-pouch swings on a pendulum.
+**Fabric.** The cape is one continuous piece of red wool: sewn under a soft
+gathered collar (closed at the throat by a little brass toggle, the hood lying
+bunched over it at the nape), draped over the shoulders, open round the arms
+and hanging to the upper calf behind. Its rest drape is built at load the way
+it would fall on the body — each column leaving the collar, curving down over
+the shoulder and hanging, its sides swinging in behind the arms — and then let
+settle under gravity on the body's own volumes.
+
+It is simulated as a 19×19 particle cloth (`src/game/cloth.js`): stretch,
+shear and two ranges of bending constraints (the long ones keep big curves big
+instead of crumpling into kinks), and tethers so it never stretches. Every row
+has a leash to where the chest would carry it — none at the collar, a few
+millimetres under the hood, a few centimetres by the shoulder blades, free from
+there down — so the top follows the body exactly and the cloth gains freedom
+toward the hem. It is kept off the body by the jacket's own volumes (exported
+from the sculpt, ellipsoids for the torso, round capsules for the shoulder
+caps and sleeves) and by capsules for the head, legs and boots: limbs push it
+aside without flinging it, and the body's volumes always have the last word.
+The ground drags it back as it runs under him.
+
+The air does the rest: the headwind streams it back further as the pace rises
+(about 40° at the starting pace, toward 60° at full tilt); behind the back the
+body's wake weakens and draws it in, so it streams as a tail instead of filling
+like a sail; gusts — smooth noise carried down the cape at the wind's pace —
+roll broad, irregular pressure waves from the shoulders to the hem, different
+under each half; and each free edge catches the air on its own, now and then
+curling over to show the lining. The runner's own acceleration reaches the
+cloth through a smoothed velocity, so a lane change makes the hem lag the
+other way and then follow and settle, a take-off leaves it hanging a beat
+before it lifts, and a landing drops it — the same at any frame rate (the step
+is fixed at most 1/120 s and the colliders, pins and leash targets slide
+through each frame's substeps). A soft breeze sways it when he stands still. A
+ceiling over the collar stops it flipping forward over the shoulders or the
+head (behind it slopes up, so it can stream up falling from a jump), and a soft
+wall in front of the chest keeps it from wrapping round to the front.
+
+The GPU draws a smooth Catmull-Rom surface through the particles with exact
+normals (a thin slab: outside, burgundy lining and edges), and the cloth's
+curvature, measured per particle and softened, keeps a soft shadow in the
+valleys of its folds and waves under any light. Curls lag and bounce on
+springs and play in the breeze; the hip pouch swings on a pendulum.
 
 **Third-party assets.** None. Free bases and animation (Kenney, Quaternius /
 Poly Pizza, OpenGameArt, Sketchfab, Mixamo, Poly Haven) were considered, but the
@@ -314,7 +368,7 @@ Create `src/world/<name>.js` exporting `{ id, name, doorColor, env, visits,
 gate, build(b), chunk(ctx), obstacles }` (copy any existing world as a
 template) and add it to `src/world/index.js`. `env` sets the palette and the
 lighting (`light.soft` / `wrap` for harsh vs soft light, `rim`, `mist`,
-`dapple`, `grade`, `skyFx`, …); `visits` lists partial `env` overrides for
+`dapple`, `grade`, `skyFx`, …, and `bloom`, the three colours its doorway bloom is made of); `visits` lists partial `env` overrides for
 each return. `build` registers prop batches from the geometry kit (`b.toon`,
 `b.beam` for light volumes, `b.pool`, `b.shadow`); `chunk` places scenery for
 each 16 m chunk and can check `ctx.visit` to add later-lap props; `obstacles`

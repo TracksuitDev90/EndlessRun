@@ -29,7 +29,6 @@ import time
 import numpy as np
 from skimage.measure import marching_cubes
 import fast_simplification
-from scipy.interpolate import PchipInterpolator
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'runner')
 
@@ -230,52 +229,13 @@ def from_head(q):
 HEAD_Y = float(from_head(V(0, 1.295, 0))[1])
 SIDES = [(-1, 'L'), (1, 'R')]
 
-# mantle: an elliptical bell over the shoulders (circle-space radius by height)
-MANTLE = dict(
-    panels=12, hinge=1.15, hem=0.99, drop=0.085, gap=0.36, thick=0.009,
-    gapTop=0.22, gapHem=0.62, folds=9, foldAmp=0.011, corner=0.045,
-    profile=[[0.302, 0.99], [0.298, 1.01], [0.286, 1.06], [0.273, 1.11], [0.263, 1.15], [0.251, 1.185],
-             [0.226, 1.215], [0.182, 1.24], [0.137, 1.258], [0.109, 1.27], [0.098, 1.279]],
-    ez=[0.72, 0.96, 1.2, 1.276],  # ez(y) = a + (b - a) * smooth(y0, y1, y)
-)
-MP = np.array(MANTLE['profile'])
-
-
-_MR = PchipInterpolator(MP[:, 1], MP[:, 0], extrapolate=True)
-
-
-def mantle_r(y):
-    # a smooth (monotone cubic) profile: a polyline's kinks would show as
-    # bands in the cel shading
-    return _MR(np.clip(y, MP[0, 1], MP[-1, 1]))
-
-
-def mantle_dr(y):
-    e = 1e-3
-    return (mantle_r(y + e) - mantle_r(y - e)) / (2 * e)
-
-
-def mantle_gap(y):
-    """Front opening (circle-space angle): closed at the clasp, an A-line below."""
-    return MANTLE['gapTop'] + (MANTLE['gapHem'] - MANTLE['gapTop']) * smooth(1.25, MANTLE['hem'], y)
-
-
-def mantle_fold(th, y):
-    """A few broad folds on the front panels, deepening toward the hem (the
-    sides lie over the sleeves and the back under the cape)."""
-    a = np.abs(th)
-    return MANTLE['foldAmp'] * np.sin(a * MANTLE['folds']) * smooth(1.17, MANTLE['hem'], y) * smooth(1.95, 2.35, a)
-
-
-def mantle_hem(th):
-    """The hem rises into rounded corners at the front opening."""
-    edge = math.pi - MANTLE['gapHem'] / 2
-    return MANTLE['hem'] + MANTLE['corner'] * smooth(edge - 0.55, edge, np.abs(th)) ** 2
-
-
-def mantle_ez(y):
-    a, b, y0, y1 = MANTLE['ez']
-    return a + (b - a) * smooth(y0, y1, y)
+# The cape is simulated in the game (src/game/outfit.js); all that is sculpted
+# of it here is what sits still at the neck: a soft gathered roll round the
+# base of the neck that the cloth hangs from (closed at the throat by a little
+# brass toggle) and the hood, lying bunched on the upper back over the cloth.
+# The roll is a ring tipped up toward the back (rise per metre of +z).
+COLLAR = dict(c=(0.0, 1.228, 0.006), R=0.074, r=0.019, sz=0.95, slope=0.22, gathers=7)
+HOOD = dict(top=1.238, mid=1.19, tip=1.1, half=0.112, puff=0.03, inner=0.02)
 
 
 POUCH = (-0.19, 0.745, 0.03)
@@ -328,12 +288,6 @@ def build_rig():
         bone('shin' + L, 'thigh' + L, (0, -THIGH, 0))
         bone('foot' + L, 'shin' + L, (0, -SHIN, 0))
         bone('toe' + L, 'foot' + L, (0, -TOE[0], -TOE[1]))  # the ball of the boot
-    hr = float(mantle_r(MANTLE['hinge']))
-    hez = float(mantle_ez(MANTLE['hinge']))
-    for k in range(MANTLE['panels']):
-        th = k / MANTLE['panels'] * 2 * math.pi
-        bone('mtU%d' % k, 'chest', (math.sin(th) * hr, MANTLE['hinge'] - CHEST_Y, math.cos(th) * hr * hez), (0, 1, 0), th)
-        bone('mtL%d' % k, 'mtU%d' % k, (0, -MANTLE['drop'], 0.02))
     bone('sim', None, (0, 0, 0))
     bone('pouch', 'sim', POUCH)
     bone('pouchLid', 'pouch', POUCH_LID)
@@ -381,34 +335,11 @@ def by_axis(a, d, ctrl):
     return along(lambda p: (p - a) @ d, ctrl)
 
 
-def mantle_weights(p):
-    x, y, z = p[:, 0], p[:, 1], p[:, 2]
-    NP = MANTLE['panels']
-    th = np.arctan2(x, z / mantle_ez(y))
-    th = np.where(th < 0, th + 2 * math.pi, th)
-    u = th / (2 * math.pi) * NP
-    k = np.floor(u).astype(int) % NP
-    f = u - np.floor(u)
-    k1 = (k + 1) % NP
-    below = MANTLE['hinge'] - y
-    gu = smooth(-0.025, 0.02, below)
-    gl = smooth(0.045, 0.105, below)
-    U = np.array([IDX['mtU%d' % i] for i in range(NP)])
-    L = np.array([IDX['mtL%d' % i] for i in range(NP)])
-    return [
-        (IDX['chest'], 1 - gu),
-        (U[k], (1 - f) * (1 - gl) * gu),
-        (U[k1], f * (1 - gl) * gu),
-        (L[k], (1 - f) * gl * gu),
-        (L[k1], f * gl * gu),
-    ]
-
-
 # --------------------------------------------------------------------------------
 # garments
 # --------------------------------------------------------------------------------
 
-MAT = dict(face=1, hair=2, jacket=3, tee=4, shorts=5, leg=6, boot=7, hand=8, mantle=9, cape=10, pouch=11, brass=12)
+MAT = dict(face=1, hair=2, jacket=3, tee=4, shorts=5, leg=6, boot=7, hand=8, hood=9, cape=10, pouch=11, brass=12)
 
 
 class Garment:
@@ -541,7 +472,7 @@ def g_hair():
 
 
 def g_tee():
-    # only its crew neck shows, between the zipped puffer and the mantle's cowl
+    # only its crew neck shows, between the zipped puffer and the cape's collar
     tee = round_cone((0, 1.15, 0.01), (0, 1.235, 0.006), 0.056, 0.05)
     return Garment('tee', MAT['tee'], 0.004, (-0.1, 1.08, -0.08), (0.1, 1.3, 0.09), tee, [(tee, rigid('chest'))], 400, outline=0.0)
 
@@ -551,47 +482,86 @@ SLEEVE_SEAMS = (0.105, 0.09, 3)
 CUFF_U = 0.352
 
 
-def g_jacket():
-    belly = ellipsoid((0, 0.8, 0.006), (0.19, 0.15, 0.15))
-    chest = ellipsoid((0, 1.045, 0.012), (0.153, 0.16, 0.128))
-    shoulders = ellipsoid((0, 1.14, 0.012), (0.172, 0.075, 0.112))
-    hollow = ellipsoid((0, 0.715, 0.006), (0.165, 0.05, 0.127))
+# The puffer's volumes (centre, radii): the yoke slopes from the collar into
+# a rounded cap over each shoulder joint, so the sleeves grow out of the
+# shoulders instead of hanging under a shelf.
+JACKET = dict(
+    belly=((0, 0.8, 0.006), (0.19, 0.15, 0.15)),
+    chest=((0, 1.045, 0.012), (0.153, 0.16, 0.128)),
+    shoulders=((0, 1.138, 0.012), (0.155, 0.08, 0.11)),
+    cap=0.084,  # shoulder caps, centred a little down each arm
+    blend=0.06,  # how softly the sleeves join the body
+)
 
-    arms = [arm_frame(s) for s, _ in SIDES]
+
+def jacket_prims():
+    """The puffer's volumes: belly, chest, the shoulders' yoke, the hollow cut
+    under its hem, and per side the shoulder cap, upper sleeve, forearm and
+    cuff."""
+    J = JACKET
+    belly = ellipsoid(*J['belly'])
+    chest = ellipsoid(*J['chest'])
+    shoulders = ellipsoid(*J['shoulders'])
+    hollow = ellipsoid((0, 0.715, 0.006), (0.165, 0.05, 0.127))
     sleeves = []
-    for S, E, W, d, out in arms:
+    for S, E, W, d, out in [arm_frame(s) for s, _ in SIDES]:
         sleeves.append((
             round_cone(S + 0.02 * d, E, 0.077, 0.072),
             round_cone(E, W - 0.03 * d, 0.072, 0.063),
             round_cone(W - 0.045 * d, W + 0.012 * d, 0.05, 0.047),
             S, d,
+            ellipsoid(S + 0.03 * d - 0.012 * out, (J['cap'], J['cap'], J['cap'] * 0.95)),
         ))
+    return belly, chest, shoulders, hollow, sleeves
+
+
+def jacket_body(p, prims):
+    belly, chest, shoulders, hollow, sleeves = prims
+    t = smin(belly(p), chest(p), 0.09)
+    t = smin(t, shoulders(p), 0.05)
+    for up, lo, cuff, S, d, cap in sleeves:
+        t = smin(t, cap(p), 0.05)
+    return t
+
+
+def jacket_smooth(p, prims):
+    """The jacket without its quilting: the surface the cape and hood lie on."""
+    t = jacket_body(p, prims)
+    for up, lo, cuff, S, d, cap in prims[4]:
+        t = smin(t, smin(up(p), lo(p), 0.02), JACKET['blend'])
+    return t
+
+
+def g_jacket():
+    prims = jacket_prims()
+    belly, chest, shoulders, hollow, sleeves = prims
+    arms = [arm_frame(s) for s, _ in SIDES]
 
     def torso_y(p):
         return p[:, 1] + 0.01 * clamp(-p[:, 2] / 0.15, 0, 1)
 
     def field(p):
         y = p[:, 1]
-        t = smin(belly(p), chest(p), 0.09)
-        t = smin(t, shoulders(p), 0.05)
+        t = jacket_body(p, prims)
         t = smax(t, 0.728 - y, 0.022)
         t = smax(t, -hollow(p), 0.008)
         t = t + seams(torso_y(p), *TORSO_SEAMS) * smooth(1.13, 1.09, y)
-        for up, lo, cuff, S, d in sleeves:
+        for up, lo, cuff, S, d, cap in sleeves:
             u = (p - S) @ d
-            sl = smin(up(p), lo(p), 0.02) + seams(u, *SLEEVE_SEAMS)
+            sl = smin(up(p), lo(p), 0.02) + seams(u, *SLEEVE_SEAMS) * smooth(0.04, 0.08, u)
             sl = smin(sl, cuff(p), 0.008)
-            t = smin(t, sl, 0.045)
+            t = smin(t, sl, JACKET['blend'])
         return t
 
     torso_w = by_y([(0.79, 'hips'), (0.9, 'spine'), (1.0, 'spine'), (1.08, 'chest')])
     owners = [(belly, torso_w), (chest, torso_w), (shoulders, torso_w)]
     n_torso = len(owners)
-    for (up, lo, cuff, S, d), (s, L) in zip(sleeves, SIDES):
+    for (up, lo, cuff, S, d, cap), (s, L) in zip(sleeves, SIDES):
         # (the padded cap blends over a long stretch, so a swinging arm bends
-        # the shoulder instead of lifting it into the mantle's yoke)
-        w = by_axis(S, d, [(0.0, 'clav' + L), (0.09, 'arm' + L), (0.185, 'arm' + L), (0.235, 'fore' + L)])
-        owners += [(up, w), (lo, w), (cuff, rigid('fore' + L))]
+        # the shoulder rather than hinging at a seam; the cap itself rides
+        # half on the collarbone, half on the arm)
+        w = by_axis(S, d, [(-0.02, 'clav' + L), (0.1, 'arm' + L), (0.185, 'arm' + L), (0.235, 'fore' + L)])
+        owners += [(up, w), (lo, w), (cuff, rigid('fore' + L)), (cap, w)]
 
     def details(p, n, own):
         torso = own[:, :n_torso].sum(1)
@@ -751,63 +721,75 @@ def g_hands():
     return Garment('hands', MAT['hand'], 0.0025, (-0.5, 0.64, -0.08), (0.5, 0.9, 0.08), field, owners, 1200)
 
 
-HOOD = dict(top=1.255, tip=1.005, half=0.125, puff=0.036)
+def g_hood():
+    """What sits still of the cape: the gathered roll round the base of the
+    neck, the toggle that closes it at the throat, and the hood lying bunched
+    on the upper back (over the simulated cloth, which hangs from under the
+    roll)."""
+    C, H = COLLAR, HOOD
+    prims = jacket_prims()
+    c = V(*C['c'])
+    Rm = rot_x(-math.atan(C['slope']))
 
+    def roll_parts(p):
+        q = (p - c) @ Rm
+        th = np.arctan2(q[:, 0], q[:, 2])
+        rho = np.sqrt(q[:, 0] ** 2 + (q[:, 2] / C['sz']) ** 2)
+        # soft gathers, fuller at the back where the hood is drawn in, and
+        # smoothing out toward the toggle at the throat
+        g = 1 + 0.13 * np.sin(th * C['gathers']) * smooth(2.75, 2.2, np.abs(th))
+        r = C['r'] * g * (1 + 0.22 * smooth(1.3, 0.2, np.abs(th)))
+        return np.sqrt((rho - C['R']) ** 2 + q[:, 1] ** 2) - r, th
 
-def mantle_parts(p):
-    """Circle-space angle (0 at the back), outward distance to the mantle's
-    outer surface, and the hood's arc coordinates."""
-    x, y, z = p[:, 0], p[:, 1], p[:, 2]
-    ez = mantle_ez(y)
-    zc = z / ez
-    rho = np.sqrt(x ** 2 + zc ** 2) + 1e-9
-    th = np.arctan2(x, zc)
-    r = mantle_r(y) + mantle_fold(th, y)
-    scale = np.sqrt((x / rho) ** 2 + (ez * zc / rho) ** 2) / np.sqrt(1 + mantle_dr(y) ** 2)
-    d_out = (rho - r) * scale
-    t = (HOOD['top'] - y) / (HOOD['top'] - HOOD['tip'])
-    hw = HOOD['half'] * np.maximum(0, 1 - np.clip(t, 0, 1) ** 1.8) ** 0.7 + 0.004
-    s = th * r
-    return th, rho, r, d_out, t, hw, s
+    roll = Prim(lambda p: roll_parts(p)[0], c - V(0.11, 0.06, 0.11), c + V(0.11, 0.06, 0.11))
+    front = c + V(0, -C['slope'] * C['R'] * C['sz'], -C['R'] * C['sz'])
+    toggle = round_cone(front + V(-0.013, -0.006, -0.016), front + V(0.013, -0.004, -0.016), 0.0065, 0.0065)
 
+    def hood_parts(p):
+        x, y = p[:, 0], p[:, 1]
+        J = jacket_smooth(p, prims)
+        t = clamp((H['mid'] - y) / (H['mid'] - H['tip']), 0, 1)
+        tt = clamp((y - H['mid']) / (H['top'] - H['mid']), 0, 1)
+        hw = (H['half'] * (1 - t ** 2) ** 0.7 + 0.003) * (1 - 0.3 * tt ** 2)
+        a = clamp(np.abs(x) / hw, 0, 1)
+        body = smooth(H['tip'] - 0.004, H['tip'] + 0.055, y) * (1 - 0.45 * smooth(H['mid'], H['top'] + 0.01, y))
+        # the seam down the middle of the hood sinks into a soft crease
+        crease = 0.009 * np.exp(-(x / 0.017) ** 2) * smooth(H['tip'], H['tip'] + 0.07, y) * smooth(H['top'], H['mid'] - 0.02, y)
+        puff = H['puff'] * (1 - a ** 2) ** 0.6 * body - crease
+        return J, hw, puff
 
-def g_mantle():
-    T = MANTLE['thick']
-    cowl = torus_y((0, 1.288, 0.006), 0.074, 0.025, 0.95)
-    rim = torus_y((0, 1.262, 0.03), 0.118, 0.02, 0.85)
+    def hood_fn(p):
+        y, z = p[:, 1], p[:, 2]
+        J, hw, puff = hood_parts(p)
+        d = np.maximum(J - (H['inner'] + 0.004 + puff), H['inner'] - J)
+        d = smax(d, np.abs(p[:, 0]) - hw, 0.008)
+        d = smax(d, H['tip'] - y, 0.008)
+        d = smax(d, y - (H['top'] + 0.02), 0.008)
+        return smax(d, 0.015 - z, 0.01)
 
-    def hood(p):
-        th, rho, r, d_out, t, hw, s = mantle_parts(p)
-        body = np.sin(math.pi * np.clip(0.12 + t * 1.05, 0, 1)) ** 0.6
-        puff = HOOD['puff'] * np.maximum(0, 1 - (s / hw) ** 2) * body
-        d = np.maximum(d_out - (puff + 0.004), -d_out - T)
-        d = smax(d, np.abs(s) - hw, 0.006)
-        d = smax(d, p[:, 1] - HOOD['top'], 0.006)
-        return smax(d, HOOD['tip'] - p[:, 1], 0.006)
+    hood = Prim(hood_fn, (-0.15, H['tip'] - 0.01, -0.02), (0.15, H['top'] + 0.04, 0.22))
 
     def field(p):
-        th, rho, r, d_out, t, hw, s = mantle_parts(p)
-        y = p[:, 1]
-        d = np.abs(d_out + T / 2) - T / 2
-        d = smin(d, cowl(p), 0.012)
-        d = smin(d, hood(p), 0.006)
-        d = smin(d, np.maximum(rim(p), 0.03 - p[:, 2]), 0.01)
-        d = smax(d, mantle_hem(th) - y, 0.004)
-        d = smax(d, y - 1.33, 0.004)
-        g = (math.pi - np.abs(th)) - mantle_gap(y) / 2
-        return smax(d, -g * rho, 0.004)
+        d = smin(roll(p), hood(p), 0.014)
+        return smin(d, toggle(p), 0.004)
 
-    whole = Prim(field, (-0.33, 0.97, -0.26), (0.33, 1.33, 0.29))
+    roll_w = by_y([(1.235, 'chest'), (1.29, 'neck')])
+    owners = [(roll, roll_w), (hood, rigid('chest')), (toggle, rigid('chest'))]
 
     def details(p, n, own):
-        th, rho, r, d_out, t, hw, s = mantle_parts(p)
-        y = p[:, 1]
-        on_hood = (t > -0.02) & (t < 1.02)
-        outline = np.where(on_hood, np.abs(s) - hw, 0.2)
-        inner = ((d_out < -T * 0.5) | ((y > 1.245) & (p[:, 2] > 0.02) & (rho < 0.118))) & (cowl(p) > 0.014)
-        return np.stack([y - mantle_hem(th), outline, np.zeros(len(p)), inner.astype(float)], 1)
+        # x: across the hood (0 on its seam), y: in from its edge (m), z: on
+        # the hood rather than the roll, w: the lining showing in its opening
+        J, hw, puff = hood_parts(p)
+        on_hood = own[:, 1]
+        lining = on_hood * smooth(H['top'] - 0.03, H['top'] - 0.012, p[:, 1]) * (p[:, 2] > 0.02)
+        edge = np.minimum(hw - np.abs(p[:, 0]), (p[:, 1] - H['tip']) * 0.8)
+        edge = np.where(on_hood > 0.5, edge, 1.0)
+        return np.stack([p[:, 0] / np.maximum(hw, 1e-3), edge, on_hood, lining], 1)
 
-    return Garment('mantle', MAT['mantle'], 0.004, (-0.33, 0.97, -0.26), (0.33, 1.33, 0.29), field, [(whole, mantle_weights)], 3600, details=details)
+    def mats(p, n, own):
+        return np.where(own[:, 2] > 0.5, MAT['brass'], MAT['hood'])
+
+    return Garment('hood', MAT['hood'], 0.0028, (-0.16, 1.02, -0.12), (0.16, 1.3, 0.23), field, owners, 2600, tau=0.008, details=details, mats=mats)
 
 
 def g_pouch():
@@ -832,6 +814,28 @@ def g_pouch():
         return np.where(own[:, 3] > 0.5, MAT['brass'], MAT['pouch'])
 
     return Garment('pouch', MAT['pouch'], 0.0025, P + V(-0.06, -0.12, -0.06), P + V(0.03, 0.04, 0.06), field, owners, 700, tau=0.006, details=details, mats=mats)
+
+
+def cloth_colliders():
+    """The volumes the cape's cloth is kept out of, in bind space, each with
+    the bone that carries it: the jacket's own (ellipsoids and round cones,
+    exactly as sculpted) and the shorts' seat."""
+    J = JACKET
+    ell = lambda bone, cr: dict(bone=bone, kind='ell', c=list(cr[0]), r=list(cr[1]))
+    out = [
+        ell('chest', J['chest']),
+        ell('chest', J['shoulders']),
+        ell('spine', J['belly']),
+        dict(bone='hips', kind='ell', c=[0, 0.775, 0.008], r=[0.15, 0.127, 0.122]),
+    ]
+    for (s, L) in SIDES:
+        S, E, W, d, o = arm_frame(s)
+        cap = S + 0.03 * d - 0.012 * o
+        # (the cap's top rides mostly on the collarbone, as it is weighted)
+        out.append(dict(bone='clav' + L, kind='cap', a=list(cap - 0.012 * d), b=list(cap + 0.02 * d), ra=J['cap'] + 0.004, rb=J['cap']))
+        out.append(dict(bone='arm' + L, kind='cap', a=list(S + 0.02 * d), b=list(E), ra=0.077, rb=0.072))
+        out.append(dict(bone='fore' + L, kind='cap', a=list(E), b=list(W - 0.03 * d), ra=0.072, rb=0.063))
+    return [{k: (round(float(v), 5) if isinstance(v, float) else [round(float(x), 5) for x in v] if isinstance(v, list) else v) for k, v in c.items()} for c in out]
 
 
 # --------------------------------------------------------------------------------
@@ -898,7 +902,7 @@ def skin_weights(g, p):
 def build():
     t0 = time.time()
     build_rig()
-    garments = [g_head(), g_hair(), g_tee(), g_jacket(), g_shorts(), g_legs(), g_boots(), g_hands(), g_mantle(), g_pouch()]
+    garments = [g_head(), g_hair(), g_tee(), g_jacket(), g_shorts(), g_legs(), g_boots(), g_hands(), g_hood(), g_pouch()]
     P, N, F, M, D, SI, SW, parts = [], [], [], [], [], [], [], []
     base = 0
     for g in garments:
@@ -937,7 +941,7 @@ def build():
         rig=dict(
             hipY=HIP_Y, hipJoint=list(HIP_JOINT), thigh=THIGH, shin=SHIN, toe=list(TOE), chestY=CHEST_Y, headY=HEAD_Y,
             shoulder=list(SHOULDER), upperArm=UPPER_ARM, forearm=FOREARM, armRest=ARM_REST,
-            mantle=MANTLE, hood=HOOD, pouch=list(POUCH), pouchLid=list(POUCH_LID),
+            collar=COLLAR, hood=HOOD, cloth=cloth_colliders(), pouch=list(POUCH), pouchLid=list(POUCH_LID),
             hair=[dict(name=k, dir=list(v / np.linalg.norm(v))) for k, v in HAIR_BONES.items()],
             sockY=SOCK_Y, shortsHem=SHORTS_HEM, bootX=BOOT_X, bootCollar=list(BOOT_COLLAR), soleH=SOLE_H, torsoSeams=list(TORSO_SEAMS), sleeveSeams=list(SLEEVE_SEAMS), cuffU=CUFF_U,
         ),

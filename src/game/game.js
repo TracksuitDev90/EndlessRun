@@ -318,7 +318,7 @@ export class Game {
     this.announceWorld(this.door.seg);
     this.depth = this.door.seg.ordinal;
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
-    this.dream.doorway();
+    this.dream.doorway(this.current.def, this.current.env);
     this.audio.door();
     this.door = null;
   }
