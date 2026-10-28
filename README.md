@@ -123,9 +123,9 @@ Append to the URL:
   distance and time — no per-object CPU updates.
 - **One skinned runner.** The wayfarer is a single skinned mesh (plus its ink
   hull) — two draw calls, ~23k sculpted triangles plus the cape. Legs are
-  placed by IK, the cape is a small cloth simulation and the mantle, curls and
-  hip pouch are springs; animation and simulation together take about half a
-  millisecond (see [The runner](#the-runner)).
+  placed by IK, the body rides on spring follow-through, the cape is a small
+  cloth simulation and the mantle, curls and hip pouch are springs; animation
+  and simulation together take about 0.6 ms (see [The runner](#the-runner)).
 - **Cheap, painterly shading.** Hand-written toon shader with a per-world
   lighting model: terminator softness and wrap (harsh vs soft worlds), rim /
   back light, low-lying mist, leaf dapple, an analytic wall shadow, colour
@@ -186,14 +186,36 @@ only stay planted for ~0.58 m of ground, which at the game's 12–28 m/s is a fe
 hundredths of a second: at the starting pace contact has no slip at all; at
 higher speeds contact is held for a minimum of ~2.4 frames so the planted pose
 reaches the screen, and the leftover slip is straight back along the run inside
-those frames (no sinking, floating or sideways skid). Jump, slide and idle
-remain keyed poses, blended with springs.
+those frames (no sinking, floating or sideways skid). Jump and slide are
+keyed poses; idle is keyed too but stands on planted feet (IK), easing its
+weight from one leg to the other. Poses blend with second-order springs, so
+every transition eases in and out.
 
-Secondary motion is deliberately restrained: the cape (a 13×13 particle cloth
-hung inside the mantle's hem, kept off the body by capsule colliders) trails
-and ripples in long slow waves rather than flagging; the mantle is twelve
-hinged panels that the arms tip up and over; curls and the hip pouch lag on
-springs.
+**Weight and follow-through.** On top of the pose, the torso, head and arms
+ride on the pelvis like loose springs, kicked by the pelvis's change of
+velocity each frame — the stride's bounce and sway, and the root's lane
+changes, jumps, landings and changes of pace (as impulses, so a sudden move
+hits equally hard at any frame rate). Every footfall ripples up the spine and
+drops the arms a touch; a lane change whips the shoulders across and lets them
+swing back through; a take-off folds the body, the flight lets it float open
+with the arms rising, and a landing folds it again before it springs up. Arms,
+elbows, spine and head also trail their own posed motion on springs, so they
+lag and overshoot at every reversal, and the lean into a lane change settles
+with a soft overshoot.
+
+**Fabric.** The cape is a 13×13 particle cloth of a light, floaty wool, hung
+inside the mantle's hem and kept off the body by capsule colliders. The
+headwind streams it back further as the pace rises (about 40° at the starting
+pace, 55° at full tilt), long slow waves roll from the shoulders to the hem,
+and very little air damping lets every bounce, lane change, take-off and
+landing carry on through the cloth. A soft breeze — slow swells from a
+wandering direction, with occasional gusts — sways it when he stands still and
+keeps working on it while he runs. A soft ceiling stops it from flipping
+forward over the shoulders but slopes up behind, so it can billow up and back
+when he falls from a jump. The mantle is twelve hinged panels: the arms tip
+them up and over, the breeze lifts them, and the hem bobs a beat behind each
+footfall. Curls lag and bounce on springs and play in the breeze; the hip
+pouch swings on a pendulum.
 
 **Third-party assets.** None. Free bases and animation (Kenney, Quaternius /
 Poly Pizza, OpenGameArt, Sketchfab, Mixamo, Poly Haven) were considered, but the
