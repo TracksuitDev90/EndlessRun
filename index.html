@@ -48,6 +48,10 @@
           <div class="score-pill"><span id="score-num">0</span></div>
           <div id="score-mult" class="score-mult" aria-label="Depth multiplier">×1</div>
         </div>
+        <div id="gem-pill" class="gem-pill" aria-label="Gems collected">
+          <svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg>
+          <span id="gem-num">0</span>
+        </div>
         <div id="score-pops"></div>
         <div id="score-best" class="score-best">new best!</div>
       </div>
@@ -67,7 +71,7 @@
       <div id="pause" class="screen modal">
         <div class="card">
           <h2>Paused</h2>
-          <p class="sub">score <b id="pause-score">0</b></p>
+          <p class="sub">score <b id="pause-score">0</b> · gems <b id="pause-gems">0</b></p>
           <button id="btn-resume" class="btn primary">Resume</button>
           <button id="btn-restart" class="btn">Start over</button>
         </div>
@@ -79,6 +83,7 @@
           <div id="crash-new" class="ribbon">new best!</div>
           <div class="tally">
             <div class="tally-row"><span>score</span><b id="crash-score">0</b></div>
+            <div class="tally-row gems"><span>gems</span><b id="crash-gems">0</b></div>
             <div class="tally-row best"><span>best</span><b id="crash-best">0</b></div>
           </div>
           <p class="sub">Dust off and keep going?</p>

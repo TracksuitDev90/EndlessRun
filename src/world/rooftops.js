@@ -3,6 +3,7 @@ import {
   roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { skyLanternParts, balloonParts, lampConeParts } from './whimsy.js';
+import { crystal, brilliant, star, FACE } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -31,6 +32,24 @@ const C = {
 };
 const BODY_TINTS = ['#26386c', '#2d4279', '#1f2f5f', '#35487f', '#3b4f8a', '#2a3d74', '#40548f'];
 const CLOTHES = ['#f4efe2', '#f2a7a0', '#9fd3e6', '#f7d36b', '#b8e0a6', '#e9b8f0', '#ffffff'];
+
+// The Citrine: honey-gold stones standing face-on like stars come down onto
+// the slates — the warm colour that sings against the night blue. Pentagon
+// cuts, trillions mixed in, and for the prize spots a faceted fallen star.
+// They twinkle a little quicker than the other worlds' gems.
+const GEM = {
+  name: 'citrine',
+  tints: ['#ffb52e', '#ffc94a', '#ffa02a'],
+  cuts: () => [
+    [crystal(brilliant({ r: 0.3, sides: 5, rot: -Math.PI / 2, pavilion: 0.8, crown: 0.4 }), { rx: FACE })],
+    [crystal(brilliant({ r: 0.33, sides: 3, rot: -Math.PI / 2, pavilion: 0.7, table: 0.5 }), { rx: FACE })],
+    [crystal(star({ R: 0.39, inner: 0.47, depth: 0.15 }), { rx: FACE })],
+  ],
+  motion: [1.5, 2.0, 0.06, 0.18],
+  look: [0.8, 1.15, 0.25, 0.4],
+  glow: 0.6,
+  pool: 0.5,
+};
 
 const OPENING = { halfW: 4.6, rectH: 11.4, arch: false };
 const GATE_DEPTH = 1.6;
@@ -293,6 +312,7 @@ export default {
   name: 'The Night Rooftops',
   doorColor: '#3a5cc0',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  gem: GEM,
   continuation: false, // the facade hides everything behind the door
   env: {
     sky: ['#060e2a', '#26407a', '#0a1430'],

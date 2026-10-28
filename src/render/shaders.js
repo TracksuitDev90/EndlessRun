@@ -23,6 +23,8 @@ export const shared = {
   // much is rainbow (the deeper the trip, the more rainbow); its three colours
   uBloom: { value: new THREE.Vector4(1, 0, 0, 0) },
   uBloomCol: { value: [new THREE.Color(), new THREE.Color(), new THREE.Color()] },
+  // the runner's chest: a collected gem flies into it (see VS_GEM)
+  uGemAt: { value: new THREE.Vector3() },
 };
 
 const COMMON = /* glsl */ `
@@ -1215,6 +1217,265 @@ void main() {
 `;
 
 // ---------------------------------------------------------------------------
+// Gems: cut stones that turn slowly and bob where they hang, unfold out of
+// nothing as they come in range like the rest of the world, and when you run
+// through one, swell, flash white and fly into you. aInst.x is the phase
+// (it ripples along a run of gems), aInst.z the moment it was collected.
+// ---------------------------------------------------------------------------
+const GEM_MOTION = /* glsl */ `
+uniform vec4 uAnim;  // y, z: grown in fully / not yet begun, in meters from the camera
+uniform vec4 uSpin;  // x turn (rad/s), y bob rate, z bob height, w nod (rad)
+uniform vec3 uGemAt;
+float easeOutBack(float t) {
+  float u = t - 1.0;
+  return 1.0 + 2.5 * u * u * u + 1.5 * u * u;
+}
+// x: 0..1 through the pick-up, y: the gem's growth, z: how far it's flown to the runner
+vec3 gemCollect(float at) {
+  if (at <= 0.0) return vec3(-1.0, 1.0, 0.0);
+  float ct = clamp((uTime - at) / 0.36, 0.0, 1.0);
+  float swell = 1.0 + 0.3 * sin(min(ct * 3.0, 1.0) * 1.5708);
+  return vec3(ct, swell * (1.0 - ct * ct), smoothstep(0.0, 0.45, ct));
+}
+vec3 gemCentre(vec3 pivot, float phase, vec3 pick) {
+  vec3 c = pivot + vec3(0.0, sin(uTime * uSpin.y + phase * 1.3) * uSpin.z, 0.0);
+  return mix(c, uGemAt + vec3(0.0, 0.25 + max(pick.x, 0.0) * 0.8, 0.0), pick.z);
+}
+`;
+
+const VS_GEM = COMMON + GEM_MOTION + /* glsl */ `
+attribute vec3 fx;
+#ifdef OUTLINE
+uniform float uOutline;
+attribute vec3 onrm;
+#endif
+#ifdef USE_INSTANCING
+attribute vec4 aInst;
+#endif
+varying vec3 vColor;
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec2 vUv;
+varying vec3 vFx;
+varying vec3 vLocalN;
+varying float vFlash;
+
+vec3 turn(vec3 v, float a, float b) {
+  float c = cos(a), s = sin(a);
+  v = vec3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z);
+  c = cos(b);
+  s = sin(b);
+  return vec3(v.x, c * v.y - s * v.z, s * v.y + c * v.z);
+}
+
+void main() {
+  mat4 M = modelMatrix;
+  float phase = 0.0;
+  float at = 0.0;
+  #ifdef USE_INSTANCING
+    M = modelMatrix * instanceMatrix;
+    phase = aInst.x;
+    at = aInst.z;
+  #endif
+  vec3 pivot = M[3].xyz;
+  float aP = uCamPos.z - pivot.z;
+  vec3 pick = gemCollect(at);
+  // turning on its own axis with a gentle nod, faster as it's snatched up
+  float spin = uTime * uSpin.x + phase + max(pick.x, 0.0) * 9.0;
+  float nod = sin(uTime * uSpin.y * 0.5 + phase * 0.7) * uSpin.w;
+  vec3 lp = turn(position, spin, nod);
+  vec3 ln = turn(normal, spin, nod);
+  float grow = max(easeOutBack(1.0 - smoothstep(uAnim.y, uAnim.z, aP)), 0.0) * pick.y;
+  vec3 c = gemCentre(pivot, phase, pick);
+  mat3 S = mat3(M);
+  vec3 wp = c + S * lp * grow;
+  vPos = wp;
+  #ifdef OUTLINE
+    float w = length(onrm);
+    if (w > 0.0001) {
+      float dist = length(wp - uCamPos);
+      wp += normalize(S * turn(onrm, spin, nod)) * (w * uOutline * min(grow, 1.0) * (1.0 + dist * 0.011));
+    }
+  #endif
+  wp = bendPos(wp);
+  vWorld = wp;
+  vNormal = normalize(S * ln);
+  vLocalN = normal;
+  vFlash = pick.x < 0.0 ? 0.0 : 1.0 - pick.x;
+  vUv = uv;
+  vFx = fx;
+  vec3 col = color;
+  #ifdef USE_INSTANCING_COLOR
+    col = mix(col, col * instanceColor, fx.z);
+  #endif
+  vColor = col;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+
+// Cut-stone shading, painted rather than ray-traced: every facet takes its
+// own tone between the stone's dark depths and the pale light caught on its
+// crown, so the cut reads in any light; the colour burns brightest through
+// the face turned to you, edges go pale, and facets that mirror a light into
+// your eye flash white (one light is the world's, one sits over the camera's
+// shoulder, so a gem sparkles even in the dark). It lights itself for the most
+// part, so it holds its colour against anything. fx = (shine, crystal, tint):
+// non-crystal parts (a gold bezel, the rock a cluster grows from) are lit like
+// any prop, polished metal with a highlight.
+const FS_GEM = FS_HEAD + /* glsl */ `
+uniform vec3 uLightDir;
+uniform vec3 uShadowTint;
+uniform vec4 uGemK; // x self-lit (ignores the world's shade), y glints, z hue spread across facets, w fire
+varying vec3 vLocalN;
+varying float vFlash;
+float facetHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+void main() {
+  vec3 n = normalize(vNormal);
+  n = gl_FrontFacing ? n : -n;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  vec3 R = reflect(V, n);
+  vec3 L = uLightDir;
+  vec3 L2 = normalize(vec3(-0.35, 0.8, 0.45));
+  float lit = smoothstep(-0.2, 0.3, dot(n, L));
+  vec3 base = vColor;
+  vec3 col;
+  if (vFx.y > 0.5) {
+    float seed = facetHash(floor(vLocalN * 7.0 + 0.5) + 11.0);
+    float env = smoothstep(-0.45, 0.8, R.y) * 0.65 + max(dot(R, L), 0.0) * 0.35;
+    float t = clamp(0.18 + env * 0.72 + (seed - 0.5) * 0.6, 0.0, 1.0);
+    vec3 deep = base * base * 0.6;
+    vec3 lite = mix(base, vec3(1.0), 0.5);
+    col = t < 0.5 ? mix(deep, base, t * 2.0) : mix(base, lite, t * 2.0 - 1.0);
+    col = hueRot(col, (seed - 0.5) * uGemK.z);
+    float face = abs(dot(n, V));
+    col += base * pow(face, 4.0) * uGemK.w;
+    vec3 shade = mix(mix(uShadowTint, vec3(1.0), 0.45), vec3(1.0), lit);
+    col *= mix(shade, vec3(1.0), uGemK.x);
+    col = mix(col, lite * 1.15, pow(1.0 - face, 2.2) * 0.55);
+    float g = pow(max(dot(R, L), 0.0), 40.0) + pow(max(dot(R, L2), 0.0), 40.0) * 0.8;
+    float tw = smoothstep(0.93, 1.0, sin(uTime * 2.7 + seed * 37.0)) * step(0.55, seed);
+    col += vec3(g * 1.4 + tw * 0.75) * uGemK.y;
+  } else {
+    col = base * mix(uShadowTint, vec3(1.0), lit);
+    if (vFx.x > 0.5) {
+      col *= 0.75 + 0.5 * smoothstep(-0.3, 0.6, R.y);
+      col += mix(base, vec3(1.0), 0.6) * (pow(max(dot(R, L), 0.0), 18.0) + pow(max(dot(R, L2), 0.0), 22.0) * 0.7);
+    }
+  }
+  col = mix(col, vec3(1.2), vFlash * 0.6);
+  // like the runner, a gem keeps its own colour however far the dream turns
+  // the palette (undone here, before the fog, so the fog still matches the sky)
+  col = hueRot(col, -uDream3.x);
+  col = atmos(col, v, dist, 0.8);
+  gl_FragColor = vec4(grade(col, uTrip, dist), 1.0);
+}
+`;
+
+// The soft glow round a gem (a camera-facing halo that bobs with it) and, with
+// POOL, the light it spills on the ground beneath (instance colour carries how
+// bright: gems hung high for a jump light the road less).
+const VS_GEM_GLOW = COMMON + GEM_MOTION + /* glsl */ `
+uniform vec4 uFog;
+attribute vec4 aInst;
+varying vec2 vUv;
+varying vec3 vColor;
+varying float vFade;
+void main() {
+  mat4 M = modelMatrix * instanceMatrix;
+  vec3 pivot = M[3].xyz;
+  float sc = length(M[0].xyz);
+  float phase = aInst.x;
+  float aP = uCamPos.z - pivot.z;
+  vec3 pick = gemCollect(aInst.z);
+  float fade = (1.0 - smoothstep(uAnim.y, uAnim.z, aP)) * (0.82 + 0.18 * sin(uTime * 2.4 + phase * 1.7));
+  #ifdef POOL
+    if (pick.x >= 0.0) fade *= 1.0 - pick.x;
+    vec3 wp = bendPos(pivot + vec3(position.x, 0.0, -position.y) * sc);
+    float dist = length(wp - uCamPos);
+  #else
+    vec3 c = gemCentre(pivot, phase, pick);
+    if (pick.x >= 0.0) {
+      sc *= 1.0 + pick.x * 1.6;
+      fade *= (1.0 - pick.x) * 2.2;
+    }
+    vec3 bp = bendPos(c);
+    vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+    vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+    vec3 wp = bp + (right * position.x + up * position.y) * sc;
+    float dist = length(bp - uCamPos);
+  #endif
+  vFade = fade * (1.0 - 0.7 * smoothstep(uFog.x, uFog.y, dist)) * smoothstep(1.5, 4.0, dist);
+  vUv = uv;
+  vColor = instanceColor;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_GEM_GLOW = /* glsl */ `
+uniform float uGemGlow;
+varying vec2 vUv;
+varying vec3 vColor;
+varying float vFade;
+void main() {
+  float r = max(1.0 - length(vUv - 0.5) * 2.0, 0.0);
+  float a = pow(r, 2.6) * 0.8 + pow(r, 9.0) * 0.5;
+  gl_FragColor = vec4(vColor * a * vFade * uGemGlow, 1.0);
+}
+`;
+
+// Sparkles thrown off a gem as you take it: a handful of bursts (slots), each
+// a spray of four-pointed glints in the gem's colour that stays with the
+// runner, spreads, falls a little and fades.
+const VS_SPARKLE = COMMON + /* glsl */ `
+uniform vec4 uBurst[SLOTS]; // x, y: offset from the runner's chest, z: size, w: start time (0 = idle)
+uniform vec3 uBurstCol[SLOTS];
+uniform vec3 uGemAt;
+uniform float uPixelRatio;
+attribute vec4 aSpark; // xyz direction, w random
+attribute float aSlot;
+varying vec3 vColor;
+varying float vAlpha;
+void main() {
+  int s = int(aSlot + 0.5);
+  vec4 b = uBurst[s];
+  float t = uTime - b.w;
+  vColor = uBurstCol[s];
+  if (b.w <= 0.0 || t < 0.0 || t > 0.8) {
+    vAlpha = 0.0;
+    gl_PointSize = 0.0;
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
+  float k = 1.0 - exp(-t * 6.5);
+  vec3 p = uGemAt + vec3(b.x, b.y, 0.0) + aSpark.xyz * (0.45 + aSpark.w * 0.9) * k * b.z;
+  p.y -= 0.9 * t * t;
+  p.z += t * 2.5;
+  vec4 mv = viewMatrix * vec4(bendPos(p), 1.0);
+  float life = 1.0 - t / 0.8;
+  gl_PointSize = (4.5 + aSpark.w * 7.0) * b.z * uPixelRatio * (40.0 / max(-mv.z, 1.0)) * (0.35 + 0.65 * life);
+  vAlpha = life * life * (0.7 + 0.3 * sin(uTime * 30.0 + aSpark.w * 20.0));
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const FS_SPARKLE = /* glsl */ `
+varying vec3 vColor;
+varying float vAlpha;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float core = pow(max(1.0 - length(c) * 2.0, 0.0), 3.0);
+  float rays = max(0.0, 1.0 - abs(c.x) * 14.0) * max(0.0, 1.0 - abs(c.y) * 2.2) + max(0.0, 1.0 - abs(c.y) * 14.0) * max(0.0, 1.0 - abs(c.x) * 2.2);
+  float a = (core + rays * 0.7) * vAlpha;
+  gl_FragColor = vec4(mix(vColor, vec3(1.0), core * 0.7) * a, 1.0);
+}
+`;
+
+// ---------------------------------------------------------------------------
 // Uniform sets per world environment
 // ---------------------------------------------------------------------------
 const color = (v) => (Array.isArray(v) ? new THREE.Color(v[0], v[1], v[2]) : new THREE.Color(v));
@@ -1508,6 +1769,56 @@ export function makePortalMaterial(mode) {
     m.depthTest = true;
   }
   return m;
+}
+
+// A world's gem: o.spin = [turn, bob rate, bob height, nod] (see VS_GEM),
+// o.look = [self-lit, glints, facet hue spread, fire] (see FS_GEM).
+export function makeGemMaterial(env, o = {}) {
+  const uniforms = withShared(env, {
+    uAnim: { value: animVector(o.anim ?? 'popEarly') },
+    uSpin: { value: new THREE.Vector4(...(o.spin || [1.2, 2, 0.07, 0.12])) },
+    uGemK: { value: new THREE.Vector4(...(o.look || [0.78, 1, 0.3, 0.35])) },
+  });
+  return new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: VS_GEM,
+    fragmentShader: FS_GEM,
+    vertexColors: true,
+  });
+}
+
+// The halo round each gem, or (o.pool) the light it spills on the ground.
+export function makeGemGlowMaterial(env, o = {}) {
+  const uniforms = withShared(env, {
+    uAnim: { value: animVector(o.anim ?? 'popEarly') },
+    uSpin: { value: new THREE.Vector4(...(o.spin || [1.2, 2, 0.07, 0.12])) },
+    uGemGlow: { value: o.gain ?? 0.6 },
+  });
+  return new THREE.ShaderMaterial({
+    uniforms,
+    defines: o.pool ? { POOL: '' } : {},
+    vertexShader: VS_GEM_GLOW,
+    fragmentShader: FS_GEM_GLOW,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
+export function makeSparkleMaterial(slots) {
+  const uniforms = withShared({}, {
+    uBurst: { value: Array.from({ length: slots }, () => new THREE.Vector4()) },
+    uBurstCol: { value: Array.from({ length: slots }, () => new THREE.Color()) },
+  });
+  return new THREE.ShaderMaterial({
+    uniforms,
+    defines: { SLOTS: slots },
+    vertexShader: VS_SPARKLE,
+    fragmentShader: FS_SPARKLE,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
 }
 
 export function makeParticleMaterial() {

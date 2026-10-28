@@ -3,6 +3,7 @@ import {
   cloudParts, rockParts, roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { birdParts, whaleParts } from './whimsy.js';
+import { crystal, crystalPoint, bipyramid } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -28,6 +29,36 @@ const C = {
   treeHi: '#c8603a',
   gold: '#ffd36a',
   lantern: '#ffe0a0',
+};
+
+// The Aquamarine: long shards of sky-coloured crystal, double-terminated and
+// leaning, as if the clear sky above the clouds had splintered — turquoise,
+// the complement of all that amber. Squat sky-diamonds mixed into the runs; a
+// fan of three splinters for the prize spots. Up here they float the most,
+// riding slow swells like the islands.
+function splinters() {
+  return [
+    [0.5, 0.11, 0, 0],
+    [0.34, 0.085, 0.55, -0.06],
+    [0.36, 0.09, -0.5, 0.07],
+  ].map(([len, r, rz, x], i) => {
+    const g = crystalPoint({ r, len, tip: r * 1.6, seed: 21 + i });
+    g.translate(0, -0.12, 0);
+    return crystal(g, { rz, x, rx: (i - 1) * 0.18, y: -0.2 });
+  });
+}
+const GEM = {
+  name: 'aquamarine',
+  tints: ['#2ee6d6', '#4af0e8', '#22d0e4'],
+  cuts: () => [
+    [crystal(crystalPoint({ r: 0.11, len: 0.42, tip: 0.16, double: true, seed: 5 }), { rz: 0.32, rx: 0.12 })],
+    [crystal(bipyramid({ r: 0.2, h: 0.3 }))],
+    splinters(),
+  ],
+  motion: [1.0, 1.4, 0.1, 0.2],
+  look: [0.75, 1.1, 0.3, 0.32],
+  glow: 0.6,
+  pool: 0.25,
 };
 
 const OPENING = { halfW: 4.6, rectH: 8.0, arch: true };
@@ -184,6 +215,7 @@ export default {
   name: 'The Sky Road',
   doorColor: '#f0843a',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  gem: GEM,
   env: {
     sky: ['#4a1a10', '#ffb84a', '#f39a40'],
     bloom: ['#ff8a3a', '#ffd060', '#ff6a9a'], // the colours its doorway bloom is made of

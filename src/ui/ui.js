@@ -35,6 +35,9 @@ export class UI {
     this.multEl = $('score-mult');
     this.scoreShown = -1;
     this.multShown = -1;
+    this.gemEl = $('gem-num');
+    this.gemPill = $('gem-pill');
+    this.gemColor = '';
     // a few recycled "+40" labels that float up from the score
     this.pops = [];
     this.popNext = 0;
@@ -107,6 +110,23 @@ export class UI {
     replay(el, 'show');
   }
 
+  // The gem counter under the score: bumps with each gem, and wears the
+  // colour of the world's stone.
+  setGems(n) {
+    this.gemEl.textContent = fmt.format(n);
+  }
+
+  gem(n) {
+    this.setGems(n);
+    replay(this.gemPill, 'bump');
+  }
+
+  setGemColor(hex) {
+    if (!hex || hex === this.gemColor) return;
+    this.gemColor = hex;
+    $('scorebox').style.setProperty('--gem', hex);
+  }
+
   newBest() {
     replay($('score-best'), 'show');
   }
@@ -158,17 +178,21 @@ export class UI {
     this.inkEl.style.opacity = String(Math.min(1, q * 1.15));
   }
 
-  showPause(on, score = 0) {
-    if (on) $('pause-score').textContent = fmt.format(Math.floor(score));
+  showPause(on, score = 0, gems = 0) {
+    if (on) {
+      $('pause-score').textContent = fmt.format(Math.floor(score));
+      $('pause-gems').textContent = fmt.format(gems);
+    }
     $('pause').classList.toggle('show', on);
   }
 
-  showCrash(continuesLeft, score, best, isNewBest) {
+  showCrash(continuesLeft, score, best, isNewBest, gems = 0) {
     const btn = $('btn-continue');
     btn.style.display = continuesLeft > 0 ? '' : 'none';
     $('continue-count').textContent = continuesLeft === 1 ? '1 left' : `${continuesLeft} left`;
     $('crash-score').textContent = fmt.format(Math.floor(score));
     $('crash-best').textContent = fmt.format(Math.floor(best));
+    $('crash-gems').textContent = fmt.format(gems);
     $('crash').classList.toggle('is-new-best', isNewBest);
     $('crash').querySelector('.sub').textContent = continuesLeft > 0 ? 'Dust off and keep going?' : 'One more go?';
     $('crash').classList.add('show');

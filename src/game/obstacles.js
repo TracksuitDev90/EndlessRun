@@ -116,6 +116,9 @@ export class ObstacleField {
     this.game = game;
     this.records = [];
     this.groups = [];
+    // every row laid, in order: { d, end, lanes: [record | null] x3, hint },
+    // read by the gem director to plan its route through them
+    this.rows = [];
     this.nextD = 0;
   }
 
@@ -137,6 +140,7 @@ export class ObstacleField {
     for (const g of this.groups) g.world.removeOwner(g);
     this.groups.length = 0;
     this.records.length = 0;
+    this.rows.length = 0;
   }
 
   dropWorld(world) {
@@ -159,6 +163,15 @@ export class ObstacleField {
     w = 0;
     for (const r of this.records) if (!r.group.dead) this.records[w++] = r;
     this.records.length = w;
+    w = 0;
+    for (const row of this.rows) if (row.lanes.some((r) => r && !r.group.dead)) this.rows[w++] = row;
+    this.rows.length = w;
+  }
+
+  // The first row at or after d the gem director hasn't planned yet.
+  rowAfter(d) {
+    for (const row of this.rows) if (!row.gemmed && row.d >= d - 0.01) return row;
+    return null;
   }
 
   update(dist, runTime) {
@@ -168,6 +181,7 @@ export class ObstacleField {
     if (this.groups.length && this.groups[0].d + this.groups[0].len < limit) {
       this.removeWhere((g) => g.d + g.len < limit);
     }
+    while (this.rows.length && this.rows[0].end < limit) this.rows.shift();
   }
 
   spawnNext(dist, runTime) {
@@ -224,12 +238,16 @@ export class ObstacleField {
   placeRow(world, d, row) {
     const defs = world.def.obstacles;
     const r = this.rng;
+    const lanes = [null, null, null];
+    const laid = { d, end: d, lanes, hint: row.hint || null };
+    this.rows.push(laid);
     if (row.wide) {
       const spec = row.wide === 'L' ? defs.LW : defs.HW;
       const group = this.group(world, d, spec.len, row.hint, CONFIG.score.wide);
       this.putSpec(world, group, spec, 0, d, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
       if (!spec.flat) this.shadow(world, group, 0, d, spec.len, 8.6, row.wide === 'L' ? 0.9 : 2.2);
-      for (let lane = 0; lane < 3; lane++) this.record(group, lane, d, spec.len, row.wide, spec);
+      for (let lane = 0; lane < 3; lane++) lanes[lane] = this.record(group, lane, d, spec.len, row.wide, spec);
+      laid.end = d + spec.len;
       return spec.len;
     }
     let maxLen = 0;
@@ -238,7 +256,9 @@ export class ObstacleField {
       if (!kind) continue;
       const x = CONFIG.laneX[lane];
       if (kind === 'W' && defs.SW && lane !== 1 && r.chance(0.4)) {
-        this.placeSwing(world, defs.SW, lane, d, row.hint);
+        lanes[lane] = this.placeSwing(world, defs.SW, lane, d, row.hint);
+        laid.d = Math.min(laid.d, lanes[lane].d);
+        laid.end = Math.max(laid.end, lanes[lane].d + lanes[lane].len);
         maxLen = Math.max(maxLen, defs.SW.len);
         continue;
       }
@@ -250,7 +270,8 @@ export class ObstacleField {
         p0: r.float(0, 6.28),
       });
       if (!spec.flat) this.shadow(world, group, x, d, spec.len, 2.4, kind === 'L' ? 0.9 : kind === 'H' ? 2.2 : 3);
-      this.record(group, lane, d, spec.len, kind, spec);
+      lanes[lane] = this.record(group, lane, d, spec.len, kind, spec);
+      laid.end = Math.max(laid.end, d + spec.len);
       maxLen = Math.max(maxLen, spec.len);
     }
     return maxLen;
@@ -282,7 +303,7 @@ export class ObstacleField {
     const o = { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p1: -1, c: tint, p0: 0 };
     world.put(group, spec.name, s * spec.wallX, 0, d, o);
     world.put(group, spec.frame, s * spec.wallX, 0, d, o);
-    this.record(group, lane, d - spec.len / 2, spec.len, 'W');
+    return this.record(group, lane, d - spec.len / 2, spec.len, 'W');
   }
 
   // points: what getting past it cleanly is worth (see CONFIG.score); hit is
@@ -307,7 +328,7 @@ export class ObstacleField {
   // you can't stand on (water): landing in it trips you like running into it.
   record(group, lane, d, len, kind, spec) {
     const y = KIND_Y[kind];
-    this.records.push({
+    const rec = {
       group,
       lane,
       x: CONFIG.laneX[lane],
@@ -319,7 +340,9 @@ export class ObstacleField {
       kind,
       wade: !!spec?.wade,
       hit: false,
-    });
+    };
+    this.records.push(rec);
+    return rec;
   }
 
   // Highest LOW-obstacle top the player could be standing on.

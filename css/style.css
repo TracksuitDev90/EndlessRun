@@ -322,10 +322,49 @@ body:not(.touch) .touch-only {
 .score-mult.bump {
   animation: bump 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
+/* the gem counter: a smaller pill under the score, its gem in the world's colour */
+.gem-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  height: 32px;
+  padding: 0 12px 0 8px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 2px 3px 0 var(--ink);
+  font-weight: 600;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums lining-nums;
+  transform-origin: 20% 50%;
+}
+.gem-pill.bump {
+  animation: gem-bump 0.38s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.gem-ic {
+  width: 22px;
+  height: 19px;
+  overflow: visible;
+}
+.gem-body {
+  fill: var(--gem, #2c6cff);
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transition: fill 0.6s ease;
+}
+.gem-cut {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.7);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
 #score-pops {
   position: absolute;
   left: 16px;
-  top: 52px;
+  top: 92px;
 }
 .pop {
   position: absolute;
@@ -344,7 +383,7 @@ body:not(.touch) .touch-only {
 .score-best {
   position: absolute;
   left: 4px;
-  top: 54px;
+  top: 94px;
   padding: 3px 12px 4px;
   border-radius: 999px;
   border: 2.5px solid var(--ink);
@@ -519,6 +558,9 @@ body:not(.touch) .touch-only {
   font-size: 26px;
   font-variant-numeric: tabular-nums lining-nums;
 }
+.tally-row.gems b {
+  font-size: 20px;
+}
 .tally-row.best b {
   font-size: 17px;
   opacity: 0.75;
@@ -595,6 +637,11 @@ body:not(.touch) .touch-only {
   0% { transform: rotate(-8deg) scale(1); }
   35% { transform: rotate(6deg) scale(1.4); }
   100% { transform: rotate(-8deg) scale(1); }
+}
+@keyframes gem-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14); }
+  100% { transform: scale(1); }
 }
 @keyframes stamp {
   0% { opacity: 0; transform: rotate(-12deg) scale(1.8); }

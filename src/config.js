@@ -53,6 +53,34 @@ export const CONFIG = {
   // count `wide` times).
   score: { perMeter: 1, clear: 10, wide: 2 },
 
+  // Gems (see game/gems.js): laid in runs along a "ghost" route through the
+  // obstacles ahead. Missing them costs nothing. Times are seconds of running
+  // (so the layout stays fair as speed climbs); [easy, hard] pairs ease from
+  // the first to the second with the obstacle difficulty.
+  gems: {
+    firstAt: 30, // meters of road before the first run
+    size: 1.25, // scale on the cuts as built (an everyday stone ends up ~0.7 m, half the runner's height)
+    spacing: 0.135, // seconds between gems in a run (2.3–3.9 m)
+    ground: 0.86, // height of a gem's centre on the road...
+    low: 0.55, // ...and under a duck bar
+    reach: 0.55, // how far outside the runner's body a gem is still picked up
+    run: [4, 7], // gems in a run along open road (a few more later on)
+    maxRun: 14,
+    often: [0.6, 0.85], // chance a stretch of open road gets a run
+    rest: [1.3, 0.6], // seconds of empty road after a run
+    lead: [1.05, 0.42], // how long before a wall in its lane a run swerves out of it
+    react: [0.6, 0.36], // a gem is never closer than this to a wall in its lane
+    swerve: 0.3, // seconds a run takes to drift across one lane
+    // the difficulty each move first shows up at: runs hung on a jump over a
+    // hurdle, ducked under a bar, wandering across lanes on open road, and
+    // jumps on open road for gems you don't strictly need
+    unlock: { arc: 0.06, slide: 0.13, wander: 0.1, hop: 0.3 },
+    doorTrail: 0.75, // chance of a line of gems leading through a doorway
+    // points (× depth) for a gem and a crown stone; a run taken whole pays
+    // `perfect` × its length on top
+    score: { gem: 10, crown: 30, perfect: 5 },
+  },
+
   // Hits
   stumbleWindow: 4.5, // a second hit within this many seconds ends the run
   stumbleSpeedMul: 0.72,
