@@ -4,6 +4,7 @@ import {
   cypressParts, roundTreeParts, bushParts, potParts, lanternPostParts, gateFrameParts, gateLeafParts,
 } from './shapes.js';
 import { shaftParts, butterflyParts, giantFlowerParts } from './whimsy.js';
+import { crystal, briolette, outlineCut, pearOutline, heartOutline, FACE } from './gems.js';
 import { groundStrip, doorShape } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -33,6 +34,25 @@ const C = {
   lawn: '#3f7a52',
   lantern: '#ffd27a',
   frameDark: '#24453c',
+};
+
+// The Ruby: dewdrops of red glass, as if the humid air had condensed on the
+// glazing into gems — briolettes, faceted all over, hanging point up. Red, the
+// complement of all that green and mint, and nothing else in here is that
+// colour. Face-on pear cuts mixed into the runs; a ruby heart for the prize
+// spots, for a garden of blossom.
+const GEM = {
+  name: 'ruby',
+  tints: ['#ff2d55', '#ff4a6e', '#e81e48'],
+  cuts: () => [
+    [crystal(briolette({ r: 0.21, h: 0.62 }))],
+    [crystal(outlineCut(pearOutline(0.25, 0.3)), { rx: FACE })],
+    [crystal(outlineCut(heartOutline(0.33), { depth: 0.1, back: 0.2 }), { rx: FACE })],
+  ],
+  motion: [1.2, 1.9, 0.08, 0.12],
+  look: [0.74, 1, 0.28, 0.38],
+  glow: 0.65,
+  pool: 0.3,
 };
 
 const OPENING = { halfW: 4.4, rectH: 5.6, arch: true };
@@ -253,6 +273,7 @@ export default {
   name: 'The Glasshouse',
   doorColor: '#2fa39a',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  gem: GEM,
   env: {
     sky: ['#2f7f88', '#ffe6a8', '#4f8f74'],
     bloom: ['#2fc0a8', '#ff9ac8', '#ffa83a'], // the colours its doorway bloom is made of

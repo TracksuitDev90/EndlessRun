@@ -8,6 +8,8 @@ import { RNG } from '../core/rng.js';
 import { Course } from './course.js';
 import { ChunkStreamer } from './chunks.js';
 import { ObstacleField } from './obstacles.js';
+import { GemField } from './gems.js';
+import { Sparkles } from '../render/sparkles.js';
 import { Player } from './player.js';
 import { ChaseCamera } from './camera.js';
 import { Portal } from './portal.js';
@@ -18,6 +20,7 @@ const smooth01 = (e0, e1, x) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
 };
+const CHEST = 0.9; // a collected gem flies to the runner's chest, this high above their feet
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const numeral = (n) => NUMERALS[n - 1] || String(n);
 
@@ -34,15 +37,17 @@ export class Game {
     this.course = new Course(this.worlds);
     this.chunks = new ChunkStreamer(this);
     this.obstacles = new ObstacleField(this);
+    this.gems = new GemField(this);
     this.player = new Player(WORLD_DEFS[0].env);
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
+    this.sparkles = new Sparkles();
     this.dream = new Dream();
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
-    this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points);
+    this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.sparkles.points);
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
@@ -88,8 +93,11 @@ export class Game {
     this.crashTimer = 0;
     this.crashShown = false;
     this.score = 0;
+    this.gemCount = 0;
     this.bestBefore = this.best;
     this.passedBest = false;
+    this.ui.setGems(0);
+    this.sparkles.reset();
 
     this.course.ensure(0, CONFIG.speed.start);
     this.depth = this.course.segAt(0).ordinal;
@@ -100,6 +108,8 @@ export class Game {
     this.sceneMain.add(this.current.root);
     this.chunks.reset(seed, 0);
     this.obstacles.reset(this.rng, 0, !this.tutorialDone && !this.params.world);
+    this.gems.reset(new RNG(seed ^ 0x2c1b3c6d), 0);
+    this.ui.setGemColor(this.current.def.gem?.tints[0]);
 
     this.player.reset();
     copyEnvUniforms(this.player.u, this.current.u);
@@ -108,6 +118,7 @@ export class Game {
 
     this.chunks.update(0);
     this.obstacles.update(0, 0);
+    this.gems.update(0, 0);
     for (const w of this.worlds) w.flush(this.origin);
 
     this.state = title ? 'title' : 'running';
@@ -140,7 +151,7 @@ export class Game {
     this.pausedFrom = this.state;
     this.state = 'paused';
     this.saveBest();
-    this.ui.showPause(true, this.score);
+    this.ui.showPause(true, this.score, this.gemCount);
     this.audio.suspend();
   }
 
@@ -174,6 +185,30 @@ export class Game {
 
   announceWorld(seg) {
     this.ui.toast(numeral(seg.ordinal), seg.world.name);
+  }
+
+  // --- gems -----------------------------------------------------------------
+  // Each gem pays its points × depth with a chime that climbs the scale along
+  // its run, and throws off sparkles; taking a whole run pays a bonus on top.
+  // A gem missed costs nothing.
+  collectGems() {
+    const p = this.player;
+    const got = this.gems.collect(p, this.prevDist, this.dist, this.time);
+    if (!got.length) return;
+    const S = CONFIG.gems.score;
+    for (const g of got) {
+      this.score += (g.crown ? S.crown : S.gem) * this.depth;
+      this.gemCount++;
+      this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.tint, this.time, g.crown ? 1.5 : 1);
+      this.audio.gem(g.index, g.crown);
+      if (g.whole) {
+        const bonus = S.perfect * g.run.size * this.depth;
+        this.score += bonus;
+        this.ui.scorePop(bonus);
+        this.audio.gemRun();
+      }
+    }
+    this.ui.gem(this.gemCount);
   }
 
   // --- score ----------------------------------------------------------------
@@ -303,6 +338,7 @@ export class Game {
     const old = this.current;
     this.chunks.dropWorld(old);
     this.obstacles.dropWorld(old);
+    this.gems.dropWorld(old);
     old.clearAll();
     old.flush(this.origin);
     old.root.removeFromParent();
@@ -316,6 +352,7 @@ export class Game {
     const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
     this.announceWorld(this.door.seg);
+    this.ui.setGemColor(this.current.def.gem?.tints[0]);
     this.depth = this.door.seg.ordinal;
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
     this.dream.doorway(this.current.def, this.current.env);
@@ -345,6 +382,8 @@ export class Game {
     this.sceneMain.add(this.current.root);
     this.chunks.reset(this.seed, d);
     this.obstacles.reset(this.rng, d, false);
+    this.gems.reset(new RNG(this.seed ^ 0x2c1b3c6d ^ Math.floor(d)), d);
+    this.ui.setGemColor(this.current.def.gem?.tints[0]);
     copyEnvUniforms(this.player.u, this.current.u);
     const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
@@ -373,7 +412,7 @@ export class Game {
       this.crashTimer -= dt;
       if (this.crashTimer <= 0 && !this.crashShown) {
         this.crashShown = true;
-        this.ui.showCrash(this.continuesLeft, this.score, this.best, this.score > this.bestBefore && this.score > 0);
+        this.ui.showCrash(this.continuesLeft, this.score, this.best, this.score > this.bestBefore && this.score > 0, this.gemCount);
       }
     } else if (st === 'reviving') {
       this.speed = 0;
@@ -393,14 +432,19 @@ export class Game {
 
     this.course.ensure(this.dist, Math.max(this.speed, CONFIG.speed.start));
     this.chunks.update(this.dist);
-    if (st !== 'title') this.obstacles.update(this.dist, this.runTime);
+    if (st !== 'title') {
+      this.obstacles.update(this.dist, this.runTime);
+      this.gems.update(this.dist, this.runTime);
+    }
 
     this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
     if (this.state === 'running') this.collide();
+    if (this.state === 'running') this.collectGems();
     if (this.state === 'running') this.updateScore(dt);
 
     const pz = -(this.dist - this.origin);
     this.player.place(pz);
+    shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);
     this.dream.update(dt);
     this.cam.sway = this.dream.sway;
     this.cam.update(dt, this.player, pz, this.speed, this.time);
@@ -458,7 +502,7 @@ export class Game {
       w.setAllVisibleForCompile(true);
       scene.add(w.root);
     }
-    scene.add(this.player.root, this.player.shadow, this.particles.points, this.portal.depthMesh, this.portal.stencilMesh);
+    scene.add(this.player.root, this.player.shadow, this.particles.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
     try {
       if (this.renderer.compileAsync) await this.renderer.compileAsync(scene, this.cam.camera);
       else this.renderer.compile(scene, this.cam.camera);
@@ -468,7 +512,7 @@ export class Game {
         root.removeFromParent();
         if (parent) parent.add(root);
       }
-      this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points);
+      this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.sparkles.points);
       this.scenePortal.add(this.portal.stencilMesh);
     }
   }

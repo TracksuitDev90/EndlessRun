@@ -9,6 +9,9 @@ const CHORDS = [
   [45, 52, 57, 59, 61], // A(add9)
 ];
 const CHIMES = [74, 76, 78, 81, 83, 86, 88];
+// a gem's ting climbs this ladder (D major pentatonic, like the pads) one
+// step per gem along its run
+const GEM_NOTES = [81, 83, 86, 88, 90, 93, 95, 98, 100, 102];
 const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
 export class Ambient {
@@ -159,6 +162,46 @@ export class Ambient {
     if (!ctx || this.muted || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     [81, 86, 88, 93].forEach((m, i) => this.chime(hz(m), t + i * 0.07, 0.05));
+  }
+
+  // A short glassy ting: a sine with two inharmonic partials, quick to fade.
+  ting(f, t, vol) {
+    const ctx = this.ctx;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    g.connect(this.bus);
+    for (const [mul, amp] of [[1, 1], [2.76, 0.22], [5.4, 0.08]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * mul;
+      const a = ctx.createGain();
+      a.gain.value = amp;
+      o.connect(a).connect(g);
+      o.start(t);
+      o.stop(t + 0.95);
+    }
+    setTimeout(() => g.disconnect(), (t - ctx.currentTime + 1.2) * 1000);
+  }
+
+  // A gem: the step-th of its run (missing one doesn't reset the climb); a
+  // crown stone rings an octave over.
+  gem(step, crown) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const m = GEM_NOTES[Math.min(step, GEM_NOTES.length - 1)];
+    this.ting(hz(m), t, crown ? 0.07 : 0.05);
+    if (crown) this.ting(hz(m + 12), t + 0.06, 0.035);
+  }
+
+  // A whole run taken: a quick sparkle of notes on top.
+  gemRun() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    [86, 90, 93, 98].forEach((m, i) => this.ting(hz(m), t + 0.1 + i * 0.06, 0.04));
   }
 
   // A bright little run of chimes the moment you beat your best.

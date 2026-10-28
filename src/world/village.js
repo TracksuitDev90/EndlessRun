@@ -3,6 +3,7 @@ import {
   cypressParts, roundTreeParts, bushParts, lanternPostParts, potParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { shaftParts, giantFlowerParts } from './whimsy.js';
+import { crystal, brilliant } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -36,6 +37,24 @@ const C = {
   grass: '#5ea83a',
 };
 const HOUSE_TINTS = ['#f2c64b', '#8fe0b8', '#45b89a', '#e9b43a', '#bfe7a0', '#6fcfa8', '#f6d873', '#9ad86a'];
+
+// The Sapphire: the round brilliant everyone draws when they draw a gem, so
+// the first gem you ever see reads as one. Cornflower blue against the lane's
+// greens and mustards; oval stones mixed into the runs, a big twelve-sided
+// royal brilliant for the prize spots.
+const GEM = {
+  name: 'sapphire',
+  tints: ['#2c6cff', '#3f8dff', '#4f5cff'],
+  cuts: () => [
+    [crystal(brilliant({ r: 0.29 }))],
+    [crystal(brilliant({ r: 0.28, sx: 1.28, sz: 0.82 }))],
+    [crystal(brilliant({ r: 0.36, sides: 12, crown: 0.46 }))],
+  ],
+  motion: [1.3, 2.2, 0.07, 0.14],
+  look: [0.75, 1, 0.3, 0.35],
+  glow: 0.55,
+  pool: 0.3,
+};
 
 const OPENING = { halfW: 4.6, rectH: 8.2, arch: true };
 const SUN = [-0.55, 0.78, 0.38];
@@ -231,6 +250,7 @@ export default {
   name: 'The Cypress Lane',
   doorColor: '#f2b93b',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  gem: GEM,
   env: {
     sky: ['#7cbf46', '#eef8b4', '#3d8a36'],
     bloom: ['#f2b93b', '#a6e04a', '#3fb8b0'], // the colours its doorway bloom is made of

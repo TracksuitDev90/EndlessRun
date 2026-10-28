@@ -8,7 +8,9 @@ next world, nested inside this one. Run through, and you're in it. Keep
 running and the worlds come back around, each time a little stranger — and
 once you're deep enough they stop holding their shape: slowly at first, then
 roads corkscrew, forests melt, skies swirl like wet paint. Every doorway also raises your score
-multiplier, so the strangest stretches are the ones worth the most.
+multiplier, so the strangest stretches are the ones worth the most. And every
+world has its own gemstone to collect, laid in runs that swerve round its
+walls, arc over its hurdles and lead you through its doorways.
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -105,6 +107,77 @@ colour is left alone). Tunables (including when each effect joins) live in
 
 ![The dream deepening: worlds 3, 6, 10, 14 and 18 of one run — untouched, a quiet morph in the distance, the first stir in the sky, then the colours turning](docs/dream.jpg)
 
+## Gems
+
+![Each world's gem: its everyday stone (left), its crown stone (middle) and the variant mixed into its runs (right)](docs/gems.jpg)
+
+Every world has its own stone, in a colour chosen to stand off that world's
+palette, and cut in that world's character:
+
+| World | Gem | Why it sings there | Cuts: everyday · variant · crown |
+|---|---|---|---|
+| Cypress Lane | **Sapphire** | cornflower blue against the greens and mustards | round brilliant (the gem everyone draws, so the first one you see reads as one) · oval brilliant · twelve-sided royal brilliant |
+| Deepwood | **Amethyst** | the one purple thing in the shade, glowing like a spirit-lamp | crystal points growing from a lump of dark stone · a lone double-terminated point · a great geode cluster |
+| Night Rooftops | **Citrine** | honey gold against the night blue | pentagon cut stood face-on like a star come down · trillion · a faceted fallen star |
+| Hall of Doors | **Emerald** | green, the complement of the coral walls | an heirloom pendant — emerald cut in a gold bezel (the hall's doorknob brass) on a loop · square asscher · a larger pendant in a double rim |
+| Glasshouse | **Ruby** | red against all that green and mint, as if the humid air had condensed into gems | briolette dewdrop faceted all over · pear cut · a heart |
+| Sky Road | **Aquamarine** | turquoise, the complement of all that amber — a splinter of clear sky | long leaning double-terminated shard · squat sky-diamond · a fan of three splinters |
+
+Each turns slowly and bobs where it hangs, at its own world's pace (the
+amethysts drift like the fireflies; the aquamarines ride the biggest swells;
+the emeralds barely stir in their still room), and unfolds out of nothing as
+it comes in range like everything else. A soft halo and a little pool of light
+on the road make them stand off the scene — subtle in daylight, a glowing trail
+in the dark worlds. They're painted rather than ray-traced: every facet takes
+its own tone between the stone's dark depths and the pale light caught on its
+crown, the colour burns brightest through the face turned to you, and facets
+that mirror a light into your eye flash white (one light is the world's, one
+sits over the camera's shoulder, so they sparkle even in the Deepwood). Like
+the runner, a gem keeps its colour however far the dream turns the palette. An
+everyday stone is about 0.7 m across — half the runner's height — so a run
+reads at a glance on a phone. Run through one and it swells, flashes and flies
+into you in a spray of sparkles in its colour.
+
+![Gems in play: a run leading through a doorway into the Deepwood, the first amethyst taken on the far side (+130 for the whole run), and runs on the rooftops, through the Hall of Doors, the Glasshouse and along the Sky Road](docs/gem-runs.jpg)
+
+**Where they go.** Gems are laid in runs along a *ghost route* — the line a
+good runner would take through the obstacles ahead, planned row by row as the
+obstacles are laid — so every run can be taken, reads at a glance, and plays
+with the obstacles instead of ignoring them:
+
+- it **swerves out of a lane** before the wall in it (and, later on, tucks back
+  in behind it), the gems drifting across between lanes;
+- it **arcs over a hurdle** at the exact height of a jump taken at the right
+  moment (so following the arc *is* the jump), with a crown stone at the top;
+- it **ducks under a bar** — low gems you take in a slide, a crown waiting on
+  the far side;
+- it **threads the gap** between walls;
+- and it **leads you through a doorway**: the last few gems in this world's
+  stone, then — as the same run, its chime still climbing — the first few in
+  the next world's, a crown first.
+
+A gem never touches an obstacle or a doorway's frame, never hangs in a lane
+so close before a wall that taking it leaves no time to swerve, and a run
+only arcs or ducks if the route is settled in its lane in time. Runs ripple —
+each gem turns and bobs a beat behind the one before — and mix in the world's
+variant cut every few gems so a line never looks stamped out.
+
+**Getting harder.** Early on the route is lazy and kind: short runs with
+plenty of empty road between, kept to free lanes, swerving a full second
+before anything. As the run goes on (on the same curve as the obstacles) it
+swerves later and later (down to about 0.4 s before a wall), takes the hurdles
+and bars it used to steer round, wanders across lanes on open road, hangs gems
+in the air for jumps you don't strictly need, and the runs come longer and
+closer together. The first run of the game pairs a run with each tutorial
+obstacle, so the gems teach the jump, the slide and the dodge along with the
+hints.
+
+**No penalty.** Missing a gem costs nothing — no streak to break, no points
+lost, and the chime keeps climbing from wherever you rejoin a run.
+
+Tunables (spacing, heights, how early runs swerve, when each move unlocks,
+points) live in `CONFIG.gems`.
+
 ## Score
 
 You score **one point per meter × your depth** — ×1 in the first world, ×2
@@ -114,6 +187,12 @@ bonus** of 10 × depth for every obstacle you get past without touching it
 running further: the multiplier is the badge stamped on the end of the score
 pill, and it bumps every time you come through a door. Stumbling costs you that
 obstacle's bonus; a Continue keeps your score and multiplier.
+
+**Gems** pay 10 × depth each (a crown stone 30 × depth), with a glassy ting
+that climbs the pentatonic scale along the run; take a whole run (three gems
+or more) and it pays 5 × its length × depth on top, with a sparkle of notes.
+The gem counter sits under the score, its little gem in the colour of the
+world you're in, and the pause and crash cards tally the run's gems.
 
 Your best is saved on the device, shown on the title screen, and the moment you
 pass it mid-run a *new best!* ribbon pops under the score with a little run of
@@ -220,6 +299,12 @@ Append to the URL:
   decals. Ink lines use the inverted-hull trick.
 - **No hitches.** All shaders are compiled during the loading screen; no
   allocations in the hot loop.
+- **Gems are cheap too.** A world's three cuts are three instanced batches
+  (plus their ink), its halos and ground pools one batch each, and the
+  pick-up sparkles a single point cloud whose bursts live in uniforms — nine
+  draw calls in all. Spinning, bobbing, rippling and the pick-up flight happen
+  in the vertex shader; taking a gem rewrites one small batch once. Planning
+  and pick-up cost a few microseconds a frame.
 - **Adaptive resolution.** Renders at up to 2× device pixels and steps down in
   0.25 increments if the frame rate dips below ~52 fps.
 
@@ -351,12 +436,14 @@ src/main.js                   boot, render loop, adaptive resolution, input wiri
 src/core/                     input (swipes + keys), ambient audio, seeded RNG
 src/render/                   shaders, geometry kit, instanced batches, textures, particles
 src/world/                    world runtime + one file per world (art, lighting, lap
-                              variations, layout, obstacles, doorway); whimsy.js holds
-                              the shared later-lap props and light volumes
+                              variations, layout, obstacles, gem, doorway); whimsy.js holds
+                              the shared later-lap props and light volumes, gems.js the
+                              gem cuts (faceted lofts, settings)
 src/game/                     game loop, player (animation, IK legs, secondary
                               motion, movement), outfit (palette, cape), cloth,
                               runner asset loader, camera, course (world order),
-                              chunk streaming, obstacle director, portal, dream
+                              chunk streaming, obstacle director, gem director
+                              (gems.js: the ghost route and pick-up), portal, dream
                               (depth recipes and the shared warp uniforms)
 tools/runner/build.py         offline sculpt of the runner -> assets/runner/
 vendor/three/                 three.js r185 (MIT)
@@ -365,7 +452,7 @@ vendor/three/                 three.js r185 (MIT)
 ### Adding a world
 
 Create `src/world/<name>.js` exporting `{ id, name, doorColor, env, visits,
-gate, build(b), chunk(ctx), obstacles }` (copy any existing world as a
+gate, gem, build(b), chunk(ctx), obstacles }` (copy any existing world as a
 template) and add it to `src/world/index.js`. `env` sets the palette and the
 lighting (`light.soft` / `wrap` for harsh vs soft light, `rim`, `mist`,
 `dapple`, `grade`, `skyFx`, …, and `bloom`, the three colours its doorway bloom is made of); `visits` lists partial `env` overrides for
@@ -380,7 +467,18 @@ shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
 true })` gives a surface the running-water shader, and ground pattern 6 is the
 forest's long grass (pass the chunk distance as `p0` so it runs on seamlessly).
 
+`gem` is the world's collectible: `tints` (a few close shades it's picked from,
+the first also colouring the HUD), `cuts()` returning its three stones —
+everyday, variant, crown — as part lists built from `world/gems.js`
+(`brilliant`, `briolette`, `crystalPoint`, `bipyramid`, `star`, `stepCut`,
+`outlineCut` with `pearOutline` / `heartOutline`, `bezelParts`; wrap crystal
+in `crystal()`, settings in `metal()`, rock in `stone()`, and stand face-on cuts
+up with `rx: FACE`), `motion` (`[turn, bob rate, bob height, nod]`), `look`
+(`[self-lit, glints, facet hue spread, fire]`) and `glow` / `pool` (halo and
+ground-light strength). Pick a colour nothing else in the world is.
+
 ## Not in yet (on purpose)
 
-Keys/collectibles, power-ups, extra characters and most sound effects are
-left for the next pass; the ambient soundtrack is generated live with Web Audio.
+Keys, power-ups, extra characters and most sound effects are left for the
+next pass; the ambient soundtrack (and the gems' chimes) is generated live
+with Web Audio.

@@ -1,6 +1,7 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
 import { shaftParts } from './whimsy.js';
+import { crystal, stone, crystalPoint, rough } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -41,6 +42,32 @@ const SHROOMS = ['#9affe0', '#ffe08a', '#b8a8ff', '#8ae0ff'];
 const TOADSTOOLS = ['#ff5a8a', '#b86aff', '#ff8a3a', '#4ad0c0', '#ffd24a'];
 const JELLIES = ['#ff9ad8', '#9adfff', '#c8a8ff', '#a8ffd0'];
 const RAINBOW = [[3.0, 1.1, 2.4], [3.0, 2.3, 0.9], [1.3, 2.8, 1.5], [1.0, 2.4, 3.2], [2.2, 1.2, 3.4]];
+
+// The Amethyst: raw violet crystal points growing out of a lump of dark
+// stone, as if prised from a geode under the roots — the one thing in the
+// Deepwood that is purple, glowing like a spirit-lamp in the shade. A lone
+// double-terminated point mixed into the runs; a great geode cluster for the
+// prize spots. They drift slowly, like the fireflies.
+function amethystCluster(points, rock, seed, lift) {
+  const parts = [stone(rough({ r: rock, seed }), null, { sy: 0.62, y: -lift, grad: ['#211b2a', '#584866', -lift - rock * 0.5, -lift + rock * 0.6] })];
+  points.forEach(([len, r, rx, rz, x, z], i) => {
+    parts.push(crystal(crystalPoint({ r, len, tip: r * 1.5, seed: seed + i }), { rx, rz, x, y: rock * 0.2 - lift, z }));
+  });
+  return parts;
+}
+const GEM = {
+  name: 'amethyst',
+  tints: ['#a24dff', '#bd5cff', '#8a4dff'],
+  cuts: () => [
+    amethystCluster([[0.3, 0.085, 0.08, -0.05, 0, 0], [0.2, 0.065, -0.15, 0.55, -0.07, 0.02], [0.22, 0.07, 0.2, -0.5, 0.07, -0.02], [0.15, 0.055, -0.6, 0.12, 0, -0.06]], 0.15, 3, 0.2),
+    [crystal(crystalPoint({ r: 0.09, len: 0.34, tip: 0.14, double: true, seed: 9 }), { rz: 0.3, rx: 0.1 })],
+    amethystCluster([[0.38, 0.1, 0.05, 0.04, 0, 0], [0.27, 0.08, -0.2, 0.6, -0.1, 0.03], [0.29, 0.085, 0.15, -0.55, 0.1, 0], [0.2, 0.065, -0.65, -0.2, 0.03, -0.08], [0.18, 0.06, 0.6, 0.3, -0.04, 0.09]], 0.2, 17, 0.24),
+  ],
+  motion: [0.9, 1.6, 0.09, 0.16],
+  look: [0.82, 1, 0.35, 0.4],
+  glow: 0.5,
+  pool: 0.55,
+};
 
 const OPENING = { halfW: 4.4, rectH: 6.6, arch: true };
 const GATE_DEPTH = 2.4;
@@ -517,6 +544,7 @@ export default {
   name: 'The Deepwood',
   doorColor: '#5a9a32',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  gem: GEM,
   env: {
     sky: ['#0a1d18', '#3a6446', '#0c2219'],
     bloom: ['#6ab83a', '#e2ff86', '#ffae4a'], // the colours its doorway bloom is made of

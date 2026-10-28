@@ -11,8 +11,11 @@ import {
   makeBeamMaterial,
   makePoolMaterial,
   makeSkyMaterial,
+  makeGemMaterial,
+  makeGemGlowMaterial,
 } from '../render/shaders.js';
 import { P, part, merge, rgb } from '../render/geo.js';
+import { CONFIG } from '../config.js';
 
 // A World owns its palette/lighting uniforms, its sky dome and every prop
 // batch it can place. World *definitions* (village.js etc.) describe the art;
@@ -70,7 +73,9 @@ export class World {
     this.root.add(this.sky);
     this.track(skyMat, true);
 
-    def.build(new WorldBuilder(this));
+    const b = new WorldBuilder(this);
+    def.build(b);
+    if (def.gem) b.gems(def.gem);
   }
 
   // Re-light for the n-th return to this world (0 = first time).
@@ -106,12 +111,14 @@ export class World {
   }
 
   // Place one instance. o: { ry, s, sx, sy, sz, c:[r,g,b], p0, p1 }
+  // (p2 is left for the gems: the moment one was collected)
   put(owner, name, x, y, d, o) {
     const it = makeItem();
     it.owner = owner;
     it.x = x;
     it.y = y;
     it.d = d;
+    it.p2 = 0;
     if (o) {
       const s = o.s ?? 1;
       it.ry = o.ry ?? 0;
@@ -237,6 +244,27 @@ class WorldBuilder {
     const b = new Batch(name, g, mat, null, o.cap ?? 64);
     b.renderOrder = 1;
     return this.world.addBatch(name, b);
+  }
+
+  // The world's collectible gem (def.gem, see world/gems.js): its three cuts
+  // (gem0 the everyday stone, gem1 the variant mixed into runs, gem2 the
+  // crown for prize spots), each inked, plus the halo round every gem and the
+  // light it spills on the road.
+  gems(spec) {
+    const o = { spin: spec.motion, look: spec.look };
+    const size = CONFIG.gems.size;
+    spec.cuts().forEach((parts, i) => {
+      const mat = makeGemMaterial(this.u, o);
+      const name = `gem${i}`;
+      const geo = merge(parts).scale(size, size, size);
+      this.world.addBatch(name, new Batch(name, geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), [96, 64, 40][i]));
+    });
+    for (const [name, gain, pool] of [['gemGlow', spec.glow, false], ['gemPool', spec.pool, true]]) {
+      const g = part(quadGeo(), '#ffffff', { outline: 0 });
+      const b = new Batch(name, g, makeGemGlowMaterial(this.u, { ...o, gain, pool }), null, 200);
+      b.renderOrder = pool ? 1 : 7;
+      this.world.addBatch(name, b);
+    }
   }
 
   merge(parts) {

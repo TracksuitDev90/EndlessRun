@@ -3,6 +3,7 @@ import {
   cloudParts, wallDoorParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.js';
+import { crystal, stepCut, octagon, bezelParts, FACE } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -28,6 +29,37 @@ const C = {
 };
 const DOOR_TINTS = ['#2fa59a', '#e8b13a', '#3456b8', '#8fd6b6', '#8a4a8a', '#c8402e', '#7fb8e0', '#f08a5d', '#4a8a5a', '#f2d06b'];
 const BOOKS = ['#c8402e', '#3456b8', '#e8b13a', '#2fa59a', '#f6ecd4', '#8a4a8a', '#4a8a5a', '#f08a5d'];
+
+// The Emerald: an heirloom pendant — an emerald-cut stone in a gold bezel
+// (the same brass as the hall's doorknobs and teacup rims), hung from a little
+// loop, as if dropped out of one of the drawers. Green, the complement of the
+// coral walls. Square asscher cuts mixed into the runs; a larger pendant in a
+// double rim of gold for the prize spots. They turn slowly and barely bob, like
+// things in a still, sunlit room.
+function pendant({ w, h, c, bail = 0, double = false }) {
+  const o = octagon(w, h, c);
+  const corner = (sx, sy) => [sx * (w - c / 2) * 1.04, sy * (h - c / 2) * 1.04];
+  const parts = [
+    crystal(stepCut({ w, h, chamfer: c }), { rx: FACE }),
+    ...bezelParts(o, { claws: [corner(1, 1), corner(-1, 1), corner(1, -1), corner(-1, -1)], bail: double ? 0 : bail }),
+  ];
+  // the loop hangs from whichever rim is outermost
+  if (double) parts.push(...bezelParts(o, { k: 1.26, inner: 1.15, depth: 0.05, color: '#f2d27a', bail }));
+  return parts;
+}
+const GEM = {
+  name: 'emerald',
+  tints: ['#18c46a', '#2fd88a', '#12b060'],
+  cuts: () => [
+    pendant({ w: 0.19, h: 0.26, c: 0.065, bail: 0.05 }),
+    pendant({ w: 0.22, h: 0.22, c: 0.075 }),
+    pendant({ w: 0.24, h: 0.32, c: 0.08, bail: 0.06, double: true }),
+  ],
+  motion: [1.0, 1.7, 0.045, 0.1],
+  look: [0.72, 1, 0.22, 0.35],
+  glow: 0.7,
+  pool: 0.22,
+};
 
 const OPENING = { halfW: 4.6, rectH: 11.0, arch: false };
 const GATE_DEPTH = 1.6;
@@ -275,6 +307,7 @@ export default {
   name: 'The Hall of Doors',
   doorColor: '#d8553a',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  gem: GEM,
   env: {
     sky: ['#2e6cc4', '#f6e9c8', '#f4f8fb'],
     bloom: ['#ff6a4a', '#ffd23a', '#3ab0e0'], // the colours its doorway bloom is made of
