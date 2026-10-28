@@ -6,7 +6,7 @@ import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// III · The Hall of Doors — a coral corridor with a checkerboard floor,
+// IV · The Hall of Doors — a coral corridor with a checkerboard floor,
 // open to the sky, lined with doors of every color. Nested door frames
 // recede ahead; doors and armchairs float among the clouds outside.
 // Lit like a de Chirico piazza: hard, low, raking sun and razor-edged

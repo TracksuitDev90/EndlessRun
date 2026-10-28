@@ -11,6 +11,7 @@ import { ObstacleField } from './obstacles.js';
 import { Player } from './player.js';
 import { ChaseCamera } from './camera.js';
 import { Portal } from './portal.js';
+import { Dream } from './dream.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -37,6 +38,7 @@ export class Game {
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
+    this.dream = new Dream();
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
@@ -46,6 +48,8 @@ export class Game {
     this.time = 0;
     this.god = !!params.god;
     this.tutorialDone = readFlag('er.tutorialDone');
+    this.best = readNumber('er.best');
+    this.ui.setBest(this.best);
     this.newRun(true);
   }
 
@@ -72,7 +76,7 @@ export class Game {
     this.next = null;
     this.door = null;
 
-    this.course.reset(new RNG(seed ^ 0x5bd1e995), this.params.world, this.params.visit || 0);
+    this.course.reset(new RNG(seed ^ 0x5bd1e995), this.params.world, this.params.visit || 0, this.params.dream);
     this.dist = 0;
     this.prevDist = 0;
     this.origin = 0;
@@ -83,8 +87,14 @@ export class Game {
     this.continuesLeft = CONFIG.continuesPerRun;
     this.crashTimer = 0;
     this.crashShown = false;
+    this.score = 0;
+    this.bestBefore = this.best;
+    this.passedBest = false;
 
     this.course.ensure(0, CONFIG.speed.start);
+    this.depth = this.course.segAt(0).ordinal;
+    this.ui.setScore(0, this.depth);
+    this.dream.reset(this.course.segAt(0).dream);
     this.current = this.course.segAt(0).world;
     this.current.applyVisit(this.course.segAt(0).visit);
     this.sceneMain.add(this.current.root);
@@ -129,7 +139,8 @@ export class Game {
     if (this.state !== 'running' && this.state !== 'reviving') return;
     this.pausedFrom = this.state;
     this.state = 'paused';
-    this.ui.showPause(true);
+    this.saveBest();
+    this.ui.showPause(true, this.score);
     this.audio.suspend();
   }
 
@@ -165,6 +176,31 @@ export class Game {
     this.ui.toast(numeral(seg.ordinal), seg.world.name);
   }
 
+  // --- score ----------------------------------------------------------------
+  updateScore(dt) {
+    const S = CONFIG.score;
+    this.score += this.speed * dt * S.perMeter * this.depth;
+    const cleared = this.obstacles.collectCleared(this.dist - CONFIG.player.halfDepth);
+    if (cleared > 0) {
+      const bonus = cleared * S.clear * this.depth;
+      this.score += bonus;
+      this.ui.scorePop(bonus);
+    }
+    if (!this.passedBest && this.bestBefore > 0 && this.score > this.bestBefore) {
+      this.passedBest = true;
+      this.ui.newBest();
+      this.audio.fanfare();
+    }
+    this.ui.setScore(this.score, this.depth);
+  }
+
+  saveBest() {
+    if (this.score <= this.best) return;
+    this.best = Math.floor(this.score);
+    writeNumber('er.best', this.best);
+    this.ui.setBest(this.best);
+  }
+
   // --- hits -----------------------------------------------------------------
   collide() {
     const p = this.player;
@@ -186,7 +222,9 @@ export class Game {
 
       const frontal = prevFront <= o.d + 0.05;
       const glancing = dx > 0.62;
-      if (frontal && !glancing) {
+      o.group.hit = true;
+      // dropping into water from a mistimed jump trips you just like running in
+      if ((frontal || o.wade) && !glancing) {
         if (o.kind === 'W') {
           this.crash();
           return;
@@ -224,6 +262,7 @@ export class Game {
 
   crash() {
     this.state = 'crashed';
+    this.saveBest();
     this.player.crash();
     this.cam.kick(1.25);
     this.crashTimer = 1.0;
@@ -243,6 +282,7 @@ export class Game {
         this.next.applyVisit(b.to.visit);
         this.door = { d: b.d, quadD: b.d + this.current.def.gate.depth / 2, seg: b.to };
         this.portal.setShape(this.current.def.gate);
+        this.portal.setTrip(this.current.u.uTrip.value);
         this.portal.active = true;
         this.next.setStencil(true);
         this.scenePortal.add(this.next.root);
@@ -254,6 +294,7 @@ export class Game {
       const t = smooth01(55, 0, door.quadD - this.dist);
       lerpEnvUniforms(this.player.u, this.current.u, this.next.u, t);
       this.particles.set(this.current.env.particles, this.next.env.particles, t);
+      this.dream.set(this.course.prevOf(door.seg)?.dream ?? door.seg.dream, door.seg.dream, t);
       if (this.camDist() >= door.quadD - 0.45) this.crossDoor();
     }
   }
@@ -275,6 +316,9 @@ export class Game {
     const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
     this.announceWorld(this.door.seg);
+    this.depth = this.door.seg.ordinal;
+    this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
+    this.dream.doorway();
     this.audio.door();
     this.door = null;
   }
@@ -296,6 +340,8 @@ export class Game {
     this.course.ensure(d, Math.max(this.speed, CONFIG.speed.start));
     this.current = this.course.segAt(d).world;
     this.current.applyVisit(this.course.segAt(d).visit);
+    this.depth = this.course.segAt(d).ordinal;
+    this.dream.reset(this.course.segAt(d).dream);
     this.sceneMain.add(this.current.root);
     this.chunks.reset(this.seed, d);
     this.obstacles.reset(this.rng, d, false);
@@ -327,7 +373,7 @@ export class Game {
       this.crashTimer -= dt;
       if (this.crashTimer <= 0 && !this.crashShown) {
         this.crashShown = true;
-        this.ui.showCrash(this.continuesLeft);
+        this.ui.showCrash(this.continuesLeft, this.score, this.best, this.score > this.bestBefore && this.score > 0);
       }
     } else if (st === 'reviving') {
       this.speed = 0;
@@ -351,9 +397,12 @@ export class Game {
 
     this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
     if (this.state === 'running') this.collide();
+    if (this.state === 'running') this.updateScore(dt);
 
     const pz = -(this.dist - this.origin);
     this.player.place(pz);
+    this.dream.update(dt);
+    this.cam.sway = this.dream.sway;
     this.cam.update(dt, this.player, pz, this.speed, this.time);
     shared.uCamPos.value.copy(this.cam.camera.position);
     this.updateDoor();
@@ -430,6 +479,20 @@ function readFlag(k) {
     return localStorage.getItem(k) === '1';
   } catch {
     return false;
+  }
+}
+function readNumber(k) {
+  try {
+    return Math.max(0, Number(localStorage.getItem(k)) || 0);
+  } catch {
+    return 0;
+  }
+}
+function writeNumber(k, v) {
+  try {
+    localStorage.setItem(k, String(v));
+  } catch {
+    /* storage unavailable (private mode) */
   }
 }
 function writeFlag(k) {

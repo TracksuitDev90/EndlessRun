@@ -3,6 +3,7 @@ import rooftops from './rooftops.js';
 import corridor from './corridor.js';
 import conservatory from './conservatory.js';
 import causeway from './causeway.js';
+import forest from './forest.js';
 
 // The first lap always nests inward in this order; later laps shuffle.
-export const WORLD_DEFS = [village, rooftops, corridor, conservatory, causeway];
+export const WORLD_DEFS = [village, forest, rooftops, corridor, conservatory, causeway];

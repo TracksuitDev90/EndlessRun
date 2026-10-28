@@ -47,6 +47,12 @@ export const CONFIG = {
   laneRate: 16, // lane-change responsiveness (higher = snappier)
   inputBuffer: 0.16, // seconds a jump pressed in mid-air is remembered
 
+  // Score: every meter run is worth `perMeter` points times the depth you're
+  // at (×1 in the first world, ×2 through the first doorway, …), and every
+  // obstacle you get past without a hit pays `clear` × depth (full-width rows
+  // count `wide` times).
+  score: { perMeter: 1, clear: 10, wide: 2 },
+
   // Hits
   stumbleWindow: 4.5, // a second hit within this many seconds ends the run
   stumbleSpeedMul: 0.72,
@@ -67,6 +73,12 @@ export const CONFIG = {
   firstWorldLength: 672,
   doorClearBefore: 52, // no obstacles this close before a doorway
   doorClearAfter: 36, // ...or this close after it
+
+  // Dream depth (see game/dream.js): no distortion in the first world, then
+  // perWorld more per doorway up to max (reached ~13 worlds in). lucidChance:
+  // odds a deeper world comes up calm. reducedMotion scales the shape warps
+  // and camera sway when the OS asks for less motion (colour is untouched).
+  dream: { start: 1, perWorld: 0.11, max: 1.35, lucidChance: 0.18, rushTime: 1.3, rushBase: 0.35, reducedMotion: 0.3 },
 
   // Camera
   camera: { back: 6.6, height: 4.1, lookAhead: 7.5, lookHeight: 0.95, minFov: 52, maxFov: 76, coverHalfWidth: 3.0 },

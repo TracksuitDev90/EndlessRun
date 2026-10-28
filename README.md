@@ -5,22 +5,26 @@ jacket and a crimson hooded cape runs into the screen through a storybook world 
 scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
 next world, nested inside this one. Run through, and you're in it. Keep
-running and the worlds come back around, each time a little stranger.
+running and the worlds come back around, each time a little stranger — and
+the deeper you go, the less they hold their shape: roads corkscrew, forests
+melt, skies swirl like wet paint. Every doorway also raises your score
+multiplier, so the strangest stretches are the ones worth the most.
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 
-![The five worlds](docs/preview.jpg)
+![The six worlds](docs/preview.jpg)
 
 ## The worlds
 
 | # | World | Light | Inspired by |
 |---|-------|-------|-------------|
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
-| II | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
-| III | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour, nested door frames, doors floating among the clouds | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
-| IV | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
-| V | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
+| II | **The Deepwood** — colossal mossy trunks on buttress roots under a canopy that closes overhead, a trodden path through long grass, ferns, wildflowers, glowing mushrooms; the way out is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
+| III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
+| IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour, nested door frames, doors floating among the clouds | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
+| V | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
+| VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
 
 The first lap always nests inward in that order; after that the order shuffles
 (never the same world twice in a row). Each doorway is painted the colour of
@@ -35,12 +39,67 @@ rolls in slow waves:
 | | 2nd visit | 3rd visit | 4th visit |
 |---|---|---|---|
 | Cypress Lane | golden hour, blossom trees, flower beds, petals on the wind | lilac dusk, moon, fireflies, giant flowers over the lane | teal-and-pink dream, aurora, cypresses changing colour |
+| Deepwood | firefly night: moonbeams, little white forest spirits watching from the roots, their heads rattling | the toadstool dusk: violet haze, giant glowing toadstools among the trunks, spores drifting up | the dreaming wood: rainbow bark, jellyfish drifting between the trees, aurora through the leaves |
 | Night Rooftops | paper sky lanterns drift up, faint aurora | a huge moon, strong aurora | purple night, hot-air balloons |
 | Hall of Doors | the books take flight | a tea party at dusk: teal-and-cream floor, teacups and teapots adrift | violet night, the shadows swap sides, clocks float past |
 | Glasshouse | butterflies over the beds, pink petals | dusk, rose glass, giant blooms in the beds | bioluminescent night, glowing spores, aurora |
 | Sky Road | flocks of birds | a ringed planet in a pink sky | whales swimming through the clouds |
 
 ![The Hall of Doors on four visits](docs/laps.jpg)
+
+![The Deepwood on four visits](docs/deepwood.jpg)
+
+### Dream depth
+
+On top of the per-world looks, every doorway takes you one world *deeper*, and
+the deeper you are the less the worlds hold their shape. The first world is
+always untouched; from the second on, each stretch of the course is dealt its
+own seeded *dream recipe* — a handful of distortions, more of them and stronger
+the deeper it lies — so no two passes through the same world ever look alike.
+A recipe blends into the next as you run up to each doorway, so the world
+morphs around you on the approach, and coming through a doorway sends a bloom
+of colour out from the centre of the screen and a swell racing down the road.
+
+| Distortion | What happens |
+|---|---|
+| twist | the road ahead corkscrews about its own axis |
+| waves | slow swells roll through the far world |
+| melt | the far world wobbles like jelly, the tall things most |
+| breathe | props in the distance swell and settle like living things |
+| rings | rings of hue roll toward you through the world |
+| swirl | the sky stirs like wet paint, banded in rainbow |
+| neon | ink lines burn in cycling neon |
+| palette | the whole world turns to new hues |
+
+It creeps in gently over the first lap (a little breathing, a sky starting to
+swirl), is unmistakable by the second, and is in full flight by the third. Every
+so often a deeper world comes up *lucid* — calm, a breather — before it gets
+strange again. Past ~0.35 depth the camera starts to sway a little, too.
+
+Two rules keep it fair and readable: every shape distortion grows with distance
+from the camera, so the stretch of road you're actually reacting to — and every
+obstacle on it — is always exactly where it looks (things far off firm up into
+their true shape as they approach); and the runner keeps their own colours
+however far the palette shifts, so you never lose yourself. If your system asks
+for reduced motion, the shape warps and camera sway are scaled right down (the
+colour is left alone). Tunables live in `CONFIG.dream`.
+
+![The dream deepening: worlds 3, 6, 10, 13 and 20 — the last three panels are all the Sky Road](docs/dream.jpg)
+
+## Score
+
+You score **one point per meter × your depth** — ×1 in the first world, ×2
+once through the first doorway, ×3 after the next, and so on — plus a **clear
+bonus** of 10 × depth for every obstacle you get past without touching it
+(double for full-width rows). So surviving deeper is worth far more than
+running further: the multiplier is the badge stamped on the end of the score
+pill, and it bumps every time you come through a door. Stumbling costs you that
+obstacle's bonus; a Continue keeps your score and multiplier.
+
+Your best is saved on the device, shown on the title screen, and the moment you
+pass it mid-run a *new best!* ribbon pops under the score with a little run of
+chimes. The crash card tallies the run against your best. Tunables live in
+`CONFIG.score`.
 
 ## Controls
 
@@ -68,7 +127,11 @@ tunnels) unlock as the run goes on. All of it is tunable in `CONFIG.obstacles`.
 **Reading obstacles.** Every world draws its obstacles with the same grammar:
 *low and solid to the ground* — jump it; *a frame or overhang with clear floor
 beneath, its lowest edge on the same duck line in every world* — slide under
-it; *tall and solid* — go around it.
+it; *tall and solid* — go around it. In the Deepwood that's a creek banked with
+stones (jump it — and since it's water, you can't land on it: drop into it and
+you trip), a fallen tree propped on a boulder and a stump, its hanging moss
+ending on the duck line (slide under it), and giant mossy boulders, one of them
+roped and hung with paper streamers like a shrine stone (go around).
 
 ## Run it locally
 
@@ -99,8 +162,9 @@ Append to the URL:
 | Flag | Effect |
 |---|---|
 | `?debug` | FPS, draw calls, triangles, pixel ratio, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
-| `?world=rooftops` | start in a given world (`village`, `rooftops`, `corridor`, `conservatory`, `causeway`) |
+| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
+| `?dream=1` | pin every world to one dream depth (0 = off, ~1.35 = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
@@ -238,7 +302,8 @@ src/world/                    world runtime + one file per world (art, lighting,
 src/game/                     game loop, player (animation, IK legs, secondary
                               motion, movement), outfit (palette, cape), cloth,
                               runner asset loader, camera, course (world order),
-                              chunk streaming, obstacle director, portal
+                              chunk streaming, obstacle director, portal, dream
+                              (depth recipes and the shared warp uniforms)
 tools/runner/build.py         offline sculpt of the runner -> assets/runner/
 vendor/three/                 three.js r185 (MIT)
 ```
@@ -255,8 +320,13 @@ each return. `build` registers prop batches from the geometry kit (`b.toon`,
 each 16 m chunk and can check `ctx.visit` to add later-lap props; `obstacles`
 maps the three gameplay kinds (L = jump over, H = slide under, W = go around)
 to your themed props — keep H obstacles' lowest edge at `CONFIG.duckLine`.
+An obstacle spec can also bring companion batches drawn with another material
+(`with: ['creekWater']`), lower its collision top (`top`), skip its contact
+shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
+true })` gives a surface the running-water shader, and ground pattern 6 is the
+forest's long grass (pass the chunk distance as `p0` so it runs on seamlessly).
 
 ## Not in yet (on purpose)
 
-Score, keys/collectibles, power-ups, extra characters and sound effects are
+Keys/collectibles, power-ups, extra characters and most sound effects are
 left for the next pass; the ambient soundtrack is generated live with Web Audio.

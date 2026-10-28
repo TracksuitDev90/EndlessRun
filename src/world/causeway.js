@@ -6,7 +6,7 @@ import { birdParts, whaleParts } from './whimsy.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// V · The Sky Road — a sandstone causeway over a sea of amber cloud, low
+// VI · The Sky Road — a sandstone causeway over a sea of amber cloud, low
 // rolling ridges, floating islands and a huge low sun straight ahead.
 // Harsh backlight: the sun sits dead ahead, so everything facing you falls
 // into warm silhouette with a blazing golden rim, rays fan out of the sun and

@@ -161,6 +161,14 @@ export class Ambient {
     [81, 86, 88, 93].forEach((m, i) => this.chime(hz(m), t + i * 0.07, 0.05));
   }
 
+  // A bright little run of chimes the moment you beat your best.
+  fanfare() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    [74, 78, 81, 86, 90].forEach((m, i) => this.chime(hz(m), t + i * 0.09, 0.06));
+  }
+
   setIntensity(v) {
     if (!this.ctx || this.muted || Math.abs(v - this.intensity) < 0.03) return;
     this.intensity = v;

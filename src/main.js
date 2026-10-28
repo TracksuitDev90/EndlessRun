@@ -9,7 +9,8 @@ import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
 
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
-// ?visit=<n> (start on a later lap's look), ?seed=<n>, ?dpr=<n>, ?god
+// ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
+// 0 = off), ?seed=<n>, ?dpr=<n>, ?god
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
@@ -17,6 +18,7 @@ function parseParams() {
     debug: q.has('debug'),
     world: q.get('world') || undefined,
     visit: num('visit'),
+    dream: num('dream'),
     seed: num('seed'),
     dpr: num('dpr'),
     god: q.has('god'),

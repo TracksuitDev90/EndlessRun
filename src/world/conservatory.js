@@ -7,7 +7,7 @@ import { shaftParts, butterflyParts, giantFlowerParts } from './whimsy.js';
 import { groundStrip, doorShape } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// IV · The Glasshouse — a white-ribbed greenhouse tunnel full of monstera,
+// V · The Glasshouse — a white-ribbed greenhouse tunnel full of monstera,
 // ferns, potted cypress, hanging vines with white blossom and orange trees,
 // glowing in warm late light. The softest world: backlit, humid haze,
 // sunbeams slanting through the glazing and leaf-dappled floors. Returns bring

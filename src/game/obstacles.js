@@ -226,10 +226,10 @@ export class ObstacleField {
     const r = this.rng;
     if (row.wide) {
       const spec = row.wide === 'L' ? defs.LW : defs.HW;
-      const group = this.group(world, d, spec.len, row.hint);
-      world.put(group, spec.name, 0, 0, d, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
-      this.shadow(world, group, 0, d, spec.len, 8.6, row.wide === 'L' ? 0.9 : 2.2);
-      for (let lane = 0; lane < 3; lane++) this.record(group, lane, d, spec.len, row.wide);
+      const group = this.group(world, d, spec.len, row.hint, CONFIG.score.wide);
+      this.putSpec(world, group, spec, 0, d, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
+      if (!spec.flat) this.shadow(world, group, 0, d, spec.len, 8.6, row.wide === 'L' ? 0.9 : 2.2);
+      for (let lane = 0; lane < 3; lane++) this.record(group, lane, d, spec.len, row.wide, spec);
       return spec.len;
     }
     let maxLen = 0;
@@ -244,16 +244,35 @@ export class ObstacleField {
       }
       const spec = r.pick(defs[kind]);
       const group = this.group(world, d, spec.len, row.hint);
-      world.put(group, spec.name, x, 0, d, {
+      this.putSpec(world, group, spec, x, d, {
         c: spec.tints ? rgb(r.pick(spec.tints)) : null,
         ry: spec.flip && r.chance(0.5) ? Math.PI : 0,
         p0: r.float(0, 6.28),
       });
-      this.shadow(world, group, x, d, spec.len, 2.4, kind === 'L' ? 0.9 : kind === 'H' ? 2.2 : 3);
-      this.record(group, lane, d, spec.len, kind);
+      if (!spec.flat) this.shadow(world, group, x, d, spec.len, 2.4, kind === 'L' ? 0.9 : kind === 'H' ? 2.2 : 3);
+      this.record(group, lane, d, spec.len, kind, spec);
       maxLen = Math.max(maxLen, spec.len);
     }
     return maxLen;
+  }
+
+  // Total points of the groups that have fallen behind the player since the
+  // last call, counting only those passed without a hit.
+  collectCleared(dist) {
+    let pts = 0;
+    for (const g of this.groups) {
+      if (g.scored || g.d + g.len > dist) continue;
+      g.scored = true;
+      if (!g.hit) pts += g.points;
+    }
+    return pts;
+  }
+
+  // An obstacle's prop plus any companion batches drawn with another
+  // material (spec.with), e.g. a creek's water beside its stones.
+  putSpec(world, group, spec, x, d, o) {
+    world.put(group, spec.name, x, 0, d, o);
+    if (spec.with) for (const name of spec.with) world.put(group, name, x, 0, d, o);
   }
 
   placeSwing(world, spec, lane, d, hint) {
@@ -266,8 +285,10 @@ export class ObstacleField {
     this.record(group, lane, d - spec.len / 2, spec.len, 'W');
   }
 
-  group(world, d, len, hint) {
-    const g = { world, d, len, hint: hint || null, hinted: false, dead: false };
+  // points: what getting past it cleanly is worth (see CONFIG.score); hit is
+  // set by the game when the player touches any part of it.
+  group(world, d, len, hint, points = 1) {
+    const g = { world, d, len, hint: hint || null, hinted: false, dead: false, points, hit: false, scored: false };
     this.groups.push(g);
     return g;
   }
@@ -282,7 +303,9 @@ export class ObstacleField {
     world.put(group, 'shadow', x + cx * 0.5, 0.035, d + len / 2 - cz * 0.5, { sx: width + Math.abs(cx), sz: len + 1.4 + Math.abs(cz), c: [0.9, 1, 1] });
   }
 
-  record(group, lane, d, len, kind) {
+  // spec.top overrides the kind's collision top; spec.wade marks something
+  // you can't stand on (water): landing in it trips you like running into it.
+  record(group, lane, d, len, kind, spec) {
     const y = KIND_Y[kind];
     this.records.push({
       group,
@@ -292,8 +315,9 @@ export class ObstacleField {
       d,
       len,
       y0: y[0],
-      y1: y[1],
+      y1: spec?.top ?? y[1],
       kind,
+      wade: !!spec?.wade,
       hit: false,
     });
   }
@@ -303,7 +327,7 @@ export class ObstacleField {
     let h = 0;
     const pw = CONFIG.player.halfWidth;
     for (const o of this.records) {
-      if (o.kind !== 'L' || o.hit) continue;
+      if (o.kind !== 'L' || o.hit || o.wade) continue;
       if (dist < o.d - 0.25 || dist > o.d + o.len + 0.25) continue;
       if (Math.abs(x - o.x) > o.hw + pw - 0.15) continue;
       if (o.y1 > h) h = o.y1;

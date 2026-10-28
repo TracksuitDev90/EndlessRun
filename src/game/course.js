@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import { makeDream } from './dream.js';
 
 // The course is the sequence of worlds laid out along the track. Each
 // segment is a stretch of one world; a doorway stands at every boundary.
@@ -10,9 +11,11 @@ export class Course {
     this.segments = [];
   }
 
-  // startVisit lets debug runs (?visit=n) begin on a later lap's look.
-  reset(rng, startId, startVisit = 0) {
+  // startVisit lets debug runs (?visit=n) begin on a later lap's look;
+  // dream (?dream=x) pins every world to one dream level.
+  reset(rng, startId, startVisit = 0, dream) {
     this.rng = rng;
+    this.forcedDream = dream;
     this.segments.length = 0;
     this.startVisit = startVisit;
     this.visits = new Map();
@@ -22,7 +25,7 @@ export class Course {
     this.queue = ids.slice(startIdx).concat(ids.slice(0, startIdx)).slice(1);
     this.lastId = ids[startIdx];
     const L = CONFIG.chunkLength;
-    this.segments.push({ world: this.byId.get(this.lastId), start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1, visit: this.nextVisit(this.lastId) });
+    this.segments.push({ world: this.byId.get(this.lastId), start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1, visit: this.nextVisit(this.lastId), dream: makeDream(rng, 1, dream) });
   }
 
   // How many times this world has already been run through this run.
@@ -50,7 +53,8 @@ export class Course {
       len = Math.min(CONFIG.worldMax, Math.max(CONFIG.worldMin, len));
       len = Math.round(len / L) * L;
       const id = this.nextWorldId();
-      this.segments.push({ world: this.byId.get(id), start: last.end, end: last.end + len, ordinal: last.ordinal + 1, visit: this.nextVisit(id) });
+      const ordinal = last.ordinal + 1;
+      this.segments.push({ world: this.byId.get(id), start: last.end, end: last.end + len, ordinal, visit: this.nextVisit(id), dream: makeDream(this.rng, ordinal, this.forcedDream) });
     }
     // forget segments far behind
     while (this.segments.length > 2 && this.segments[1].end < d - 600) this.segments.shift();
