@@ -4,23 +4,23 @@ import { makeEnvUniforms, makeCharacterMaterials } from '../render/shaders.js';
 import { TAU, damp, clamp, smooth, Spring } from './rig.js';
 import { Cloth } from './cloth.js';
 import { runner } from './runner-asset.js';
-import { RIG, MANTLE, CAPE, configureRig, mantleEZ, mantleWeights, capeBind, capeFrame, palette, buildRunnerGeometry } from './outfit.js';
+import { RIG, CAPE, configureRig, capeBind, capeColliders, setColliders, capeGeometry, bodyGeometry, palette } from './outfit.js';
 
 // The runner: a young wayfarer in a hooded cape. The body and clothes are
 // sculpted offline (tools/runner/build.py, loaded by runner-asset.js) as
 // continuous surfaces skinned to this skeleton; the cape is built in
-// outfit.js. One skinned mesh plus its ink hull: two draw calls. The run's
-// legs are placed by IK, the jump / slide / idle poses are keyed (idle on
-// planted feet), and on top sits a layer of weight and secondary motion:
+// outfit.js. One skinned mesh and the cape, each with its ink hull: four draw
+// calls. The run's legs are placed by IK, the jump / slide / idle poses are
+// keyed (idle on planted feet), and on top sits a layer of weight and
+// secondary motion:
 //   - torso, head and arms ride on the pelvis like loose springs, kicked by
 //     each footfall, lane change, take-off and landing, and trail their own
-//     posed motion so they lag and overshoot;
-//   - the mantle over the shoulders (and the hood lying on it) is twelve
-//     hinged panels that flare in the wind and the breeze, bob behind each
-//     footfall, lift when falling and get shouldered aside by the arms;
-//   - the cape beneath it is a cloth simulation (cloth.js) — a particle grid
-//     driving one bone each — hung from the mantle's hem, kept off the body by
-//     capsules, streaming back in the headwind and swayed by a shifting breeze;
+//     posed motion so they lag and overshoot; the chest turns against the
+//     hips and the shoulders roll forward and back with the arms;
+//   - the cape is a cloth simulation (cloth.js): sewn under the collar, held
+//     to the shoulders by a leash that loosens down the back, kept off the
+//     body by its own volumes, streaming back in the headwind, swayed by a
+//     shifting breeze and lagging every lane change, take-off and landing;
 //   - curls bounce on springs; the hip pouch is a pendulum, its flap lifting.
 // Also owns lane / jump / slide movement.
 // --- pose channels -----------------------------------------------------------
@@ -30,7 +30,7 @@ const NAMES = [
   'hipY', 'hipX', 'hipYaw', 'hipRoll', 'hipPitch',
   'spLean', 'spTwist', 'spSide', 'chLean', 'chTwist', 'chSide',
   'hdPitch', 'hdYaw', 'hdRoll',
-  'clL', 'clR', 'shLx', 'shRx', 'shLy', 'shRy', 'shLz', 'shRz', 'elL', 'elR', 'wrL', 'wrR', 'wrLz', 'wrRz',
+  'clL', 'clR', 'clLy', 'clRy', 'shLx', 'shRx', 'shLy', 'shRy', 'shLz', 'shRz', 'elL', 'elR', 'wrL', 'wrR', 'wrLz', 'wrRz',
   'thLx', 'thRx', 'thLz', 'thRz', 'thLy', 'thRy', 'knL', 'knR', 'anL', 'anR', 'toL', 'toR',
   'bodyPitch', 'bodyZ', 'bodyRoll', 'sq',
 ];
@@ -38,7 +38,7 @@ const C = {};
 NAMES.forEach((n, i) => (C[n] = i));
 const N = NAMES.length;
 const PAIRS = [
-  ['clL', 'clR'], ['shLx', 'shRx'], ['shLy', 'shRy'], ['shLz', 'shRz'], ['elL', 'elR'], ['wrL', 'wrR'], ['wrLz', 'wrRz'],
+  ['clL', 'clR'], ['clLy', 'clRy'], ['shLx', 'shRx'], ['shLy', 'shRy'], ['shLz', 'shRz'], ['elL', 'elR'], ['wrL', 'wrR'], ['wrLz', 'wrRz'],
   ['thLx', 'thRx'], ['thLz', 'thRz'], ['thLy', 'thRy'], ['knL', 'knR'], ['anL', 'anR'], ['toL', 'toR'],
 ].map(([a, b]) => [C[a], C[b]]);
 const NEGATE = ['hipX', 'hipYaw', 'hipRoll', 'spTwist', 'spSide', 'chTwist', 'chSide', 'hdYaw', 'hdRoll', 'bodyRoll'].map((n) => C[n]);
@@ -86,17 +86,15 @@ const SWING = [
   [0.84, -0.28, 0.24, -0.02, 0.0], // reach...
 ];
 // Arms swing with the opposite leg's phase.
-const ARM_SAMPLES = [0.35, 0.6, 0.85, 1.3]; // along the upper arm (1.3: past the elbow)
 const ARM = {
-  // a compact swing (the upper arm stays under the mantle; the bent elbow
-  // carries the hand up and through)
+  // a compact swing (the bent elbow carries the hand up and through)
   swing: [0.16, 0.5, 0.58, 0.36, -0.1, -0.44, -0.54, -0.32],
   abd: [0.44, 0.38, 0.37, 0.41, 0.45, 0.49, 0.5, 0.48], // held out clear of the puffer
   elbow: [1.35, 1.65, 1.78, 1.6, 1.25, 1.0, 0.95, 1.1],
 };
 
 // Proportions come with the generated rig (see configure()).
-let HIP_Y, HIP_JOINT, THIGH, SHIN, CHEST_Y, UPPER_ARM, FOREARM;
+let HIP_Y, HIP_JOINT, THIGH, SHIN, UPPER_ARM, FOREARM;
 let ANKLE_H, TOE_D, TOE_F; // ankle height over the ground; ball of the foot below and ahead of it
 
 function configure() {
@@ -105,7 +103,6 @@ function configure() {
   HIP_JOINT = { x: RIG.hipJoint[0], y: RIG.hipJoint[1] };
   THIGH = RIG.thigh;
   SHIN = RIG.shin;
-  CHEST_Y = RIG.chestY;
   UPPER_ARM = RIG.upperArm;
   FOREARM = RIG.forearm;
   ANKLE_H = HIP_JOINT.y - THIGH - SHIN;
@@ -163,6 +160,14 @@ const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _m = new THREE.Matrix4();
 const DOWN = new THREE.Vector3(0, -1, 0);
+
+// Curvature of the cloth through particle o between its neighbours a and b,
+// along the normal there (1/m; > 0 bending toward the outside).
+function curve(P, N, o, a, b) {
+  const lx = P[a] + P[b] - 2 * P[o], ly = P[a + 1] + P[b + 1] - 2 * P[o + 1], lz = P[a + 2] + P[b + 2] - 2 * P[o + 2];
+  const dx = P[b] - P[a], dy = P[b + 1] - P[a + 1], dz = P[b + 2] - P[a + 2];
+  return (4 * (lx * N[o] + ly * N[o + 1] + lz * N[o + 2])) / Math.max(1e-6, dx * dx + dy * dy + dz * dz);
+}
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Player {
@@ -173,13 +178,22 @@ export class Player {
       new THREE.Vector4(RIG.sockY, RIG.bootX, RIG.cuffU, RIG.shortsHem),
       new THREE.Vector4(RIG.bootCollar[0], RIG.bootCollar[1], RIG.soleH, 0),
     ];
-    const { mat, ink } = makeCharacterMaterials(this.u, palette(), rig, 0.0105);
-    this.mat = mat;
-    this.inkMat = ink;
+    // the cape's particles, as the shader reads them (runner space)
+    this.capeData = new Float32Array(CAPE.cols * CAPE.rows * 4);
+    this.capeTex = new THREE.DataTexture(this.capeData, CAPE.cols, CAPE.rows, THREE.RGBAFormat, THREE.FloatType);
+    this.capeTex.magFilter = this.capeTex.minFilter = THREE.NearestFilter;
+    this.capeTex.needsUpdate = true;
+    const grid = new THREE.Vector4(CAPE.cols, CAPE.rows, CAPE.thick / 2, 0);
+    const mats = makeCharacterMaterials(this.u, palette(), rig, 0.0105, { texture: this.capeTex, grid });
+    this.mat = mats.mat;
+    this.inkMat = mats.ink;
+    this.capeMat = mats.capeMat;
+    this.capeInkMat = mats.capeInk;
     this.root = new THREE.Group();
     this.root.name = 'player';
     this.buildSkeleton();
     this.buildBody();
+    this.buildCape();
     this.buildShadow();
     this.buildSim();
 
@@ -210,9 +224,7 @@ export class Player {
     this.breeze = new THREE.Vector3();
     this.hairBones = RIG.hair.map((h) => ({ name: h.name, dir: new THREE.Vector3(...h.dir) }));
     this.hair = this.hairBones.map(() => ({ x: new Spring(), y: new Spring(), z: new Spring() }));
-    this.mantle = Array.from({ length: MANTLE.panels }, () => new Spring(0.02));
     this.lid = new Spring();
-    this.mantleBob = new Spring();
     this.reset();
   }
 
@@ -233,26 +245,13 @@ export class Player {
     // out); the poses set absolute rotations, so the bind angles never show
     for (const d of runner().meta.bones) {
       const b = new THREE.Bone();
-      // (yaw outermost: the mantle panels turn to face out; the thighs turn
-      // against the pelvis so a planted foot keeps pointing down the track)
-      if (d.name.startsWith('mtU') || d.name.startsWith('thigh')) b.rotation.order = 'YXZ';
+      // (yaw outermost: the thighs turn against the pelvis so a planted foot
+      // keeps pointing down the track; the collarbones roll forward and back
+      // before they lift)
+      if (d.name.startsWith('thigh') || d.name.startsWith('clav')) b.rotation.order = 'YXZ';
       b.position.fromArray(d.p);
       b.quaternion.fromArray(d.q);
       add(d.name, d.parent ? this.b[d.parent] : null, b);
-    }
-    this.panelAngle = Array.from({ length: MANTLE.panels }, (_, k) => (k / MANTLE.panels) * TAU);
-    // one bone per cape particle, in root space, bound in the cape's rest shape
-    this.capeRest = capeBind();
-    this.capeBones = [];
-    this.capeFirst = bones.length;
-    for (let j = 0; j < CAPE.rows; j++) {
-      for (let i = 0; i < CAPE.cols; i++) {
-        const k = j * CAPE.cols + i;
-        const b = add('cp' + k, this.b.sim, new THREE.Bone());
-        b.position.fromArray(this.capeRest, k * 3);
-        capeFrame(this.capeRest, i, j, b.quaternion);
-        this.capeBones.push(b);
-      }
     }
 
     this.ids = ids;
@@ -268,7 +267,7 @@ export class Player {
 
   // --- the model ------------------------------------------------------------------
   buildBody() {
-    const geo = buildRunnerGeometry(this.capeFirst);
+    const geo = bodyGeometry();
     this.mesh = new THREE.SkinnedMesh(geo, this.mat);
     this.inkMesh = new THREE.SkinnedMesh(geo, this.inkMat);
     for (const m of [this.mesh, this.inkMesh]) {
@@ -279,6 +278,23 @@ export class Player {
     this.root.updateMatrixWorld(true);
     this.mesh.bind(this.skeleton);
     this.inkMesh.bind(this.skeleton, this.mesh.bindMatrix);
+    this.boneInv = {};
+    this.bones.forEach((b, i) => (this.boneInv[b.name] = this.skeleton.boneInverses[i]));
+  }
+
+  // The cape: its rest drape settles onto the body as bound, then the render
+  // mesh is laid out over that.
+  buildCape() {
+    this.capeDefs = capeColliders(this.bindPos);
+    this.capeRest = capeBind(this.capeDefs);
+    const geo = capeGeometry(this.capeRest);
+    this.capeMesh = new THREE.Mesh(geo, this.capeMat);
+    this.capeInk = new THREE.Mesh(geo, this.capeInkMat);
+    for (const m of [this.capeMesh, this.capeInk]) {
+      m.frustumCulled = false;
+      m.renderOrder = -20;
+      this.root.add(m);
+    }
   }
 
   buildShadow() {
@@ -298,41 +314,20 @@ export class Player {
 
   // --- secondary-motion state ------------------------------------------------------
   buildSim() {
-    // the cape, pinned along the inside of the mantle's hem: each pin follows
-    // the mantle bones exactly as the hem's own vertices do
-    this.cloth = new Cloth(CAPE.cols, CAPE.rows, this.capeRest);
-    const mw = mantleWeights(this.ids);
-    this.pins = [];
-    for (let i = 0; i < CAPE.cols; i++) {
-      const p = new THREE.Vector3().fromArray(this.capeRest, i * 3);
-      const out = [];
-      mw(p.x, p.y, p.z, out);
-      let total = 0;
-      for (let k = 1; k < out.length; k += 2) total += out[k];
-      const w = [];
-      for (let k = 0; k < out.length; k += 2) w.push([out[k], out[k + 1] / total]);
-      this.pins.push({ p, w });
+    // the cape: row 0 sewn under the collar; the rows over the shoulders and
+    // under the hood leashed to where the chest would carry them, tightly at
+    // first and looser by the shoulder blades; free from there down
+    const { cols, rows } = CAPE;
+    this.cloth = new Cloth(cols, rows, this.capeRest);
+    let s = 0;
+    for (let j = 1; j < rows; j++) {
+      const a = ((j - 1) * cols + (cols >> 1)) * 3, b = (j * cols + (cols >> 1)) * 3;
+      s += Math.hypot(this.capeRest[a] - this.capeRest[b], this.capeRest[a + 1] - this.capeRest[b + 1], this.capeRest[a + 2] - this.capeRest[b + 2]);
+      this.cloth.leash[j] = s < 0.3 ? 0.003 + 3 * Math.max(0, s - 0.08) ** 2 : Infinity;
     }
-    // what the cape can't pass through: torso and hips (elliptic), head,
-    // limbs, boots and the pouch
-    const col = (bone, a, b, r, rz = 0) => ({ bone: this.b[bone], a: new THREE.Vector3(...a), b: new THREE.Vector3(...b), r, rz });
-    this.colliders = [
-      col('hips', [0, -0.12, 0.006], [0, 0.1, 0.006], 0.205, 0.168),
-      col('chest', [0, -0.05, 0.01], [0, 0.14, 0.01], 0.19, 0.155),
-      col('head', [0, 0.1, 0.01], [0, 0.145, 0.01], 0.125),
-      col('pouch', [-0.012, -0.04, 0], [-0.012, -0.09, 0], 0.045),
-    ];
-    for (const L of ['L', 'R']) {
-      this.colliders.push(
-        col('arm' + L, [0, 0, 0], [0, -UPPER_ARM, 0], 0.085),
-        col('fore' + L, [0, 0, 0], [0, -FOREARM - 0.07, 0], 0.075),
-        col('thigh' + L, [0, 0, 0], [0, -THIGH, 0], 0.1),
-        col('shin' + L, [0, 0, 0], [0, -SHIN + 0.05, 0], 0.058),
-        col('foot' + L, [0, -0.04, 0.04], [0, -0.055, -0.13], 0.07),
-      );
-    }
-    this.cloth.setColliderCount(this.colliders.length);
-    this.wind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, turb: 0, freq: 1, wave: 1, kn: 0, kt: 0, floor: 0, t: 0 };
+    this.cloth.setColliderCount(this.capeDefs.length);
+    this.capeM = (bone) => _m.multiplyMatrices(this.b[bone].matrixWorld, this.boneInv[bone]);
+    this.wind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.2, draw: 0.7, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.4, floor: 0, lift: 0.1, t: 0 };
 
     this.pouchSim = {
       local: new THREE.Vector3(...RIG.pouch).sub(this.bindPos.hips),
@@ -352,10 +347,8 @@ export class Player {
     this.headVel = new THREE.Vector3();
     this.headAcc = new THREE.Vector3();
     this.hipsInv = new THREE.Matrix4();
-    this.chestInv = new THREE.Matrix4();
+    this.chestM = new THREE.Matrix4();
     this.chestPrev = new THREE.Vector3();
-    // points along each upper arm, in the mantle's terms (see armOffsets)
-    this._arms = Array.from({ length: 2 * ARM_SAMPLES.length }, () => ({ th: 0, r: 0, drop: 0 }));
   }
 
   resetSim() {
@@ -367,6 +360,7 @@ export class Player {
     this.frameAcc.set(0, 0, 0);
     this.headVel.set(0, 0, 0);
     this.headAcc.set(0, 0, 0);
+    this.cloth.collidersMoved = false;
     this.simReady = false;
   }
 
@@ -408,8 +402,6 @@ export class Player {
       h.y.reset();
       h.z.reset();
     }
-    for (const s of this.mantle) s.reset(0.02);
-    this.mantleBob.reset();
     this.lid.reset();
     this.root.visible = true;
     this.resetSim();
@@ -813,6 +805,12 @@ export class Player {
       r[wr] = 0.18;
       r[wz] = 0.05;
     }
+    // the shoulders roll with the arms, forward with each forward swing and
+    // back with the back swing, lifting a touch as the arm drives through
+    r[C.clLy] = 0.22 * (r[C.shLx] - 0.06);
+    r[C.clRy] = 0.22 * (r[C.shRx] - 0.06);
+    r[C.clL] = 0.035 * Math.max(0, r[C.shLx]);
+    r[C.clR] = 0.035 * Math.max(0, r[C.shRx]);
     r[C.bodyPitch] = 0;
     r[C.bodyZ] = 0;
     r[C.bodyRoll] = 0;
@@ -1099,8 +1097,8 @@ export class Player {
     b.chest.rotation.set(-Pz[C.chLean], Pz[C.chTwist], Pz[C.chSide]);
     b.neck.rotation.set(Pz[C.hdPitch] * 0.3, Pz[C.hdYaw] * 0.35, Pz[C.hdRoll] * 0.4);
     b.head.rotation.set(Pz[C.hdPitch] * 0.7, Pz[C.hdYaw] * 0.65, Pz[C.hdRoll] * 0.6);
-    b.clavL.rotation.z = -Pz[C.clL];
-    b.clavR.rotation.z = Pz[C.clR];
+    b.clavL.rotation.set(0, -Pz[C.clLy], -Pz[C.clL]);
+    b.clavR.rotation.set(0, Pz[C.clRy], Pz[C.clR]);
     b.armL.rotation.set(Pz[C.shLx], -Pz[C.shLy], -Pz[C.shLz]);
     b.armR.rotation.set(Pz[C.shRx], Pz[C.shRy], Pz[C.shRz]);
     b.foreL.rotation.x = Pz[C.elL];
@@ -1117,7 +1115,7 @@ export class Player {
     b.toeR.rotation.x = Pz[C.toR];
   }
 
-  // --- secondary motion: curls, mantle, pouch, cape -------------------------------
+  // --- secondary motion: curls, pouch, cape ---------------------------------------
   secondary(dt, sp) {
     if (dt <= 0) return;
     // Bone transforms in root space (the renderer recomputes true world
@@ -1128,11 +1126,14 @@ export class Player {
     // Motion of the root through the world -> inertial acceleration, and the
     // air streaming past (plus a gusty breeze so he's never quite still).
     const t = this.time;
+    // (the acceleration is taken from a smoothed velocity, so a sudden change
+    // — a take-off, the start of a lane change — reaches the cloth as a short
+    // push of the same shape and strength at any frame rate)
     const vel = _v.set(this.vx, this.grounded ? 0 : this.vy, -this.speed);
-    const acc = _v2.subVectors(vel, this.frameVel).divideScalar(Math.max(dt, 1 / 240));
-    this.frameVel.copy(vel);
-    acc.clampLength(0, 60);
-    this.frameAcc.lerp(acc, 1 - Math.exp(-dt * 30));
+    if (!this.simReady) this.frameVel.copy(vel);
+    _v2.copy(this.frameVel);
+    this.frameVel.lerp(vel, 1 - Math.exp(-dt * 30));
+    this.frameAcc.subVectors(this.frameVel, _v2).divideScalar(dt).clampLength(0, 60);
     this.invQ.copy(this.root.quaternion).invert();
     this.gravity.set(0, -9.8, 0).applyQuaternion(this.invQ);
     // A soft breeze: slow swells from a wandering direction, now and then a
@@ -1150,7 +1151,6 @@ export class Player {
     const steps = Math.min(8, Math.max(1, Math.ceil(dt / (1 / 120))));
 
     this.hairSim(dt, airSpeed);
-    this.mantleSim(dt, spd);
     this.pouchStep(dt, steps, sp);
     this.capeSim(dt);
     this.simReady = true;
@@ -1189,82 +1189,6 @@ export class Player {
       const rz = s.z.step(d.x * push.y - d.y * push.x, f, 0.18, dt);
       b[this.hairBones[i].name].rotation.set(clamp(rx, -0.45, 0.45), clamp(ry, -0.45, 0.45), clamp(rz, -0.45, 0.45));
     }
-  }
-
-  // Mantle panels: wind flare at the back, lift when falling, puff on landing,
-  // swing with sideways moves — and shouldered out of the way by the arms.
-  mantleSim(dt, spd) {
-    const b = this.b;
-    const t = this.time;
-    const fall = clamp(-(this.grounded ? 0 : this.vy) * 0.05, -0.12, 0.45);
-    const puff = this.springs.land.x * 0.3;
-    const lat = this.accLocal.x + this.pelvisA.x;
-    const bounce = this.mantleBob.step(clamp(-this.pelvisA.y * 0.006, -0.12, 0.12), 2.6, 0.22, dt);
-    const bx = this.breeze.x, bz = this.breeze.z;
-    const arms = this.armOffsets();
-    for (let k = 0; k < MANTLE.panels; k++) {
-      const th = this.panelAngle[k];
-      const sn = Math.sin(th);
-      const cs = Math.cos(th);
-      // (the front stands a little off the jacket while running: the chest
-      // twists over the belly beneath it)
-      let target = 0.02 + 0.03 * Math.max(0, -cs) * this.w.run;
-      // (gently at the back: the cape hangs from those panels, and a pumping
-      // hem would fling it about)
-      target += (0.04 + 0.1 * spd) * Math.pow(Math.max(0, cs), 1.5) * (0.6 + 0.4 * this.w.run);
-      target -= 0.015 * spd * Math.max(0, -cs); // (pressed only lightly: the jacket is right beneath)
-      target += fall + puff + bounce;
-      target += clamp(-lat * sn * 0.012, -0.15, 0.25);
-      // the breeze lifts the panels it blows under
-      target += 0.025 * Math.max(0, -bx * sn + bz * cs * 0.3) * (1 - 0.6 * this.w.run);
-      const flare = this.mantle[k].step(target, 2.6, 0.24, dt);
-      let req = -1;
-      for (const A of arms) {
-        const close = Math.cos(th - A.th);
-        if (close < 0.35) continue;
-        // tip the panel out (or up and over, for an arm raised past the
-        // hinge) until it clears the sleeve's padded surface plus the
-        // mantle's own thickness
-        const dr = A.r - MANTLE.hingeR;
-        const fr = Math.atan2(dr, A.drop) + Math.asin(clamp(0.095 / Math.hypot(dr, A.drop), 0, 1)) - MANTLE.rest;
-        req = Math.max(req, Math.min(fr, 1.85) * smooth(0.35, 0.88, close));
-      }
-      const up = Math.max(flare, req, 0.01);
-      // the hem only ever flutters outward, off the jacket
-      const flutter = 0.05 * spd * Math.max(0, -cs) * (0.5 + 0.5 * Math.sin(t * 16 + k * 1.9)) + 0.015 * (0.5 + 0.5 * Math.sin(t * 2.1 + k));
-      b['mtU' + k].rotation.x = -up;
-      b['mtL' + k].rotation.x = -(0.4 * (flare - 0.02) + flutter);
-    }
-    b.chest.updateWorldMatrix(false, true);
-  }
-
-  // Points along each upper arm under the mantle, in chest space: angle
-  // around the body, elliptical radius and depth below the panels' hinge
-  // (points below the hem count where the arm crosses the hem).
-  armOffsets() {
-    const b = this.b;
-    this.chestInv.copy(b.chest.matrixWorld).invert();
-    const hingeY = MANTLE.hinge - CHEST_Y;
-    const hemY = MANTLE.hem + 0.012 - CHEST_Y;
-    let i = 0;
-    for (const side of ['L', 'R']) {
-      const S = _v.setFromMatrixPosition(b['arm' + side].matrixWorld).applyMatrix4(this.chestInv);
-      const E = _v2.setFromMatrixPosition(b['fore' + side].matrixWorld).applyMatrix4(this.chestInv);
-      const dy = E.y - S.y;
-      const tHem = dy < -0.02 ? clamp((hemY - S.y) / dy, 0, 1.3) : 1;
-      for (const t of ARM_SAMPLES) {
-        const tt = Math.min(t, tHem);
-        const y = S.y + dy * tt;
-        const ez = mantleEZ(clamp(y + CHEST_Y, MANTLE.hem, MANTLE.hinge));
-        const x = S.x + (E.x - S.x) * tt;
-        const z = (S.z + (E.z - S.z) * tt) / ez;
-        const A = this._arms[i++];
-        A.th = Math.atan2(x, z);
-        A.r = Math.hypot(x, z);
-        A.drop = hingeY - y;
-      }
-    }
-    return this._arms;
   }
 
   // Hip pouch: a pendulum hung from the belt, kept outside the hips, its flap
@@ -1320,87 +1244,66 @@ export class Player {
 
   // The cape. Simulation space has world axes and its origin at the runner:
   // turning and leaning swing the cape instead of carrying it. The air is the
-  // runner's own speed (the cape's angle grows with it) plus a slow side-to-
-  // side drift; the turbulence that sets it flapping strengthens and quickens
-  // with speed.
+  // runner's own speed (the cape streams back further as it grows) plus the
+  // breeze; the gusts that roll down it strengthen and quicken with speed.
   capeSim(dt) {
     const cl = this.cloth;
     const Q = this.root.quaternion;
     const t = this.time;
     const W = this.speed;
-    // pins, skinned to the mantle like the hem they hang from
-    for (let i = 0; i < this.pins.length; i++) {
-      const pin = this.pins[i];
-      _v.set(0, 0, 0);
-      for (const [id, w] of pin.w) {
-        _m.multiplyMatrices(this.bones[id].matrixWorld, this.skeleton.boneInverses[id]);
-        _v.addScaledVector(_v2.copy(pin.p).applyMatrix4(_m), w);
-      }
-      _v.applyQuaternion(Q).toArray(cl.pinB, i * 3);
+    const { cols, rows } = CAPE;
+    // where the chest carries every particle (the collar seam exactly; the
+    // rest is leashed to it), in simulation space
+    const Mc = this.chestM.copy(this.capeM('chest'));
+    const rest = this.capeRest;
+    for (let k = 0; k < cols * rows; k++) {
+      _v.fromArray(rest, k * 3).applyMatrix4(Mc).applyQuaternion(Q).toArray(cl.skin, k * 3);
     }
-    // colliders into simulation space
-    for (let k = 0; k < this.colliders.length; k++) {
-      const d = this.colliders[k];
-      const c = cl.colliders[k];
-      const M = d.bone.matrixWorld;
-      _v.copy(d.a).applyMatrix4(M).applyQuaternion(Q);
-      _v2.copy(d.b).applyMatrix4(M).applyQuaternion(Q);
-      c.ax = _v.x; c.ay = _v.y; c.az = _v.z;
-      c.bx = _v2.x; c.by = _v2.y; c.bz = _v2.z;
-      c.cx = (_v.x + _v2.x) / 2; c.cy = (_v.y + _v2.y) / 2; c.cz = (_v.z + _v2.z) / 2;
-      const R = _v.distanceTo(_v2) / 2 + Math.max(d.r, d.rz) + 0.02;
-      c.R2 = R * R;
-      c.r = d.r;
-      c.rz = d.rz;
-      c.ell = d.rz > 0;
-      if (c.ell) {
-        _v3.setFromMatrixColumn(M, 0).normalize().applyQuaternion(Q);
-        c.ex[0] = _v3.x; c.ex[1] = _v3.y; c.ex[2] = _v3.z;
-        _v3.setFromMatrixColumn(M, 2).normalize().applyQuaternion(Q);
-        c.ez[0] = _v3.x; c.ez[1] = _v3.y; c.ez[2] = _v3.z;
-      }
-    }
+    cl.pinB.set(cl.skin.subarray(0, cols * 3));
+    setColliders(cl, this.capeDefs, this.capeM, Q);
     // forces: gravity, a share of the runner's own acceleration (the game's
     // gravity is ~3x real, so only part of a jump's reaches the cloth: it
-    // floats rather than flags), and the air
+    // lifts and floats rather than flags), and the air
     const f = this.wind;
-    // (A light, floaty wool: about half the pull of gravity, and soft on the
-    // air, so it streams and rolls rather than flags. Never letting the fall
-    // of a jump flip the pull upward: the cape floats higher on the way down,
-    // but it still hangs.)
-    f.gx = -this.frameAcc.x * 0.3;
-    f.gy = Math.min(-1.6, -5 - this.frameAcc.y * 0.17);
-    f.gz = -this.frameAcc.z * 0.35;
+    // (Wool with some weight: most of gravity's pull, and never less than
+    // half of it however a jump falls — the cape rises behind on the way
+    // down, but it still hangs.)
+    f.gx = -this.frameAcc.x * 0.22;
+    f.gy = Math.min(-5, -8 - this.frameAcc.y * 0.14);
+    f.gz = -this.frameAcc.z * 0.3;
     // The headwind the cape feels grows slower than the run speed: it streams
-    // back further as the pace rises, rolling in long, slow waves that start
-    // at the shoulders and travel down to the hem; the breeze swings it side
-    // to side, and very little damping lets every bounce, lane change and
-    // landing carry on through the cloth. It never lifts over the shoulders.
-    // (standing still, the breeze is all there is: it gets a stronger hand)
+    // back further as the pace rises; gusts roll down it in broad, irregular
+    // waves, and each free edge plays on its own. Standing still, the breeze
+    // is all there is: it gets a stronger hand.
     const B = this.breeze;
-    const still = 1 + 1.6 * (1 - Math.min(1, W / 6));
-    f.ax = clamp(-this.vx * 0.5, -7, 7) + B.x * (1.4 + 0.03 * W) * still;
-    f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.5, -4, 3) + B.y * still;
-    f.az = (W > 0 ? 1.15 * W + 1 : 0) + B.z * still;
-    f.turb = 0.7 * still + 0.07 * W;
-    f.freq = 0.4 + 0.05 * W;
-    f.wave = 0.95 + 0.025 * W;
-    f.kn = 0.45;
-    f.kt = 0.12;
-    f.damp = 0.45;
-    f.floor = (this.groundY || 0) - this.y + 0.012;
-    f.lift = 0.12;
+    const still = 1 + 1.4 * (1 - Math.min(1, W / 6));
+    f.ax = clamp(-this.vx * 0.32, -4.5, 4.5) + B.x * (1.2 + 0.03 * W) * still;
+    f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.35, -3.5, 2.5) + B.y * still;
+    f.az = (W > 0 ? 1.05 * W + 1 : 0) + B.z * still;
+    f.gust = 0.6 * still + 0.18 * W;
+    f.gustSpeed = 1.2 + 0.32 * W;
+    f.gustLen = 0.75 + 0.012 * W;
+    f.curl = 0.8 * still + 0.18 * W;
+    f.kn = 0.5;
+    f.kt = 0.1;
+    f.damp = 0.5;
+    // (the ground under him, but never above his feet: brushing past the
+    // top of something he isn't standing on must not lift the cloth)
+    f.floor = Math.min(this.groundY || 0, this.y) - this.y + CAPE.margin;
+    f.groundV = W;
+    f.lift = 0.1;
     f.t = t;
     // Carry the cloth along with most of the body's own bob and sway: the
-    // stride bounces the shoulders at several g, which a real mantle's hem
-    // would partly soak up — the rest rolls on down the cape as a ripple.
+    // stride bounces the shoulders at several g, which real wool would partly
+    // soak up — the rest rolls on down the cape as a ripple.
     _v.setFromMatrixPosition(this.b.chest.matrixWorld).applyQuaternion(Q);
-    if (this.simReady) cl.shift((_v.x - this.chestPrev.x) * 0.72, (_v.y - this.chestPrev.y) * 0.72, (_v.z - this.chestPrev.z) * 0.72);
+    if (this.simReady) cl.shift((_v.x - this.chestPrev.x) * 0.65, (_v.y - this.chestPrev.y) * 0.65, (_v.z - this.chestPrev.z) * 0.65);
     this.chestPrev.copy(_v);
     if (!this.simReady) {
-      // start from the rest shape and let it settle under gravity
-      cl.place((v) => v.applyQuaternion(Q));
+      // start from the rest drape, carried by the body, and let it settle
+      cl.place((v) => v.applyMatrix4(Mc).applyQuaternion(Q));
       cl.pinA.set(cl.pinB);
+      cl.skinPrev.set(cl.skin);
       f.t = t - 0.75;
       for (let i = 0; i < 45; i++) {
         f.t += 1 / 60;
@@ -1409,16 +1312,44 @@ export class Player {
     } else {
       cl.step(dt, f);
     }
-    // one bone per particle, oriented to the cloth surface
-    const { cols, rows } = CAPE;
+    // hand the particles to the shader, in the runner's own space, with how
+    // deeply the cloth curves at each (1/m, toward its outside; across plus a
+    // share along, softened over the neighbours so only real folds and waves
+    // count)
+    const D = this.capeData;
+    const K = this.capeFold || (this.capeFold = new Float32Array(cols * rows));
+    const P = cl.p, Nn = cl.nrm;
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {
         const k = j * cols + i;
-        const bone = this.capeBones[k];
-        bone.position.fromArray(cl.p, k * 3).applyQuaternion(this.invQ);
-        Cloth.frame(cl.p, cols, rows, i, j, bone.quaternion).premultiply(this.invQ);
+        const o = k * 3;
+        let c = 0;
+        if (i > 0 && i < cols - 1) c += curve(P, Nn, o, o - 3, o + 3);
+        if (j > 0 && j < rows - 1) c += 0.6 * curve(P, Nn, o, o - cols * 3, o + cols * 3);
+        K[k] = c;
       }
     }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          const k = j * cols + i;
+          let sum = K[k] * 2, w = 2;
+          if (i > 0) (sum += K[k - 1]), w++;
+          if (i < cols - 1) (sum += K[k + 1]), w++;
+          if (j > 0) (sum += K[k - cols]), w++;
+          if (j < rows - 1) (sum += K[k + cols]), w++;
+          D[k * 4 + 3] = sum / w;
+        }
+      }
+      for (let k = 0; k < cols * rows; k++) K[k] = D[k * 4 + 3];
+    }
+    for (let k = 0; k < cols * rows; k++) {
+      _v.fromArray(P, k * 3).applyQuaternion(this.invQ);
+      D[k * 4] = _v.x;
+      D[k * 4 + 1] = _v.y;
+      D[k * 4 + 2] = _v.z;
+    }
+    this.capeTex.needsUpdate = true;
   }
   place(z) {
     this.root.position.set(this.x, this.y, z);

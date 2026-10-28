@@ -233,6 +233,7 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   env: {
     sky: ['#7cbf46', '#eef8b4', '#3d8a36'],
+    bloom: ['#f2b93b', '#a6e04a', '#3fb8b0'], // the colours its doorway bloom is made of
     sun: { dir: [-0.25, 0.3, -1], glow: '#fff3b0' },
     stars: 0,
     skyFx: { rays: 0.35, clouds: 0.28 },
@@ -257,6 +258,7 @@ export default {
       // golden hour, blossom drifting
       env: {
         sky: ['#f0b878', '#fff0b8', '#4f8a3a'],
+        bloom: ['#ffa86a', '#ffd890', '#ff9ac0'],
         sun: { dir: [-0.4, 0.14, -1], glow: '#ffd890' },
         skyFx: { rays: 0.6, clouds: 0.4 },
         light: { shadow: [0.72, 0.66, 0.74], hi: [1.14, 1.05, 0.86] },
@@ -271,6 +273,7 @@ export default {
       // lilac dusk, lamps lit, fireflies, giant flowers in the fields
       env: {
         sky: ['#6a5ab8', '#ffc4b0', '#3a5a3a'],
+        bloom: ['#9a7ae8', '#ffb0a0', '#fff2a0'],
         sun: { dir: [0.3, 0.06, -1], glow: '#ff9ab0' },
         moon: { dir: [-0.5, 0.45, -1], color: '#fff2d0', size: 0.06 },
         stars: 0.5,
@@ -287,6 +290,7 @@ export default {
       // the dream: teal and pink, aurora, the far lane rolling like a sea
       env: {
         sky: ['#1f8a9a', '#ffd0e8', '#3a6a5a'],
+        bloom: ['#2fc0c8', '#ff9ad0', '#fff4c0'],
         sun: { dir: [-0.2, 0.25, -1], glow: '#ffc0e0' },
         moon: undefined,
         stars: 0.3,

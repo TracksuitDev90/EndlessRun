@@ -74,11 +74,27 @@ export const CONFIG = {
   doorClearBefore: 52, // no obstacles this close before a doorway
   doorClearAfter: 36, // ...or this close after it
 
-  // Dream depth (see game/dream.js): no distortion in the first world, then
-  // perWorld more per doorway up to max (reached ~13 worlds in). lucidChance:
-  // odds a deeper world comes up calm. reducedMotion scales the shape warps
-  // and camera sway when the OS asks for less motion (colour is untouched).
-  dream: { start: 1, perWorld: 0.11, max: 1.35, lucidChance: 0.18, rushTime: 1.3, rushBase: 0.35, reducedMotion: 0.3 },
+  // Dream depth (see game/dream.js), counted in worlds (1 = the first). The
+  // worlds are untouched until morphFrom, when the far distance starts quietly
+  // to morph; the colour trip begins at tripFrom; everything is in by full.
+  // schedule: the world each effect can first appear in and the world it
+  // reaches full strength. lucidChance: odds a deeper world comes up calm.
+  // rushBase: strength of the doorway bloom before the dream deepens it.
+  // reducedMotion scales the shape warps and camera sway when the OS asks for
+  // less motion (colour is untouched).
+  dream: {
+    morphFrom: 4,
+    tripFrom: 8,
+    full: 18,
+    schedule: {
+      breathe: [4, 13], waves: [4, 14], melt: [6, 16],
+      swirl: [8, 16], rings: [9, 17], palette: [10, 18], neon: [11, 18], twist: [12, 19],
+    },
+    lucidChance: 0.18,
+    rushTime: 1.3,
+    rushBase: 0.75,
+    reducedMotion: 0.3,
+  },
 
   // Camera
   camera: { back: 6.6, height: 4.1, lookAhead: 7.5, lookHeight: 0.95, minFov: 52, maxFov: 76, coverHalfWidth: 3.0 },

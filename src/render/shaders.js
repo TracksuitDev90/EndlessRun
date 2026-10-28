@@ -19,6 +19,10 @@ export const shared = {
   uDream: { value: new THREE.Vector4() }, // x twist, y waves, z melt, w breathe
   uDream2: { value: new THREE.Vector4() }, // x colour rings, y sky swirl, z neon ink, w doorway rush
   uDream3: { value: new THREE.Vector4() }, // x palette hue shift, y saturation push, z rush progress, w rush swell
+  // the doorway bloom: x how much of it is the new world's own colours, y how
+  // much is rainbow (the deeper the trip, the more rainbow); its three colours
+  uBloom: { value: new THREE.Vector4(1, 0, 0, 0) },
+  uBloomCol: { value: [new THREE.Color(), new THREE.Color(), new THREE.Color()] },
 };
 
 const COMMON = /* glsl */ `
@@ -88,6 +92,8 @@ uniform vec3 uVignette;
 uniform vec2 uResolution;
 uniform vec4 uDream2;
 uniform vec4 uDream3;
+uniform vec4 uBloom;
+uniform vec3 uBloomCol[3];
 vec3 hueRot(vec3 c, float a) {
   const vec3 k = vec3(0.57735);
   float ca = cos(a);
@@ -96,7 +102,9 @@ vec3 hueRot(vec3 c, float a) {
 // Per-world color grade + tinted vignette, applied to everything opaque, plus
 // the dream's colour: a palette shift, rings of hue rolling toward you through
 // the world (dist < 0: no world position, e.g. the sky), and a bloom of colour
-// from the centre of the screen as you come through a doorway.
+// from the centre of the screen as you come through a doorway — bands of the
+// new world's own colours laid over the picture's light and shade, turning to
+// rainbow as the trip deepens.
 vec3 grade(vec3 c, vec4 trip, float dist) {
   float l = dot(c, vec3(0.299, 0.587, 0.114));
   c = mix(vec3(l), c, uGrade.x * (1.0 + uDream3.y));
@@ -106,7 +114,17 @@ vec3 grade(vec3 c, vec4 trip, float dist) {
   float r = length(q) * 1.414;
   float h = trip.x + trip.z * sin(uTime * 0.13) + uDream3.x;
   if (uDream2.x > 0.0 && dist >= 0.0) h += uDream2.x * sin(dist * 0.06 - uTime * 1.3) * 1.6 * smoothstep(10.0, 40.0, dist);
-  if (uDream2.w > 0.0) h += uDream2.w * sin(r * 9.0 - uTime * 7.0) * 1.4 * smoothstep(0.05, 0.5, r);
+  if (uDream2.w > 0.0) {
+    float k = uDream2.w * smoothstep(0.05, 0.5, r);
+    float s = sin(r * 9.0 - uTime * 7.0);
+    float u = 0.5 + 0.5 * s;
+    vec3 band = u < 0.5 ? mix(uBloomCol[0], uBloomCol[1], u * 2.0) : mix(uBloomCol[1], uBloomCol[2], u * 2.0 - 1.0);
+    float lc = dot(c, vec3(0.299, 0.587, 0.114));
+    float lb = max(dot(band, vec3(0.299, 0.587, 0.114)), 0.05);
+    vec3 tinted = min(band * (0.4 + 0.9 * lc / lb), vec3(1.25));
+    c = mix(c, tinted, clamp(k * uBloom.x, 0.0, 0.85)) + band * (k * uBloom.x * 0.2 * u * u);
+    h += k * uBloom.y * s * 1.4;
+  }
   if (h != 0.0) c = hueRot(c, h);
   float vg = smoothstep(0.42, 0.95, r) * uGrade.z;
   return mix(c, c * uVignette, vg);
@@ -602,6 +620,73 @@ attribute float aMat;
 uniform float uOutline;
 attribute vec3 onrm;
 #endif
+#ifdef CAPE
+// The cape: each vertex knows only where it lies on the particle grid; the
+// surface is rebuilt here through the simulated particles (Catmull-Rom, so it
+// passes through every one of them, with exact normals from its tangents).
+uniform sampler2D uCape; // particle positions in the runner's space, cols x rows
+uniform vec4 uCapeGrid; // x cols, y rows, z half thickness
+attribute vec4 aCape; // x, y grid position; z side (+1 outside, -1 lining); w 0 inside, 1 border, 2 edge strip
+attribute vec2 aEdge; // which border(s): -1 / +1 across and down
+vec4 capeRaw(int i, int j) {
+  return texelFetch(uCape, ivec2(i, j), 0);
+}
+// past the border the grid continues its last segment straight on (w, the
+// fold, just carries on as it is at the border)
+vec4 capeOn(vec4 a, vec4 b) {
+  return vec4(2.0 * a.xyz - b.xyz, a.w);
+}
+vec4 capeRow(int i, int j) {
+  int C = int(uCapeGrid.x);
+  if (i < 0) return capeOn(capeRaw(0, j), capeRaw(1, j));
+  if (i >= C) return capeOn(capeRaw(C - 1, j), capeRaw(C - 2, j));
+  return capeRaw(i, j);
+}
+vec4 capeP(int i, int j) {
+  int R = int(uCapeGrid.y);
+  if (j < 0) return capeOn(capeRow(i, 0), capeRow(i, 1));
+  if (j >= R) return capeOn(capeRow(i, R - 1), capeRow(i, R - 2));
+  return capeRow(i, j);
+}
+vec4 crW(float t) {
+  float t2 = t * t, t3 = t2 * t;
+  return 0.5 * vec4(-t3 + 2.0 * t2 - t, 3.0 * t3 - 5.0 * t2 + 2.0, -3.0 * t3 + 4.0 * t2 + t, t3 - t2);
+}
+vec4 crD(float t) {
+  float t2 = t * t;
+  return 0.5 * vec4(-3.0 * t2 + 4.0 * t - 1.0, 9.0 * t2 - 10.0 * t, -9.0 * t2 + 8.0 * t + 1.0, 3.0 * t2 - 2.0 * t);
+}
+// position, tangents across (u) and down (v), and how deeply the cloth folds
+// there (curvature measured per particle, carried in w, smoothly blended)
+void capeSurface(vec2 g, out vec3 P, out vec3 Tu, out vec3 Tv, out float fold) {
+  int i0 = int(clamp(floor(g.x), 0.0, uCapeGrid.x - 2.0));
+  int j0 = int(clamp(floor(g.y), 0.0, uCapeGrid.y - 2.0));
+  float fu = g.x - float(i0), fv = g.y - float(j0);
+  vec4 wu = crW(fu), du = crD(fu);
+  vec4 wv = crW(fv), dv = crD(fv);
+  P = vec3(0.0);
+  Tu = vec3(0.0);
+  Tv = vec3(0.0);
+  fold = 0.0;
+  for (int b = 0; b < 4; b++) {
+    vec3 r = vec3(0.0), rd = vec3(0.0);
+    float k = 0.0;
+    for (int a = 0; a < 4; a++) {
+      vec4 c = capeP(i0 - 1 + a, j0 - 1 + b);
+      r += c.xyz * wu[a];
+      rd += c.xyz * du[a];
+      k += c.w * wu[a];
+    }
+    P += r * wv[b];
+    Tu += rd * wv[b];
+    Tv += r * dv[b];
+    fold += k * wv[b];
+  }
+}
+vec3 safeNormalize(vec3 v) {
+  return v * inversesqrt(max(dot(v, v), 1e-12));
+}
+#endif
 varying vec3 vColor;
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -618,6 +703,26 @@ void main() {
   #ifdef OUTLINE
     vec3 lo = onrm;
   #endif
+  #ifdef CAPE
+    vec3 P, Tu, Tv;
+    float fold;
+    capeSurface(aCape.xy, P, Tu, Tv, fold);
+    vec3 nC = safeNormalize(cross(Tv, Tu));
+    float side = aCape.z;
+    // > 0 in the valleys of its folds and waves as seen from this side
+    vFx = vec3(fold * side, 0.0, 0.0);
+    vec3 e = vec3(0.0);
+    if (aCape.w > 0.5) {
+      vec3 eu = safeNormalize(Tu - nC * dot(nC, Tu));
+      vec3 ev = safeNormalize(Tv - nC * dot(nC, Tv));
+      e = safeNormalize(aEdge.x * eu + aEdge.y * ev);
+    }
+    lp = P + nC * (side * uCapeGrid.z);
+    ln = aCape.w > 1.5 ? e : nC * side;
+    #ifdef OUTLINE
+      lo = (aCape.w > 0.5 ? safeNormalize(nC * side + e) : nC * side) * 0.6;
+    #endif
+  #endif
   #ifdef USE_SKINNING
     mat4 skinM = skinWeight.x * getBoneMatrix(skinIndex.x)
       + skinWeight.y * getBoneMatrix(skinIndex.y)
@@ -633,7 +738,7 @@ void main() {
   vec3 wp = (modelMatrix * vec4(lp, 1.0)).xyz;
   vPos = wp;
   #ifdef OUTLINE
-    float w = length(onrm);
+    float w = length(lo);
     if (w > 0.0001) {
       float dist = length(wp - uCamPos);
       wp += normalize(mat3(modelMatrix) * lo) * (w * uOutline * (1.0 + dist * 0.011));
@@ -644,7 +749,9 @@ void main() {
   vNormal = normalize(mat3(modelMatrix) * ln);
   vColor = vec3(0.0);
   vUv = vec2(0.0);
-  vFx = vec3(0.0);
+  #ifndef CAPE
+    vFx = vec3(0.0);
+  #endif
   vRest = position;
   vD = aD;
   vMat = aMat;
@@ -668,7 +775,6 @@ varying float vMat;
 #define P_SOLE 17
 #define P_MIDSOLE 18
 #define P_LACE 19
-#define P_TRIM 20
 #define P_LINING 21
 #define P_EYE 22
 #define P_IRIS 23
@@ -771,23 +877,15 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     float eyelet = fill(length(vec2(abs(x) - 0.023, fract((r.y - 0.085) / 0.024 + 0.5) * 0.024 - 0.012)) - 0.0028) * onTongue;
     c = mix(c, uPal[P_LACE], eyelet);
   } else if (m == 9) {
-    // mantle: crimson wool, burgundy lining, gold at the hem and round the hood
-    c = mix(c, uPal[P_LINING], step(0.5, d.w));
-    c = mix(c, uPal[P_TRIM], max(fill(d.x - 0.016), band(d.y, 0.0035) * step(d.w, 0.5)));
+    // hood and collar: crimson wool; the hood's seam sinks into its middle,
+    // and its lining shows where it opens under the collar (x across the
+    // hood, y down from its top, z on the hood, w lining)
+    c = mix(c, uPal[P_LINING], d.w);
+    c = mix(c, c * 0.84, band(d.x, 0.03) * d.z * step(0.02, d.y));
+    c = mix(c, c * 0.7, band(d.y - 0.0045, 0.0013) * d.z);
   } else if (m == 10) {
-    // the cape (u, v across and down): lining inside, a gold hem band, and
-    // the crest — a sun over two peaks in a ring — on the back
+    // the cape (u, v across and down; w: the lining side)
     c = mix(c, uPal[P_LINING], step(0.5, d.w));
-    c = mix(c, uPal[P_TRIM], band(d.y - 0.955, 0.018));
-    if (d.w < 0.5) {
-      vec2 p = (d.xy - vec2(0.5, 0.38)) * vec2(0.74, -0.62);
-      float rr = length(p);
-      float ring = band(rr - 0.074, 0.0055);
-      vec2 pk = vec2(abs(p.x + 0.006), p.y + 0.028);
-      float peaks = fill(max(pk.y - 0.062 + pk.x * 1.4, -pk.y)) * step(rr, 0.065);
-      float sun = fill(length(p - vec2(0.03, 0.034)) - 0.012);
-      c = mix(c, uPal[P_TRIM], max(ring, max(peaks, sun)));
-    }
   } else if (m == 11) {
     c = mix(c, uPal[P_FLAP], step(0.5, d.x));
   }
@@ -809,12 +907,18 @@ void main() {
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   vec3 V = v / dist;
-  // one broad, crisp shadow shape (a touch softer on the hanging cloth, whose
-  // panels bend against each other)
-  float soft = (m == 9 || m == 10) ? 0.09 : 0.045;
+  // one broad, crisp shadow shape (softer on the cape, so its folds shade in
+  // soft gradients like the cloth they are)
+  float soft = m == 10 ? 0.16 : m == 9 ? 0.09 : 0.045;
   float lit = smoothstep(-soft, soft, dot(n, uLightDir) + 0.15);
   vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
   vec3 col = base * mix(sh, vec3(1.0), max(lit, unlit));
+  if (m == 10) {
+    // the cape's folds and waves keep a soft shadow in their valleys, under
+    // any light (as a painter would shade them)
+    float fold = smoothstep(0.8, 4.0, vFx.x) - 0.25 * smoothstep(1.0, 5.0, -vFx.x);
+    col *= mix(vec3(1.0), mix(sh, vec3(1.0), 0.3), clamp(fold, -0.3, 1.0) * 0.7);
+  }
   if (m == 2) {
     // one restrained lighter tone where the curls face the light from above
     float hl = smoothstep(0.58, 0.64, dot(n, uLightDir)) * smoothstep(0.25, 0.5, n.y);
@@ -1266,20 +1370,29 @@ export function makeInkMaterial(toon, width) {
 
 // The runner's surface and ink materials (VS_CHAR / FS_CHAR). pal is an array
 // of 32 THREE.Color palette slots indexed by material id; rig a Vector4 of
-// garment constants (sock line, boot offset, sleeve cuff start).
-export function makeCharacterMaterials(env, pal, rig, outline) {
+// garment constants (sock line, boot offset, sleeve cuff start). cape: the
+// particle texture and grid (Vector4: cols, rows, half thickness) the cape's
+// pair of materials rebuild its surface from.
+export function makeCharacterMaterials(env, pal, rig, outline, cape) {
   // The runner keeps their own colours however deep the dream goes (uDream3
   // carries the palette shift; its doorway-swell terms never reach this close).
   const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }); // rig: [Vector4, Vector4]
-  const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VS_CHAR, fragmentShader: FS_CHAR });
-  const ink = new THREE.ShaderMaterial({
-    uniforms: Object.assign({}, uniforms, { uOutline: { value: outline } }),
-    defines: { OUTLINE: '' },
-    vertexShader: VS_CHAR,
-    fragmentShader: FS_CHAR_INK,
-    side: THREE.BackSide,
-  });
-  return { mat, ink };
+  const make = (defines, extra) => {
+    const u = Object.assign({}, uniforms, extra);
+    return [
+      new THREE.ShaderMaterial({ uniforms: u, defines, vertexShader: VS_CHAR, fragmentShader: FS_CHAR }),
+      new THREE.ShaderMaterial({
+        uniforms: Object.assign({}, u, { uOutline: { value: outline } }),
+        defines: Object.assign({ OUTLINE: '' }, defines),
+        vertexShader: VS_CHAR,
+        fragmentShader: FS_CHAR_INK,
+        side: THREE.BackSide,
+      }),
+    ];
+  };
+  const [mat, ink] = make({}, {});
+  const [capeMat, capeInk] = make({ CAPE: '' }, { uCape: { value: cape.texture }, uCapeGrid: { value: cape.grid } });
+  return { mat, ink, capeMat, capeInk };
 }
 
 export function makeGlassMaterial(env, o = {}) {

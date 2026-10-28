@@ -296,6 +296,7 @@ export default {
   continuation: false, // the facade hides everything behind the door
   env: {
     sky: ['#060e2a', '#26407a', '#0a1430'],
+    bloom: ['#4a6ae8', '#ffc45a', '#ff7a6a'], // the colours its doorway bloom is made of
     sun: { dir: [0.5, 0.42, -1], glow: '#3c4c94' },
     moon: { dir: [0.5, 0.42, -1], color: '#fbe9b0', size: 0.05 },
     stars: 1,

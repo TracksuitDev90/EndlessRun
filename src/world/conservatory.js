@@ -255,6 +255,7 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   env: {
     sky: ['#2f7f88', '#ffe6a8', '#4f8f74'],
+    bloom: ['#2fc0a8', '#ff9ac8', '#ffa83a'], // the colours its doorway bloom is made of
     sun: { dir: [0.25, 0.22, -1], glow: '#ffe2a0', disc: '#fff6d8', size: 0.045 },
     stars: 0,
     skyFx: { rays: 0.5, clouds: 0.22 },
