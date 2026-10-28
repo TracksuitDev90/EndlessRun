@@ -30,6 +30,7 @@
         <div class="title-top">
           <h1 id="logo" class="logo">EndlessRun</h1>
           <p class="tagline">a run through worlds within worlds</p>
+          <p id="title-best" class="title-best" hidden>best <b id="title-best-num">0</b></p>
         </div>
         <div class="title-bottom">
           <div class="howto">
@@ -40,6 +41,15 @@
           <div class="begin"><span class="touch-only">tap or swipe to begin</span><span class="mouse-only">click, swipe or press a key to begin</span></div>
           <button id="btn-sound-2" class="pill sound-toggle" aria-label="Toggle sound"><span class="ic-sound"></span><span id="sound-label">Sound on</span></button>
         </div>
+      </div>
+
+      <div id="scorebox" aria-live="off">
+        <div class="score-row">
+          <div class="score-pill"><span id="score-num">0</span></div>
+          <div id="score-mult" class="score-mult" aria-label="Depth multiplier">×1</div>
+        </div>
+        <div id="score-pops"></div>
+        <div id="score-best" class="score-best">new best!</div>
       </div>
 
       <div id="hud">
@@ -57,6 +67,7 @@
       <div id="pause" class="screen modal">
         <div class="card">
           <h2>Paused</h2>
+          <p class="sub">score <b id="pause-score">0</b></p>
           <button id="btn-resume" class="btn primary">Resume</button>
           <button id="btn-restart" class="btn">Start over</button>
         </div>
@@ -65,6 +76,11 @@
       <div id="crash" class="screen modal">
         <div class="card">
           <h2>Oof.</h2>
+          <div id="crash-new" class="ribbon">new best!</div>
+          <div class="tally">
+            <div class="tally-row"><span>score</span><b id="crash-score">0</b></div>
+            <div class="tally-row best"><span>best</span><b id="crash-best">0</b></div>
+          </div>
           <p class="sub">Dust off and keep going?</p>
           <button id="btn-continue" class="btn primary">Continue <small id="continue-count">1 left</small></button>
           <button id="btn-again" class="btn">Run again</button>

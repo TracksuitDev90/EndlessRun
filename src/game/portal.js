@@ -39,6 +39,12 @@ export class Portal {
     this.depthMesh.geometry = geo;
   }
 
+  // The doorway bends with the world it stands in (its far-world waves).
+  setTrip(v) {
+    this.stencilMat.uniforms.uTrip.value.copy(v);
+    this.depthMat.uniforms.uTrip.value.copy(v);
+  }
+
   place(z) {
     this.stencilMesh.position.z = z;
     this.depthMesh.position.z = z;

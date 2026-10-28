@@ -14,6 +14,11 @@ export const shared = {
   uNoise: { value: null },
   uPixelRatio: { value: 1 },
   uResolution: { value: new THREE.Vector2(1, 1) },
+  // Dream depth (see game/dream.js), shared by every world so the doorway
+  // and both worlds around it always warp together.
+  uDream: { value: new THREE.Vector4() }, // x twist, y waves, z melt, w breathe
+  uDream2: { value: new THREE.Vector4() }, // x colour rings, y sky swirl, z neon ink, w doorway rush
+  uDream3: { value: new THREE.Vector4() }, // x palette hue shift, y saturation push, z rush progress, w rush swell
 };
 
 const COMMON = /* glsl */ `
@@ -21,18 +26,47 @@ uniform vec3 uCamPos;
 uniform float uTime;
 uniform vec4 uBend;
 uniform vec4 uTrip; // x hue shift, y far-world undulation, z hue drift
+uniform vec4 uDream;
+uniform vec4 uDream3;
+// The curved world, plus everything the dream does to the shape of it. All of
+// it grows with distance, so the stretch of road you're actually reading is
+// always true.
 vec3 bendPos(vec3 wp) {
+  vec3 o = wp;
   float a = uCamPos.z - wp.z;
   float d = clamp(a - uBend.w, 0.0, 320.0);
   float d2 = d * d;
   wp.y -= uBend.x * d2;
   wp.x += uBend.y * d2;
-  if (uTrip.y != 0.0) {
+  float wv = uTrip.y + uDream.y;
+  if (wv != 0.0) {
     // the distant world breathes in slow waves rolling toward you
     float k = d * 0.0125;
     k *= k;
-    wp.y += sin(a * 0.045 - uTime * 0.7) * uTrip.y * k * 5.0;
-    wp.x += sin(a * 0.028 + uTime * 0.45) * uTrip.y * k * 8.0;
+    wp.y += sin(a * 0.045 - uTime * 0.7) * wv * k * 5.0;
+    wp.x += sin(a * 0.028 + uTime * 0.45) * wv * k * 8.0;
+  }
+  if (uDream.z != 0.0) {
+    // melt: the far world wobbles like jelly, the tall things most
+    float k = smoothstep(12.0, 70.0, d) * uDream.z;
+    float h = max(o.y, 0.0);
+    wp.x += sin(o.y * 0.42 + uTime * 1.3 + a * 0.05) * k * (0.45 + h * 0.26);
+    wp.y += sin(o.x * 0.35 + uTime * 0.9 + a * 0.03) * k * h * 0.1;
+  }
+  if (uDream.x != 0.0) {
+    // twist: the road ahead corkscrews about its own axis
+    float k = smoothstep(14.0, 130.0, d);
+    float ang = uDream.x * k * (0.75 + 0.45 * sin(uTime * 0.16));
+    vec2 c = vec2(0.0, 1.5 - uBend.x * d2);
+    vec2 r = wp.xy - c;
+    float cs = cos(ang);
+    float sn = sin(ang);
+    wp.xy = c + vec2(r.x * cs - r.y * sn, r.x * sn + r.y * cs);
+  }
+  if (uDream3.w > 0.0) {
+    // through a doorway: a swell races out across the world ahead
+    float x = (a - uDream3.z * 150.0) / 9.0;
+    wp.y += uDream3.w * exp(-x * x) * 1.6 * smoothstep(8.0, 30.0, a);
   }
   return wp;
 }
@@ -52,22 +86,33 @@ uniform vec3 uSunColor;
 uniform vec4 uGrade; // x saturation, y contrast, z vignette, w exposure
 uniform vec3 uVignette;
 uniform vec2 uResolution;
+uniform vec4 uDream2;
+uniform vec4 uDream3;
 vec3 hueRot(vec3 c, float a) {
   const vec3 k = vec3(0.57735);
   float ca = cos(a);
   return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
 }
-// Per-world color grade + tinted vignette, applied to everything opaque.
-vec3 grade(vec3 c, vec4 trip) {
+// Per-world color grade + tinted vignette, applied to everything opaque, plus
+// the dream's colour: a palette shift, rings of hue rolling toward you through
+// the world (dist < 0: no world position, e.g. the sky), and a bloom of colour
+// from the centre of the screen as you come through a doorway.
+vec3 grade(vec3 c, vec4 trip, float dist) {
   float l = dot(c, vec3(0.299, 0.587, 0.114));
-  c = mix(vec3(l), c, uGrade.x);
+  c = mix(vec3(l), c, uGrade.x * (1.0 + uDream3.y));
   c = (c - 0.5) * uGrade.y + 0.5;
   c *= uGrade.w;
-  float h = trip.x + trip.z * sin(uTime * 0.13);
-  if (h != 0.0) c = hueRot(c, h);
   vec2 q = gl_FragCoord.xy / uResolution - 0.5;
-  float vg = smoothstep(0.42, 0.95, length(q) * 1.414) * uGrade.z;
+  float r = length(q) * 1.414;
+  float h = trip.x + trip.z * sin(uTime * 0.13) + uDream3.x;
+  if (uDream2.x > 0.0 && dist >= 0.0) h += uDream2.x * sin(dist * 0.06 - uTime * 1.3) * 1.6 * smoothstep(10.0, 40.0, dist);
+  if (uDream2.w > 0.0) h += uDream2.w * sin(r * 9.0 - uTime * 7.0) * 1.4 * smoothstep(0.05, 0.5, r);
+  if (h != 0.0) c = hueRot(c, h);
+  float vg = smoothstep(0.42, 0.95, r) * uGrade.z;
   return mix(c, c * uVignette, vg);
+}
+vec3 grade(vec3 c, vec4 trip) {
+  return grade(c, trip, -1.0);
 }
 vec3 skyColor(vec3 dir) {
   float h = dir.y;
@@ -89,6 +134,7 @@ const VS_OBJECT = COMMON + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uWobble;
 uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
+uniform float uDreamK; // 1 for props that may breathe (see makeToonMaterial)
 attribute vec3 fx;
 #ifdef OUTLINE
 uniform float uOutline;
@@ -195,6 +241,15 @@ void main() {
     wp.y -= (1.0 - easeOutBack(t)) * uAnim.w;
   }
 
+  if (uDream.w * uDreamK > 0.0) {
+    // breathe: props in the distance swell and settle like living things,
+    // and firm up into their true shape as they come close
+    float k = smoothstep(26.0, 64.0, aP) * uDream.w * uDreamK;
+    float b = sin(uTime * 1.6 + phase * 2.0 + aP * 0.06) * k;
+    wp.y = pivot.y + (wp.y - pivot.y) * (1.0 + b * 0.34);
+    wp.xz = pivot.xz + (wp.xz - pivot.xz) * (1.0 - b * 0.12);
+  }
+
   vPos = wp;
   #ifdef OUTLINE
     float w = length(onrm);
@@ -207,6 +262,11 @@ void main() {
   vWorld = wp;
   vNormal = wn;
   vUv = uv;
+  #ifdef GROUND
+    #if GROUND == 6
+      vUv.y += phase; // the pattern runs on across chunks (p0 = chunk distance)
+    #endif
+  #endif
   vFx = fx;
   vec3 col = color;
   #ifdef USE_INSTANCING_COLOR
@@ -370,6 +430,53 @@ vec3 groundColor(vec2 p, float dist) {
     c = mix(c, avg, far * 0.6);
     float border = smoothstep(3.75, 3.85, abs(p.x));
     return mix(c, uGroundC, border);
+  #elif GROUND == 6
+    // forest floor: long grass laid down in painterly strokes (two staggered
+    // layers of tapering blades, dark at the root, catching light at the tip),
+    // a trodden earth path wandering down the middle, flecks of wildflowers.
+    // p.y runs on from chunk to chunk (see the vertex shader), so every period
+    // here divides the 4096 m it wraps at.
+    float soften = smoothstep(0.25, 0.9, fwidth(p.x) * 9.0);
+    vec3 c = mix(uGroundA, uGroundB, 0.3);
+    for (int k = 0; k < 2; k++) {
+      float fk = float(k);
+      vec2 gs = vec2(0.075, 0.42);
+      vec2 q = vec2(p.x + sin(p.y * 0.785398 + fk * 2.1) * 0.1 + fk * 0.0375, p.y + fk * 0.21) / gs;
+      q.y += hash12(vec2(floor(q.x), 7.0 + fk)) * 4.0;
+      vec2 cell = floor(q);
+      vec2 f = fract(q);
+      float h = hash12(cell + 11.0 + fk * 5.0);
+      float h2 = hash12(cell + 23.0 + fk);
+      float lean = (hash12(cell + 3.0) - 0.5) * 0.7;
+      // a spindle: fades in at the root, widest low down, tapering to a point
+      float wdt = 0.62 * (1.0 - f.y) * smoothstep(0.0, 0.35, f.y) * (0.65 + h2 * 0.7);
+      float aa = fwidth(q.x) + 0.04;
+      float blade = 1.0 - smoothstep(wdt - aa, wdt + aa, abs(f.x - 0.5 - (h2 - 0.5) * 0.3 - lean * f.y));
+      vec3 bc = mix(uGroundA, uGroundB, h * 0.55 + f.y * 0.45);
+      c = mix(c, bc, blade * (1.0 - soften * 0.75) * (k == 0 ? 1.0 : 0.8));
+    }
+    float wander = sin(p.y * 0.0490874) * 0.9 + sin(p.y * 0.1963495 + 1.7) * 0.4;
+    float pw = 1.05 + 0.4 * sin(p.y * 0.392699 + 0.6);
+    float wash = texture2D(uNoise, p * 0.0625).g;
+    float edge = abs(p.x - wander) - pw + (wash - 0.5) * 0.9;
+    // grass creeping in over the edges in streaks along the path
+    float tuft = texture2D(uNoise, vec2(p.x * 1.6, p.y * 0.375)).g;
+    float dirt = 1.0 - smoothstep(-0.3, 0.05, edge + (tuft - 0.5) * 0.7);
+    vec3 earth = uGroundC * (0.85 + texture2D(uNoise, p * 0.25).g * 0.3);
+    c = mix(c, earth, dirt * (1.0 - far * 0.4));
+    // wildflowers dotted through the grass (not on the path)
+    vec2 fq = p / 0.5;
+    vec2 fc = floor(fq);
+    float fh = hash12(fc + 41.0);
+    vec2 fo = vec2(hash12(fc + 3.7), hash12(fc + 9.1)) * 0.6 + 0.2;
+    float fd = length((fract(fq) - fo) * vec2(1.0, 0.7));
+    float faa = fwidth(fq.x) * 1.2;
+    float petal = (1.0 - smoothstep(0.07 - faa, 0.07 + faa, fd)) * step(0.91, fh) * (1.0 - dirt) * (1.0 - far);
+    vec3 bloom = fh > 0.975 ? vec3(0.8, 0.68, 1.0) : fh > 0.945 ? vec3(1.0, 0.86, 0.36) : vec3(1.0, 0.98, 0.9);
+    c = mix(c, bloom, petal);
+    c = mix(c, mix(uGroundA, uGroundB, 0.4), far * 0.55);
+    float border = smoothstep(3.9, 4.4, abs(p.x));
+    return mix(c, uGroundA * 0.85, border);
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -427,6 +534,24 @@ void main() {
   #endif
   vec3 col = mix(base * shade, base, vFx.y);
 
+  #ifdef WATER
+    // running water (local u is downstream): a dark body that takes a wash of
+    // reflected sky at grazing angles, ripple streaks drifting downstream, and
+    // glints that ignore the shade so a stream still reads in the dark
+    vec2 fq = vUv * vec2(0.3, 0.9) + vec2(-uTime * 0.22, 0.0);
+    float r1 = texture2D(uNoise, fq).g;
+    float r2 = texture2D(uNoise, fq * vec2(2.1, 2.6) + vec2(-uTime * 0.13, 0.41)).g;
+    float rip = smoothstep(0.58, 0.7, r1 * 0.6 + r2 * 0.5);
+    float trough = 1.0 - smoothstep(0.3, 0.46, r1 * 0.5 + r2 * 0.5);
+    float glint = smoothstep(0.76, 0.81, r1 * 0.45 + r2 * 0.65);
+    float wfres = pow(1.0 - abs(V.y), 3.0);
+    vec3 skyW = skyColor(reflect(V, vec3(0.0, 1.0, 0.0)));
+    vec3 hl = mix(skyW, vec3(0.86, 0.78, 1.0), 0.55) * 1.35 + 0.18;
+    col = mix(base * mix(vec3(1.0), shade, 0.4), skyW, 0.18 + 0.5 * wfres);
+    col *= 1.0 - trough * 0.45;
+    col = mix(col, hl, rip * 0.5 + glint * 0.5);
+  #endif
+
   #ifndef GROUND
     // back light: silhouettes catch the light when it's behind them
     float fres = 1.0 - abs(dot(n, V));
@@ -440,7 +565,7 @@ void main() {
   col *= 1.0 + g * 0.05 + wash * 0.09;
 
   col = atmos(col, v, dist, vFx.y);
-  gl_FragColor = vec4(grade(col, uTrip), 1.0);
+  gl_FragColor = vec4(grade(col, uTrip, dist), 1.0);
 }
 `;
 
@@ -450,7 +575,14 @@ void main() {
   vec3 ink = mix(uInk, vColor * 0.3, 0.42);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
-  gl_FragColor = vec4(grade(atmos(ink, v, dist, 0.0), uTrip), 1.0);
+  float glow = 0.0;
+  if (uDream2.z > 0.0) {
+    // deep in the dream the ink lines burn in neon, cycling through the hues
+    glow = uDream2.z * smoothstep(8.0, 30.0, dist);
+    vec3 neon = hueRot(vec3(1.0, 0.25, 0.62), uTime * 0.6 + vWorld.z * 0.04 + vWorld.y * 0.12);
+    ink = mix(ink, neon * 1.2, glow);
+  }
+  gl_FragColor = vec4(grade(atmos(ink, v, dist, glow * 0.7), uTrip, dist), 1.0);
 }
 `;
 
@@ -719,7 +851,7 @@ void main() {
   vec3 c = uGlass.rgb * vColor + streak * 0.45 + fres * 0.18;
   float a = uGlass.a + fres * 0.22 + streak * 0.35;
   float f = smoothstep(uFog.x, uFog.y, dist);
-  c = grade(atmos(c, v, dist, 0.0), uTrip);
+  c = grade(atmos(c, v, dist, 0.0), uTrip, dist);
   gl_FragColor = vec4(c, a * (1.0 - f * 0.7));
 }
 `;
@@ -859,6 +991,15 @@ float hash13(vec3 p) {
 }
 void main() {
   vec3 d = normalize(vDir);
+  float sw = uDream2.y;
+  if (sw > 0.0) {
+    // a swirling sky: azimuth and elevation stirred like paint
+    float az0 = atan(d.x, -d.z);
+    float el = asin(clamp(d.y, -1.0, 1.0));
+    az0 += sw * 0.6 * sin(el * 7.0 + uTime * 0.25);
+    el += sw * 0.12 * sin(az0 * 4.0 - uTime * 0.3) * cos(el);
+    d = vec3(sin(az0) * cos(el), sin(el), -cos(az0) * cos(el));
+  }
   vec3 c = skyColor(d);
   float sd = dot(d, uSunDir);
   float sun = smoothstep(uSkyFx.y - 0.00012, uSkyFx.y + 0.00012, sd);
@@ -927,6 +1068,7 @@ void main() {
     vec3 ac = mix(vec3(0.25, 1.0, 0.65), vec3(0.85, 0.35, 0.95), smoothstep(0.2, 0.5, d.y));
     c += ac * curtain * streak * uSkyFx2.z;
   }
+  if (sw > 0.0) c = hueRot(c, sw * 1.3 * sin(az * 3.0 + d.y * 9.0 + uTime * 0.35));
   c += (texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5) * 0.02;
   gl_FragColor = vec4(grade(c, uTrip), 1.0);
 }
@@ -953,6 +1095,7 @@ void main() {
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_PointSize = uSize * (0.5 + aRand) * uPixelRatio * (40.0 / max(-mv.z, 1.0));
   vAlpha = smoothstep(-92.0, -60.0, p.z) * smoothstep(6.0, 1.0, p.z) * (0.55 + 0.45 * sin(uTime * (1.0 + aRand * 3.0) + aRand * 50.0));
+  vAlpha *= smoothstep(1.5, 4.5, -mv.z); // no giant blobs drifting across the lens
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -1085,14 +1228,20 @@ function withShared(env, extra) {
 }
 
 export function makeToonMaterial(env, o = {}) {
+  const anim = animVector(o.anim);
+  // Only props that pop up or lift in may breathe with the dream: continuous
+  // structures, ground strips and doorway pieces would come apart at the seams.
+  const breathes = anim.x === 1 || anim.x === 4;
   const uniforms = withShared(env, {
-    uAnim: { value: animVector(o.anim) },
+    uAnim: { value: anim },
+    uDreamK: { value: o.dream ?? (breathes ? 1 : 0) },
     uWobble: { value: new THREE.Vector4(...(o.wobble || [0, 0, 1, 0])) },
     uFly: { value: new THREE.Vector4(...(o.fly || [0, 0, 0, 0])) },
     uMarkRepeat: { value: new THREE.Vector2(...(o.marks || [3, 3])) },
   });
   const defines = {};
   if (o.ground) defines.GROUND = o.ground;
+  if (o.water) defines.WATER = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -1119,7 +1268,9 @@ export function makeInkMaterial(toon, width) {
 // of 32 THREE.Color palette slots indexed by material id; rig a Vector4 of
 // garment constants (sock line, boot offset, sleeve cuff start).
 export function makeCharacterMaterials(env, pal, rig, outline) {
-  const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig } }); // rig: [Vector4, Vector4]
+  // The runner keeps their own colours however deep the dream goes (uDream3
+  // carries the palette shift; its doorway-swell terms never reach this close).
+  const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }); // rig: [Vector4, Vector4]
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VS_CHAR, fragmentShader: FS_CHAR });
   const ink = new THREE.ShaderMaterial({
     uniforms: Object.assign({}, uniforms, { uOutline: { value: outline } }),

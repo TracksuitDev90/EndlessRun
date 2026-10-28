@@ -268,6 +268,112 @@ body:not(.touch) .touch-only {
   visibility: visible;
 }
 
+/* --- score --------------------------------------------------------------- */
+#scorebox {
+  position: absolute;
+  top: calc(12px + var(--safe-top));
+  left: calc(12px + var(--safe-left));
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease;
+}
+#scorebox.show {
+  opacity: 1;
+  visibility: visible;
+}
+.score-row {
+  display: flex;
+  align-items: center;
+}
+.score-pill {
+  height: 44px;
+  min-width: 76px;
+  padding: 0 22px 0 14px;
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 3px 4px 0 var(--ink);
+  font-weight: 600;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.01em;
+}
+/* the depth multiplier: an orange seal stamped on the end of the pill */
+.score-mult {
+  position: relative;
+  margin-left: -14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--coat);
+  color: var(--ink);
+  border: 2.5px solid var(--ink);
+  box-shadow: 2px 3px 0 var(--ink);
+  font-weight: 600;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums lining-nums;
+  transform: rotate(-8deg);
+}
+.score-mult.bump {
+  animation: bump 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+#score-pops {
+  position: absolute;
+  left: 16px;
+  top: 52px;
+}
+.pop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--white);
+  text-shadow: 0 0 2px var(--ink), 0 1px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink), 0 -1px 0 var(--ink), 0 2px 10px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+}
+.pop.show {
+  animation: pop 0.95s ease-out forwards;
+}
+.score-best {
+  position: absolute;
+  left: 4px;
+  top: 54px;
+  padding: 3px 12px 4px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink);
+  background: var(--coat);
+  color: var(--ink);
+  box-shadow: 2px 3px 0 var(--ink);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  opacity: 0;
+}
+.score-best.show {
+  animation: best 2.8s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+.title-best {
+  margin: 1.1em 0 0;
+  font-size: clamp(14px, 3.6vw, 18px);
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  opacity: 0.95;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+.title-best b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.04em;
+}
+
 /* --- world toast --------------------------------------------------------- */
 #toast {
   position: absolute;
@@ -386,6 +492,55 @@ body:not(.touch) .touch-only {
   font-style: italic;
   opacity: 0.8;
 }
+.card .sub b {
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.tally {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 6px 4px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+.tally-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 15px;
+  font-style: italic;
+}
+.tally-row b {
+  font-style: normal;
+  font-weight: 600;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.tally-row.best b {
+  font-size: 17px;
+  opacity: 0.75;
+}
+.ribbon {
+  display: none;
+  align-self: center;
+  margin: -6px 0 -2px;
+  padding: 3px 14px 4px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink);
+  background: var(--coat);
+  box-shadow: 2px 3px 0 var(--ink);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 15px;
+  transform: rotate(-3deg);
+}
+.is-new-best .ribbon {
+  display: block;
+  animation: stamp 0.8s 0.25s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
 .btn {
   font-size: 19px;
   padding: 12px 16px;
@@ -435,6 +590,28 @@ body:not(.touch) .touch-only {
   12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
   80% { opacity: 1; }
   100% { opacity: 0; }
+}
+@keyframes bump {
+  0% { transform: rotate(-8deg) scale(1); }
+  35% { transform: rotate(6deg) scale(1.4); }
+  100% { transform: rotate(-8deg) scale(1); }
+}
+@keyframes stamp {
+  0% { opacity: 0; transform: rotate(-12deg) scale(1.8); }
+  100% { opacity: 1; transform: rotate(-3deg) scale(1); }
+}
+@keyframes pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.85); }
+  15% { opacity: 1; transform: translateY(0) scale(1.05); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-22px) scale(1); }
+}
+@keyframes best {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.7) rotate(-6deg); }
+  14% { opacity: 1; transform: translateY(0) scale(1.08) rotate(-3deg); }
+  24% { transform: scale(1) rotate(-3deg); }
+  82% { opacity: 1; transform: scale(1) rotate(-3deg); }
+  100% { opacity: 0; transform: translateY(-4px) scale(0.96) rotate(-3deg); }
 }
 @keyframes nudge-up {
   0%, 100% { transform: translateY(2px); }

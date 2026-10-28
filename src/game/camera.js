@@ -18,6 +18,7 @@ export class ChaseCamera {
     this.baseFov = 60;
     this.boom = 1;
     this.roll = 0;
+    this.sway = 0; // dream depth: a slow drunken roll and breathing FOV
     this.look = new THREE.Vector3();
   }
 
@@ -84,9 +85,10 @@ export class ChaseCamera {
     this.look.set(lx, ly, lz);
     this.camera.lookAt(this.look);
     this.roll = damp(this.roll, -player.vx * 0.006, 8, dt);
-    this.camera.rotateZ(this.roll * (1 - i));
+    const sw = Math.min(1, this.sway) * (1 - i);
+    this.camera.rotateZ(this.roll * (1 - i) + sw * (0.045 * Math.sin(time * 0.31) + 0.02 * Math.sin(time * 0.83 + 1.2)));
 
-    const fov = this.baseFov + sp * 7 + i * 4;
+    const fov = this.baseFov + sp * 7 + i * 4 + sw * 2.4 * Math.sin(time * 0.47);
     if (Math.abs(this.camera.fov - fov) > 0.01) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
