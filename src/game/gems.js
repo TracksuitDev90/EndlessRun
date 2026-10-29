@@ -79,7 +79,7 @@ export class GemField {
     const limit = dist - 12;
     let w = 0;
     for (const g of this.gems) {
-      if (g.taken ? time - g.taken > 0.5 : g.d < limit) this.unput(g);
+      if (g.taken ? time - g.taken > 0.3 : g.d < limit) this.unput(g);
       else this.gems[w++] = g;
     }
     this.gems.length = w;
@@ -377,8 +377,9 @@ export class GemField {
   // --- pick-up --------------------------------------------------------------
   // Gems the runner's body (plus a little reach) passed through this frame,
   // swept along the distance covered so a slow frame can't skip one. Each is
-  // marked taken (its gem, halo and pool start their pick-up animation) and
-  // gets `whole` if it completed its run.
+  // marked taken (its gem, halo and pool start being sucked into the runner,
+  // from as far ahead of them as the gem was) and gets `whole` if it
+  // completed its run.
   collect(p, prevDist, dist, time) {
     const out = this.got;
     out.length = 0;
@@ -391,7 +392,10 @@ export class GemField {
     for (const g of this.gems) {
       if (g.taken || g.d < z0 || g.d > z1 || Math.abs(g.x - p.x) > hw || g.y < y0 || g.y > y1) continue;
       g.taken = time;
-      for (const it of g.items) it.p2 = time;
+      for (const it of g.items) {
+        it.p2 = time;
+        it.p3 = dist - g.d;
+      }
       g.world.batch(`gem${g.cut}`).dirty = true;
       g.world.batch('gemGlow').dirty = true;
       g.world.batch('gemPool').dirty = true;

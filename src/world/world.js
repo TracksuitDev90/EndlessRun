@@ -111,7 +111,8 @@ export class World {
   }
 
   // Place one instance. o: { ry, s, sx, sy, sz, c:[r,g,b], p0, p1 }
-  // (p2 is left for the gems: the moment one was collected)
+  // (p2 and p3 are left for the gems: the moment one was collected, and how
+  // far ahead of the runner it was)
   put(owner, name, x, y, d, o) {
     const it = makeItem();
     it.owner = owner;
@@ -119,6 +120,7 @@ export class World {
     it.y = y;
     it.d = d;
     it.p2 = 0;
+    it.p3 = 0;
     if (o) {
       const s = o.s ?? 1;
       it.ry = o.ry ?? 0;

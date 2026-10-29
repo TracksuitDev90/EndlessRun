@@ -3,7 +3,7 @@ import {
   cypressParts, roundTreeParts, bushParts, lanternPostParts, potParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { shaftParts, giantFlowerParts } from './whimsy.js';
-import { crystal, brilliant } from './gems.js';
+import { crystal, barrel, nugget } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -38,17 +38,21 @@ const C = {
 };
 const HOUSE_TINTS = ['#f2c64b', '#8fe0b8', '#45b89a', '#e9b43a', '#bfe7a0', '#6fcfa8', '#f6d873', '#9ad86a'];
 
-// The Sapphire: the round brilliant everyone draws when they draw a gem, so
-// the first gem you ever see reads as one. Cornflower blue against the lane's
-// greens and mustards; oval stones mixed into the runs, a big twelve-sided
-// royal brilliant for the prize spots.
+// The Sapphire, as it comes out of the ground: corundum's hexagonal barrel,
+// tapering to flat ends and leaning a little, cornflower blue against the
+// lane's greens and mustards. Water-worn pebbles (the way sapphires turn up,
+// in river gravels) mixed into the runs; a great barrel with a smaller one
+// grown into its side for the prize spots.
 const GEM = {
   name: 'sapphire',
   tints: ['#2c6cff', '#3f8dff', '#4f5cff'],
   cuts: () => [
-    [crystal(brilliant({ r: 0.29 }))],
-    [crystal(brilliant({ r: 0.28, sx: 1.28, sz: 0.82 }))],
-    [crystal(brilliant({ r: 0.36, sides: 12, crown: 0.46 }))],
+    [crystal(barrel({ r: 0.15, h: 0.29, seed: 3 }), { rz: 0.14 })],
+    [crystal(nugget({ r: [0.25, 0.17, 0.2], faces: 30, spread: 0.06, chips: 2, seed: 5 }), { veins: 0.25 })],
+    [
+      crystal(barrel({ r: 0.19, h: 0.35, seed: 8 }), { rz: 0.1 }),
+      crystal(barrel({ r: 0.1, h: 0.19, seed: 9 }), { x: 0.19, y: -0.1, rz: -0.85, rx: 0.3 }),
+    ],
   ],
   motion: [1.3, 2.2, 0.07, 0.14],
   look: [0.75, 1, 0.3, 0.35],

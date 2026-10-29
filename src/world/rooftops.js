@@ -3,7 +3,7 @@ import {
   roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { skyLanternParts, balloonParts, lampConeParts } from './whimsy.js';
-import { crystal, brilliant, star, FACE } from './gems.js';
+import { crystal, topazPrism, nugget } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -33,17 +33,22 @@ const C = {
 const BODY_TINTS = ['#26386c', '#2d4279', '#1f2f5f', '#35487f', '#3b4f8a', '#2a3d74', '#40548f'];
 const CLOTHES = ['#f4efe2', '#f2a7a0', '#9fd3e6', '#f7d36b', '#b8e0a6', '#e9b8f0', '#ffffff'];
 
-// The Citrine: honey-gold stones standing face-on like stars come down onto
-// the slates — the warm colour that sings against the night blue. Pentagon
-// cuts, trillions mixed in, and for the prize spots a faceted fallen star.
-// They twinkle a little quicker than the other worlds' gems.
+// The Topaz: golden crystals like the best one in a mineral drawer — a long
+// lozenge prism under a wedge-and-pyramid tip, broken off at its foot where
+// it grew from the rock, leaning — honey gold, the warm colour that sings
+// against the night blue. Rough golden nuggets, cracked like amber, mixed
+// into the runs; a great crystal with a second grown from its foot for the
+// prize spots. They twinkle a little quicker than the other worlds' gems.
 const GEM = {
-  name: 'citrine',
+  name: 'topaz',
   tints: ['#ffb52e', '#ffc94a', '#ffa02a'],
   cuts: () => [
-    [crystal(brilliant({ r: 0.3, sides: 5, rot: -Math.PI / 2, pavilion: 0.8, crown: 0.4 }), { rx: FACE })],
-    [crystal(brilliant({ r: 0.33, sides: 3, rot: -Math.PI / 2, pavilion: 0.7, table: 0.5 }), { rx: FACE })],
-    [crystal(star({ R: 0.39, inner: 0.47, depth: 0.15 }), { rx: FACE })],
+    [crystal(topazPrism({ w: 0.12, top: 0.3, foot: 0.28, seed: 2 }), { rz: 0.35 })],
+    [crystal(nugget({ r: [0.23, 0.2, 0.19], faces: 12, spread: 0.22, chips: 3, seed: 7 }), { veins: 0.45 })],
+    [
+      crystal(topazPrism({ w: 0.15, top: 0.36, foot: 0.32, seed: 4 }), { rz: 0.3 }),
+      crystal(topazPrism({ w: 0.08, top: 0.2, foot: 0.17, seed: 5 }), { rz: -0.55, x: 0.12, y: -0.14 }),
+    ],
   ],
   motion: [1.5, 2.0, 0.06, 0.18],
   look: [0.8, 1.15, 0.25, 0.4],

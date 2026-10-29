@@ -112,16 +112,26 @@ colour is left alone). Tunables (including when each effect joins) live in
 ![Each world's gem: its everyday stone (left), its crown stone (middle) and the variant mixed into its runs (right)](docs/gems.jpg)
 
 Every world has its own stone, in a colour chosen to stand off that world's
-palette, and cut in that world's character:
+palette, and in that world's character — mostly as it comes out of the
+ground:
 
-| World | Gem | Why it sings there | Cuts: everyday · variant · crown |
+| World | Gem | Why it sings there | Forms: everyday · variant · crown |
 |---|---|---|---|
-| Cypress Lane | **Sapphire** | cornflower blue against the greens and mustards | round brilliant (the gem everyone draws, so the first one you see reads as one) · oval brilliant · twelve-sided royal brilliant |
+| Cypress Lane | **Sapphire** | cornflower blue against the greens and mustards | corundum's hexagonal barrel, tapering to flat ends · a water-worn pebble (the way sapphires turn up, in river gravels) · a great barrel with a smaller one grown into its side |
 | Deepwood | **Amethyst** | the one purple thing in the shade, glowing like a spirit-lamp | crystal points growing from a lump of dark stone · a lone double-terminated point · a great geode cluster |
-| Night Rooftops | **Citrine** | honey gold against the night blue | pentagon cut stood face-on like a star come down · trillion · a faceted fallen star |
+| Night Rooftops | **Topaz** | honey gold against the night blue | a long lozenge prism under a wedge-and-pyramid tip, broken off at its foot · a rough nugget, cracked like amber · a great crystal with a second grown from its foot |
 | Hall of Doors | **Emerald** | green, the complement of the coral walls | an heirloom pendant — emerald cut in a gold bezel (the hall's doorknob brass) on a loop · square asscher · a larger pendant in a double rim |
-| Glasshouse | **Ruby** | red against all that green and mint, as if the humid air had condensed into gems | briolette dewdrop faceted all over · pear cut · a heart |
+| Glasshouse | **Ruby** | red against all that green and mint, like berries of red glass | a chunky rough nugget threaded with pale cracks · a water-worn pebble · a ruby crystal in corundum's six-sided plate, stood up to show its face |
 | Sky Road | **Aquamarine** | turquoise, the complement of all that amber — a splinter of clear sky | long leaning double-terminated shard · squat sky-diamond · a fan of three splinters |
+
+The natural stones are made the way real ones are bounded: cleaved out of a
+block by flat planes — the faces of a crystal's habit (a sapphire barrel is a
+steep hexagonal dipyramid cut off flat at both ends; a ruby plate a hexagonal
+prism with alternate edges bevelled by rhombohedral faces; a topaz a lozenge
+prism under a wedge and a pyramid), or the fracture surfaces of a nugget or a
+pebble — each plane tipped a little off true and a few corners chipped away,
+so none of them looks machined. Rough stones carry a faint network of cracks
+through them, fixed in the stone so it turns with it.
 
 Each turns slowly and bobs where it hangs, at its own world's pace (the
 amethysts drift like the fireflies; the aquamarines ride the biggest swells;
@@ -129,16 +139,23 @@ the emeralds barely stir in their still room), and unfolds out of nothing as
 it comes in range like everything else. A soft halo and a little pool of light
 on the road make them stand off the scene — subtle in daylight, a glowing trail
 in the dark worlds. They're painted rather than ray-traced: every facet takes
-its own tone between the stone's dark depths and the pale light caught on its
-crown, the colour burns brightest through the face turned to you, and facets
+its own tone between the stone's dark depths and the pale light caught on
+top, the colour burns brightest through the face turned to you, and facets
 that mirror a light into your eye flash white (one light is the world's, one
 sits over the camera's shoulder, so they sparkle even in the Deepwood). Like
 the runner, a gem keeps its colour however far the dream turns the palette. An
 everyday stone is about 0.7 m across — half the runner's height — so a run
-reads at a glance on a phone. Run through one and it swells, flashes and flies
-into you in a spray of sparkles in its colour.
+reads at a glance on a phone.
 
-![Gems in play: a run leading through a doorway into the Deepwood, the first amethyst taken on the far side (+130 for the whole run), and runs on the rooftops, through the Hall of Doors, the Glasshouse and along the Sky Road](docs/gem-runs.jpg)
+Run through one and it's sucked into you: drawn in faster and faster,
+stretching toward you and shrinking to nothing inside the runner's body, over
+a quarter of a second, with a few faint motes of its colour spiralling in
+after it — held level with you as you run on, so it never trails back toward
+the camera, and never pulls your eye off the road.
+
+![A gem taken, frame by frame: it's drawn into the runner's back and gone](docs/gem-pickup.jpg)
+
+![Gems in play: a run leading through a doorway into the Deepwood (+130 for the whole run, taken on the far side), and runs on the rooftops, through the Hall of Doors, the Glasshouse and along the Sky Road](docs/gem-runs.jpg)
 
 **Where they go.** Gems are laid in runs along a *ghost route* — the line a
 good runner would take through the obstacles ahead, planned row by row as the
@@ -299,11 +316,11 @@ Append to the URL:
   decals. Ink lines use the inverted-hull trick.
 - **No hitches.** All shaders are compiled during the loading screen; no
   allocations in the hot loop.
-- **Gems are cheap too.** A world's three cuts are three instanced batches
+- **Gems are cheap too.** A world's three stones are three instanced batches
   (plus their ink), its halos and ground pools one batch each, and the
-  pick-up sparkles a single point cloud whose bursts live in uniforms — nine
-  draw calls in all. Spinning, bobbing, rippling and the pick-up flight happen
-  in the vertex shader; taking a gem rewrites one small batch once. Planning
+  pick-up motes a single point cloud whose bursts live in uniforms — nine
+  draw calls in all. Spinning, bobbing, rippling and being sucked into the
+  runner happen in the vertex shader; taking a gem rewrites one small batch once. Planning
   and pick-up cost a few microseconds a frame.
 - **Adaptive resolution.** Renders at up to 2× device pixels and steps down in
   0.25 increments if the frame rate dips below ~52 fps.
@@ -469,13 +486,15 @@ forest's long grass (pass the chunk distance as `p0` so it runs on seamlessly).
 
 `gem` is the world's collectible: `tints` (a few close shades it's picked from,
 the first also colouring the HUD), `cuts()` returning its three stones —
-everyday, variant, crown — as part lists built from `world/gems.js`
-(`brilliant`, `briolette`, `crystalPoint`, `bipyramid`, `star`, `stepCut`,
-`outlineCut` with `pearOutline` / `heartOutline`, `bezelParts`; wrap crystal
-in `crystal()`, settings in `metal()`, rock in `stone()`, and stand face-on cuts
-up with `rx: FACE`), `motion` (`[turn, bob rate, bob height, nod]`), `look`
-(`[self-lit, glints, facet hue spread, fire]`) and `glow` / `pool` (halo and
-ground-light strength). Pick a colour nothing else in the world is.
+everyday, variant, crown — as part lists built from `world/gems.js`: natural
+forms cleaved by planes (`barrel`, `tabular`, `topazPrism`, `nugget` for rough
+stones and pebbles, or `cleave` with your own planes, `around` making rings of
+them), lofted ones (`crystalPoint`, `bipyramid`, `stepCut`) and `bezelParts`;
+wrap crystal in `crystal()` (with `veins` for a network of cracks), settings in
+`metal()`, rock in `stone()`, and stand face-on ones up with `rx: FACE`. Then
+`motion` (`[turn, bob rate, bob height, nod]`), `look` (`[self-lit, glints,
+facet hue spread, fire]`) and `glow` / `pool` (halo and ground-light
+strength). Pick a colour nothing else in the world is.
 
 ## Not in yet (on purpose)
 

@@ -121,7 +121,7 @@ export class Batch {
       a[i * 4] = it.p0;
       a[i * 4 + 1] = it.p1;
       a[i * 4 + 2] = it.p2;
-      a[i * 4 + 3] = 0;
+      a[i * 4 + 3] = it.p3;
     }
     const im = this.mesh.instanceMatrix;
     im.clearUpdateRanges();
