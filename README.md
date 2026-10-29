@@ -109,29 +109,45 @@ colour is left alone). Tunables (including when each effect joins) live in
 
 ## Gems
 
-![Each world's gem: its everyday stone (left), its crown stone (middle) and the variant mixed into its runs (right)](docs/gems.jpg)
+![Every stone of each world, its crown last: Cypress Lane and the Deepwood, the Night Rooftops and the Hall of Doors, the Glasshouse and the Sky Road](docs/gems.jpg)
 
-Every world has its own stone, in a colour chosen to stand off that world's
-palette, and in that world's character — mostly as it comes out of the
-ground:
+Every world has its own colour of stone, chosen to stand off that world's
+palette — and, the way stones turn up in the ground, a whole family in that
+colour: the world's namesake gem in a couple of forms, mixed with three or
+four cousins found alongside it, mostly rough, as they come out of the rock:
 
-| World | Gem | Why it sings there | Forms: everyday · variant · crown |
-|---|---|---|---|
-| Cypress Lane | **Sapphire** | cornflower blue against the greens and mustards | corundum's hexagonal barrel, tapering to flat ends · a water-worn pebble (the way sapphires turn up, in river gravels) · a great barrel with a smaller one grown into its side |
-| Deepwood | **Amethyst** | the one purple thing in the shade, glowing like a spirit-lamp | crystal points growing from a lump of dark stone · a lone double-terminated point · a great geode cluster |
-| Night Rooftops | **Topaz** | honey gold against the night blue | a long lozenge prism under a wedge-and-pyramid tip, broken off at its foot · a rough nugget, cracked like amber · a great crystal with a second grown from its foot |
-| Hall of Doors | **Emerald** | green, the complement of the coral walls | an heirloom pendant — emerald cut in a gold bezel (the hall's doorknob brass) on a loop · square asscher · a larger pendant in a double rim |
-| Glasshouse | **Ruby** | red against all that green and mint, like berries of red glass | a chunky rough nugget threaded with pale cracks · a water-worn pebble · a ruby crystal in corundum's six-sided plate, stood up to show its face |
-| Sky Road | **Aquamarine** | turquoise, the complement of all that amber — a splinter of clear sky | long leaning double-terminated shard · squat sky-diamond · a fan of three splinters |
+| World | Colour | Why it sings there | Stones (namesake first) | Crown |
+|---|---|---|---|---|
+| Cypress Lane | **Sapphire** blue | cornflower blue against the greens and mustards | sapphire, corundum's hexagonal barrel tapering to flat ends · a water-worn sapphire pebble · kyanite, striated blades fanning out of a scrap of pale rock · azurite, deep blue lumps grown together · hauyne, a rough sky-blue nugget | a great barrel with a smaller one grown into its side |
+| Deepwood | **Amethyst** purple | the one purple thing in the shade, glowing like a spirit-lamp | amethyst points growing from a lump of dark stone · a lone double-terminated point · lace agate, a lavender pebble laid down in fine wavy layers · fluorite, a cleaved octahedron zoned in rings | a great geode cluster |
+| Night Rooftops | **Topaz** gold | honey gold against the night blue | topaz, a lozenge prism under a wedge-and-pyramid tip · a rough topaz nugget · pyrite, brassy cubes grown through each other · citrine, a quartz point smoky at its foot, clearing to gold at the tip · amber, a honey pebble with dark specks caught inside | a great topaz with a second grown from its foot |
+| Hall of Doors | **Emerald** green | the complement of the coral walls | an heirloom pendant — emerald cut in a gold bezel (the hall's doorknob brass) on a loop · a square asscher pendant · olivine, bright yellow-green, granular and rough · beryl, emerald's own six-sided prism, striated along its length · malachite, a rounded lump banded in rings of light and dark green | a larger pendant in a double rim |
+| Glasshouse | **Ruby** red | red against all that green and mint, like berries of red glass | a chunky rough ruby · a water-worn ruby pebble · garnet, deep wine red, grown as a ball of twelve rhombs · rhodonite, opaque pink seamed with black · zircon, an orange-red four-sided prism pointed at both ends | a ruby crystal in corundum's six-sided plate, stood up to show its face |
+| Sky Road | **Aquamarine** turquoise | the complement of all that amber — a splinter of clear sky | a long leaning double-terminated aquamarine shard · a squat sky diamond · turquoise, sky blue in a web of dark matrix · fluorite, pale sea-green octahedra zoned in rings | a fan of three splinters |
 
 The natural stones are made the way real ones are bounded: cleaved out of a
 block by flat planes — the faces of a crystal's habit (a sapphire barrel is a
 steep hexagonal dipyramid cut off flat at both ends; a ruby plate a hexagonal
-prism with alternate edges bevelled by rhombohedral faces; a topaz a lozenge
-prism under a wedge and a pyramid), or the fracture surfaces of a nugget or a
-pebble — each plane tipped a little off true and a few corners chipped away,
-so none of them looks machined. Rough stones carry a faint network of cracks
-through them, fixed in the stone so it turns with it.
+prism with alternate edges bevelled by rhombohedral faces; a garnet the twelve
+rhombs of a dodecahedron, its corners worn round; fluorite an octahedron;
+pyrite a few cubes grown through each other; kyanite long flat blades), or the
+fracture surfaces of a nugget or a pebble — each plane tipped a little off
+true and a few corners chipped away, so none of them looks machined.
+
+None of them is clean, either. Each stone has its own surface, painted in the
+shader in the stone's own space so it turns with it rather than swimming over
+it: a faint grain and cloudy mottling through every crystal, specks caught
+inside (olivine's granular glitter, the dark flecks in amber), pale cracks
+through the rough stones; agate and malachite are laid down in bands that
+wander the way real ones do — fine layers in the agate, rings round a centre
+in the malachite — and fluorite is zoned in nested shells of deeper and paler
+colour following its octahedron; turquoise and rhodonite are seamed with dark
+matrix. The opaque stones (azurite, malachite, turquoise, rhodonite, the lace
+agate) trade the glassy inner glow for a matt, stony tone and catch fewer,
+duller glints, and pyrite is lit as brassy metal. Up close, fine pale lines
+pick out the edges where a crystal's faces meet, fading out with distance so a
+far run stays clean. Every gem is also picked from a few close shades and
+scaled a touch either way.
 
 Each turns slowly and bobs where it hangs, at its own world's pace (the
 amethysts drift like the fireflies; the aquamarines ride the biggest swells;
@@ -176,8 +192,10 @@ with the obstacles instead of ignoring them:
 A gem never touches an obstacle or a doorway's frame, never hangs in a lane
 so close before a wall that taking it leaves no time to swerve, and a run
 only arcs or ducks if the route is settled in its lane in time. Runs ripple —
-each gem turns and bobs a beat behind the one before — and mix in the world's
-variant cut every few gems so a line never looks stamped out.
+each gem turns and bobs a beat behind the one before — and each is led by one
+stone of the world's family (most often its namesake), with about a third of
+its gems drawn from the rest, so a run reads as one find but never looks
+stamped out.
 
 **Getting harder.** Early on the route is lazy and kind: short runs with
 plenty of empty road between, kept to free lanes, swerving a full second
@@ -193,7 +211,7 @@ hints.
 lost, and the chime keeps climbing from wherever you rejoin a run.
 
 Tunables (spacing, heights, how early runs swerve, when each move unlocks,
-points) live in `CONFIG.gems`.
+how much a run mixes its stones, points) live in `CONFIG.gems`.
 
 ## Score
 
@@ -316,10 +334,12 @@ Append to the URL:
   decals. Ink lines use the inverted-hull trick.
 - **No hitches.** All shaders are compiled during the loading screen; no
   allocations in the hot loop.
-- **Gems are cheap too.** A world's three stones are three instanced batches
-  (plus their ink), its halos and ground pools one batch each, and the
-  pick-up motes a single point cloud whose bursts live in uniforms — nine
-  draw calls in all. Spinning, bobbing, rippling and being sucked into the
+- **Gems are cheap too.** All of a world's stones share one instanced batch
+  — every kind is in the one geometry, and each instance folds away all but
+  its own in the vertex shader — plus its ink, its halos and ground pools one
+  batch each, and the pick-up motes a single point cloud whose bursts live in
+  uniforms: five draw calls in all, however many kinds of stone a world has.
+  Each kind's surface is a handful of numbers in a uniform array. Spinning, bobbing, rippling and being sucked into the
   runner happen in the vertex shader; taking a gem rewrites one small batch once. Planning
   and pick-up cost a few microseconds a frame.
 - **Adaptive resolution.** Renders at up to 2× device pixels and steps down in
@@ -455,7 +475,7 @@ src/render/                   shaders, geometry kit, instanced batches, textures
 src/world/                    world runtime + one file per world (art, lighting, lap
                               variations, layout, obstacles, gem, doorway); whimsy.js holds
                               the shared later-lap props and light volumes, gems.js the
-                              gem cuts (faceted lofts, settings)
+                              gem kit (cleaved crystal habits, lofts, settings)
 src/game/                     game loop, player (animation, IK legs, secondary
                               motion, movement), outfit (palette, cape), cloth,
                               runner asset loader, camera, course (world order),
@@ -484,17 +504,24 @@ shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
 true })` gives a surface the running-water shader, and ground pattern 6 is the
 forest's long grass (pass the chunk distance as `p0` so it runs on seamlessly).
 
-`gem` is the world's collectible: `tints` (a few close shades it's picked from,
-the first also colouring the HUD), `cuts()` returning its three stones —
-everyday, variant, crown — as part lists built from `world/gems.js`: natural
-forms cleaved by planes (`barrel`, `tabular`, `topazPrism`, `nugget` for rough
-stones and pebbles, or `cleave` with your own planes, `around` making rings of
-them), lofted ones (`crystalPoint`, `bipyramid`, `stepCut`) and `bezelParts`;
-wrap crystal in `crystal()` (with `veins` for a network of cracks), settings in
-`metal()`, rock in `stone()`, and stand face-on ones up with `rx: FACE`. Then
-`motion` (`[turn, bob rate, bob height, nod]`), `look` (`[self-lit, glints,
-facet hue spread, fire]`) and `glow` / `pool` (halo and ground-light
-strength). Pick a colour nothing else in the world is.
+`gem` is the world's collectible: a `name`, a `color` (the HUD's little gem),
+its `stones` — each `{ name, weight, tints, parts(), texture }`, `weight`
+being how often it leads or joins a run and `tints` a few close shades it's
+picked from — and a `crown` for the prize spots, up to eight kinds in all.
+`parts()` returns a part list built from `world/gems.js`: natural forms
+cleaved by planes (`barrel`, `tabular`, `topazPrism`, `point`, `hexPrism`,
+`tetragonal`, `dodecahedron`, `octahedron`, `cube`, `blade`, `nugget` for
+rough stones and pebbles, `lumps` for stones grown in rounded clusters, or
+`cleave` with your own planes, `around` making rings of them), lofted ones
+(`crystalPoint`, `bipyramid`, `stepCut`) and `bezelParts`; wrap crystal in
+`crystal()`, settings in `metal()`, rock in `stone()`, and stand face-on ones
+up with `rx: FACE`. `texture` is the stone's surface, every key optional:
+`mottle`, `speckle`, `veins` (cracks, pale unless `veinColor` makes them dark
+matrix), `bands` with `bandFreq`, `wander` and `rings` (`'round'` or
+`'nested'`) in a `second` colour, `opaque`, `rough`, `metal`, `glints` and
+`scale`. Then `motion` (`[turn, bob rate, bob height, nod]`), `look`
+(`[self-lit, glints, facet hue spread, fire]`) and `glow` / `pool` (halo and
+ground-light strength). Pick a colour nothing else in the world is.
 
 ## Not in yet (on purpose)
 

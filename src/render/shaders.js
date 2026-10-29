@@ -1254,6 +1254,7 @@ vec3 gemCentre(vec3 pivot, float phase, vec3 pick, float dz) {
 
 const VS_GEM = COMMON + GEM_MOTION + /* glsl */ `
 attribute vec3 fx;
+attribute vec3 edge;
 #ifdef OUTLINE
 uniform float uOutline;
 attribute vec3 onrm;
@@ -1270,6 +1271,8 @@ varying vec3 vFx;
 varying vec3 vLocalN;
 varying vec3 vLocal;
 varying float vFlash;
+varying float vKind;
+varying vec3 vEdge;
 
 vec3 turn(vec3 v, float a, float b) {
   float c = cos(a), s = sin(a);
@@ -1285,6 +1288,13 @@ void main() {
   float at = 0.0;
   float dz = 0.0;
   #ifdef USE_INSTANCING
+    // every stone the world has is in this one geometry, its triangles marked
+    // with their kind (uv.x): an instance draws only its own (aInst.y), the
+    // rest collapse to nothing and are never rasterised
+    if (abs(uv.x - aInst.y) > 0.5) {
+      gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+      return;
+    }
     M = modelMatrix * instanceMatrix;
     phase = aInst.x;
     at = aInst.z;
@@ -1323,6 +1333,8 @@ void main() {
   vNormal = normalize(S * ln);
   vLocalN = normal;
   vLocal = position;
+  vKind = uv.x;
+  vEdge = edge;
   vFlash = pick.x < 0.0 ? 0.0 : sin(pick.x * 3.14159);
   vUv = uv;
   vFx = fx;
@@ -1341,18 +1353,34 @@ void main() {
 // turned to you, edges go pale, and facets that mirror a light into your eye
 // flash white (one light is the world's, one sits over the camera's shoulder,
 // so a gem sparkles even in the dark). It lights itself for the most part, so
-// it holds its colour against anything. fx = (veins / shine, crystal, tint):
-// crystal parts may carry a pale network of cracks through the stone (fixed
-// in the stone, so it turns with it), as in a rough stone; non-crystal parts
-// (a gold bezel, the rock a cluster grows from) are lit like any prop, the
-// shine flag marking polished metal.
+// it holds its colour against anything.
+//
+// Each kind of stone has its own surface (uKind*, indexed by the kind): its
+// colour can wander through it in patches, toward a second colour (mottle);
+// it can carry grains and inclusions (speckle), wavy layers along it or rings
+// round its heart (bands: agate, malachite, colour zoning, striations), and a
+// network of cracks, pale or in a dark matrix (veins: turquoise's web,
+// rhodonite's black seams); a rough stone takes the light unevenly and its
+// glints break up into glitter; an opaque one is lit like a pebble, not a
+// glass. All of it is fixed in the stone (its own coordinates), so it turns
+// with it. fx = (shine, crystal, tint): non-crystal parts (a gold bezel, the
+// rock a cluster grows from) are lit like any prop, shine marking polished
+// metal.
 const FS_GEM = FS_HEAD + /* glsl */ `
+#define GEM_KINDS 8
 uniform vec3 uLightDir;
 uniform vec3 uShadowTint;
 uniform vec4 uGemK; // x self-lit (ignores the world's shade), y glints, z hue spread across facets, w fire
+uniform vec4 uKindA[GEM_KINDS]; // x veins, y mottle, z speckle, w bands
+uniform vec4 uKindB[GEM_KINDS]; // x opaque, y rough, z texture scale (per meter), w band frequency
+uniform vec4 uKindC[GEM_KINDS]; // rgb second colour, w how the bands lie: 0 layers along it, 1 round its heart, 2 nested like its faces (octahedral zoning)
+uniform vec4 uKindD[GEM_KINDS]; // rgb vein colour, w how much veins take it (0: pale cracks)
+uniform vec4 uKindE[GEM_KINDS]; // x glints, y how much the bands wander, z metallic
 varying vec3 vLocalN;
 varying vec3 vLocal;
 varying float vFlash;
+varying float vKind;
+varying vec3 vEdge;
 float facetHash(vec3 p) {
   p = fract(p * 0.1031);
   p += dot(p, p.zyx + 31.32);
@@ -1393,6 +1421,20 @@ float cracks(vec3 p) {
   float wall = fract(cellHash(c1).y + cellHash(c2).y); // the same either side of a wall
   return d2 - d1 + (1.0 - smoothstep(0.35, 0.75, wall)) * 0.5;
 }
+float vnoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = p - i;
+  f = f * f * (3.0 - 2.0 * f);
+  vec2 e = vec2(1.0, 0.0);
+  return mix(
+    mix(mix(facetHash(i), facetHash(i + e.xyy), f.x), mix(facetHash(i + e.yxy), facetHash(i + e.xxy), f.x), f.y),
+    mix(mix(facetHash(i + e.yyx), facetHash(i + e.xyx), f.x), mix(facetHash(i + e.yxx), facetHash(i + e.xxx), f.x), f.y),
+    f.z
+  );
+}
+float fbm(vec3 p) {
+  return vnoise(p) * 0.55 + vnoise(p * 2.07 + 13.1) * 0.3 + vnoise(p * 4.31 + 7.7) * 0.15;
+}
 void main() {
   vec3 n = normalize(vNormal);
   n = gl_FrontFacing ? n : -n;
@@ -1406,26 +1448,64 @@ void main() {
   vec3 base = vColor;
   vec3 col;
   if (vFx.y > 0.5) {
+    int k = int(vKind + 0.5);
+    vec4 A = uKindA[k];
+    vec4 B = uKindB[k];
+    vec4 C = uKindC[k];
+    vec4 D = uKindD[k];
+    vec3 q = vLocal * B.z;
+    float m = fbm(q);
     float seed = facetHash(floor(vLocalN * 7.0 + 0.5) + 11.0);
     float env = smoothstep(-0.45, 0.8, R.y) * 0.65 + max(dot(R, L), 0.0) * 0.35;
-    float t = clamp(0.18 + env * 0.72 + (seed - 0.5) * 0.6, 0.0, 1.0);
+    // a rough stone's faces don't take the light evenly; an opaque one has no glassy depths
+    float t = clamp(0.18 + env * 0.72 + (seed - 0.5) * 0.6 + (m - 0.5) * B.y, 0.0, 1.0);
+    t = mix(t, 0.3 + t * 0.55, B.x * 0.6);
     vec3 deep = base * base * 0.6;
     vec3 lite = mix(base, vec3(1.0), 0.5);
     col = t < 0.5 ? mix(deep, base, t * 2.0) : mix(base, lite, t * 2.0 - 1.0);
+    // a metallic stone (pyrite) mirrors its surroundings in its own brass
+    col = mix(col, base * (0.3 + 1.1 * env) + pow(max(dot(R, L), 0.0), 12.0) * 0.6, uKindE[k].z);
+    // and every stone has a fine grain to it, like pigment settling in a wash
+    col *= 1.0 + (vnoise(q * 9.0) - 0.5) * 0.14;
+    vec3 two = C.rgb * (0.55 + 0.7 * t); // the second colour, in the stone's own light and shade
+    if (A.y > 0.0) {
+      col *= 1.0 + (m - 0.5) * 0.8 * A.y;
+      col = mix(col, two, smoothstep(0.5, 0.8, fbm(q * 0.6 + 4.3)) * A.y);
+    }
+    if (A.w > 0.0) {
+      vec3 aq = abs(q);
+      float along = C.w > 1.5 ? aq.x + aq.y + aq.z : C.w > 0.5 ? length(q) : q.y;
+      float b = along * B.w + (fbm(q * 0.7 + 1.7) - 0.5) * uKindE[k].y;
+      col = mix(col, two, smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(b)) * A.w);
+    }
     col = hueRot(col, (seed - 0.5) * uGemK.z);
     float face = abs(dot(n, V));
-    col += base * pow(face, 4.0) * uGemK.w;
+    col += base * pow(face, 4.0) * uGemK.w * (1.0 - B.x);
     vec3 shade = mix(mix(uShadowTint, vec3(1.0), 0.45), vec3(1.0), lit);
-    col *= mix(shade, vec3(1.0), uGemK.x);
-    col = mix(col, lite * 1.15, pow(1.0 - face, 2.2) * 0.55);
-    float g = pow(max(dot(R, L), 0.0), 40.0) + pow(max(dot(R, L2), 0.0), 40.0) * 0.8;
-    float tw = smoothstep(0.93, 1.0, sin(uTime * 2.7 + seed * 37.0)) * step(0.55, seed);
-    col += vec3(g * 1.4 + tw * 0.75) * uGemK.y;
-    if (vFx.x > 0.0) {
-      float c = cracks(vLocal * 6.0);
-      float vein = 1.0 - smoothstep(0.016, 0.036 + fwidth(c) * 1.5, c);
-      col = mix(col, lite * 1.08, vein * vFx.x);
+    col *= mix(shade, vec3(1.0), uGemK.x * (1.0 - B.x * 0.4));
+    col = mix(col, lite * 1.15, pow(1.0 - face, 2.2) * 0.55 * (1.0 - B.x * 0.7));
+    if (A.z > 0.0) {
+      vec3 sq = q * 3.0;
+      vec3 cell = floor(sq);
+      float dd = length(sq - cell - (cellHash(cell + 5.0) * 0.6 + 0.2));
+      float on = step(1.0 - A.z, facetHash(cell + 3.7));
+      col = mix(col, two * 1.1, (1.0 - smoothstep(0.1, 0.18 + fwidth(dd), dd)) * on * 0.9);
     }
+    if (A.x > 0.0) {
+      // dark matrix seams run heavier than pale cracks
+      float c = cracks(q);
+      float vein = 1.0 - smoothstep(0.016 + D.w * 0.03, 0.036 + D.w * 0.04 + fwidth(c) * 1.5, c);
+      col = mix(col, mix(lite * 1.08, D.rgb, D.w), vein * A.x);
+    }
+    // the facets' edges catch the light in fine pale lines, as in a painting
+    // of a stone (fading out with distance, before they'd shimmer)
+    float ed = min(vEdge.x, min(vEdge.y, vEdge.z));
+    float line = (1.0 - smoothstep(0.0, fwidth(ed) * 1.4, ed)) * (1.0 - smoothstep(9.0, 26.0, dist));
+    col = mix(col, lite * 1.2, line * 0.5 * (1.0 - B.x * 0.5));
+    float g = pow(max(dot(R, L), 0.0), 40.0) + pow(max(dot(R, L2), 0.0), 40.0) * 0.8;
+    g *= mix(1.0, smoothstep(0.5, 0.75, vnoise(q * 5.0)) * 1.6, B.y);
+    float tw = smoothstep(0.93, 1.0, sin(uTime * 2.7 + seed * 37.0)) * step(0.55, seed);
+    col += vec3(g * 1.4 + tw * 0.75) * uGemK.y * uKindE[k].x;
   } else {
     col = base * mix(uShadowTint, vec3(1.0), lit);
     if (vFx.x > 0.5) {
@@ -1834,13 +1914,27 @@ export function makePortalMaterial(mode) {
   return m;
 }
 
-// A world's gem: o.spin = [turn, bob rate, bob height, nod] (see VS_GEM),
-// o.look = [self-lit, glints, facet hue spread, fire] (see FS_GEM).
+// A world's gems: o.spin = [turn, bob rate, bob height, nod] (see VS_GEM),
+// o.look = [self-lit, glints, facet hue spread, fire] (see FS_GEM), o.kinds
+// each stone kind's surface: { veins, veinColor, mottle, speckle, bands,
+// bandFreq, wander, rings ('round' its heart or 'nested' like its faces),
+// second, opaque, rough, metal, scale, glints }.
+const GEM_KINDS = 8;
 export function makeGemMaterial(env, o = {}) {
+  const v4 = (f) => ({ value: Array.from({ length: GEM_KINDS }, (_, i) => new THREE.Vector4(...f((o.kinds || [])[i] || {}))) });
+  const rgbOf = (c) => {
+    const col = new THREE.Color(c);
+    return [col.r, col.g, col.b];
+  };
   const uniforms = withShared(env, {
     uAnim: { value: animVector(o.anim ?? 'popEarly') },
     uSpin: { value: new THREE.Vector4(...(o.spin || [1.2, 2, 0.07, 0.12])) },
     uGemK: { value: new THREE.Vector4(...(o.look || [0.78, 1, 0.3, 0.35])) },
+    uKindA: v4((k) => [k.veins ?? 0, k.mottle ?? 0, k.speckle ?? 0, k.bands ?? 0]),
+    uKindB: v4((k) => [k.opaque ?? 0, k.rough ?? 0, k.scale ?? 6, k.bandFreq ?? 10]),
+    uKindC: v4((k) => [...rgbOf(k.second ?? '#ffffff'), k.rings === 'nested' ? 2 : k.rings ? 1 : 0]),
+    uKindD: v4((k) => [...rgbOf(k.veinColor ?? '#ffffff'), k.veinColor ? 1 : 0]),
+    uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, 0]),
   });
   return new THREE.ShaderMaterial({
     uniforms,

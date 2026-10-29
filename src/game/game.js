@@ -109,7 +109,7 @@ export class Game {
     this.chunks.reset(seed, 0);
     this.obstacles.reset(this.rng, 0, !this.tutorialDone && !this.params.world);
     this.gems.reset(new RNG(seed ^ 0x2c1b3c6d), 0);
-    this.ui.setGemColor(this.current.def.gem?.tints[0]);
+    this.ui.setGemColor(this.current.def.gem?.color);
 
     this.player.reset();
     copyEnvUniforms(this.player.u, this.current.u);
@@ -352,7 +352,7 @@ export class Game {
     const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);
     this.announceWorld(this.door.seg);
-    this.ui.setGemColor(this.current.def.gem?.tints[0]);
+    this.ui.setGemColor(this.current.def.gem?.color);
     this.depth = this.door.seg.ordinal;
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
     this.dream.doorway(this.current.def, this.current.env);
@@ -383,7 +383,7 @@ export class Game {
     this.chunks.reset(this.seed, d);
     this.obstacles.reset(this.rng, d, false);
     this.gems.reset(new RNG(this.seed ^ 0x2c1b3c6d ^ Math.floor(d)), d);
-    this.ui.setGemColor(this.current.def.gem?.tints[0]);
+    this.ui.setGemColor(this.current.def.gem?.color);
     copyEnvUniforms(this.player.u, this.current.u);
     const pd = this.current.env.particles;
     this.particles.set(pd, pd, 0);

@@ -3,7 +3,7 @@ import {
   cypressParts, roundTreeParts, bushParts, lanternPostParts, potParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { shaftParts, giantFlowerParts } from './whimsy.js';
-import { crystal, barrel, nugget } from './gems.js';
+import { crystal, stone, barrel, nugget, blade, lumps, rough } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -38,22 +38,72 @@ const C = {
 };
 const HOUSE_TINTS = ['#f2c64b', '#8fe0b8', '#45b89a', '#e9b43a', '#bfe7a0', '#6fcfa8', '#f6d873', '#9ad86a'];
 
-// The Sapphire, as it comes out of the ground: corundum's hexagonal barrel,
-// tapering to flat ends and leaning a little, cornflower blue against the
-// lane's greens and mustards. Water-worn pebbles (the way sapphires turn up,
-// in river gravels) mixed into the runs; a great barrel with a smaller one
-// grown into its side for the prize spots.
+// The blues, as they come out of the ground — cornflower to midnight against
+// the lane's greens and mustards. Sapphire above all: corundum's hexagonal
+// barrel, tapering to flat ends and leaning a little, with darker bands of
+// colour zoning across it. Mixed in: water-worn sapphire pebbles (the way
+// they turn up, in river gravels), blades of kyanite fanning out of a scrap
+// of pale rock, rounded lumps of deep azurite, and rough sky-blue hauyne. A
+// great barrel with a smaller one grown into its side for the prize spots.
 const GEM = {
   name: 'sapphire',
-  tints: ['#2c6cff', '#3f8dff', '#4f5cff'],
-  cuts: () => [
-    [crystal(barrel({ r: 0.15, h: 0.29, seed: 3 }), { rz: 0.14 })],
-    [crystal(nugget({ r: [0.25, 0.17, 0.2], faces: 30, spread: 0.06, chips: 2, seed: 5 }), { veins: 0.25 })],
-    [
+  color: '#2c6cff',
+  stones: [
+    {
+      name: 'sapphire',
+      weight: 3,
+      tints: ['#2c6cff', '#3f8dff', '#2546e0'],
+      parts: () => [crystal(barrel({ r: 0.15, h: 0.29, seed: 3 }), { rz: 0.14 })],
+      texture: { bands: 0.25, bandFreq: 9, second: '#1a2a9a', mottle: 0.4, rough: 0.35, speckle: 0.1 },
+    },
+    {
+      name: 'sapphire pebble',
+      weight: 1.2,
+      tints: ['#2c6cff', '#4a7cf0', '#3a5ae8'],
+      parts: () => [crystal(nugget({ r: [0.25, 0.17, 0.2], faces: 30, spread: 0.06, chips: 2, seed: 5 }))],
+      texture: { veins: 0.3, mottle: 0.5, second: '#9ac0ff', rough: 0.45, speckle: 0.15 },
+    },
+    {
+      // bladed crystals fanning out of a scrap of pale rock, finely striated
+      name: 'kyanite',
+      weight: 1.3,
+      tints: ['#3a6ee8', '#5a8af0', '#2f5cd4'],
+      parts: () => [
+        stone(rough({ r: 0.1, seed: 4 }), null, { y: -0.23, sy: 0.6, grad: ['#aeb6c4', '#eef0f4', -0.3, -0.16] }),
+        ...[[-0.45, -0.08, 0.02, 0.44, 1, 0.3], [0.05, 0, 0, 0.54, 2, -0.2], [0.45, 0.08, -0.03, 0.42, 3, 0.5], [-0.1, -0.02, -0.07, 0.38, 4, 1.4]].map(([rz, x, z, len, seed, ry]) => {
+          const g = blade({ len, w: 0.08, t: 0.022, seed });
+          g.translate(0, len / 2 - 0.22, 0);
+          return crystal(g, { rz, x, z, ry });
+        }),
+      ],
+      texture: { bands: 0.4, bandFreq: 60, wander: 3, second: '#b8d0ff', mottle: 0.4, rough: 0.3, glints: 0.7 },
+    },
+    {
+      // deep blue, in rounded lumps grown together
+      name: 'azurite',
+      weight: 1,
+      tints: ['#1d3cb4', '#2448c8', '#1a34a0'],
+      parts: () => lumps({ n: 6, r: 0.12, spread: 0.12, seed: 4 }).map((g) => crystal(g)),
+      texture: { opaque: 0.7, mottle: 0.6, speckle: 0.45, second: '#6a9aff', rough: 0.55, scale: 8, glints: 0.6 },
+    },
+    {
+      // pale sky blue, rough
+      name: 'hauyne',
+      weight: 0.9,
+      tints: ['#5aa8ff', '#74b8ff'],
+      parts: () => [crystal(nugget({ r: [0.21, 0.19, 0.18], faces: 15, spread: 0.18, chips: 3, seed: 13 }))],
+      texture: { mottle: 0.35, speckle: 0.12, second: '#dceeff', rough: 0.35, veins: 0.25 },
+    },
+  ],
+  crown: {
+    name: 'sapphire',
+    tints: ['#2c6cff', '#3f8dff', '#2546e0'],
+    parts: () => [
       crystal(barrel({ r: 0.19, h: 0.35, seed: 8 }), { rz: 0.1 }),
       crystal(barrel({ r: 0.1, h: 0.19, seed: 9 }), { x: 0.19, y: -0.1, rz: -0.85, rx: 0.3 }),
     ],
-  ],
+    texture: { bands: 0.25, bandFreq: 8, second: '#1a2a9a', mottle: 0.3, rough: 0.2, speckle: 0.06 },
+  },
   motion: [1.3, 2.2, 0.07, 0.14],
   look: [0.75, 1, 0.3, 0.35],
   glow: 0.55,

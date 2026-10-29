@@ -3,7 +3,7 @@ import {
   cloudParts, rockParts, roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { birdParts, whaleParts } from './whimsy.js';
-import { crystal, crystalPoint, bipyramid } from './gems.js';
+import { crystal, crystalPoint, bipyramid, nugget, octahedron } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -31,11 +31,12 @@ const C = {
   lantern: '#ffe0a0',
 };
 
-// The Aquamarine: long shards of sky-coloured crystal, double-terminated and
-// leaning, as if the clear sky above the clouds had splintered — turquoise,
-// the complement of all that amber. Squat sky-diamonds mixed into the runs; a
-// fan of three splinters for the prize spots. Up here they float the most,
-// riding slow swells like the islands.
+// The sky colours — turquoise, the complement of all that amber. Aquamarine
+// above all: long shards of sky-coloured crystal, double-terminated and
+// leaning, as if the clear sky above the clouds had splintered. Mixed in:
+// squat sky-diamonds, turquoise in its web of dark matrix, and pale
+// sea-green fluorite zoned in rings. A fan of three splinters for the prize
+// spots. Up here they float the most, riding slow swells like the islands.
 function splinters() {
   return [
     [0.5, 0.11, 0, 0],
@@ -47,14 +48,48 @@ function splinters() {
     return crystal(g, { rz, x, rx: (i - 1) * 0.18, y: -0.2 });
   });
 }
+const AQUAMARINE = { bands: 0.25, bandFreq: 12, second: '#c8fff8', mottle: 0.35, rough: 0.3, speckle: 0.08 };
 const GEM = {
   name: 'aquamarine',
-  tints: ['#2ee6d6', '#4af0e8', '#22d0e4'],
-  cuts: () => [
-    [crystal(crystalPoint({ r: 0.11, len: 0.42, tip: 0.16, double: true, seed: 5 }), { rz: 0.32, rx: 0.12 })],
-    [crystal(bipyramid({ r: 0.2, h: 0.3 }))],
-    splinters(),
+  color: '#2ee6d6',
+  stones: [
+    {
+      name: 'aquamarine',
+      weight: 3,
+      tints: ['#2ee6d6', '#4af0e8', '#22d0e4'],
+      parts: () => [crystal(crystalPoint({ r: 0.11, len: 0.42, tip: 0.16, double: true, seed: 5 }), { rz: 0.32, rx: 0.12 })],
+      texture: AQUAMARINE,
+    },
+    {
+      name: 'sky diamond',
+      weight: 1,
+      tints: ['#2ee6d6', '#4af0e8', '#22d0e4'],
+      parts: () => [crystal(bipyramid({ r: 0.2, h: 0.3 }))],
+      texture: AQUAMARINE,
+    },
+    {
+      // sky blue stone in a web of dark matrix
+      name: 'turquoise',
+      weight: 1.5,
+      tints: ['#3ec8d0', '#4ad6da', '#58c2c4'],
+      parts: () => [crystal(nugget({ r: [0.22, 0.18, 0.2], faces: 22, spread: 0.1, chips: 2, seed: 41 }))],
+      texture: { opaque: 0.85, veins: 0.9, veinColor: '#3a2a1c', mottle: 0.5, second: '#a2f2ea', rough: 0.35, speckle: 0.1, scale: 7, glints: 0.5 },
+    },
+    {
+      // pale sea-green octahedra, zoned in rings
+      name: 'fluorite',
+      weight: 1,
+      tints: ['#6ee0c8', '#5ad8c0', '#80e8d4'],
+      parts: () => [crystal(octahedron({ r: 0.19, seed: 7 }), { rx: 0.5, rz: -0.2 })],
+      texture: { bands: 0.45, rings: 'nested', bandFreq: 14, wander: 2, second: '#e0fff6', rough: 0.3, mottle: 0.3, speckle: 0.08 },
+    },
   ],
+  crown: {
+    name: 'aquamarine splinters',
+    tints: ['#2ee6d6', '#4af0e8', '#22d0e4'],
+    parts: () => splinters(),
+    texture: AQUAMARINE,
+  },
   motion: [1.0, 1.4, 0.1, 0.2],
   look: [0.75, 1.1, 0.3, 0.32],
   glow: 0.6,

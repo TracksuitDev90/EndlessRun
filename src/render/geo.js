@@ -205,18 +205,23 @@ const ATTRS = [
   ['fx', 3],
   ['onrm', 3],
 ];
+// Carried through a merge only if some part has them; the others get `fill`.
+// edge: where a gem's facet edges are (see facetEdges in world/gems.js).
+const OPTIONAL = [['edge', 3, 1]];
 
 export function merge(parts) {
   const list = parts.flat().filter(Boolean);
   let total = 0;
   for (const g of list) total += g.attributes.position.count;
   const out = new THREE.BufferGeometry();
-  for (const [name, size] of ATTRS) {
+  for (const [name, size, fill] of [...ATTRS, ...OPTIONAL.filter(([n]) => list.some((g) => g.attributes[n]))]) {
     const arr = new Float32Array(total * size);
     let off = 0;
     for (const g of list) {
-      arr.set(g.attributes[name].array, off);
-      off += g.attributes[name].array.length;
+      const n = g.attributes.position.count * size;
+      if (g.attributes[name]) arr.set(g.attributes[name].array, off);
+      else arr.fill(fill, off, off + n);
+      off += n;
     }
     out.setAttribute(name, new THREE.BufferAttribute(arr, size));
   }

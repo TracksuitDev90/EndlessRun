@@ -3,7 +3,7 @@ import {
   cloudParts, wallDoorParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.js';
-import { crystal, stepCut, octagon, bezelParts, FACE } from './gems.js';
+import { crystal, stepCut, octagon, bezelParts, nugget, hexPrism, FACE } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -30,12 +30,15 @@ const C = {
 const DOOR_TINTS = ['#2fa59a', '#e8b13a', '#3456b8', '#8fd6b6', '#8a4a8a', '#c8402e', '#7fb8e0', '#f08a5d', '#4a8a5a', '#f2d06b'];
 const BOOKS = ['#c8402e', '#3456b8', '#e8b13a', '#2fa59a', '#f6ecd4', '#8a4a8a', '#4a8a5a', '#f08a5d'];
 
-// The Emerald: an heirloom pendant — an emerald-cut stone in a gold bezel
-// (the same brass as the hall's doorknobs and teacup rims), hung from a little
-// loop, as if dropped out of one of the drawers. Green, the complement of the
-// coral walls. Square asscher cuts mixed into the runs; a larger pendant in a
-// double rim of gold for the prize spots. They turn slowly and barely bob, like
-// things in a still, sunlit room.
+// The greens, as if a cabinet of curiosities had spilled down the hall — the
+// complement of the coral walls. Heirloom pendants: emerald-cut stones (with
+// the little inclusions real emeralds have) in gold bezels, the same brass as
+// the hall's doorknobs and teacup rims, hung from little loops; square
+// asscher cuts. And the specimens beside them: rough olivine, bright and
+// granular; beryl, emerald's own six-sided crystal; and malachite banded in
+// rings of light and dark green. A larger pendant in a double rim of gold for
+// the prize spots. They turn slowly and barely bob, like things in a still,
+// sunlit room.
 function pendant({ w, h, c, bail = 0, double = false }) {
   const o = octagon(w, h, c);
   const corner = (sx, sy) => [sx * (w - c / 2) * 1.04, sy * (h - c / 2) * 1.04];
@@ -47,14 +50,56 @@ function pendant({ w, h, c, bail = 0, double = false }) {
   if (double) parts.push(...bezelParts(o, { k: 1.26, inner: 1.15, depth: 0.05, color: '#f2d27a', bail }));
   return parts;
 }
+const EMERALD = { mottle: 0.3, speckle: 0.15, second: '#0b7a40', rough: 0.15 };
 const GEM = {
   name: 'emerald',
-  tints: ['#18c46a', '#2fd88a', '#12b060'],
-  cuts: () => [
-    pendant({ w: 0.19, h: 0.26, c: 0.065, bail: 0.05 }),
-    pendant({ w: 0.22, h: 0.22, c: 0.075 }),
-    pendant({ w: 0.24, h: 0.32, c: 0.08, bail: 0.06, double: true }),
+  color: '#18c46a',
+  stones: [
+    {
+      name: 'emerald pendant',
+      weight: 1.6,
+      tints: ['#18c46a', '#2fd88a', '#12b060'],
+      parts: () => pendant({ w: 0.19, h: 0.26, c: 0.065, bail: 0.05 }),
+      texture: EMERALD,
+    },
+    {
+      name: 'asscher pendant',
+      weight: 0.8,
+      tints: ['#18c46a', '#2fd88a', '#12b060'],
+      parts: () => pendant({ w: 0.22, h: 0.22, c: 0.075 }),
+      texture: EMERALD,
+    },
+    {
+      // peridot as it's found: bright yellow-green, granular, rough
+      name: 'olivine',
+      weight: 2,
+      tints: ['#8cd43a', '#a2e04c', '#78c632'],
+      parts: () => [crystal(nugget({ r: [0.22, 0.2, 0.19], faces: 17, spread: 0.16, chips: 3, seed: 31 }))],
+      texture: { mottle: 0.55, speckle: 0.35, second: '#e4ff8a', rough: 0.5, veins: 0.2, glints: 1.1 },
+    },
+    {
+      // emerald's own crystal, a six-sided prism, striated along its length
+      name: 'beryl',
+      weight: 1.2,
+      tints: ['#26b064', '#34c274', '#1ea458'],
+      parts: () => [crystal(hexPrism({ r: 0.135, top: 0.25, foot: 0.23, seed: 6 }), { rz: 0.25, rx: 0.1 })],
+      texture: { bands: 0.25, bandFreq: 30, second: '#9cf0bc', mottle: 0.4, rough: 0.35, speckle: 0.1 },
+    },
+    {
+      // a rounded lump banded in rings of light and dark green
+      name: 'malachite',
+      weight: 1,
+      tints: ['#1c9a58', '#20a862', '#168a4c'],
+      parts: () => [crystal(nugget({ r: [0.23, 0.18, 0.18], faces: 26, spread: 0.07, chips: 2, seed: 33 }))],
+      texture: { opaque: 0.8, bands: 0.85, rings: 'round', bandFreq: 34, wander: 14, second: '#0a4426', mottle: 0.2, rough: 0.3, glints: 0.6 },
+    },
   ],
+  crown: {
+    name: 'emerald pendant',
+    tints: ['#18c46a', '#2fd88a', '#12b060'],
+    parts: () => pendant({ w: 0.24, h: 0.32, c: 0.08, bail: 0.06, double: true }),
+    texture: EMERALD,
+  },
   motion: [1.0, 1.7, 0.045, 0.1],
   look: [0.72, 1, 0.22, 0.35],
   glow: 0.7,
