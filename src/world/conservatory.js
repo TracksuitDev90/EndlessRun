@@ -4,7 +4,7 @@ import {
   cypressParts, roundTreeParts, bushParts, potParts, lanternPostParts, gateFrameParts, gateLeafParts,
 } from './shapes.js';
 import { shaftParts, butterflyParts, giantFlowerParts } from './whimsy.js';
-import { crystal, briolette, outlineCut, pearOutline, heartOutline, FACE } from './gems.js';
+import { crystal, nugget, tabular } from './gems.js';
 import { groundStrip, doorShape } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -36,18 +36,18 @@ const C = {
   frameDark: '#24453c',
 };
 
-// The Ruby: dewdrops of red glass, as if the humid air had condensed on the
-// glazing into gems — briolettes, faceted all over, hanging point up. Red, the
+// The Ruby, rough: red stones as they're found, as if the beds had grown
+// berries of red glass — chunky nuggets threaded with pale cracks. Red, the
 // complement of all that green and mint, and nothing else in here is that
-// colour. Face-on pear cuts mixed into the runs; a ruby heart for the prize
-// spots, for a garden of blossom.
+// colour. Water-worn ruby pebbles mixed into the runs; for the prize spots a
+// ruby crystal in corundum's six-sided plate, stood up to show its face.
 const GEM = {
   name: 'ruby',
   tints: ['#ff2d55', '#ff4a6e', '#e81e48'],
   cuts: () => [
-    [crystal(briolette({ r: 0.21, h: 0.62 }))],
-    [crystal(outlineCut(pearOutline(0.25, 0.3)), { rx: FACE })],
-    [crystal(outlineCut(heartOutline(0.33), { depth: 0.1, back: 0.2 }), { rx: FACE })],
+    [crystal(nugget({ r: [0.24, 0.21, 0.21], faces: 13, spread: 0.2, chips: 3, seed: 2 }), { veins: 0.5 })],
+    [crystal(nugget({ r: [0.22, 0.18, 0.2], faces: 30, spread: 0.06, chips: 2, seed: 11 }), { veins: 0.25 })],
+    [crystal(tabular({ r: 0.3, t: 0.11, jitter: 0.08, chips: 4, seed: 6 }), { rx: 1.15 })],
   ],
   motion: [1.2, 1.9, 0.08, 0.12],
   look: [0.74, 1, 0.28, 0.38],

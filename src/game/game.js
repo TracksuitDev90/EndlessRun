@@ -20,7 +20,7 @@ const smooth01 = (e0, e1, x) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
 };
-const CHEST = 0.9; // a collected gem flies to the runner's chest, this high above their feet
+const CHEST = 0.9; // a collected gem is sucked into the runner's chest, this high above their feet
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const numeral = (n) => NUMERALS[n - 1] || String(n);
 
@@ -189,8 +189,8 @@ export class Game {
 
   // --- gems -----------------------------------------------------------------
   // Each gem pays its points × depth with a chime that climbs the scale along
-  // its run, and throws off sparkles; taking a whole run pays a bonus on top.
-  // A gem missed costs nothing.
+  // its run, and is sucked into the runner with a few motes of its colour;
+  // taking a whole run pays a bonus on top. A gem missed costs nothing.
   collectGems() {
     const p = this.player;
     const got = this.gems.collect(p, this.prevDist, this.dist, this.time);
@@ -199,7 +199,7 @@ export class Game {
     for (const g of got) {
       this.score += (g.crown ? S.crown : S.gem) * this.depth;
       this.gemCount++;
-      this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.tint, this.time, g.crown ? 1.5 : 1);
+      this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.tint, this.time, g.crown ? 1.25 : 1);
       this.audio.gem(g.index, g.crown);
       if (g.whole) {
         const bonus = S.perfect * g.run.size * this.depth;

@@ -2,18 +2,18 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeSparkleMaterial } from './shaders.js';
 import { mulberry32 } from '../core/rng.js';
 
-// The spray of glints a gem throws off as you take it. A fixed set of burst
-// slots in one draw call: emitting writes a slot's uniforms, the vertex
-// shader does the rest — no per-frame CPU work.
+// The faint motes sucked into the runner with a gem as you take it. A fixed
+// set of slots in one draw call: emitting writes a slot's uniforms, the
+// vertex shader does the rest — no per-frame CPU work.
 
 export class Sparkles {
-  constructor(slots = 8, per = 16) {
+  constructor(slots = 8, per = 9) {
     const rnd = mulberry32(7);
     const n = slots * per;
     const spark = new Float32Array(n * 4);
     const slot = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      // round the sphere, thrown more up and out than down
+      // round the sphere, a little flattened front to back
       const a = rnd() * Math.PI * 2;
       const y = rnd() * 1.6 - 0.6;
       const r = Math.sqrt(Math.max(0, 1 - Math.min(1, y * y)));
@@ -32,7 +32,7 @@ export class Sparkles {
     this.next = 0;
   }
 
-  // dx, dy: where the gem was relative to the runner's chest; size scales the spray
+  // dx, dy: where the gem was relative to the runner's chest; size scales the shell
   emit(dx, dy, color, time, size = 1) {
     const u = this.material.uniforms;
     const i = this.next;
