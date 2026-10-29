@@ -4,7 +4,7 @@ import {
   cypressParts, roundTreeParts, bushParts, potParts, lanternPostParts, gateFrameParts, gateLeafParts,
 } from './shapes.js';
 import { shaftParts, butterflyParts, giantFlowerParts } from './whimsy.js';
-import { crystal, nugget, tabular } from './gems.js';
+import { crystal, nugget, tabular, dodecahedron, tetragonal } from './gems.js';
 import { groundStrip, doorShape } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -36,19 +36,62 @@ const C = {
   frameDark: '#24453c',
 };
 
-// The Ruby, rough: red stones as they're found, as if the beds had grown
-// berries of red glass — chunky nuggets threaded with pale cracks. Red, the
-// complement of all that green and mint, and nothing else in here is that
-// colour. Water-worn ruby pebbles mixed into the runs; for the prize spots a
-// ruby crystal in corundum's six-sided plate, stood up to show its face.
+// The reds, as if the beds had grown berries of red glass — the complement of
+// all that green and mint, and nothing else in here is that colour. Rough
+// rubies above all, chunky nuggets threaded with pale cracks, and garnets,
+// deep wine red, each grown as a ball of twelve rhombs. Mixed in: water-worn
+// ruby pebbles, opaque pink rhodonite seamed with black, and orange-red
+// zircon pointed at both ends. For the prize spots a ruby crystal in
+// corundum's six-sided plate, stood up to show its face.
 const GEM = {
   name: 'ruby',
-  tints: ['#ff2d55', '#ff4a6e', '#e81e48'],
-  cuts: () => [
-    [crystal(nugget({ r: [0.24, 0.21, 0.21], faces: 13, spread: 0.2, chips: 3, seed: 2 }), { veins: 0.5 })],
-    [crystal(nugget({ r: [0.22, 0.18, 0.2], faces: 30, spread: 0.06, chips: 2, seed: 11 }), { veins: 0.25 })],
-    [crystal(tabular({ r: 0.3, t: 0.11, jitter: 0.08, chips: 4, seed: 6 }), { rx: 1.15 })],
+  color: '#ff2d55',
+  stones: [
+    {
+      name: 'ruby',
+      weight: 2,
+      tints: ['#ff2d55', '#ff4a6e', '#e81e48'],
+      parts: () => [crystal(nugget({ r: [0.24, 0.21, 0.21], faces: 13, spread: 0.2, chips: 3, seed: 2 }))],
+      texture: { veins: 0.45, mottle: 0.4, second: '#ff8aa0', rough: 0.4, speckle: 0.08 },
+    },
+    {
+      name: 'ruby pebble',
+      weight: 1,
+      tints: ['#ff2d55', '#ff4a6e', '#f03a60'],
+      parts: () => [crystal(nugget({ r: [0.22, 0.18, 0.2], faces: 30, spread: 0.06, chips: 2, seed: 11 }))],
+      texture: { veins: 0.2, mottle: 0.45, second: '#ffb0c0', rough: 0.25, speckle: 0.1 },
+    },
+    {
+      // deep wine red, grown as a ball of twelve rhombs
+      name: 'garnet',
+      weight: 2,
+      tints: ['#a00e28', '#b81634', '#8c0a22'],
+      parts: () => [crystal(dodecahedron({ r: 0.2, round: 0.88, seed: 3 }), { rx: 0.4, rz: 0.3 })],
+      texture: { mottle: 0.45, second: '#ff4a5a', rough: 0.35, speckle: 0.1, glints: 1.2 },
+    },
+    {
+      // opaque pink, seamed with black
+      name: 'rhodonite',
+      weight: 1,
+      tints: ['#e8687a', '#f07a8a', '#de5a6e'],
+      parts: () => [crystal(nugget({ r: [0.23, 0.19, 0.19], faces: 14, spread: 0.18, chips: 3, seed: 23 }))],
+      texture: { opaque: 0.75, veins: 0.85, veinColor: '#2a1a1e', mottle: 0.45, second: '#ffc8d0', rough: 0.4, scale: 7, glints: 0.6 },
+    },
+    {
+      // orange-red, a four-sided prism pointed at both ends
+      name: 'zircon',
+      weight: 1,
+      tints: ['#ff5a2a', '#ff6e3a', '#f04a22'],
+      parts: () => [crystal(tetragonal({ w: 0.1, len: 0.12, tip: 0.15, seed: 4 }), { rz: 0.3, ry: 0.4 })],
+      texture: { mottle: 0.3, second: '#ffb060', rough: 0.2, bands: 0.15, bandFreq: 8 },
+    },
   ],
+  crown: {
+    name: 'ruby crystal',
+    tints: ['#ff2d55', '#ff4a6e', '#e81e48'],
+    parts: () => [crystal(tabular({ r: 0.3, t: 0.11, jitter: 0.08, chips: 4, seed: 6 }), { rx: 1.15 })],
+    texture: { mottle: 0.4, second: '#ff8aa0', rough: 0.35, speckle: 0.1, veins: 0.2 },
+  },
   motion: [1.2, 1.9, 0.08, 0.12],
   look: [0.74, 1, 0.28, 0.38],
   glow: 0.65,

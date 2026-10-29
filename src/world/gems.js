@@ -4,10 +4,12 @@ import { P, part } from '../render/geo.js';
 // The gem kit. Every world has its own collectible stone (def.gem, built by
 // WorldBuilder.gems and laid by game/gems.js): its own colour, chosen to stand
 // off the world's palette, and its own forms in the world's character. A
-// world gives three: the everyday stone, a variant mixed into its runs so a
-// line of gems never looks stamped out, and a larger crown stone for the
-// prize spots — the top of a jump, the way out from under a bar, the first
-// step into a new world.
+// world gives a family of stones in its colour — its namesake gem in a couple
+// of forms and three or four cousins found alongside it (garnet with the
+// ruby, olivine with the emerald...), each run led by one and mixed with the
+// rest so a line of gems never looks stamped out — and a larger crown stone
+// for the prize spots: the top of a jump, the way out from under a bar, the
+// first step into a new world.
 //
 // Two ways of making them, both flat-shaded so every facet catches the light
 // on its own. Most stones grow the way real ones do (cleave()): cut out of a
@@ -19,13 +21,15 @@ import { P, part } from '../render/geo.js';
 // Built at the size they're seen in the world: an everyday stone is about
 // half a meter across, a third of the runner's height.
 //
-// Parts carry flags for the gem shader (fx = veins, crystal, tint): crystal
-// parts take the instance colour and the stone shading — veins is how much of
-// a pale network of cracks runs through it, as in a rough stone — and
+// A world's stones are listed in def.gem: `stones` (its everyday stones, each
+// { name, weight, tints, parts(), texture }) and a `crown`; texture is the
+// stone's surface (see makeGemMaterial: mottle, speckle, bands, veins, rough,
+// opaque...). Parts carry flags for the gem shader (fx = shine, crystal,
+// tint): crystal parts take the instance colour and the stone's surface;
 // anything else (a gold bezel, the rock a cluster grows from) is lit like any
 // prop, the shine flag marking polished metal.
 
-export const crystal = (geo, o = {}) => part(geo, '#ffffff', { ...o, mark: o.veins ?? 0, emit: 1, tint: 1 });
+export const crystal = (geo, o = {}) => facetEdges(part(geo, '#ffffff', { ...o, emit: 1, tint: 1 }));
 export const metal = (geo, color, o = {}) => part(geo, color, { ...o, mark: 1 });
 export const stone = (geo, color, o = {}) => part(geo, color, o);
 
@@ -326,6 +330,154 @@ export function topazPrism({ w = 0.12, top = 0.3, foot = 0.28, jitter = 0.05, ch
   planes.push([0, 1, 0, top]); // {001}: a small flat top
   planes.push([...unit([(rnd() - 0.5) * 0.7, -1, (rnd() - 0.5) * 0.7]), foot]); // where it broke off
   return cleave(planes, { box: [w * 2, Math.max(top, foot) * 1.3, w * 2], jitter, chips, seed });
+}
+
+// A quartz-type point (citrine): a six-sided prism under a six-sided pyramid,
+// broken off at the foot.
+export function point({ r = 0.1, len = 0.24, tip = 0.16, foot = 0.22, jitter = 0.06, chips = 2, seed = 1 } = {}) {
+  const rnd = seeded(seed * 37 + 11);
+  const g = Math.atan2(r, tip);
+  return cleave([
+    ...around(6, 0, r),
+    ...around(6, g, r * Math.cos(g) + len * Math.sin(g)),
+    [...unit([(rnd() - 0.5) * 0.8, -1, (rnd() - 0.5) * 0.8]), foot],
+  ], { box: [r * 1.4, (len + tip) * 1.2, r * 1.4], jitter, chips, seed });
+}
+
+// Beryl (a natural emerald): a six-sided prism with a flat top, its top edges
+// just bevelled, broken off at the foot.
+export function hexPrism({ r = 0.1, top = 0.26, foot = 0.24, jitter = 0.05, chips = 2, seed = 1 } = {}) {
+  const rnd = seeded(seed * 41 + 3);
+  return cleave([
+    ...around(6, 0, r),
+    [0, 1, 0, top],
+    ...around(6, 0.8, (r * Math.cos(0.8) + top * Math.sin(0.8)) * 0.975),
+    [...unit([(rnd() - 0.5) * 0.6, -1, (rnd() - 0.5) * 0.6]), foot],
+  ], { box: [r * 1.4, Math.max(top, foot) * 1.3, r * 1.4], jitter, chips, seed });
+}
+
+// Zircon: a four-sided prism under a four-sided pyramid at each end.
+export function tetragonal({ w = 0.1, len = 0.12, tip = 0.15, jitter = 0.05, chips = 2, seed = 1 } = {}) {
+  const g = Math.atan2(w, tip);
+  const d = w * Math.cos(g) + len * Math.sin(g);
+  return cleave([...around(4, 0, w), ...around(4, g, d), ...around(4, -g, d)], { box: [w * 1.5, (len + tip) * 1.2, w * 1.5], jitter, chips, seed });
+}
+
+// Garnet: a rhombic dodecahedron, the edges worn round by the faces of a
+// trapezohedron — the ball of twelve rhombs a garnet grows as.
+export function dodecahedron({ r = 0.2, round = 0.93, jitter = 0.04, chips = 2, seed = 1 } = {}) {
+  const planes = [];
+  for (const [a, b] of [[0, 1], [0, 2], [1, 2]]) {
+    for (const sa of [-1, 1]) {
+      for (const sb of [-1, 1]) {
+        const n = [0, 0, 0];
+        n[a] = sa;
+        n[b] = sb;
+        planes.push([...unit(n), r]);
+      }
+    }
+  }
+  for (let big = 0; big < 3; big++) {
+    for (const s0 of [-1, 1]) {
+      for (const s1 of [-1, 1]) {
+        for (const s2 of [-1, 1]) {
+          const n = [s0, s1, s2];
+          n[big] *= 2;
+          planes.push([...unit(n), r * 1.1547 * round]);
+        }
+      }
+    }
+  }
+  return cleave(planes, { box: [r * 1.5, r * 1.5, r * 1.5], jitter, chips, seed });
+}
+
+// Fluorite: the octahedron it cleaves into, its points blunted.
+export function octahedron({ r = 0.2, blunt = 0.82, jitter = 0.05, chips = 3, seed = 1 } = {}) {
+  const planes = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) planes.push([...unit([sx, sy, sz]), r]);
+  for (let a = 0; a < 3; a++) {
+    for (const s of [-1, 1]) {
+      const n = [0, 0, 0];
+      n[a] = s;
+      planes.push([...n, r * Math.sqrt(3) * blunt]);
+    }
+  }
+  return cleave(planes, { box: [r * 2, r * 2, r * 2], jitter, chips, seed });
+}
+
+// A cube, not quite square (pyrite).
+export function cube({ s = 0.1, jitter = 0.04, chips = 1, seed = 1 } = {}) {
+  return cleave([[1, 0, 0, s], [-1, 0, 0, s], [0, 1, 0, s], [0, -1, 0, s], [0, 0, 1, s], [0, 0, -1, s]], { box: [s * 1.5, s * 1.5, s * 1.5], jitter, chips, deep: [0.03, 0.08], seed });
+}
+
+// A blade of kyanite: long, flat and thin, its end broken at a slant.
+export function blade({ len = 0.5, w = 0.07, t = 0.022, jitter = 0.04, chips = 2, seed = 1 } = {}) {
+  const rnd = seeded(seed * 43 + 1);
+  return cleave([
+    [1, 0, 0, w],
+    [-1, 0, 0, w],
+    [0, 0, 1, t],
+    [0, 0, -1, t],
+    ...around(4, 0, (w + t) * Math.SQRT1_2 * 0.88, Math.PI / 4),
+    [...unit([(rnd() - 0.5) * 1.2, 1, 0]), len / 2],
+    [0, -1, 0, len / 2],
+  ], { box: [w * 1.5, len, t * 2], jitter, chips, deep: [0.03, 0.08], seed });
+}
+
+// Rounded lumps grown together (azurite, botryoidal): n little pebbles
+// heaped round the middle; returns the geometries, already in place.
+export function lumps({ n = 5, r = 0.11, spread = 0.11, seed = 1 } = {}) {
+  const rnd = seeded(seed * 53 + 9);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const k = 0.75 + rnd() * 0.5;
+    const g = nugget({ r: [r * k, r * k * 0.9, r * k], faces: 18, spread: 0.08, chips: 1, seed: seed * 10 + i });
+    const a = (i / n) * Math.PI * 2 + rnd();
+    const rr = i === 0 ? 0 : spread * (0.6 + rnd() * 0.5);
+    g.translate(Math.cos(a) * rr, (rnd() - 0.4) * spread * 0.9, Math.sin(a) * rr * 0.8);
+    out.push(g);
+  }
+  return out;
+}
+
+// Mark where a stone's facet edges are, so the shader can draw them as fine
+// lines the way a painting of a stone does: each triangle carries an edge
+// coordinate per corner — (1,0,0), (0,1,0), (0,0,1), so the smallest
+// component is 0 along its edges — and an edge that only splits a flat facet
+// in two (a diagonal across a quad, a spoke of a fan) is hidden by holding its
+// component at 1.
+function facetEdges(g) {
+  const pos = g.attributes.position.array;
+  const nor = g.attributes.normal.array;
+  const tris = pos.length / 9;
+  const key = (i) => `${Math.round(pos[i * 3] * 1e4)},${Math.round(pos[i * 3 + 1] * 1e4)},${Math.round(pos[i * 3 + 2] * 1e4)}`;
+  const edgeKey = (a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+  };
+  const owners = new Map();
+  for (let t = 0; t < tris; t++) {
+    for (let e = 0; e < 3; e++) {
+      const k = edgeKey(t * 3 + e, t * 3 + ((e + 1) % 3));
+      if (!owners.has(k)) owners.set(k, []);
+      owners.get(k).push(t);
+    }
+  }
+  const same = (a, b) => nor[a * 9] * nor[b * 9] + nor[a * 9 + 1] * nor[b * 9 + 1] + nor[a * 9 + 2] * nor[b * 9 + 2] > 0.999;
+  const edge = new Float32Array(pos.length);
+  for (let t = 0; t < tris; t++) {
+    for (let v = 0; v < 3; v++) edge[(t * 3 + v) * 3 + v] = 1;
+    for (let e = 0; e < 3; e++) {
+      const k = edgeKey(t * 3 + e, t * 3 + ((e + 1) % 3));
+      if (owners.get(k).some((o) => o !== t && same(o, t))) {
+        const opp = (e + 2) % 3;
+        for (let v = 0; v < 3; v++) edge[(t * 3 + v) * 3 + opp] = 1;
+      }
+    }
+  }
+  g.setAttribute('edge', new THREE.Float32BufferAttribute(edge, 3));
+  return g;
 }
 
 // --- plane geometry for cleave() -----------------------------------------------------

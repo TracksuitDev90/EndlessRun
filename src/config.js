@@ -66,6 +66,7 @@ export const CONFIG = {
     reach: 0.55, // how far outside the runner's body a gem is still picked up
     run: [4, 7], // gems in a run along open road (a few more later on)
     maxRun: 14,
+    mix: 0.35, // chance a gem is another of the world's stones, not its run's lead
     often: [0.6, 0.85], // chance a stretch of open road gets a run
     rest: [1.3, 0.6], // seconds of empty road after a run
     lead: [1.05, 0.42], // how long before a wall in its lane a run swerves out of it

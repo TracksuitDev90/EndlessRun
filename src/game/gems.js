@@ -18,9 +18,12 @@ import { rgb } from '../render/geo.js';
 // and closer together. Missing gems costs nothing.
 //
 // Within a run the gems ripple — each turns and bobs a beat behind the one
-// before — and mix in the world's variant cut; its prize spots (the top of a
-// jump, the way out from under a bar, the first step into a new world) get
-// the crown stone, worth more.
+// before. A world has several stones in its colour family (garnet and
+// rhodonite among the rubies, olivine and malachite with the emeralds...):
+// each run has a lead stone, weighted toward the world's own, with the others
+// mixed in, every gem in its own shade of its stone. The prize spots (the top
+// of a jump, the way out from under a bar, the first step into a new world)
+// get the world's crown stone, worth more.
 
 const X = CONFIG.laneX;
 const T = CONFIG.jump.time;
@@ -65,7 +68,7 @@ export class GemField {
   }
 
   unput(g) {
-    g.world.batch(`gem${g.cut}`).removeOwner(g);
+    g.world.batch('gems').removeOwner(g);
     g.world.batch('gemGlow').removeOwner(g);
     g.world.batch('gemPool').removeOwner(g);
   }
@@ -345,19 +348,26 @@ export class GemField {
     let run = this.run;
     if (!run || run.size >= C.maxRun || (!join && !this.joins(d, this.spacing(v)))) {
       if (run) run.closed = true;
-      run = this.run = { size: 0, taken: 0, closed: false, last: d, phase: r.float(0, 6.28), alt: r.int(0, 3) };
+      run = this.run = { size: 0, taken: 0, closed: false, last: d, phase: r.float(0, 6.28), lead: new Map() };
     }
     const index = run.size++;
     run.last = d;
-    // the world's variant cut every fourth gem or so, a crown at the prize spots
-    const cut = crown ? 2 : (index + run.alt) % 4 === 3 ? 1 : 0;
-    const tints = spec.rgb || (spec.rgb = spec.tints.map((t) => rgb(t)));
+    // the run's lead stone for this world (a run through a doorway has one in
+    // each), now and then another of the world's stones, the crown at the
+    // prize spots
+    let kind = spec.stones.length;
+    if (!crown) {
+      if (!run.lead.has(world)) run.lead.set(world, this.pickStone(spec));
+      kind = r.chance(C.mix) ? this.pickStone(spec) : run.lead.get(world);
+    }
+    const stone = crown ? spec.crown : spec.stones[kind];
+    const tints = stone.rgb || (stone.rgb = stone.tints.map((t) => rgb(t)));
     const a = r.pick(tints);
     const b = r.pick(tints);
     const t = r.float(0, 1);
     const k = r.float(0.93, 1.05);
     const tint = [lerp(a[0], b[0], t) * k, lerp(a[1], b[1], t) * k, lerp(a[2], b[2], t) * k];
-    const g = { d, x, y, world, run, index, cut, crown, tint, taken: 0, items: null };
+    const g = { d, x, y, world, run, index, kind, crown, tint, taken: 0, items: null };
     // each gem turns and bobs a beat behind the one before: the run ripples
     const p0 = run.phase - index * 0.6;
     const pool = Math.max(0.15, 1 - (y - C.ground) / 2.4);
@@ -365,13 +375,18 @@ export class GemField {
     // gems ducking under a bar duck a little themselves, to keep clear of it
     const duck = y < C.ground - 0.1 ? 0.85 : 1;
     g.items = [
-      world.put(g, `gem${cut}`, x, y, d, { s: (crown ? 1 : r.float(0.94, 1.06)) * duck, c: tint, p0 }),
+      world.put(g, 'gems', x, y, d, { s: (crown ? 1 : r.float(0.92, 1.08)) * duck, c: tint, p0, p1: kind }),
       world.put(g, 'gemGlow', x, y, d, { s: (spec.halo ?? 1.5) * s, c: tint, p0 }),
       world.put(g, 'gemPool', x, 0.04, d, { s: 1.7 * s, c: [tint[0] * pool, tint[1] * pool, tint[2] * pool], p0 }),
     ];
     this.gems.push(g);
     this.restUntil = Math.max(this.restUntil, d + v * this.restT);
     return true;
+  }
+
+  // One of the world's everyday stones, by weight.
+  pickStone(spec) {
+    return this.rng.weighted(spec.stones.map((s, i) => [i, s.weight ?? 1]));
   }
 
   // --- pick-up --------------------------------------------------------------
@@ -396,7 +411,7 @@ export class GemField {
         it.p2 = time;
         it.p3 = dist - g.d;
       }
-      g.world.batch(`gem${g.cut}`).dirty = true;
+      g.world.batch('gems').dirty = true;
       g.world.batch('gemGlow').dirty = true;
       g.world.batch('gemPool').dirty = true;
       const run = g.run;

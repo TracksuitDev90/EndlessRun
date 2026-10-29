@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
 import { shaftParts } from './whimsy.js';
-import { crystal, stone, crystalPoint, rough } from './gems.js';
+import { crystal, stone, crystalPoint, rough, nugget, octahedron } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -43,10 +43,12 @@ const TOADSTOOLS = ['#ff5a8a', '#b86aff', '#ff8a3a', '#4ad0c0', '#ffd24a'];
 const JELLIES = ['#ff9ad8', '#9adfff', '#c8a8ff', '#a8ffd0'];
 const RAINBOW = [[3.0, 1.1, 2.4], [3.0, 2.3, 0.9], [1.3, 2.8, 1.5], [1.0, 2.4, 3.2], [2.2, 1.2, 3.4]];
 
-// The Amethyst: raw violet crystal points growing out of a lump of dark
-// stone, as if prised from a geode under the roots — the one thing in the
-// Deepwood that is purple, glowing like a spirit-lamp in the shade. A lone
-// double-terminated point mixed into the runs; a great geode cluster for the
+// The violets: amethyst above all — raw crystal points growing out of a lump
+// of dark stone, as if prised from a geode under the roots, paler at the
+// foot and deeper at the tips — the one thing in the Deepwood that is purple,
+// glowing like a spirit-lamp in the shade. Mixed in: lone amethyst points,
+// lavender pebbles of lace agate laid down in fine wavy layers, and fluorite
+// cleaved into octahedra and zoned in rings. A great geode cluster for the
 // prize spots. They drift slowly, like the fireflies.
 function amethystCluster(points, rock, seed, lift) {
   const parts = [stone(rough({ r: rock, seed }), null, { sy: 0.62, y: -lift, grad: ['#211b2a', '#584866', -lift - rock * 0.5, -lift + rock * 0.6] })];
@@ -55,14 +57,48 @@ function amethystCluster(points, rock, seed, lift) {
   });
   return parts;
 }
+const AMETHYST = { bands: 0.3, bandFreq: 7, second: '#e2c4ff', mottle: 0.35, rough: 0.35, speckle: 0.08 };
 const GEM = {
   name: 'amethyst',
-  tints: ['#a24dff', '#bd5cff', '#8a4dff'],
-  cuts: () => [
-    amethystCluster([[0.3, 0.085, 0.08, -0.05, 0, 0], [0.2, 0.065, -0.15, 0.55, -0.07, 0.02], [0.22, 0.07, 0.2, -0.5, 0.07, -0.02], [0.15, 0.055, -0.6, 0.12, 0, -0.06]], 0.15, 3, 0.2),
-    [crystal(crystalPoint({ r: 0.09, len: 0.34, tip: 0.14, double: true, seed: 9 }), { rz: 0.3, rx: 0.1 })],
-    amethystCluster([[0.38, 0.1, 0.05, 0.04, 0, 0], [0.27, 0.08, -0.2, 0.6, -0.1, 0.03], [0.29, 0.085, 0.15, -0.55, 0.1, 0], [0.2, 0.065, -0.65, -0.2, 0.03, -0.08], [0.18, 0.06, 0.6, 0.3, -0.04, 0.09]], 0.2, 17, 0.24),
+  color: '#a24dff',
+  stones: [
+    {
+      name: 'amethyst',
+      weight: 3,
+      tints: ['#a24dff', '#bd5cff', '#8a4dff'],
+      parts: () => amethystCluster([[0.3, 0.085, 0.08, -0.05, 0, 0], [0.2, 0.065, -0.15, 0.55, -0.07, 0.02], [0.22, 0.07, 0.2, -0.5, 0.07, -0.02], [0.15, 0.055, -0.6, 0.12, 0, -0.06]], 0.15, 3, 0.2),
+      texture: AMETHYST,
+    },
+    {
+      name: 'amethyst point',
+      weight: 1.3,
+      tints: ['#a24dff', '#9446f0', '#b45cff'],
+      parts: () => [crystal(crystalPoint({ r: 0.09, len: 0.34, tip: 0.14, double: true, seed: 9 }), { rz: 0.3, rx: 0.1 })],
+      texture: AMETHYST,
+    },
+    {
+      // a lavender pebble laid down in fine wavy layers
+      name: 'lace agate',
+      weight: 1.2,
+      tints: ['#b49ae6', '#c4a8ee', '#a890e0'],
+      parts: () => [crystal(nugget({ r: [0.28, 0.15, 0.13], faces: 40, spread: 0.035, chips: 1, seed: 21 }), { rz: 0.5 })],
+      texture: { opaque: 0.55, bands: 0.75, bandFreq: 26, wander: 16, second: '#f4ecff', mottle: 0.25, rough: 0.15, glints: 0.6 },
+    },
+    {
+      // cleaved octahedra, zoned in rings of deeper and paler violet
+      name: 'fluorite',
+      weight: 1,
+      tints: ['#8456e0', '#9a66ea', '#7448d0'],
+      parts: () => [crystal(octahedron({ r: 0.2, seed: 12 }), { rx: 0.3, rz: 0.2 })],
+      texture: { bands: 0.45, rings: 'nested', bandFreq: 14, wander: 2, second: '#e0d0ff', rough: 0.3, mottle: 0.3, speckle: 0.08 },
+    },
   ],
+  crown: {
+    name: 'amethyst geode',
+    tints: ['#a24dff', '#bd5cff', '#8a4dff'],
+    parts: () => amethystCluster([[0.38, 0.1, 0.05, 0.04, 0, 0], [0.27, 0.08, -0.2, 0.6, -0.1, 0.03], [0.29, 0.085, 0.15, -0.55, 0.1, 0], [0.2, 0.065, -0.65, -0.2, 0.03, -0.08], [0.18, 0.06, 0.6, 0.3, -0.04, 0.09]], 0.2, 17, 0.24),
+    texture: AMETHYST,
+  },
   motion: [0.9, 1.6, 0.09, 0.16],
   look: [0.82, 1, 0.35, 0.4],
   glow: 0.5,

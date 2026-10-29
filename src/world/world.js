@@ -248,22 +248,32 @@ class WorldBuilder {
     return this.world.addBatch(name, b);
   }
 
-  // The world's collectible gem (def.gem, see world/gems.js): its three cuts
-  // (gem0 the everyday stone, gem1 the variant mixed into runs, gem2 the
-  // crown for prize spots), each inked, plus the halo round every gem and the
-  // light it spills on the road.
+  // The world's collectible stones (def.gem, see world/gems.js): every kind
+  // it has — its everyday stones, then its crown — built into one geometry,
+  // each kind's triangles marked with its index in uv.x, so a single instanced
+  // batch ('gems', and its ink) draws them all, each instance showing only its
+  // own kind (p1). Plus the halo round every gem and the light it spills on
+  // the road.
   gems(spec) {
-    const o = { spin: spec.motion, look: spec.look };
+    const kinds = [...spec.stones, spec.crown];
     const size = CONFIG.gems.size;
-    spec.cuts().forEach((parts, i) => {
-      const mat = makeGemMaterial(this.u, o);
-      const name = `gem${i}`;
-      const geo = merge(parts).scale(size, size, size);
-      this.world.addBatch(name, new Batch(name, geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), [96, 64, 40][i]));
-    });
+    const geo = merge(
+      kinds.map((kind, i) => {
+        const g = merge(kind.parts());
+        const uv = g.attributes.uv.array;
+        for (let j = 0; j < uv.length; j += 2) {
+          uv[j] = i;
+          uv[j + 1] = 0;
+        }
+        return g;
+      })
+    ).scale(size, size, size);
+    const o = { spin: spec.motion, look: spec.look };
+    const mat = makeGemMaterial(this.u, { ...o, kinds: kinds.map((k) => k.texture || {}) });
+    this.world.addBatch('gems', new Batch('gems', geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), 220));
     for (const [name, gain, pool] of [['gemGlow', spec.glow, false], ['gemPool', spec.pool, true]]) {
       const g = part(quadGeo(), '#ffffff', { outline: 0 });
-      const b = new Batch(name, g, makeGemGlowMaterial(this.u, { ...o, gain, pool }), null, 200);
+      const b = new Batch(name, g, makeGemGlowMaterial(this.u, { ...o, gain, pool }), null, 220);
       b.renderOrder = pool ? 1 : 7;
       this.world.addBatch(name, b);
     }
