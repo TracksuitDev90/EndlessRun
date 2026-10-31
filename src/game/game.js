@@ -20,6 +20,7 @@ const smooth01 = (e0, e1, x) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
 };
+const NO_MOTES = { color: '#000000', size: 1, drift: [0, 0, 0], opacity: 0 };
 const CHEST = 0.9; // a collected gem is sucked into the runner's chest, this high above their feet
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const numeral = (n) => NUMERALS[n - 1] || String(n);
@@ -42,12 +43,15 @@ export class Game {
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
+    // a second layer some worlds use (env.particles2): Hell's falling ash
+    // under its rising embers; invisible elsewhere
+    this.particles2 = new Particles(320, 7);
     this.sparkles = new Sparkles();
     this.dream = new Dream();
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
-    this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.sparkles.points);
+    this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
@@ -112,9 +116,9 @@ export class Game {
     this.ui.setGemColor(this.current.def.gem?.color);
 
     this.player.reset();
+    this.startDrain(this.current, 2.4);
     copyEnvUniforms(this.player.u, this.current.u);
-    const pd = this.current.env.particles;
-    this.particles.set(pd, pd, 0);
+    this.setParticles(this.current.env, this.current.env, 0);
 
     this.chunks.update(0);
     this.obstacles.update(0, 0);
@@ -199,7 +203,7 @@ export class Game {
     for (const g of got) {
       this.score += (g.crown ? S.crown : S.gem) * this.depth;
       this.gemCount++;
-      this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.tint, this.time, g.crown ? 1.25 : 1);
+      this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, g.crown ? 1.25 : 1);
       this.audio.gem(g.index, g.crown);
       if (g.whole) {
         const bonus = S.perfect * g.run.size * this.depth;
@@ -304,6 +308,35 @@ export class Game {
     this.crashShown = false;
   }
 
+  // Ambient motes, blended between two worlds' settings (t = 0..1).
+  setParticles(a, b, t) {
+    this.particles.set(a.particles, b.particles, t);
+    this.particles2.set(a.particles2 || NO_MOTES, b.particles2 || NO_MOTES, t);
+  }
+
+  // --- the colour drain ---------------------------------------------------------
+  // A world whose env asks for it (Hell) is seen through its doorway in full
+  // colour; come through and the colour drains out of it, spreading from the
+  // centre of the screen, leaving black, grey and white — only what burns
+  // (and the runner's cape) keeps its colour. Leaving, the next world is in
+  // full colour through the doorway, and the runner's own colour comes back
+  // as they run up to it (the env blend carries the drain).
+  startDrain(world, at = 0) {
+    this.drainWorld = world.def.env.drain ? world : null;
+    this.drainR = at;
+    if (this.drainWorld) world.u.uDrain.value.set(1, at, 0, 0);
+  }
+
+  updateDrain(dt) {
+    const w = this.drainWorld;
+    if (!w) return;
+    this.drainR = Math.min(2.4, this.drainR + dt * (0.35 + this.drainR * 1.1));
+    w.u.uDrain.value.y = this.drainR;
+    // the runner drains with it (until the run-up to the doorway out blends it back)
+    if (w === this.current && !this.portal.active) this.player.u.uDrain.value.copy(w.u.uDrain.value);
+    if (this.drainR >= 2.4) this.drainWorld = null;
+  }
+
   // --- doorways ---------------------------------------------------------------
   camDist() {
     return this.origin - this.cam.camera.position.z;
@@ -315,6 +348,7 @@ export class Game {
       if (b && b.from.world === this.current && b.d - this.dist < CONFIG.viewAhead + 24) {
         this.next = b.to.world;
         this.next.applyVisit(b.to.visit);
+        this.next.u.uDrain.value.set(this.next.def.env.drain ? 1 : 0, -1, 0, 0);
         this.door = { d: b.d, quadD: b.d + this.current.def.gate.depth / 2, seg: b.to };
         this.portal.setShape(this.current.def.gate);
         this.portal.setTrip(this.current.u.uTrip.value);
@@ -328,7 +362,7 @@ export class Game {
       this.portal.place(-(door.quadD - this.origin));
       const t = smooth01(55, 0, door.quadD - this.dist);
       lerpEnvUniforms(this.player.u, this.current.u, this.next.u, t);
-      this.particles.set(this.current.env.particles, this.next.env.particles, t);
+      this.setParticles(this.current.env, this.next.env, t);
       this.dream.set(this.course.prevOf(door.seg)?.dream ?? door.seg.dream, door.seg.dream, t);
       if (this.camDist() >= door.quadD - 0.45) this.crossDoor();
     }
@@ -349,13 +383,13 @@ export class Game {
     this.sceneMain.add(this.current.root);
     this.portal.active = false;
     copyEnvUniforms(this.player.u, this.current.u);
-    const pd = this.current.env.particles;
-    this.particles.set(pd, pd, 0);
+    this.setParticles(this.current.env, this.current.env, 0);
     this.announceWorld(this.door.seg);
     this.ui.setGemColor(this.current.def.gem?.color);
     this.depth = this.door.seg.ordinal;
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
-    this.dream.doorway(this.current.def, this.current.env);
+    this.dream.doorway(this.current.def, this.current.env, !!old.def.env.drain);
+    this.startDrain(this.current, 0);
     this.audio.door();
     this.door = null;
   }
@@ -384,9 +418,9 @@ export class Game {
     this.obstacles.reset(this.rng, d, false);
     this.gems.reset(new RNG(this.seed ^ 0x2c1b3c6d ^ Math.floor(d)), d);
     this.ui.setGemColor(this.current.def.gem?.color);
+    this.startDrain(this.current, 2.4);
     copyEnvUniforms(this.player.u, this.current.u);
-    const pd = this.current.env.particles;
-    this.particles.set(pd, pd, 0);
+    this.setParticles(this.current.env, this.current.env, 0);
   }
 
   skipToNextDoor(before = 150) {
@@ -446,6 +480,7 @@ export class Game {
     this.player.place(pz);
     shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);
     this.dream.update(dt);
+    this.updateDrain(dt);
     this.cam.sway = this.dream.sway;
     this.cam.update(dt, this.player, pz, this.speed, this.time);
     shared.uCamPos.value.copy(this.cam.camera.position);
@@ -455,6 +490,7 @@ export class Game {
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);
     shared.uBend.value.set(CONFIG.bend, sway, 0, CONFIG.bendStart);
     this.particles.update(this.dist);
+    this.particles2.update(this.dist);
     for (const w of this.worlds) w.sky.position.copy(this.cam.camera.position);
 
     this.current.flush(this.origin);
@@ -502,7 +538,7 @@ export class Game {
       w.setAllVisibleForCompile(true);
       scene.add(w.root);
     }
-    scene.add(this.player.root, this.player.shadow, this.particles.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
+    scene.add(this.player.root, this.player.shadow, this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
     try {
       if (this.renderer.compileAsync) await this.renderer.compileAsync(scene, this.cam.camera);
       else this.renderer.compile(scene, this.cam.camera);
@@ -512,7 +548,7 @@ export class Game {
         root.removeFromParent();
         if (parent) parent.add(root);
       }
-      this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.sparkles.points);
+      this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
       this.scenePortal.add(this.portal.stencilMesh);
     }
   }

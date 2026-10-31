@@ -6,6 +6,7 @@ import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.
 import { crystal, stepCut, octagon, bezelParts, nugget, hexPrism, FACE } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
+import { paintingsGeo, glimpsesGeo, Deck, PAINTING_COUNT, GLIMPSE_COUNT } from './hall-art.js';
 
 // IV · The Hall of Doors — a coral corridor with a checkerboard floor,
 // open to the sky, lined with doors of every color. Nested door frames
@@ -13,6 +14,15 @@ import { CONFIG } from '../config.js';
 // Lit like a de Chirico piazza: hard, low, raking sun and razor-edged
 // shadows. Each return gets stranger — books take flight, a tea party drifts
 // past at dusk, then clocks float through a violet night.
+//
+// Nine different paintings hang between the doors, dealt from a shuffled
+// deck so no two neighbours match and no run of them repeats. Now and then a
+// door stands ajar: a little under half of those open onto a glimpse of some
+// other world (the sea floor, a snowy night, the desert, deep space, an
+// autumn wood, islands in a pink sky) — scenery only, never a way in — and
+// the rest just spill a coloured glow. And books flutter up off the shelves
+// and stacks in the way: rarely at first, more each time the hall comes round
+// (they're only decoration: nothing to hit, nothing in the lanes).
 
 const C = {
   wall: '#e27b5e',
@@ -29,6 +39,25 @@ const C = {
 };
 const DOOR_TINTS = ['#2fa59a', '#e8b13a', '#3456b8', '#8fd6b6', '#8a4a8a', '#c8402e', '#7fb8e0', '#f08a5d', '#4a8a5a', '#f2d06b'];
 const BOOKS = ['#c8402e', '#3456b8', '#e8b13a', '#2fa59a', '#f6ecd4', '#8a4a8a', '#4a8a5a', '#f08a5d'];
+// the glow spilling from doors that open on nothing you can see
+const GLOWS = [[1, 0.78, 0.45], [1, 0.62, 0.56], [0.6, 0.84, 1], [0.8, 0.7, 1], [1, 0.9, 0.6], [0.66, 1, 0.8]];
+const paintings = new Deck(PAINTING_COUNT);
+const glimpses = new Deck(GLIMPSE_COUNT);
+
+// Books flying up off a shelf or a stack (obstacle spec extras): purely for
+// show, above head height, a little past the obstacle so its own outline
+// stays clean. Rare the first time through the hall, more each time round.
+function bookFlight(lo, hi) {
+  return (put, rng, { x, d, visit }) => {
+    if (!rng.chance(Math.min(0.75, 0.22 + 0.18 * visit))) return;
+    const n = 1 + (rng.chance(0.25 + 0.2 * visit) ? 1 : 0) + (visit >= 2 && rng.chance(0.4) ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      put(rng.chance(0.5) ? 'shelfBook' : 'shelfBookB', x + rng.float(-0.9, 0.9), rng.float(lo, hi), d + rng.float(0.3, 1.6), {
+        ry: rng.float(-0.9, 0.9) + (rng.chance(0.3) ? Math.PI : 0), c: rng.pick(BOOKS), s: rng.float(1.35, 1.8), p0: rng.float(0, 6.28),
+      });
+    }
+  };
+}
 
 // The greens, as if a cabinet of curiosities had spilled down the hall — the
 // complement of the coral walls. Heirloom pendants: emerald-cut stones (with
@@ -140,22 +169,11 @@ function openDoorGeo() {
     part(P.box(0.18, h + 0.18, 0.26), C.cream, { x: -w / 2 - 0.09, y: (h + 0.18) / 2 }),
     part(P.box(0.18, h + 0.18, 0.26), C.cream, { x: w / 2 + 0.09, y: (h + 0.18) / 2 }),
     part(P.box(w + 0.36, 0.18, 0.26), C.cream, { y: h + 0.09 }),
-    part(P.box(w, h, 0.05), C.lit, { y: h / 2, z: -0.06, emit: 1, outline: 0 }),
   ];
+  // (what shows through it — a glow or another world — is its own batch)
   // leaf hinged on the right jamb, swung ~63° out into the hall
   const a = 1.1;
   parts.push(part(P.box(w, h, 0.12), '#ffffff', { x: w / 2 - (w / 2) * Math.cos(a), y: h / 2, z: 0.06 + (w / 2) * Math.sin(a), ry: a, tint: 1 }));
-  return merge(parts);
-}
-
-function pictureGeo(seed) {
-  const rnd = seeded(seed);
-  const parts = [
-    part(P.box(1.3, 1.0, 0.1), C.gold, { y: 0 }),
-    part(P.box(1.1, 0.8, 0.12), mix('#9fd3e6', '#ffffff', rnd() * 0.3), { y: 0, outline: 0 }),
-    part(P.box(1.1, 0.34, 0.13), mix('#6fb35a', '#2f7a3a', rnd()), { y: -0.23, outline: 0 }),
-    part(P.sphere(0.1, 8, 6), '#ffe08a', { x: 0.3, y: 0.18, z: 0.05, sz: 0.3, outline: 0 }),
-  ];
   return merge(parts);
 }
 
@@ -415,7 +433,13 @@ export default {
     b.toon('walls', hallWallsGeo(), { cap: 40, ink: 0.04, anim: 'rise' });
     b.toon('door', merge(wallDoorParts({ w: 1.5, h: 3.1, depth: 0.2 })), { cap: 200, anim: 'pop' });
     b.toon('openDoor', openDoorGeo(), { cap: 60, anim: 'pop' });
-    b.toon('picture', pictureGeo(3), { cap: 120, anim: 'pop' });
+    b.toon('painting', paintingsGeo(), { cap: 120, anim: 'pop', kinds: true, ink: 0 });
+    b.toon('glimpse', glimpsesGeo(), { cap: 40, anim: 'pop', kinds: true, ink: 0 });
+    // (brightest low down, where the light spills over the threshold)
+    b.toon('doorPane', merge([part(P.box(1.5, 3.1, 0.05, 1, 4, 1), null, { y: 1.55, z: -0.06, emit: 1, tint: 1, outline: 0, grad: ['#ffffff', '#8e8a9a', 0.2, 3.1] })]), { cap: 40, anim: 'pop', ink: 0 });
+    // books off the shelves: some flutter fast and close, some glide in wide loops
+    b.toon('shelfBook', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [1.1, 11, 0.45, 0.95], ink: 0.035 });
+    b.toon('shelfBookB', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [0.65, 5.5, 1.1, 0.42], ink: 0.035 });
     b.toon('sconce', sconceGeo(), { cap: 120, anim: 'pop', ink: 0.025 });
     b.glow('glow', { cap: 160, anim: 'pop' });
     b.toon('hallFrame', hallFrameGeo(), { cap: 24, anim: 'popLate' });
@@ -444,9 +468,9 @@ export default {
   },
 
   obstacles: {
-    L: [{ name: 'armchair', len: 1.0 }, { name: 'books', len: 0.6 }],
+    L: [{ name: 'armchair', len: 1.0 }, { name: 'books', len: 0.6, extras: bookFlight(2.9, 3.9) }],
     H: [{ name: 'lowDoorway', len: 0.4 }],
-    W: [{ name: 'wardrobe', len: 0.8, tints: DOOR_TINTS }, { name: 'bookshelf', len: 0.8 }],
+    W: [{ name: 'wardrobe', len: 0.8, tints: DOOR_TINTS }, { name: 'bookshelf', len: 0.8, extras: bookFlight(3.5, 4.8) }],
     LW: { name: 'settee', len: 1.0 },
     HW: { name: 'curtain', len: 0.4 },
     // Side doors that swing out across an outer lane as you approach.
@@ -469,9 +493,18 @@ export default {
           if (dz > 15.5) continue;
           const x = s * (WALL_X - 0.08);
           const tint = rng.pick(DOOR_TINTS);
-          if (rng.chance(0.18)) {
+          if (rng.chance(0.2)) {
+            // an open door: about 45% show a glimpse of another world, the
+            // rest a coloured glow (decided as it's placed, and kept)
             ctx.put('openDoor', x, 0, dz, { ry, c: tint });
-            ctx.put('glow', s * (WALL_X - 1.2), 1.6, dz, { s: 3.4, c: [1, 0.78, 0.45] });
+            if (rng.chance(0.45)) {
+              ctx.put('glimpse', x, 0, dz, { ry, p1: glimpses.deal(rng) });
+              ctx.put('glow', s * (WALL_X - 1.2), 1.6, dz, { s: 2.6, c: [0.85, 0.85, 0.9] });
+            } else {
+              const g = rng.pick(GLOWS);
+              ctx.put('doorPane', x, 0, dz, { ry, c: g });
+              ctx.put('glow', s * (WALL_X - 1.2), 1.6, dz, { s: 3.4, c: g });
+            }
           } else {
             ctx.put('door', x, 0, dz, { ry, c: tint });
           }
@@ -482,7 +515,7 @@ export default {
               ctx.put('sconce', s * (WALL_X - 0.04), 3.4, mid, { ry });
               ctx.put('glow', s * (WALL_X - 0.4), 3.7, mid, { s: 1.6, c: [1, 0.8, 0.5] });
             } else {
-              ctx.put('picture', s * (WALL_X - 0.04), 3.9, mid, { ry, s: rng.float(0.8, 1.2) });
+              ctx.put('painting', s * (WALL_X - 0.04), 3.9, mid, { ry, s: rng.float(0.85, 1.15), p1: paintings.deal(rng) });
             }
           }
         }

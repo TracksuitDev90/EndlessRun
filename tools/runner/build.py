@@ -211,11 +211,12 @@ SHOULDER = (0.165, 1.165)
 UPPER_ARM = 0.21
 FOREARM = 0.19
 ARM_REST = 0.5
-# The head and hair are sculpted in their own space and placed scaled on a
-# longer neck: the reference is about six and a half heads tall, not a toy.
-HEAD_S = 0.8
+# The head and hair are sculpted in their own space and placed scaled, seated
+# low on a short neck inside the jacket's stand-up collar: about six heads
+# tall, the head broad enough to hold its own against the padded shoulders.
+HEAD_S = 0.85
 HEAD_PIV = V(0, 1.3, 0)  # sculpt space
-HEAD_AT = V(0, 1.36, 0)  # where that point sits on the body
+HEAD_AT = V(0, 1.316, 0)  # where that point sits on the body
 
 
 def to_head(p):
@@ -386,39 +387,44 @@ def head_garment(g):
 
 
 def head_prims():
-    cran = ellipsoid((0, 1.44, 0.01), (0.104, 0.113, 0.106))
-    face = ellipsoid((0, 1.372, -0.026), (0.088, 0.085, 0.082))
-    cheeks = [ellipsoid((s * 0.048, 1.357, -0.057), (0.038, 0.032, 0.032)) for s, _ in SIDES]
-    chin = ellipsoid((0, 1.305, -0.05), (0.032, 0.022, 0.026))
-    return cran, face, cheeks, chin
+    # a young face: broad and round through the cheeks, a soft jaw that
+    # tucks under into the neck, a small rounded chin
+    cran = ellipsoid((0, 1.44, 0.012), (0.111, 0.112, 0.108))
+    face = ellipsoid((0, 1.376, -0.028), (0.095, 0.08, 0.084))
+    cheeks = [ellipsoid((s * 0.058, 1.346, -0.046), (0.05, 0.042, 0.042)) for s, _ in SIDES]
+    chin = ellipsoid((0, 1.316, -0.05), (0.04, 0.023, 0.03))
+    jaw = ellipsoid((0, 1.341, -0.014), (0.085, 0.045, 0.068))
+    return cran, face, cheeks, chin, jaw
 
 
 def skull(p):
     """The head without ears, nose and neck: what the hair is laid over."""
-    cran, face, cheeks, chin = head_prims()
+    cran, face, cheeks, chin, jaw = head_prims()
     d = smin(cran(p), face(p), 0.045)
     for c in cheeks:
-        d = smin(d, c(p), 0.03)
-    return smin(d, chin(p), 0.025)
+        d = smin(d, c(p), 0.035)
+    d = smin(d, jaw(p), 0.04)
+    return smin(d, chin(p), 0.03)
 
 
 def g_head():
-    cran, face, cheeks, chin = head_prims()
-    nose = ellipsoid((0, 1.383, -0.11), (0.012, 0.016, 0.012))
-    ears = [ellipsoid((s * 0.107, 1.402, 0.012), (0.015, 0.03, 0.024), rot_y(s * 0.35)) for s, _ in SIDES]
-    neck = round_cone(to_head(V(0, 1.18, 0.012)), (0, 1.33, 0.0), 0.043 / HEAD_S, 0.041 / HEAD_S)
+    cran, face, cheeks, chin, jaw = head_prims()
+    nose = ellipsoid((0, 1.377, -0.111), (0.013, 0.015, 0.012))
+    ears = [ellipsoid((s * 0.112, 1.4, 0.014), (0.015, 0.029, 0.023), rot_y(s * 0.35)) for s, _ in SIDES]
+    # short and sturdy, rising out of the collar and flowing up under the jaw
+    neck = round_cone(to_head(V(0, 1.17, 0.016)), (0, 1.35, 0.014), 0.047 / HEAD_S, 0.045 / HEAD_S)
 
     def field(p):
         d = skull(p)
         d = smin(d, nose(p), 0.012)
         for e in ears:
             d = smin(d, e(p), 0.008)
-        return smin(d, neck(p), 0.035)
+        return smin(d, neck(p), 0.03)
 
     head = rigid('head')
-    owners = [(cran, head), (face, head), (chin, head), (nose, head)] + [(c, head) for c in cheeks] + [(e, head) for e in ears]
-    owners.append((neck, by_y([(1.225, 'chest'), (1.275, 'neck'), (1.345, 'head')])))
-    return head_garment(Garment('head', MAT['face'], 0.0025, (-0.135, 1.0, -0.145), (0.135, 1.585, 0.14), field, owners, 2600))
+    owners = [(cran, head), (face, head), (chin, head), (jaw, head), (nose, head)] + [(c, head) for c in cheeks] + [(e, head) for e in ears]
+    owners.append((neck, by_y([(1.215, 'chest'), (1.258, 'neck'), (1.305, 'head')])))
+    return head_garment(Garment('head', MAT['face'], 0.0025, (-0.14, 1.0, -0.15), (0.14, 1.59, 0.14), field, owners, 2600))
 
 
 def hair_angle(p):
@@ -433,42 +439,75 @@ def hairline(p):
                      [1.478, 1.47, 1.452, 1.425, 1.385, 1.392, 1.44, 1.415, 1.36, 1.33, 1.318])
 
 
+CRAN = ((0, 1.44, 0.012), (0.111, 0.112, 0.108))
+
+
+def clump(theta, elev, length, r0, lift=0.012, curl=0.012, twist=0.0, fwd=0.0):
+    """A clump of hair rooted on the crown at (azimuth theta from the front,
+    elevation elev): a tapering stroke laid down along the skull toward the
+    hairline, its tip curling out - the way a lock of short tousled hair lies."""
+    c, r = V(*CRAN[0]), V(*CRAN[1])
+    u = V(math.sin(theta) * math.cos(elev), math.sin(elev), -math.cos(theta) * math.cos(elev))
+    p0 = c + r * u
+    n = u / r ** 2
+    n /= np.linalg.norm(n)
+    down = V(0, -1, 0) + V(0, 0, -fwd)
+    t = down - n * (down @ n)
+    t /= np.linalg.norm(t)
+    side = np.cross(n, t)
+    a = p0 + n * lift
+    b = a + t * length * 0.42 + n * lift * 0.5 + side * twist * 0.3
+    m = b + t * length * 0.34 + n * 0.002 + side * twist * 0.6
+    tip = m + t * length * 0.24 + n * curl + side * twist
+    return stroke([a, b, m, tip], [r0, r0 * 0.85, r0 * 0.6, r0 * 0.26])
+
+
 def g_hair():
-    # one mass laid over the skull: thin and close at the sides and nape, full
-    # on top, then a few large curls that break the outline into soft scallops
+    # short and tousled: a close cap over the skull, thin at the sides and
+    # nape, and over it deliberate clumps - locks laid from the crown down
+    # over the skull in three loose rings, each its own length and lean, tips
+    # curling out - so the outline breaks into an uneven, lively scallop and
+    # the fringe falls over the forehead in irregular points instead of one
+    # solid mass
     def mass(p):
-        y, z = p[:, 1], p[:, 2]
-        thick = 0.011 + 0.024 * smooth(1.42, 1.53, y) + 0.008 * smooth(0.0, -0.1, z) * smooth(1.46, 1.54, y)
+        y = p[:, 1]
+        thick = 0.008 + 0.01 * smooth(1.42, 1.53, y)
         return skull(p) - thick
 
     base = Prim(mass, (-0.13, 1.3, -0.15), (0.13, 1.62, 0.14))
-    clumps = [ellipsoid(c, r, rot_x(a)) for c, r, a in [
-        ((-0.064, 1.552, -0.05), (0.054, 0.036, 0.056), -0.5),
-        ((0.008, 1.566, -0.066), (0.056, 0.036, 0.054), -0.55),
-        ((0.074, 1.542, -0.036), (0.05, 0.036, 0.054), -0.4),
-        ((-0.054, 1.57, 0.03), (0.058, 0.034, 0.06), 0.1),
-        ((0.048, 1.57, 0.03), (0.056, 0.034, 0.06), 0.1),
-        ((0.0, 1.54, 0.088), (0.07, 0.042, 0.044), 0.5),
-        ((-0.1, 1.5, 0.0), (0.034, 0.042, 0.064), 0.0),
-        ((0.1, 1.5, 0.0), (0.034, 0.042, 0.064), 0.0),
-    ]]
-    curls = [
-        stroke([(-0.03, 1.555, -0.088), (-0.064, 1.52, -0.12), (-0.074, 1.486, -0.118), (-0.058, 1.47, -0.102)], [0.032, 0.023, 0.014, 0.008]),
-        stroke([(0.02, 1.56, -0.092), (0.032, 1.52, -0.126), (0.047, 1.489, -0.122), (0.064, 1.484, -0.102)], [0.031, 0.022, 0.013, 0.007]),
-    ] + [stroke([(s * 0.088, 1.535, -0.05), (s * 0.11, 1.497, -0.068), (s * 0.112, 1.46, -0.066)], [0.03, 0.02, 0.01]) for s, _ in SIDES]
+    rnd = np.random.default_rng(7)
+    D = math.pi / 180
+    front, top, back = [], [], []
+    # the crown: short locks spraying out from the whorl, giving the top its volume
+    for i, th in enumerate(np.arange(0, 360, 60) + 20):
+        g = clump(th * D, 66 * D, 0.06 + rnd.uniform(-0.008, 0.01), 0.032, lift=0.02, curl=0.016, twist=rnd.uniform(-0.012, 0.012))
+        (front if abs(((th + 180) % 360) - 180) < 70 else top).append(g)
+    # the middle ring: the fringe at the front (longer, falling forward over
+    # the forehead), sweeping back over the temples and down the back
+    for th in [-58, -30, -4, 22, 50, 82, 112, 142, 172, 202, 232, 262, 290]:
+        th = th + rnd.uniform(-6, 6)
+        a = abs(((th + 180) % 360) - 180)
+        fr = a < 66
+        L = (0.085 if fr else 0.075 if a < 115 else 0.085) + rnd.uniform(-0.012, 0.012)
+        g = clump(th * D, 36 * D, L, 0.03 if fr else 0.028, lift=0.012, curl=0.013 if fr else 0.009, twist=rnd.uniform(-0.016, 0.016), fwd=0.5 if fr else 0.0)
+        (front if fr else back if a > 110 else top).append(g)
+    # the lower ring: tufts over the ears and at the nape (none over the face)
+    for th in [92, 120, 150, 180, 210, 240, 268]:
+        th = th + rnd.uniform(-5, 5)
+        g = clump(th * D, 8 * D, 0.05 + rnd.uniform(-0.008, 0.01), 0.024, lift=0.008, curl=0.008, twist=rnd.uniform(-0.012, 0.012))
+        (back if abs(((th + 180) % 360) - 180) > 110 else top).append(g)
 
     def field(p):
         d = smax(base(p), hairline(p) - p[:, 1], 0.01)
-        for q in clumps:
-            d = smin(d, q(p), 0.011)
-        for q in curls:
-            d = smin(d, q(p), 0.012)
+        for q in front + top + back:
+            d = smin(d, q(p), 0.008)
         return d
 
     owners = [(base, rigid('head'))]
-    owners += [(q, rigid('hairF' if i < 3 else 'hairT' if i < 5 else 'hairB' if i < 6 else 'head')) for i, q in enumerate(clumps)]
-    owners += [(q, rigid('hairF')) for q in curls]
-    return head_garment(Garment('hair', MAT['hair'], 0.0025, (-0.16, 1.3, -0.17), (0.16, 1.68, 0.17), field, owners, 2400, tau=0.01))
+    owners += [(q, rigid('hairF')) for q in front]
+    owners += [(q, rigid('hairT')) for q in top]
+    owners += [(q, rigid('hairB')) for q in back]
+    return head_garment(Garment('hair', MAT['hair'], 0.0025, (-0.17, 1.3, -0.18), (0.17, 1.67, 0.18), field, owners, 3200, tau=0.01))
 
 
 def g_tee():
@@ -532,9 +571,37 @@ def jacket_smooth(p, prims):
     return t
 
 
+STAND_COLLAR = dict(c=(0.0, 1.21, 0.008), R=0.07, lean=0.06, t=0.011, front=0.05, back=0.064)
+
+
+def stand_collar():
+    """The puffer's stand-up collar: a soft padded funnel round the base of
+    the neck, leaning in a little, higher at the back, open at the throat to
+    show the tee - it seats the neck in the jacket the way the reference does."""
+    S = STAND_COLLAR
+    c = V(*S['c'])
+
+    def fn(p):
+        q = p - c
+        x, y, z = q[:, 0], q[:, 1], q[:, 2]
+        rho = np.sqrt(x ** 2 + (z / 0.96) ** 2)
+        yy = clamp(y, 0, 0.08)
+        R = S['R'] - S['lean'] * yy
+        top = S['front'] + (S['back'] - S['front']) * smooth(-0.07, 0.07, z)
+        d = np.abs(rho - R) - S['t'] * (1 - 0.25 * smooth(0, top, y))
+        d = smax(d, y - top, 0.009)
+        d = smax(d, -0.04 - y, 0.01)
+        # open at the throat, the opening widening toward the top
+        gap = np.maximum(np.abs(x) - (0.006 + 0.42 * np.maximum(y, 0)), z + 0.03)
+        return smax(d, -gap, 0.006)
+
+    return Prim(fn, c - V(0.095, 0.05, 0.095), c + V(0.095, 0.08, 0.095))
+
+
 def g_jacket():
     prims = jacket_prims()
     belly, chest, shoulders, hollow, sleeves = prims
+    collar = stand_collar()
     arms = [arm_frame(s) for s, _ in SIDES]
 
     def torso_y(p):
@@ -546,6 +613,7 @@ def g_jacket():
         t = smax(t, 0.728 - y, 0.022)
         t = smax(t, -hollow(p), 0.008)
         t = t + seams(torso_y(p), *TORSO_SEAMS) * smooth(1.13, 1.09, y)
+        t = smin(t, collar(p), 0.018)
         for up, lo, cuff, S, d, cap in sleeves:
             u = (p - S) @ d
             sl = smin(up(p), lo(p), 0.02) + seams(u, *SLEEVE_SEAMS) * smooth(0.04, 0.08, u)
@@ -554,7 +622,7 @@ def g_jacket():
         return t
 
     torso_w = by_y([(0.79, 'hips'), (0.9, 'spine'), (1.0, 'spine'), (1.08, 'chest')])
-    owners = [(belly, torso_w), (chest, torso_w), (shoulders, torso_w)]
+    owners = [(belly, torso_w), (chest, torso_w), (shoulders, torso_w), (collar, by_y([(1.235, 'chest'), (1.3, 'neck')]))]
     n_torso = len(owners)
     for (up, lo, cuff, S, d, cap), (s, L) in zip(sleeves, SIDES):
         # (the padded cap blends over a long stretch, so a swinging arm bends
@@ -570,7 +638,7 @@ def g_jacket():
         u = ((p - S) * d).sum(1)
         return np.stack([(torso_y(p) - TORSO_SEAMS[0]) / TORSO_SEAMS[1], (u - SLEEVE_SEAMS[0]) / SLEEVE_SEAMS[1], torso, u], 1)
 
-    return Garment('jacket', MAT['jacket'], 0.005, (-0.47, 0.68, -0.21), (0.47, 1.3, 0.21), field, owners, 5200, tau=0.015, details=details)
+    return Garment('jacket', MAT['jacket'], 0.005, (-0.47, 0.68, -0.21), (0.47, 1.32, 0.21), field, owners, 5600, tau=0.015, details=details)
 
 
 SHORTS_HEM = 0.6

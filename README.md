@@ -1,7 +1,7 @@
 # EndlessRun
 
 An endless runner through worlds within worlds. A young wayfarer in a puffer
-jacket and a crimson hooded cape runs into the screen through a storybook world that never stops changing:
+jacket and an orange hooded cape runs into the screen through a storybook world that never stops changing:
 scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
 next world, nested inside this one. Run through, and you're in it. Keep
@@ -15,7 +15,7 @@ walls, arc over its hurdles and lead you through its doorways.
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 
-![The six worlds](docs/preview.jpg)
+![The first six worlds](docs/preview.jpg)
 
 ## The worlds
 
@@ -24,13 +24,54 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
 | II | **The Deepwood** — colossal mossy trunks on buttress roots under a canopy that closes overhead, a trodden path through long grass, ferns, wildflowers, glowing mushrooms; the way out is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
 | III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
-| IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour, nested door frames, doors floating among the clouds | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
+| IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands ajar on a coloured glow, or on a glimpse of some other world — the sea floor, a snowy night, the desert, deep space, an autumn wood, islands in a pink sky — that you can see but never reach), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
 | V | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
+| VII | **Hell** — fire and brimstone, and above all emptiness: an ash plain out to the edge of the world, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava and far-off smoking volcanoes; embers rise and ash falls all the time | seen through its doorway it burns red; come through and the colour drains out of it (see [The colour drain](#the-colour-drain)) — black, grey and white, lit hard from the burning horizon, with only the lava, the embers and your cape still in colour | fire and brimstone |
+| VIII | **The Gallery of Hours** — a gallery of clocks open to the sky: an ivory walk inlaid with brass clock-ticks between colonnades of ivory arches, oversized clock faces with turning hands, great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, and dials and gears adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 
 The first lap always nests inward in that order; after that the order shuffles
 (never the same world twice in a row). Each doorway is painted the colour of
 the world it leads to.
+
+In the Hall of Doors, the nine paintings are dealt from a shuffled deck (every
+one hangs before any repeats, never twice side by side, and the order changes
+every round), and roughly 45% of the doors standing ajar open on a world, the
+rest on a glow; each is decided as it's placed and kept. All nine paintings
+are one instanced batch, and so are the six worlds: every design's triangles
+are marked with its index and each instance folds away all but its own in the
+vertex shader (toon option `kinds`), so they cost two draw calls, not fifteen.
+The books that flutter up off a bookshelf or a stack are an obstacle's
+decoration (`extras` on its spec): above head height, a little past it,
+nothing to hit — rare the first time through the hall and more each time it
+comes round.
+
+### The colour drain
+
+Hell is the one world that takes your colour away. Through its doorway it
+looks the way you'd expect — red sky, red-brown ash, fire on the horizon —
+but come through and, instead of the usual bloom of colour, the doorway bursts
+into ash and smoke and the colour *drains* out of the world, spreading from
+the centre of the screen behind an inky front, until everything is black,
+grey and white: the sky, the ash, the rock, the gems and the runner. Only what
+burns keeps its colour — the lava, the glowing fissures, the embers on the
+wind — and the runner's orange cape. The ash is kept pale and the rock dark
+with pale edges (and the grey is given a little extra contrast), so the dark
+stones and the obstacles still read at a glance. Leaving, the next world shows
+in full colour through the doorway out, the runner's own colours come back as
+they run up to it, and crossing it floods the screen with colour at full
+strength.
+
+It's one per-world uniform (`uDrain`: how much, and how far from the centre of
+the screen it has spread) applied in the shared colour grade, with emissive
+surfaces, the lava material, the ground's glowing cracks and the cape marked to
+keep their colour — so a world seen through a doorway can be drained or not
+independently of the one around it, at no extra render cost. Any world can
+ask for it with `env.drain: true`.
+
+![Into Hell: the Sky Road's doorway shows it burning; crossing, the doorway bursts into ash and the colour drains out from the centre of the screen until only the lava, the embers and the cape are left in colour](docs/hell.jpg)
+
+![The Gallery of Hours (a pendulum crossbar to slide under), and Hell once the colour has gone](docs/new-worlds.jpg)
 
 ### Coming back around
 
@@ -46,6 +87,8 @@ rolls in slow waves:
 | Hall of Doors | the books take flight | a tea party at dusk: teal-and-cream floor, teacups and teapots adrift | violet night, the shadows swap sides, clocks float past |
 | Glasshouse | butterflies over the beds, pink petals | dusk, rose glass, giant blooms in the beds | bioluminescent night, glowing spores, aurora |
 | Sky Road | flocks of birds | a ringed planet in a pink sky | whales swimming through the clouds |
+| Hell | an ember storm: more fire on the wind, the plain alight | the eclipse: a black sun ringed in fire, ash falling thick | the colours begin to drift |
+| Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
 
 ![The Hall of Doors on four visits](docs/laps.jpg)
 
@@ -124,6 +167,8 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Hall of Doors | **Emerald** green | the complement of the coral walls | an heirloom pendant — emerald cut in a gold bezel (the hall's doorknob brass) on a loop · a square asscher pendant · olivine, bright yellow-green, granular and rough · beryl, emerald's own six-sided prism, striated along its length · malachite, a rounded lump banded in rings of light and dark green | a larger pendant in a double rim |
 | Glasshouse | **Ruby** red | red against all that green and mint, like berries of red glass | a chunky rough ruby · a water-worn ruby pebble · garnet, deep wine red, grown as a ball of twelve rhombs · rhodonite, opaque pink seamed with black · zircon, an orange-red four-sided prism pointed at both ends | a ruby crystal in corundum's six-sided plate, stood up to show its face |
 | Sky Road | **Aquamarine** turquoise | the complement of all that amber — a splinter of clear sky | a long leaning double-terminated aquamarine shard · a squat sky diamond · turquoise, sky blue in a web of dark matrix · fluorite, pale sea-green octahedra zoned in rings | a fan of three splinters |
+| Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
+| Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
 
 The natural stones are made the way real ones are bounded: cleaved out of a
 block by flat planes — the faces of a crystal's habit (a sapphire barrel is a
@@ -264,7 +309,17 @@ it; *tall and solid* — go around it. In the Deepwood that's a creek banked wit
 stones (jump it — and since it's water, you can't land on it: drop into it and
 you trip), a fallen tree propped on a boulder and a stump, its hanging moss
 ending on the duck line (slide under it), and giant mossy boulders, one of them
-roped and hung with paper streamers like a shrine stone (go around).
+roped and hung with paper streamers like a shrine stone (go around). In Hell:
+a low basalt ridge, or a lava fissure between crusted lips (jump — you can't
+land in the lava), a charred beam on two basalt posts with embers in its cracks
+(slide), basalt columns and obsidian shards (go around); a fissure across the
+whole road and a long charred beam are the wide ones. In the Gallery of Hours:
+a fallen clock hand or a broken section of dial (jump; a fallen minute hand
+spans the walk), a brass crossbar hung with pendulums whose bobs end on the
+duck line (slide), and grandfather clocks, great hourglasses and clock weights
+(go around). All the Gallery's turning and swinging — hands, gears, the great
+pendulums — is decoration kept off the walk; the obstacles stand still, so a
+jump or a slide is never mistimed by something moving.
 
 ## Run it locally
 
@@ -295,7 +350,7 @@ Append to the URL:
 | Flag | Effect |
 |---|---|
 | `?debug` | FPS, draw calls, triangles, pixel ratio, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
-| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`) |
+| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
@@ -364,9 +419,21 @@ the shorts wrap the hips. The fields are polygonised (marching cubes),
 simplified, and given exact smooth normals from the field; skin weights come
 from which volume "owns" each point of the surface, so the mesh bends where the
 shapes blend. Proportions follow the reference illustration: about six heads
-tall (the head and hair are sculpted in their own space and placed scaled on
-the neck), knee a little under a third of the height, high socks and chunky
+tall (the head and hair are sculpted in their own space and placed scaled,
+seated low on a short neck), the head broad enough — about 0.45 of the padded
+shoulders' width — to hold its own against the puffer, knee a little under a
+third of the height, high socks and chunky
 mid-cut hiking boots with a thick sole and a collar that dips at the front.
+The face is young and broad — full cheeks, a soft jaw that tucks under into
+the neck, a small rounded chin, the eyes sitting low in the head the way a
+child's do — and the puffer's padded stand-up collar, open at the throat over
+the tee, seats the short neck in the jacket. The hair is short and tousled: a
+thin cap over the skull and, over it, clumps laid from the crown down toward
+the hairline in three loose rings, each its own length and lean with its tip
+curling out (seeded, so they're irregular but stable), which breaks the
+outline into an uneven scallop and lets the fringe fall over the forehead in
+points. The eyes are drawn relaxed: big warm-brown irises nearly filling the
+opening, the upper lid lowered a little over them, soft brows resting low.
 Fine linework — quilting seams, laces, the face, trims, the hood's seam — is
 not modelled: each vertex carries a few smooth coordinates and the character
 shader draws those lines crisply at any distance. Shading is one broad, crisp
@@ -415,7 +482,8 @@ puffer's rounded shoulder caps, so the sleeves swing out of the shoulders
 rather than hinging under them), while the head counter-turns and stays
 steady.
 
-**Fabric.** The cape is one continuous piece of red wool: sewn under a soft
+**Fabric.** The cape is one continuous piece of orange wool — light at the
+collar, deepening toward the hem, with a burnt-orange lining: sewn under a soft
 gathered collar (closed at the throat by a little brass toggle, the hood lying
 bunched over it at the nape), draped over the shoulders, open round the arms
 and hanging to the upper calf behind. Its rest drape is built at load the way
@@ -452,7 +520,7 @@ head (behind it slopes up, so it can stream up falling from a jump), and a soft
 wall in front of the chest keeps it from wrapping round to the front.
 
 The GPU draws a smooth Catmull-Rom surface through the particles with exact
-normals (a thin slab: outside, burgundy lining and edges), and the cloth's
+normals (a thin slab: outside, burnt-orange lining and edges), and the cloth's
 curvature, measured per particle and softened, keeps a soft shadow in the
 valleys of its folds and waves under any light. Curls lag and bounce on
 springs and play in the breeze; the hip pouch swings on a pendulum.
@@ -502,7 +570,15 @@ An obstacle spec can also bring companion batches drawn with another material
 (`with: ['creekWater']`), lower its collision top (`top`), skip its contact
 shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
 true })` gives a surface the running-water shader, and ground pattern 6 is the
-forest's long grass (pass the chunk distance as `p0` so it runs on seamlessly).
+forest's long grass, 7 Hell's ash (fissures glowing beyond the road) and 8 the
+Gallery's ivory slabs with their brass clock-tick bezel (for all three, pass the
+chunk distance as `p0` so they run on seamlessly). `b.toon(…, { lava: true })`
+gives a surface the molten-rock material (it lights itself and keeps its colour
+through a drain), and `b.toon(…, { turn: [spinZ, swingX, swingRate, spinY] })`
+turns a prop in the vertex shader — gears and clock hands spinning about their
+face, pendulums swinging from their origin (`p0` offsets the phase). `env.drain`
+makes the world drain of colour once you're in it, and `env.particles2` adds a
+second layer of motes (Hell's falling ash under its rising embers).
 
 `gem` is the world's collectible: a `name`, a `color` (the HUD's little gem),
 its `stones` — each `{ name, weight, tints, parts(), texture }`, `weight`
@@ -521,7 +597,9 @@ matrix), `bands` with `bandFreq`, `wander` and `rings` (`'round'` or
 `'nested'`) in a `second` colour, `opaque`, `rough`, `metal`, `glints` and
 `scale`. Then `motion` (`[turn, bob rate, bob height, nod]`), `look`
 (`[self-lit, glints, facet hue spread, fire]`) and `glow` / `pool` (halo and
-ground-light strength). Pick a colour nothing else in the world is.
+ground-light strength). Pick a colour nothing else in the world is. For stones
+too dark (or pale) to glow in their own colour, `light` gives the halo, the
+light on the road and the motes they leave a colour of their own.
 
 ## Not in yet (on purpose)
 
