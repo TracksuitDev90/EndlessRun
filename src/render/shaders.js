@@ -96,6 +96,14 @@ uniform vec4 uDream2;
 uniform vec4 uDream3;
 uniform vec4 uBloom;
 uniform vec3 uBloomCol[3];
+// The colour drain (a world whose env asks for it, see game.js): x how much,
+// y the radius (from the centre of the screen) it has spread to. gKeep marks
+// what keeps its colour through it (lava, embers, the runner's cape) and
+// gEmit pixels that light themselves (a ground pattern's glowing cracks);
+// the shaders set them before grade().
+uniform vec4 uDrain;
+float gKeep = 0.0;
+float gEmit = 0.0;
 vec3 hueRot(vec3 c, float a) {
   const vec3 k = vec3(0.57735);
   float ca = cos(a);
@@ -128,6 +136,19 @@ vec3 grade(vec3 c, vec4 trip, float dist) {
     h += k * uBloom.y * s * 1.4;
   }
   if (h != 0.0) c = hueRot(c, h);
+  if (uDrain.x > 0.0) {
+    // the world drains to ash: everything but what burns goes to black, grey
+    // and white (a little more contrast, so dark stones and rock still read
+    // against the ash), the drain spreading out from the centre of the screen
+    // behind an inky front
+    float inside = 1.0 - smoothstep(uDrain.y - 0.28, uDrain.y, r);
+    float k = uDrain.x * inside * (1.0 - gKeep);
+    float lg = dot(c, vec3(0.299, 0.587, 0.114));
+    lg = clamp((lg - 0.45) * 1.12 + 0.45, 0.0, 1.2);
+    c = mix(c, vec3(lg), k);
+    float front = uDrain.x * (1.0 - smoothstep(0.0, 0.16, abs(r - uDrain.y + 0.08))) * step(uDrain.y, 1.9);
+    c *= 1.0 - 0.32 * front * (1.0 - gKeep);
+  }
   float vg = smoothstep(0.42, 0.95, r) * uGrade.z;
   return mix(c, c * uVignette, vg);
 }
@@ -155,6 +176,12 @@ uniform vec4 uAnim;
 uniform vec4 uWobble;
 uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
 uniform float uDreamK; // 1 for props that may breathe (see makeToonMaterial)
+#ifdef TURN
+// x spin about the local z axis (rad/s; gears, clock hands), y swing about the
+// local x axis (radians; a pendulum hung from the origin), z swing rate, w
+// spin about the local y axis (rad/s)
+uniform vec4 uTurn;
+#endif
 attribute vec3 fx;
 #ifdef OUTLINE
 uniform float uOutline;
@@ -196,6 +223,15 @@ void main() {
   #ifdef OUTLINE
     vec3 lo = onrm;
   #endif
+  #ifdef KINDS
+    // one batch, several designs (a hall's paintings, the worlds glimpsed
+    // through its doors): each vertex carries its design in uv.x and an
+    // instance shows only its own (aInst.y); the rest collapse off screen
+    if (abs(uv.x - aInst.y) > 0.5) {
+      gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+      return;
+    }
+  #endif
   vec3 pivot = M[3].xyz;
   float aP = uCamPos.z - pivot.z;
   int mode = int(uAnim.x + 0.5);
@@ -210,6 +246,30 @@ void main() {
       lo = rotY(lo, ang);
     #endif
   }
+  #ifdef TURN
+    {
+      float a = uTurn.x * uTime + phase * 6.2831;
+      float c = cos(a), sn = sin(a);
+      lp.xy = vec2(lp.x * c - lp.y * sn, lp.x * sn + lp.y * c);
+      ln.xy = vec2(ln.x * c - ln.y * sn, ln.x * sn + ln.y * c);
+      #ifdef OUTLINE
+        lo.xy = vec2(lo.x * c - lo.y * sn, lo.x * sn + lo.y * c);
+      #endif
+      float b = uTurn.y * sin(uTime * uTurn.z + phase * 6.2831);
+      c = cos(b);
+      sn = sin(b);
+      lp.yz = vec2(lp.y * c - lp.z * sn, lp.y * sn + lp.z * c);
+      ln.yz = vec2(ln.y * c - ln.z * sn, ln.y * sn + ln.z * c);
+      #ifdef OUTLINE
+        lo.yz = vec2(lo.y * c - lo.z * sn, lo.y * sn + lo.z * c);
+      #endif
+      lp = rotY(lp, uTurn.w * uTime + phase);
+      ln = rotY(ln, uTurn.w * uTime + phase);
+      #ifdef OUTLINE
+        lo = rotY(lo, uTurn.w * uTime + phase);
+      #endif
+    }
+  #endif
   if (uFly.x != 0.0) {
     // wings / book covers hinge on the local z axis and beat
     float side = lp.x < 0.0 ? -1.0 : 1.0;
@@ -283,7 +343,7 @@ void main() {
   vNormal = wn;
   vUv = uv;
   #ifdef GROUND
-    #if GROUND == 6
+    #if GROUND >= 6
       vUv.y += phase; // the pattern runs on across chunks (p0 = chunk distance)
     #endif
   #endif
@@ -497,6 +557,79 @@ vec3 groundColor(vec2 p, float dist) {
     c = mix(c, mix(uGroundA, uGroundB, 0.4), far * 0.55);
     float border = smoothstep(3.9, 4.4, abs(p.x));
     return mix(c, uGroundA * 0.85, border);
+  #elif GROUND == 7
+    // (p.y runs on from chunk to chunk, like the forest's grass, so every
+    // period here divides the 4096 m it wraps at)
+    // ash: pale and powdery, mottled in drifts and rippled by the wind, flecked
+    // with cinders, packed a little darker along the road; out beyond it the
+    // crust splits in glowing fissures (which keep their colour, and their
+    // light, when the world drains)
+    float n1 = texture2D(uNoise, p * 0.09375).g;
+    float n2 = texture2D(uNoise, p * 0.40625 + 0.31).g;
+    vec3 c = mix(uGroundA, uGroundB, smoothstep(0.25, 0.75, n1 * 0.7 + n2 * 0.3));
+    float rip = sin(p.y * 1.9635 + n1 * 7.0 + p.x * 0.35) * 0.5 + 0.5;
+    c *= 0.95 + 0.07 * rip * (1.0 - far);
+    vec2 cq = p / 0.53;
+    vec2 cc = floor(cq);
+    float ch = hash12(cc + 5.0);
+    vec2 co = vec2(hash12(cc + 1.3), hash12(cc + 7.7)) * 0.6 + 0.2;
+    float cr = 0.04 + 0.09 * hash12(cc + 2.9);
+    float cfa = fwidth(cq.x) + 0.02;
+    float cf = (1.0 - smoothstep(cr - cfa, cr + cfa, length((fract(cq) - co) * vec2(1.0, 1.0 + hash12(cc + 4.1))))) * step(0.93, ch) * (1.0 - far);
+    c = mix(c, uGroundC, cf * 0.7);
+    // the road: ash packed darker by passing feet, scuffed along the run,
+    // its edges fraying out into the plain
+    float edgeN = (n2 - 0.5) * 0.6 + (n1 - 0.5) * 0.8;
+    float road = 1.0 - smoothstep(3.9, 4.7, abs(p.x) + edgeN);
+    float scuff = texture2D(uNoise, vec2(p.x * 0.6, p.y * 0.046875)).g;
+    c = mix(c, c * (0.7 + 0.12 * scuff), road * (1.0 - far * 0.3));
+    float lip = (1.0 - smoothstep(0.0, 0.5, abs(abs(p.x) + edgeN - 4.5))) * (1.0 - far * 0.6);
+    c = mix(c, uGroundC * 1.2, lip * 0.35);
+    float off = smoothstep(6.0, 8.0, abs(p.x));
+    if (off > 0.0) {
+      float f = texture2D(uNoise, p * 0.0234375).g * 0.75 + texture2D(uNoise, p * 0.0703125 + 0.5).g * 0.25;
+      float line = abs(f - 0.5);
+      float w = fwidth(f) * 1.2 + 0.002;
+      float crack = (1.0 - smoothstep(0.003, 0.003 + w, line)) * off;
+      float halo = (1.0 - smoothstep(0.0, 0.035 + w * 2.0, line)) * off;
+      float pulse = 0.82 + 0.18 * sin(uTime * 1.7 + p.y * 0.19635 + p.x * 0.13);
+      vec3 hot = mix(vec3(0.9, 0.18, 0.03), vec3(1.0, 0.72, 0.22), crack) * pulse;
+      c = mix(c * (1.0 - halo * 0.45), hot, max(crack, halo * 0.35));
+      gKeep = max(crack, halo * 0.6);
+      gEmit = max(crack, halo * 0.5);
+    }
+    return c;
+  #elif GROUND == 8
+    // the gallery floor: long slabs of ivory stone laid to the lanes, faintly
+    // veined, and brass let into it — a bezel of clock ticks down each edge of
+    // the walk (every half metre, a long one every two), and beyond it a
+    // border of darker stone. (p.y runs on from chunk to chunk; every period
+    // divides the 4096 m it wraps at.)
+    vec2 cs = vec2(2.4, 3.2);
+    vec2 q = vec2(p.x + 1.2, p.y) / cs;
+    q.y += mod(floor(q.x), 2.0) * 0.5;
+    vec2 cell = floor(q);
+    float h = hash12(cell + 9.0);
+    vec3 c = mix(uGroundA, uGroundB, 0.25 + h * 0.6);
+    float vein = texture2D(uNoise, p * vec2(0.09375, 0.0390625) + h * 0.37).g;
+    float vw = fwidth(vein) + 0.01;
+    c = mix(c, uGroundC * 1.3, (1.0 - smoothstep(0.0, 0.02 + vw, abs(vein - 0.55))) * 0.3 * (1.0 - far));
+    c = mix(mix(uGroundC, c, 0.55), c, mix(edgeMask(fract(q), cs, 0.022), 1.0, far * 0.8));
+    vec3 brass = vec3(0.8, 0.6, 0.3);
+    float ax = abs(p.x);
+    float aa = fwidth(p.y) * 1.2 + 0.004;
+    float tq = abs(fract(p.y / 0.5) - 0.5) * 0.5;
+    float major = 1.0 - step(0.13, abs(fract(p.y / 2.0) - 0.5));
+    float tickW = mix(0.022, 0.045, major);
+    float tickIn = mix(4.08, 3.9, major);
+    float tick = (1.0 - smoothstep(tickW - aa, tickW + aa, tq)) * step(tickIn, ax) * step(ax, 4.36);
+    float rimA = 1.0 - smoothstep(0.018, 0.018 + aa + fwidth(ax), abs(ax - 3.82));
+    float rimB = 1.0 - smoothstep(0.03, 0.03 + aa + fwidth(ax), abs(ax - 4.42));
+    float metal = max(max(tick, rimA), rimB) * (1.0 - far * 0.7);
+    float border = smoothstep(4.46, 4.52, ax);
+    c = mix(c, mix(uGroundC, uGroundA, 0.3), border);
+    c = mix(c, brass * (0.9 + 0.2 * hash12(cell)), metal);
+    return c;
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -552,7 +685,25 @@ void main() {
       shade *= 1.0 + (smoothstep(0.42, 0.62, dp) - 0.45) * uDapple.x;
     }
   #endif
-  vec3 col = mix(base * shade, base, vFx.y);
+  vec3 col = mix(base * shade, base, max(vFx.y, gEmit));
+  gKeep = max(gKeep, vFx.y);
+
+  #ifdef LAVA
+    // molten rock: dark crust plates drifting on a glowing flow, the seams
+    // between them white-hot, the whole surface throbbing slowly; it lights
+    // itself and keeps its colour when the world drains
+    vec2 lq = vUv * vec2(0.55, 0.32) + vec2(0.0, -uTime * 0.05);
+    float l1 = texture2D(uNoise, lq).g;
+    float l2 = texture2D(uNoise, lq * 2.3 + vec2(0.37, uTime * 0.03)).g;
+    float plate = smoothstep(0.5, 0.62, l1 * 0.65 + l2 * 0.45);
+    float seam = 1.0 - smoothstep(0.0, 0.08, abs(l1 * 0.65 + l2 * 0.45 - 0.48));
+    float throb = 0.85 + 0.15 * sin(uTime * 1.3 + vPos.x * 0.4 + vPos.z * 0.25);
+    vec3 flow = mix(vec3(0.95, 0.24, 0.04), vec3(1.0, 0.56, 0.1), l2) * throb;
+    col = mix(flow, vec3(0.16, 0.07, 0.05), plate * 0.9);
+    col = mix(col, vec3(1.0, 0.88, 0.5), seam * (1.0 - plate) * 0.7);
+    gKeep = 1.0;
+    gEmit = 1.0;
+  #endif
 
   #ifdef WATER
     // running water (local u is downstream): a dark body that takes a wash of
@@ -577,14 +728,14 @@ void main() {
     float fres = 1.0 - abs(dot(n, V));
     float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
     float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y));
-    col += uRim.rgb * (0.45 + 0.55 * base) * rim * (1.0 - vFx.y);
+    col += uRim.rgb * (0.45 + 0.55 * base) * rim * (1.0 - max(vFx.y, gEmit));
   #endif
 
   float g = texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5;
   float wash = texture2D(uNoise, vPos.xz * (1.0 / 64.0)).g - 0.5;
   col *= 1.0 + g * 0.05 + wash * 0.09;
 
-  col = atmos(col, v, dist, vFx.y);
+  col = atmos(col, v, dist, max(vFx.y, gEmit));
   gl_FragColor = vec4(grade(col, uTrip, dist), 1.0);
 }
 `;
@@ -777,6 +928,7 @@ varying float vMat;
 #define P_SOLE 17
 #define P_MIDSOLE 18
 #define P_LACE 19
+#define P_CAPE_HEM 20
 #define P_LINING 21
 #define P_EYE 22
 #define P_IRIS 23
@@ -798,46 +950,62 @@ float band(float d, float halfw) {
 float lines(float x, float halfw) {
   return band(abs(fract(x + 0.5) - 0.5), halfw);
 }
-// The face, drawn on the front of the head like an illustration: almond eyes
-// with a heavy upper lash line, brows, a small smile, a touch of blush.
-// Returns the colour and how much of it ignores the light (the eyes glint).
+// The face, drawn on the front of the head like an illustration: big warm
+// brown eyes under relaxed lids (the upper lid sits a little over the iris, so
+// they read content rather than startled), a heavy upper lash line, soft
+// brows resting low over them, a small easy smile and a touch of blush on the
+// full cheeks. Returns the colour and how much of it ignores the light (the
+// eyes glint).
 vec3 drawFace(vec3 base, vec3 r, inout float unlit) {
   float front = smoothstep(-0.055, -0.08, r.z);
   if (front <= 0.0) return base;
   vec2 f = vec2(abs(r.x), r.y);
   vec3 c = base;
-  vec2 E = vec2(0.036, 1.389);
-  // blush
-  vec2 bq = (f - vec2(0.058, 1.35)) / vec2(0.017, 0.009);
-  c = mix(c, uPal[P_BLUSH], 0.4 * (1.0 - smoothstep(0.6, 1.0, length(bq))) * front);
-  // eye white: an almond, wider than tall, flatter along the upper lid
+  vec2 E = vec2(0.041, 1.38);
+  // blush, round and soft on the cheeks
+  vec2 bq = (f - vec2(0.064, 1.348)) / vec2(0.021, 0.012);
+  c = mix(c, uPal[P_BLUSH], 0.32 * (1.0 - smoothstep(0.4, 1.0, length(bq))) * front);
+  // the eye: an almond whose upper lid is lowered into a gentle curve
   vec2 q = f - E;
-  vec2 qa = vec2(q.x, q.y * (q.y > 0.0 ? 1.15 : 1.0));
-  float dS = (length(qa / vec2(0.0225, 0.0185)) - 1.0) * 0.0185;
-  float sclera = fill(dS) * front;
-  c = mix(c, uPal[P_EYE], sclera);
-  unlit = max(unlit, sclera * 0.4);
-  // iris filling the eye's height, pupil, one catch-light
-  float dI = length(q - vec2(-0.003, -0.001)) - 0.0148;
+  vec2 qa = vec2(q.x, q.y * (q.y > 0.0 ? 1.2 : 1.0));
+  float dA = (length(qa / vec2(0.025, 0.0205)) - 1.0) * 0.0205;
+  // (highest just inside the middle, easing down toward the outer corner:
+  // a kind, unhurried look)
+  float lid = q.y - (0.0128 - 7.0 * (q.x + 0.003) * (q.x + 0.003));
+  float dS = max(dA, lid);
+  float eye = fill(dS) * front;
+  c = mix(c, uPal[P_EYE], eye);
+  unlit = max(unlit, eye * 0.35);
+  // a large iris nearly filling the opening, pupil, two catch-lights
+  vec2 ic = q - vec2(-0.0015, -0.0016);
+  float dI = length(ic) - 0.0168;
   c = mix(c, uPal[P_IRIS], fill(max(dI, dS)) * front);
-  c = mix(c, uPal[P_INK], fill(max(length(q - vec2(-0.003, -0.0015)) - 0.0068, dS)) * front);
-  float hl = fill(length(q - vec2(0.0035, 0.0055)) - 0.0036) * front;
+  c = mix(c, mix(uPal[P_IRIS], uPal[P_INK], 0.45), fill(max(abs(length(ic) - 0.0146) - 0.0014, dS)) * front);
+  c = mix(c, uPal[P_INK], fill(max(length(ic) - 0.0072, dS)) * front);
+  float hl = fill(max(length(q - vec2(0.0042, 0.0042)) - 0.0036, dS)) * front;
+  hl = max(hl, fill(max(length(q - vec2(-0.0062, -0.0068)) - 0.0016, dS)) * front * 0.8);
   c = mix(c, vec3(1.0), hl);
   unlit = max(unlit, hl);
-  // upper lid line, heavier toward the outer corner where it flicks out
-  vec2 lq = qa / vec2(0.0236, 0.0196);
-  float upper = smoothstep(-0.35, 0.05, q.y / 0.0196);
-  float lash = band(length(lq) - 1.0, 0.1 + 0.16 * smoothstep(-0.01, 0.022, q.x)) * upper;
-  float flick = band(q.y - 0.004 - (q.x - 0.02) * 0.45, 0.0018) * step(0.019, q.x) * step(q.x, 0.0275);
+  // the upper lash line along the lowered lid, heavier toward the outer
+  // corner where it flicks out; a faint lower lid
+  float onTop = step(0.0, q.y + 0.004) * step(abs(q.x), 0.0265);
+  float lash = band(lid + 0.0006, 0.0011 + 0.0012 * smoothstep(-0.015, 0.02, q.x)) * onTop * step(dA, 0.0016);
+  float flick = band(q.y - 0.0035 - (q.x - 0.021) * 0.35, 0.0016) * step(0.0205, q.x) * step(q.x, 0.0285);
   c = mix(c, uPal[P_INK], max(lash, flick) * front);
-  // brows
-  vec2 bc = (f - vec2(0.039, 1.408)) / vec2(0.026, 0.02);
-  float brow = band(length(bc) - 1.0, 0.22 - 0.08 * smoothstep(-0.3, 0.9, bc.x)) * step(0.4, bc.y) * step(abs(bc.x), 0.95);
-  c = mix(c, uPal[P_INK], brow * front);
-  // smile
-  vec2 m = r.xy - vec2(0.0, 1.352);
-  float smile = band(length(m) - 0.02, 0.0016) * step(m.y, -0.011) * step(abs(m.x), 0.015);
-  c = mix(c, uPal[P_MOUTH], smile * front);
+  float lower = band(dA, 0.0007) * step(q.y, -0.007) * step(abs(q.x), 0.017);
+  c = mix(c, mix(base, uPal[P_INK], 0.5), lower * front * 0.7);
+  // brows: soft, full and low, resting close over the eyes
+  vec2 bc = f - vec2(0.042, 1.3905);
+  bc.y += 0.08 * bc.x;
+  float br = length(bc * vec2(1.0, 1.35)) - 0.0225;
+  float bw = 0.0027 - 0.0012 * smoothstep(-0.01, 0.024, bc.x);
+  float brow = band(br, bw) * step(0.006, bc.y) * step(-0.019, bc.x) * step(bc.x, 0.024);
+  c = mix(c, mix(uPal[P_INK], uPal[2], 0.35), brow * front);
+  // a small easy smile, its corners just lifting
+  vec2 m = r.xy - vec2(0.0, 1.353);
+  float smile = band(length(m) - 0.019, 0.0017) * step(m.y, -0.012) * step(abs(m.x), 0.0135);
+  float corner = band(length(vec2(abs(m.x) - 0.0148, m.y + 0.0118)) - 0.0028, 0.0011) * step(abs(m.x), 0.0168) * step(0.0128, abs(m.x)) * step(-0.0124, m.y);
+  c = mix(c, uPal[P_MOUTH], max(smile, corner * 0.8) * front);
   return c;
 }
 vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
@@ -882,12 +1050,16 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     // hood and collar: crimson wool; the hood's seam sinks into its middle,
     // and its lining shows where it opens under the collar (x across the
     // hood, y down from its top, z on the hood, w lining)
+    c = mix(c, mix(uPal[10], uPal[P_CAPE_HEM], 0.12), smoothstep(1.2, 1.08, r.y));
     c = mix(c, uPal[P_LINING], d.w);
     c = mix(c, c * 0.84, band(d.x, 0.03) * d.z * step(0.02, d.y));
     c = mix(c, c * 0.7, band(d.y - 0.0045, 0.0013) * d.z);
   } else if (m == 10) {
-    // the cape (u, v across and down; w: the lining side)
-    c = mix(c, uPal[P_LINING], step(0.5, d.w));
+    // the cape (u, v across and down; w: the lining side): light orange at
+    // the collar deepening toward the hem, the lining a burnt orange
+    float v = smoothstep(0.0, 1.0, d.y);
+    c = mix(c, uPal[P_CAPE_HEM], v * (0.75 + 0.25 * v));
+    c = mix(c, mix(uPal[P_LINING], uPal[P_LINING] * 0.78, v), step(0.5, d.w));
   } else if (m == 11) {
     c = mix(c, uPal[P_FLAP], step(0.5, d.x));
   }
@@ -903,6 +1075,7 @@ uniform sampler2D uNoise;
 void main() {
   int m = int(vMat + 0.5);
   float unlit = 0.0;
+  gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   vec3 base = charDetail(m, uPal[m], vRest, vD, unlit);
   vec3 n = normalize(vNormal);
   n = gl_FrontFacing ? n : -n;
@@ -938,7 +1111,9 @@ void main() {
 
 const FS_CHAR_INK = FS_HEAD + CHAR_DETAIL + /* glsl */ `
 void main() {
-  vec3 ink = uPal[int(vMat + 0.5)] * 0.3;
+  int m = int(vMat + 0.5);
+  gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
+  vec3 ink = uPal[m] * 0.3;
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   gl_FragColor = vec4(grade(atmos(ink, v, dist, 0.0), uTrip), 1.0);
@@ -1640,7 +1815,7 @@ export function makeEnvUniforms(env) {
     uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
-    uBeam: v4(), uPool: c(),
+    uBeam: v4(), uPool: c(), uDrain: v4(),
   };
   writeEnvUniforms(u, env);
   return u;
@@ -1691,6 +1866,9 @@ export function writeEnvUniforms(u, env) {
   const bc = color(bm.color);
   u.uBeam.value.set(bc.r, bc.g, bc.b, bm.amount);
   setColor(u.uPool.value, env.pool || '#000000');
+  // a draining world starts in full colour: game.js spreads the drain when you
+  // come through its doorway
+  u.uDrain.value.set(env.drain ? 1 : 0, -1, 0, 0);
 }
 
 // Blend environment uniforms (used for the player, who carries light between worlds).
@@ -1750,6 +1928,12 @@ export function makeToonMaterial(env, o = {}) {
   const defines = {};
   if (o.ground) defines.GROUND = o.ground;
   if (o.water) defines.WATER = '';
+  if (o.lava) defines.LAVA = '';
+  if (o.kinds) defines.KINDS = '';
+  if (o.turn) {
+    defines.TURN = '';
+    uniforms.uTurn = { value: new THREE.Vector4(...o.turn) };
+  }
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -1762,9 +1946,12 @@ export function makeToonMaterial(env, o = {}) {
 
 export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
+  // (the ink hull turns with its prop)
+  const defines = { OUTLINE: '' };
+  for (const k of ['TURN', 'KINDS']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
-    defines: { OUTLINE: '' },
+    defines,
     vertexShader: toon.vertexShader,
     fragmentShader: FS_INK,
     vertexColors: true,

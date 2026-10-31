@@ -3,7 +3,7 @@ import { runner, runnerArrays } from './runner-asset.js';
 import { Cloth } from './cloth.js';
 
 // The runner's look: a young wayfarer in a quilted puffer, cargo shorts and
-// hiking boots under a crimson hooded cape. The body and clothes are sculpted
+// hiking boots under an orange hooded cape. The body and clothes are sculpted
 // offline (tools/runner/build.py) — of the cape, only what sits still at the
 // neck: the gathered collar roll and the hood lying on the upper back. This
 // module holds the palette those surfaces are coloured with, the rig
@@ -16,15 +16,15 @@ import { Cloth } from './cloth.js';
 // colours the character shader draws details with.
 export const COL = {
   1: '#cc8a6c', // face (skin)
-  2: '#4a2e22', // hair
+  2: '#563427', // hair
   3: '#e9b374', // puffer
   4: '#8e7c80', // tee
   5: '#695863', // shorts
   6: '#cc8a6c', // legs (skin)
   7: '#b5835a', // boots
   8: '#cc8a6c', // hands (skin)
-  9: '#c4383c', // hood and collar
-  10: '#c4383c', // cape
+  9: '#f59a3e', // hood and collar
+  10: '#f7a043', // cape at the collar...
   11: '#8a5d3b', // pouch
   12: '#e0b54c', // brass
   13: '#c48a54', // quilting seams
@@ -34,16 +34,17 @@ export const COL = {
   17: '#6b3f2e', // outsole
   18: '#d6b48c', // midsole
   19: '#2f1f18', // laces
-  21: '#8a2733', // lining
-  22: '#f4ece4', // eye whites
-  23: '#4b2a1d', // irises
+  20: '#d4521a', // ...deepening to this at the hem
+  21: '#b8501e', // lining
+  22: '#f6efe8', // eye whites
+  23: '#6a3a1e', // irises (warm brown)
   24: '#24140e', // lash line, brows, pupils
   25: '#7a3428', // mouth
   26: '#de7b66', // blush
   27: '#6e4628', // pouch flap
   28: '#56474f', // shorts hem fold
   29: '#8a6040', // zip
-  30: '#6a4331', // hair highlight
+  30: '#7d5039', // hair highlight
 };
 
 export function palette() {
@@ -176,7 +177,7 @@ export function capeColliders(bindPos) {
   const out = RIG.cloth.filter((c) => c.kind !== 'ell');
   const body = RIG.cloth.filter((c) => c.kind === 'ell');
   const at = (bone, dx, dy, dz) => [bindPos[bone].x + dx, bindPos[bone].y + dy, bindPos[bone].z + dz];
-  out.push({ bone: 'head', kind: 'cap', a: at('head', 0, 0.06, 0.01), b: at('head', 0, 0.12, 0.01), ra: 0.115, rb: 0.115 });
+  out.push({ bone: 'head', kind: 'cap', a: at('head', 0, 0.095, 0.012), b: at('head', 0, 0.15, 0.012), ra: 0.115, rb: 0.115 });
   out.push({ bone: 'neck', kind: 'cap', a: at('neck', 0, -0.01, 0.006), b: at('neck', 0, 0.09, 0.003), ra: 0.05, rb: 0.048 });
   out.push({ bone: 'pouch', kind: 'cap', a: at('pouch', -0.012, -0.04, 0), b: at('pouch', -0.012, -0.09, 0), ra: 0.045, rb: 0.045 });
   for (const L of ['L', 'R']) {

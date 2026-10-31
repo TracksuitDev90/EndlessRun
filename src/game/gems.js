@@ -367,7 +367,10 @@ export class GemField {
     const t = r.float(0, 1);
     const k = r.float(0.93, 1.05);
     const tint = [lerp(a[0], b[0], t) * k, lerp(a[1], b[1], t) * k, lerp(a[2], b[2], t) * k];
-    const g = { d, x, y, world, run, index, kind, crown, tint, taken: 0, items: null };
+    // (a world of dark stones gives them a pale light of their own, or their
+    // halos and motes would vanish)
+    const light = spec.light ? (spec.lightRgb || (spec.lightRgb = rgb(spec.light))) : tint;
+    const g = { d, x, y, world, run, index, kind, crown, tint, light, taken: 0, items: null };
     // each gem turns and bobs a beat behind the one before: the run ripples
     const p0 = run.phase - index * 0.6;
     const pool = Math.max(0.15, 1 - (y - C.ground) / 2.4);
@@ -376,8 +379,8 @@ export class GemField {
     const duck = y < C.ground - 0.1 ? 0.85 : 1;
     g.items = [
       world.put(g, 'gems', x, y, d, { s: (crown ? 1 : r.float(0.92, 1.08)) * duck, c: tint, p0, p1: kind }),
-      world.put(g, 'gemGlow', x, y, d, { s: (spec.halo ?? 1.5) * s, c: tint, p0 }),
-      world.put(g, 'gemPool', x, 0.04, d, { s: 1.7 * s, c: [tint[0] * pool, tint[1] * pool, tint[2] * pool], p0 }),
+      world.put(g, 'gemGlow', x, y, d, { s: (spec.halo ?? 1.5) * s, c: light, p0 }),
+      world.put(g, 'gemPool', x, 0.04, d, { s: 1.7 * s, c: [light[0] * pool, light[1] * pool, light[2] * pool], p0 }),
     ];
     this.gems.push(g);
     this.restUntil = Math.max(this.restUntil, d + v * this.restT);

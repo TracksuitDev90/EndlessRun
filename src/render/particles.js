@@ -6,8 +6,8 @@ import { mulberry32 } from '../core/rng.js';
 // buffer wrapped in the vertex shader — no per-frame CPU work.
 
 export class Particles {
-  constructor(count = 240) {
-    const rnd = mulberry32(99);
+  constructor(count = 240, seed = 99) {
+    const rnd = mulberry32(seed);
     const pos = new Float32Array(count * 3);
     const rand = new Float32Array(count);
     for (let i = 0; i < count; i++) {

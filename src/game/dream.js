@@ -161,13 +161,17 @@ export class Dream {
   }
 
   // Coming through a doorway into world def (lit as env): a bloom of its
-  // colours and a swell racing ahead.
-  doorway(def, env) {
+  // colours and a swell racing ahead. Into a world that drains (Hell) the
+  // bloom is ash and smoke — it bursts into the drain rather than into
+  // colour; out of one (fromDrain), the colour comes back at full strength.
+  doorway(def, env, fromDrain = false) {
     this.rush = 1;
     const R = CONFIG.dream;
-    this.rushAmt = R.rushBase + (1 - R.rushBase) * Math.min(1, this.now.level);
-    this.rushTrip = this.now.trip;
-    bloomColors(def, env, this.bloom);
+    this.rushAmt = fromDrain ? 1 : R.rushBase + (1 - R.rushBase) * Math.min(1, this.now.level);
+    this.rushTrip = env.drain ? 0 : this.now.trip;
+    if (env.drain) {
+      for (let i = 0; i < 3; i++) this.bloom[i].set(env.bloom[i]);
+    } else bloomColors(def, env, this.bloom);
   }
 
   update(dt) {

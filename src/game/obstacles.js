@@ -291,9 +291,17 @@ export class ObstacleField {
 
   // An obstacle's prop plus any companion batches drawn with another
   // material (spec.with), e.g. a creek's water beside its stones.
+  // spec.extras(put, rng, info) can add purely visual companions owned by the
+  // obstacle (the Hall of Doors' books fluttering off a shelf): put(name, x, y,
+  // d, o) places one; info carries the lane x, the distance and the world's
+  // visit (how many times it has come round before).
   putSpec(world, group, spec, x, d, o) {
     world.put(group, spec.name, x, 0, d, o);
     if (spec.with) for (const name of spec.with) world.put(group, name, x, 0, d, o);
+    if (spec.extras) {
+      const seg = this.game.course.segAt(d);
+      spec.extras((name, px, py, pd, po) => world.put(group, name, px, py, pd, po), this.rng, { x, d, visit: seg.world === world ? seg.visit || 0 : 0 });
+    }
   }
 
   placeSwing(world, spec, lane, d, hint) {
