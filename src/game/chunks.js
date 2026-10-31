@@ -109,6 +109,10 @@ export class ChunkStreamer {
     from.put(owner, 'gateFrame', 0, 0, doorD);
     from.put(owner, 'gateLeaf', -g.opening.halfW, 0, leafD, { ry: 0, c: tint, p1: 1, p0: 0 });
     from.put(owner, 'gateLeaf', g.opening.halfW, 0, leafD, { ry: Math.PI, c: tint, p1: -1, p0: 0 });
-    for (const extra of from.def.gateExtras || []) from.put(owner, extra, 0, 0, doorD);
+    // (each extra a batch name, or [name, x, y, dz] to stand it somewhere on the gate)
+    for (const extra of from.def.gateExtras || []) {
+      const [name, x = 0, y = 0, dz = 0] = Array.isArray(extra) ? extra : [extra];
+      from.put(owner, name, x, y, doorD + dz, { p0: 0.37 });
+    }
   }
 }

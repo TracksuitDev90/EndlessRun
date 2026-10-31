@@ -206,8 +206,11 @@ const ATTRS = [
   ['onrm', 3],
 ];
 // Carried through a merge only if some part has them; the others get `fill`.
-// edge: where a gem's facet edges are (see facetEdges in world/gems.js).
-const OPTIONAL = [['edge', 3, 1]];
+// edge: where a gem's facet edges are (see facetEdges in world/gems.js);
+// spA / spB: a lava droplet's launch point and velocity (see SPLASH in the
+// object shader); role: what a vertex is in a part that moves in pieces (an
+// hourglass's sand, see SAND).
+const OPTIONAL = [['edge', 3, 1], ['spA', 4, 0], ['spB', 4, 0], ['role', 1, 0]];
 
 export function merge(parts) {
   const list = parts.flat().filter(Boolean);

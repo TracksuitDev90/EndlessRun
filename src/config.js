@@ -108,7 +108,8 @@ export const CONFIG = {
   // to morph; the colour trip begins at tripFrom; everything is in by full.
   // schedule: the world each effect can first appear in and the world it
   // reaches full strength. lucidChance: odds a deeper world comes up calm.
-  // rushBase: strength of the doorway bloom before the dream deepens it.
+  // rushTime: how long a doorway burst lasts (seconds); rushBase: its
+  // strength before the dream deepens it.
   // reducedMotion scales the shape warps and camera sway when the OS asks for
   // less motion (colour is untouched).
   dream: {
@@ -120,10 +121,19 @@ export const CONFIG = {
       swirl: [8, 16], rings: [9, 17], palette: [10, 18], neon: [11, 18], twist: [12, 19],
     },
     lucidChance: 0.18,
-    rushTime: 1.3,
+    rushTime: 0.65,
     rushBase: 0.75,
     reducedMotion: 0.3,
   },
+
+  // The colour drain (Hell, see game.js). The front is a radius from the
+  // centre of the screen (1 = the corners) inside which the colour still
+  // holds out. Coming in it closes from inFrom down the plughole over inTime
+  // seconds. Going out, the world beyond the doorway shows only a hint of its
+  // colour (hint: how grey it is) until wellFrom of the way through the
+  // run-up (the last ~55 m), then the colour wells back out from outFrom to
+  // outTo as you reach the doorway.
+  drain: { inTime: 1.25, inFrom: 1.12, hint: 0.88, wellFrom: 0.55, outFrom: -0.05, outTo: 1.55 },
 
   // Camera
   camera: { back: 6.6, height: 4.1, lookAhead: 7.5, lookHeight: 0.95, minFov: 52, maxFov: 76, coverHalfWidth: 3.0 },
