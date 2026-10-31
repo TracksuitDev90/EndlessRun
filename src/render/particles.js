@@ -5,6 +5,13 @@ import { mulberry32 } from '../core/rng.js';
 // Ambient motes around the camera (fireflies, dust, petals, embers). A fixed
 // buffer wrapped in the vertex shader — no per-frame CPU work.
 
+const parsed = new WeakMap();
+function colorOf(s) {
+  let c = parsed.get(s);
+  if (!c) parsed.set(s, (c = new THREE.Color(s.color)));
+  return c;
+}
+
 export class Particles {
   constructor(count = 240, seed = 99) {
     const rnd = mulberry32(seed);
@@ -27,12 +34,11 @@ export class Particles {
     this.from = null;
   }
 
-  // Blend appearance between two worlds' particle settings.
+  // Blend appearance between two worlds' particle settings (every frame
+  // while a doorway is in view: each colour is parsed once, not per frame).
   set(a, b, t) {
     const u = this.material.uniforms;
-    this.ca = this.ca || new THREE.Color();
-    this.cb = this.cb || new THREE.Color();
-    u.uColor.value.copy(this.ca.set(a.color)).lerp(this.cb.set(b.color), t);
+    u.uColor.value.copy(colorOf(a)).lerp(colorOf(b), t);
     u.uSize.value = a.size + (b.size - a.size) * t;
     u.uOpacity.value = a.opacity + (b.opacity - a.opacity) * t;
     u.uDrift.value.set(

@@ -211,14 +211,13 @@ export function setColliders(cloth, defs, M, Q) {
       c.cx = _ca.x;
       c.cy = _ca.y;
       c.cz = _ca.z;
-      const axes = [c.ax, c.ay, c.az];
       for (let e = 0; e < 3; e++) {
         _ax.setFromMatrixColumn(T, e).normalize();
         if (Q) _ax.applyQuaternion(Q);
-        _ax.toArray(axes[e]);
+        _ax.toArray(e === 0 ? c.ax : e === 1 ? c.ay : c.az);
         c.r2[e] = 1 / ((d.r[e] + m) * (d.r[e] + m));
       }
-      const R = Math.max(...d.r) + m;
+      const R = Math.max(d.r[0], d.r[1], d.r[2]) + m;
       c.R2 = R * R;
     } else {
       _ca.fromArray(d.a).applyMatrix4(T);

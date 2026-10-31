@@ -2266,9 +2266,14 @@ export function writeEnvUniforms(u, env) {
   u.uDrain.value.set(env.drain ? 1 : 0, DRAIN_NONE, 0, 0);
 }
 
-// Blend environment uniforms (used for the player, who carries light between worlds).
+// Blend environment uniforms (used for the player, who carries light between
+// worlds; every frame while a doorway is in view).
+const envKeys = new WeakMap();
 export function lerpEnvUniforms(out, a, b, t) {
-  for (const key of Object.keys(out)) {
+  let keys = envKeys.get(out);
+  if (!keys) envKeys.set(out, (keys = Object.keys(out)));
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
     const o = out[key].value;
     const va = a[key].value;
     const vb = b[key].value;

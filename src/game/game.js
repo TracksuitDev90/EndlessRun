@@ -545,8 +545,8 @@ export class Game {
 
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);
     // the world is kept true out to where the runner will be in a few seconds
-    const [rs, r0, r1] = CONFIG.dream.read;
-    const read = Math.min(r1, Math.max(r0, CONFIG.camera.back + Math.max(this.speed, CONFIG.speed.start) * rs));
+    const R = CONFIG.dream.read;
+    const read = Math.min(R[2], Math.max(R[1], CONFIG.camera.back + Math.max(this.speed, CONFIG.speed.start) * R[0]));
     shared.uBend.value.set(CONFIG.bend, sway, read, CONFIG.bendStart);
     this.particles.update(this.dist);
     this.particles2.update(this.dist);

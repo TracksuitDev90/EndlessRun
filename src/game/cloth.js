@@ -79,9 +79,24 @@ export class Cloth {
     this.pinA = new Float32Array(cols * 3);
     this.pinB = new Float32Array(cols * 3);
     this.colliders = [];
+    this.prev = []; // ...as they were last frame
+    this.live = []; // ...part way between, this substep
+    this.collidersMoved = false;
     this.colliderCount = 0;
     this.hPrev = STEP;
     this.groundStep = 0;
+    // the substep in progress (see step)
+    this.subH = STEP;
+    this.subKeep = 1;
+    this.subT = 0;
+    this.subU = 1;
+    this.near = [];
+    this.push = new Float64Array(n); // the gusts' pressure on each particle, this substep
+    // the collision pass in progress (see collide)
+    this.cCeil = 0;
+    this.cBack = 0;
+    this.cFront = 0;
+    this.cFloor = 0;
     // gusts grow toward the hem
     this.gustRow = Float32Array.from({ length: rows }, (_, j) => 0.2 + 0.8 * Math.pow(j / (rows - 1), 1.3));
     this.setRest(bind);
@@ -123,6 +138,10 @@ export class Cloth {
     this.cB = Uint16Array.from(B);
     this.cL = Float32Array.from(L);
     this.cK = Float32Array.from(K);
+    // (the same ends as offsets into the position array)
+    this.cA3 = Uint16Array.from(A, (a) => a * 3);
+    this.cB3 = Uint16Array.from(B, (b) => b * 3);
+    this.pinned3 = cols * 3;
 
     // tether every particle to the pin at the top of its column
     this.tether = new Float32Array(n);
@@ -145,9 +164,9 @@ export class Cloth {
   // frame (prev) to where they are now (colliders), so a fast-moving limb
   // sweeps the cloth aside instead of jumping into it.
   setColliderCount(count) {
-    const make = () => ({ ell: false, cx: 0, cy: 0, cz: 0, ax: [0, 0, 0], ay: [0, 0, 0], az: [0, 0, 0], r2: [1, 1, 1], a: [0, 0, 0], b: [0, 0, 0], ra: 0, rb: 0, R2: 0 });
-    this.prev = this.prev || [];
-    this.live = this.live || [];
+    // (doubles from the start, so every collider shares one hidden class
+    // with unboxed number arrays)
+    const make = () => ({ ell: false, cx: 0.5, cy: 0.5, cz: 0.5, ax: [0.5, 0, 0], ay: [0, 0.5, 0], az: [0, 0, 0.5], r2: [1.5, 1.5, 1.5], a: [0.5, 0, 0], b: [0.5, 0, 0], ra: 0.5, rb: 0.5, R2: 0.5 });
     while (this.colliders.length < count) {
       this.colliders.push(make());
       this.prev.push(make());
@@ -159,17 +178,6 @@ export class Cloth {
 
   // Colliders u of the way from last frame's to this frame's.
   blendColliders(u) {
-    const lerp3 = (o, a, b, norm) => {
-      o[0] = a[0] + (b[0] - a[0]) * u;
-      o[1] = a[1] + (b[1] - a[1]) * u;
-      o[2] = a[2] + (b[2] - a[2]) * u;
-      if (norm) {
-        const l = Math.hypot(o[0], o[1], o[2]) || 1;
-        o[0] /= l;
-        o[1] /= l;
-        o[2] /= l;
-      }
-    };
     for (let k = 0; k < this.colliderCount; k++) {
       const a = this.collidersMoved ? this.prev[k] : this.colliders[k];
       const b = this.colliders[k];
@@ -180,15 +188,15 @@ export class Cloth {
       o.cz = a.cz + (b.cz - a.cz) * u;
       o.R2 = b.R2;
       if (b.ell) {
-        lerp3(o.ax, a.ax, b.ax, true);
-        lerp3(o.ay, a.ay, b.ay, true);
-        lerp3(o.az, a.az, b.az, true);
+        lerp3(o.ax, a.ax, b.ax, u, true);
+        lerp3(o.ay, a.ay, b.ay, u, true);
+        lerp3(o.az, a.az, b.az, u, true);
         o.r2[0] = b.r2[0];
         o.r2[1] = b.r2[1];
         o.r2[2] = b.r2[2];
       } else {
-        lerp3(o.a, a.a, b.a, false);
-        lerp3(o.b, a.b, b.b, false);
+        lerp3(o.a, a.a, b.a, u, false);
+        lerp3(o.b, a.b, b.b, u, false);
         o.ra = b.ra;
         o.rb = b.rb;
       }
@@ -202,11 +210,11 @@ export class Cloth {
       a.cx = b.cx;
       a.cy = b.cy;
       a.cz = b.cz;
-      for (const key of ['ax', 'ay', 'az', 'a', 'b']) {
-        a[key][0] = b[key][0];
-        a[key][1] = b[key][1];
-        a[key][2] = b[key][2];
-      }
+      copy3(a.ax, b.ax);
+      copy3(a.ay, b.ay);
+      copy3(a.az, b.az);
+      copy3(a.a, b.a);
+      copy3(a.b, b.b);
     }
     this.collidersMoved = true;
   }
@@ -240,112 +248,206 @@ export class Cloth {
   // (m/s down the cape), gustLen (m), curl (m/s at the free edges), kn, kt
   // (aero gains), damp (1/s), floor, groundV (how fast the ground runs back
   // under the runner), lift (allowed rise above the pins), t }
+  //
+  // (Each phase of a substep is its own small method, called with integers
+  // only: one big function of nested loops kept V8 cycling between tiers
+  // — on-stack replacement in and out every call — so the solver mostly ran
+  // unoptimised, boxing every float it touched. Small hot functions are
+  // optimised once and stay optimised, and allocate nothing.)
   step(dt, f) {
     if (dt <= 0) return;
     const steps = Math.min(8, Math.max(1, Math.ceil(dt / STEP - 0.01)));
     const h = dt / steps;
-    const { cols, rows, n, p, q, nrm, cA, cB, cL, cK } = this;
-    const keep = Math.exp(-(f.damp ?? 0.35) * h);
-    const nc = cA.length;
-    const len = this.length;
+    this.subH = h;
+    this.subKeep = Math.exp(-(f.damp ?? 0.35) * h);
+    const nc = this.cA.length;
     for (let s = 0; s < steps; s++) {
-      const t = f.t - dt + h * (s + 1);
+      this.subT = f.t - dt + h * (s + 1);
       // pins, skin targets and colliders slide from last frame's to this
       // frame's
-      const u = (s + 1) / steps;
-      for (let i = 0; i < cols * 3; i++) {
-        const v = this.pinA[i] + (this.pinB[i] - this.pinA[i]) * u;
-        p[i] = v;
-        q[i] = v;
-      }
-      this.blendColliders(u);
+      this.subU = (s + 1) / steps;
+      this.pins();
+      this.blendColliders(this.subU);
       this.computeNormals();
-      // (velocity over the step that made it: a change of step size neither
-      // adds nor removes energy)
-      const vs = 1 / this.hPrev;
-      const gw = f.gustSpeed / f.gustLen;
-      for (let k = cols; k < n; k++) {
-        const o = k * 3;
-        const j = (k / cols) | 0;
-        const i = k - j * cols;
-        const px = p[o], py = p[o + 1], pz = p[o + 2];
-        const vx = (px - q[o]) * vs, vy = (py - q[o + 1]) * vs, vz = (pz - q[o + 2]) * vs;
-        const nx = nrm[o], ny = nrm[o + 1], nz = nrm[o + 2];
-        const cu = i / (cols - 1);
-        const cv = j / (rows - 1);
-        // gusts: pressure carried down the cape with the air
-        const xi = (cv * len) / f.gustLen - t * gw;
-        let tb = noise2(xi, cu * 1.3 + 3.7) + 0.25 * noise2(xi * 1.7 + 11.3, cu * 2.1 - 5.1);
-        tb *= f.gust * this.gustRow[j];
-        // the free edges catch the air on their own, each side its own way
-        const side = cu < 0.5 ? cu : 1 - cu;
-        if (side < 0.2) {
-          const e = (1 - side / 0.2) * cv;
-          tb += f.curl * e * e * noise2(t * 0.45 + (cu < 0.5 ? 0 : 17.3), cv * 1.4 + (cu < 0.5 ? 40 : 61));
-        }
-        // the body's wake: behind the back the headwind is weaker and draws
-        // in toward the middle, so the cape streams back as a tail rather
-        // than filling like a sail
-        let ax = f.ax, az = f.az;
-        if (pz > 0.05 && az > 0) {
-          const k = Math.exp(-(px * px) / 0.09 - (pz - 0.05) * 1.6);
-          az *= 1 - f.wake * k;
-          ax -= f.draw * az * px * Math.min(1, (pz - 0.05) * 4);
-        }
-        const wx = ax + nx * tb - vx;
-        const wy = f.ay + ny * tb - vy;
-        const wz = az + nz * tb - vz;
-        const wn = wx * nx + wy * ny + wz * nz;
-        const fx = f.kn * wn * nx + f.kt * (wx - wn * nx);
-        const fy = f.kn * wn * ny + f.kt * (wy - wn * ny);
-        const fz = f.kn * wn * nz + f.kt * (wz - wn * nz);
-        q[o] = px;
-        q[o + 1] = py;
-        q[o + 2] = pz;
-        p[o] = px + vx * h * keep + (f.gx + fx) * h * h;
-        p[o + 1] = py + vy * h * keep + (f.gy + fy) * h * h;
-        p[o + 2] = pz + vz * h * keep + (f.gz + fz) * h * h;
-      }
+      this.gusts(f);
+      this.gustsFine(f);
+      this.edgeGusts(f);
+      this.integrate(f);
       this.hPrev = h;
       this.groundStep = (f.groundV || 0) * h;
       for (let it = 0; it < ITERATIONS; it++) {
         // sweep alternately forward and back: Gauss-Seidel converges far
         // faster when corrections can travel both ways along the cloth
-        const back = it & 1;
-        const m = it < 2 ? nc : this.nShort;
-        for (let n2 = 0; n2 < m; n2++) {
-          const c = back ? m - 1 - n2 : n2;
-          const a = cA[c];
-          const b = cB[c];
-          const ia = a * 3;
-          const ib = b * 3;
-          const dx = p[ib] - p[ia], dy = p[ib + 1] - p[ia + 1], dz = p[ib + 2] - p[ia + 2];
-          const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (d < 1e-7) continue;
-          const diff = ((d - cL[c]) / d) * cK[c];
-          if (a < cols) {
-            // pinned end: only the free particle moves
-            p[ib] -= dx * diff;
-            p[ib + 1] -= dy * diff;
-            p[ib + 2] -= dz * diff;
-          } else {
-            const hx = dx * diff * 0.5, hy = dy * diff * 0.5, hz = dz * diff * 0.5;
-            p[ia] += hx;
-            p[ia + 1] += hy;
-            p[ia + 2] += hz;
-            p[ib] -= hx;
-            p[ib + 1] -= hy;
-            p[ib + 2] -= hz;
-          }
-        }
+        if (it & 1) this.solveBack(it < 2 ? nc : this.nShort);
+        else this.solveForward(it < 2 ? nc : this.nShort);
         this.tethers();
-        this.leashes(u);
+        this.leashes(this.subU);
         if (it >= ITERATIONS - 2) this.collide(f.floor, f.lift, it === ITERATIONS - 1 ? 2 : 1);
       }
     }
     this.pinA.set(this.pinB);
     this.skinPrev.set(this.skin);
     this.keepColliders();
+  }
+
+  // The sewn row, part way from last frame's place to this frame's.
+  pins() {
+    const { p, q, pinA, pinB } = this;
+    const u = this.subU;
+    const m = this.cols * 3;
+    for (let i = 0; i < m; i++) {
+      const v = pinA[i] + (pinB[i] - pinA[i]) * u;
+      p[i] = v;
+      q[i] = v;
+    }
+  }
+
+  // Gusts: pressure carried down the cape with the air, per particle.
+  // (Kept apart from integrate so the noise inlines: called across a
+  // function boundary, every float in and out would be boxed on the heap.)
+  gusts(f) {
+    const { cols, rows, n, push } = this;
+    const len = this.length;
+    const t = this.subT;
+    const gw = f.gustSpeed / f.gustLen;
+    const gustLen = f.gustLen;
+    for (let k = cols; k < n; k++) {
+      const j = (k / cols) | 0;
+      const i = k - j * cols;
+      const cu = i / (cols - 1);
+      const cv = j / (rows - 1);
+      const xi = (cv * len) / gustLen - t * gw;
+      push[k] = noise2(xi, cu * 1.3 + 3.7);
+    }
+  }
+
+  // ...plus a finer, fainter layer of them, the whole scaled up toward the hem.
+  gustsFine(f) {
+    const { cols, rows, n, gustRow, push } = this;
+    const len = this.length;
+    const t = this.subT;
+    const gw = f.gustSpeed / f.gustLen;
+    const gustLen = f.gustLen, gust = f.gust;
+    for (let k = cols; k < n; k++) {
+      const j = (k / cols) | 0;
+      const i = k - j * cols;
+      const cu = i / (cols - 1);
+      const cv = j / (rows - 1);
+      const xi = (cv * len) / gustLen - t * gw;
+      push[k] = (push[k] + 0.25 * noise2(xi * 1.7 + 11.3, cu * 2.1 - 5.1)) * (gust * gustRow[j]);
+    }
+  }
+
+  // The free edges catch the air on their own, each side its own way.
+  edgeGusts(f) {
+    const { cols, rows, n, push } = this;
+    const t = this.subT;
+    const curl = f.curl;
+    for (let k = cols; k < n; k++) {
+      const j = (k / cols) | 0;
+      const i = k - j * cols;
+      const cu = i / (cols - 1);
+      const side = cu < 0.5 ? cu : 1 - cu;
+      if (side < 0.2) {
+        const cv = j / (rows - 1);
+        const e = (1 - side / 0.2) * cv;
+        push[k] += curl * e * e * noise2(t * 0.45 + (cu < 0.5 ? 0 : 17.3), cv * 1.4 + (cu < 0.5 ? 40 : 61));
+      }
+    }
+  }
+
+  // Verlet step of every free particle under gravity and the air.
+  integrate(f) {
+    const { cols, n, p, q, nrm, push } = this;
+    const h = this.subH;
+    const keep = this.subKeep;
+    // (velocity over the step that made it: a change of step size neither
+    // adds nor removes energy)
+    const vs = 1 / this.hPrev;
+    const fax = f.ax, fay = f.ay, faz = f.az, wake = f.wake, draw = f.draw;
+    const kn = f.kn, kt = f.kt, gx = f.gx, gy = f.gy, gz = f.gz;
+    for (let k = cols; k < n; k++) {
+      const o = k * 3;
+      const px = p[o], py = p[o + 1], pz = p[o + 2];
+      const vx = (px - q[o]) * vs, vy = (py - q[o + 1]) * vs, vz = (pz - q[o + 2]) * vs;
+      const nx = nrm[o], ny = nrm[o + 1], nz = nrm[o + 2];
+      const tb = push[k];
+      // the body's wake: behind the back the headwind is weaker and draws
+      // in toward the middle, so the cape streams back as a tail rather
+      // than filling like a sail
+      let ax = fax, az = faz;
+      if (pz > 0.05 && az > 0) {
+        const kw = Math.exp(-(px * px) / 0.09 - (pz - 0.05) * 1.6);
+        az *= 1 - wake * kw;
+        ax -= draw * az * px * Math.min(1, (pz - 0.05) * 4);
+      }
+      const wx = ax + nx * tb - vx;
+      const wy = fay + ny * tb - vy;
+      const wz = az + nz * tb - vz;
+      const wn = wx * nx + wy * ny + wz * nz;
+      const fx = kn * wn * nx + kt * (wx - wn * nx);
+      const fy = kn * wn * ny + kt * (wy - wn * ny);
+      const fz = kn * wn * nz + kt * (wz - wn * nz);
+      q[o] = px;
+      q[o + 1] = py;
+      q[o + 2] = pz;
+      p[o] = px + vx * h * keep + (gx + fx) * h * h;
+      p[o + 1] = py + vy * h * keep + (gy + fy) * h * h;
+      p[o + 2] = pz + vz * h * keep + (gz + fz) * h * h;
+    }
+  }
+
+  // One Gauss-Seidel sweep over the first m constraints, forward or back
+  // (the two loops are the same but for their direction).
+  solveForward(m) {
+    const { p, cA3, cB3, cL, cK, pinned3 } = this;
+    for (let c = 0; c < m; c++) {
+      const ia = cA3[c];
+      const ib = cB3[c];
+      const dx = p[ib] - p[ia], dy = p[ib + 1] - p[ia + 1], dz = p[ib + 2] - p[ia + 2];
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d < 1e-7) continue;
+      const diff = ((d - cL[c]) / d) * cK[c];
+      if (ia < pinned3) {
+        // pinned end: only the free particle moves
+        p[ib] -= dx * diff;
+        p[ib + 1] -= dy * diff;
+        p[ib + 2] -= dz * diff;
+      } else {
+        const hx = dx * diff * 0.5, hy = dy * diff * 0.5, hz = dz * diff * 0.5;
+        p[ia] += hx;
+        p[ia + 1] += hy;
+        p[ia + 2] += hz;
+        p[ib] -= hx;
+        p[ib + 1] -= hy;
+        p[ib + 2] -= hz;
+      }
+    }
+  }
+
+  solveBack(m) {
+    const { p, cA3, cB3, cL, cK, pinned3 } = this;
+    for (let c = m - 1; c >= 0; c--) {
+      const ia = cA3[c];
+      const ib = cB3[c];
+      const dx = p[ib] - p[ia], dy = p[ib + 1] - p[ia + 1], dz = p[ib + 2] - p[ia + 2];
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d < 1e-7) continue;
+      const diff = ((d - cL[c]) / d) * cK[c];
+      if (ia < pinned3) {
+        p[ib] -= dx * diff;
+        p[ib + 1] -= dy * diff;
+        p[ib + 2] -= dz * diff;
+      } else {
+        const hx = dx * diff * 0.5, hy = dy * diff * 0.5, hz = dz * diff * 0.5;
+        p[ia] += hx;
+        p[ia + 1] += hy;
+        p[ia + 2] += hz;
+        p[ib] -= hx;
+        p[ib + 1] -= hy;
+        p[ib + 2] -= hz;
+      }
+    }
   }
 
   // Keep each row within its leash of where the body would carry it.
@@ -388,7 +490,7 @@ export class Cloth {
   }
 
   collide(floor, lift, passes) {
-    const { cols, n, p, q } = this;
+    const { cols, n, p } = this;
     // A ceiling over the collar keeps the cloth from flipping forward over
     // the shoulders or the head (firm in front of the neck; behind, it slopes
     // up and gives, so the cape can still stream up and back falling from a
@@ -399,10 +501,20 @@ export class Cloth {
       ceil += p[i * 3 + 1];
       back += p[i * 3 + 2];
     }
-    ceil = ceil / cols + lift;
-    const front = back / cols - 0.15;
-    back = back / cols + 0.06;
-    // broad phase: only colliders whose bounds reach the cloth's box
+    this.cCeil = ceil / cols + lift;
+    this.cFront = back / cols - 0.15;
+    this.cBack = back / cols + 0.06;
+    this.cFloor = floor;
+    this.gatherNear();
+    // (the owner lists limbs before the body's own volumes; the last time
+    // round, a particle that touched anything is checked again, so cloth a
+    // swinging arm presses inward still ends up outside the torso)
+    for (let k = cols; k < n; k++) this.collideAt(k, passes);
+  }
+
+  // Broad phase: only colliders whose bounds reach the cloth's box.
+  gatherNear() {
+    const { cols, n, p } = this;
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let o = cols * 3; o < n * 3; o += 3) {
       const x = p[o], y = p[o + 1], z = p[o + 2];
@@ -413,97 +525,99 @@ export class Cloth {
       if (z < z0) z0 = z;
       if (z > z1) z1 = z;
     }
-    const near = this.near || (this.near = []);
+    const near = this.near;
     near.length = 0;
     for (let ci = 0; ci < this.colliderCount; ci++) {
       const c = this.live[ci];
       const R = Math.sqrt(c.R2);
       if (c.cx + R > x0 && c.cx - R < x1 && c.cy + R > y0 && c.cy - R < y1 && c.cz + R > z0 && c.cz - R < z1) near.push(c);
     }
-    // (the owner lists limbs before the body's own volumes; the last time
-    // round, a particle that touched anything is checked again, so cloth a
-    // swinging arm presses inward still ends up outside the torso)
+  }
+
+  // Push particle k out of every nearby collider, under the ceiling, behind
+  // the front wall and off the ground.
+  collideAt(k, passes) {
+    const { cols, p, q, near } = this;
     const count = near.length;
-    for (let k = cols; k < n; k++) {
-      const o = k * 3;
-      let x = p[o], y = p[o + 1], z = p[o + 2];
-      for (let pass = 0, hit = true; pass < passes && hit; pass++) {
-        hit = false;
-        for (let ci = 0; ci < count; ci++) {
-          const c = near[ci];
-          const ox = x - c.cx, oy = y - c.cy, oz = z - c.cz;
-          if (ox * ox + oy * oy + oz * oz > c.R2) continue;
-          if (c.ell) {
-            // out along the surface's normal (one Newton step on the
-            // ellipsoid's field), not along its radius: where two volumes
-            // meet, neither pushes the cloth into the other
-            const X = c.ax, Y = c.ay, Z = c.az, r2 = c.r2;
-            const u = ox * X[0] + oy * X[1] + oz * X[2];
-            const v = ox * Y[0] + oy * Y[1] + oz * Y[2];
-            const w = ox * Z[0] + oy * Z[1] + oz * Z[2];
-            const e2 = u * u * r2[0] + v * v * r2[1] + w * w * r2[2];
-            if (e2 < 1) {
-              const gu = u * r2[0], gv = v * r2[1], gw = w * r2[2];
-              const gx = X[0] * gu + Y[0] * gv + Z[0] * gw;
-              const gy = X[1] * gu + Y[1] * gv + Z[1] * gw;
-              const gz = X[2] * gu + Y[2] * gv + Z[2] * gw;
-              const g = Math.sqrt(gx * gx + gy * gy + gz * gz);
-              if (g < 1e-6) {
-                y += 1 / Math.sqrt(r2[1]);
-                hit = true;
-                continue;
-              }
+    const o = k * 3;
+    let x = p[o], y = p[o + 1], z = p[o + 2];
+    for (let pass = 0, hit = true; pass < passes && hit; pass++) {
+      hit = false;
+      for (let ci = 0; ci < count; ci++) {
+        const c = near[ci];
+        const ox = x - c.cx, oy = y - c.cy, oz = z - c.cz;
+        if (ox * ox + oy * oy + oz * oz > c.R2) continue;
+        if (c.ell) {
+          // out along the surface's normal (one Newton step on the
+          // ellipsoid's field), not along its radius: where two volumes
+          // meet, neither pushes the cloth into the other
+          const X = c.ax, Y = c.ay, Z = c.az, r2 = c.r2;
+          const u = ox * X[0] + oy * X[1] + oz * X[2];
+          const v = ox * Y[0] + oy * Y[1] + oz * Y[2];
+          const w = ox * Z[0] + oy * Z[1] + oz * Z[2];
+          const e2 = u * u * r2[0] + v * v * r2[1] + w * w * r2[2];
+          if (e2 < 1) {
+            const gu = u * r2[0], gv = v * r2[1], gw = w * r2[2];
+            const gx = X[0] * gu + Y[0] * gv + Z[0] * gw;
+            const gy = X[1] * gu + Y[1] * gv + Z[1] * gw;
+            const gz = X[2] * gu + Y[2] * gv + Z[2] * gw;
+            const g = Math.sqrt(gx * gx + gy * gy + gz * gz);
+            if (g < 1e-6) {
+              y += 1 / Math.sqrt(r2[1]);
               hit = true;
-              const e = Math.sqrt(e2);
-              const d = ((1 - e) * e) / g + 1e-4;
-              x += (gx / g) * d;
-              y += (gy / g) * d;
-              z += (gz / g) * d;
+              continue;
             }
-          } else {
-            const A = c.a, Bv = c.b;
-            const abx = Bv[0] - A[0], aby = Bv[1] - A[1], abz = Bv[2] - A[2];
-            const dx = x - A[0], dy = y - A[1], dz = z - A[2];
-            const l2 = abx * abx + aby * aby + abz * abz;
-            let tt = l2 > 1e-9 ? (dx * abx + dy * aby + dz * abz) / l2 : 0;
-            tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
-            const rx = dx - abx * tt, ry = dy - aby * tt, rz = dz - abz * tt;
-            const r = c.ra + (c.rb - c.ra) * tt;
-            const d2 = rx * rx + ry * ry + rz * rz;
-            if (d2 < r * r) {
-              hit = true;
-              const d = Math.sqrt(d2) || 1e-6;
-              const s = r / d - 1;
-              x += rx * s;
-              y += ry * s;
-              z += rz * s;
-              // a limb shoves the cloth aside without flinging it: most of
-              // the push is not kept as speed (it slides off a swinging arm)
-              q[o] += rx * s * 0.7;
-              q[o + 1] += ry * s * 0.7;
-              q[o + 2] += rz * s * 0.7;
-            }
+            hit = true;
+            const e = Math.sqrt(e2);
+            const d = ((1 - e) * e) / g + 1e-4;
+            x += (gx / g) * d;
+            y += (gy / g) * d;
+            z += (gz / g) * d;
+          }
+        } else {
+          const A = c.a, Bv = c.b;
+          const abx = Bv[0] - A[0], aby = Bv[1] - A[1], abz = Bv[2] - A[2];
+          const dx = x - A[0], dy = y - A[1], dz = z - A[2];
+          const l2 = abx * abx + aby * aby + abz * abz;
+          let tt = l2 > 1e-9 ? (dx * abx + dy * aby + dz * abz) / l2 : 0;
+          tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+          const rx = dx - abx * tt, ry = dy - aby * tt, rz = dz - abz * tt;
+          const r = c.ra + (c.rb - c.ra) * tt;
+          const d2 = rx * rx + ry * ry + rz * rz;
+          if (d2 < r * r) {
+            hit = true;
+            const d = Math.sqrt(d2) || 1e-6;
+            const s = r / d - 1;
+            x += rx * s;
+            y += ry * s;
+            z += rz * s;
+            // a limb shoves the cloth aside without flinging it: most of
+            // the push is not kept as speed (it slides off a swinging arm)
+            q[o] += rx * s * 0.7;
+            q[o + 1] += ry * s * 0.7;
+            q[o + 2] += rz * s * 0.7;
           }
         }
       }
-      if (z > back) {
-        const top = ceil + (z - back) * 1.4;
-        if (y > top) y = top + (y - top) * 0.3;
-      } else if (y > ceil) {
-        y = ceil;
-      }
-      if (z < front && k >= cols * 3) z = front + (z - front) * 0.3;
-      if (y < floor) {
-        y = floor;
-        // ground friction: the ground runs back under the runner, so it drags
-        // the cloth back along with it (velocity eased toward the ground's)
-        q[o] += (x - q[o]) * 0.4;
-        q[o + 2] += (z - this.groundStep - q[o + 2]) * 0.4;
-      }
-      p[o] = x;
-      p[o + 1] = y;
-      p[o + 2] = z;
     }
+    const ceil = this.cCeil, back = this.cBack, front = this.cFront, floor = this.cFloor;
+    if (z > back) {
+      const top = ceil + (z - back) * 1.4;
+      if (y > top) y = top + (y - top) * 0.3;
+    } else if (y > ceil) {
+      y = ceil;
+    }
+    if (z < front && k >= cols * 3) z = front + (z - front) * 0.3;
+    if (y < floor) {
+      y = floor;
+      // ground friction: the ground runs back under the runner, so it drags
+      // the cloth back along with it (velocity eased toward the ground's)
+      q[o] += (x - q[o]) * 0.4;
+      q[o + 2] += (z - this.groundStep - q[o + 2]) * 0.4;
+    }
+    p[o] = x;
+    p[o + 1] = y;
+    p[o + 2] = z;
   }
 
   computeNormals() {
@@ -531,3 +645,21 @@ export class Cloth {
 }
 
 const _v = new THREE.Vector3();
+
+function lerp3(o, a, b, u, norm) {
+  o[0] = a[0] + (b[0] - a[0]) * u;
+  o[1] = a[1] + (b[1] - a[1]) * u;
+  o[2] = a[2] + (b[2] - a[2]) * u;
+  if (norm) {
+    const l = Math.hypot(o[0], o[1], o[2]) || 1;
+    o[0] /= l;
+    o[1] /= l;
+    o[2] /= l;
+  }
+}
+
+function copy3(o, a) {
+  o[0] = a[0];
+  o[1] = a[1];
+  o[2] = a[2];
+}
