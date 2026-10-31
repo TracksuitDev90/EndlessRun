@@ -12,10 +12,23 @@ import { CONFIG } from '../config.js';
 // the columns — and beyond it all a pale, heavenly sky of cloud with more
 // dials and gears adrift in it.
 //
+// And time has come unstuck here. Every clock hand — on the great clocks up
+// on the arches, the dials adrift in the sky, the grandfather clocks, the
+// pocket watches dangling on their chains, the clock over the doorway out —
+// turns at its own pace, either way round; and the further you run, the
+// wonkier they get (env.wonk, see game.js): lurching back and forth, racing,
+// stalling, ticking in jerks — on purpose, to set you off balance. The
+// hourglasses work: their sand runs from the top bulb into the bottom one,
+// and when it has run through, the whole glass turns over on its waist and
+// starts again. Pocket watches dangle out of the sky, hourglasses drift and
+// turn over among the clouds, armillary spheres turn on pedestals in the
+// bays, and little cogs drift by high over the walk.
+//
 // All the turning and swinging is decoration, and kept off the walk: the
-// obstacles stand still (their pendulum bobs only sway along the run, rising
-// as they swing, never dipping below the duck line), so timing a jump or a
-// slide is never in doubt.
+// obstacles stay where they stand (their pendulum bobs only sway along the
+// run, rising as they swing, never dipping below the duck line; an
+// hourglass in your way turns over within its own footprint), so timing a
+// jump or a slide is never in doubt.
 //
 // Obstacles: a fallen clock hand or a broken section of dial to jump (a
 // fallen minute hand across the whole walk), a brass crossbar hung with
@@ -35,7 +48,8 @@ const C = {
   wood: '#6e4326',
   woodHi: '#9a6438',
   glass: '#dfeaf2',
-  sand: '#e8c98a',
+  sand: '#d49a48',
+  sandHi: '#e6b664',
   sky: '#dfe9f6',
 };
 
@@ -232,9 +246,91 @@ function bigPendulumParts(len = 6.5) {
   ];
 }
 
-// Gears and dials adrift in the sky.
-function floatDialParts() {
-  return [...dialParts({ r: 3.2, depth: 0.4 }), ...handParts({ len: 2.3, w: 0.16, z: 0.3 }), ...handParts({ len: 1.6, w: 0.2, z: 0.36 }).map((g) => g.rotateZ(-2.1))];
+// A pocket watch dangling out of the sky on a long chain: its case, dial,
+// crown and bow (its hands are their own turning batches).
+function watchParts() {
+  const parts = [
+    part(P.cyl(1.15, 1.15, 0.36, 28), null, { rx: Math.PI / 2, grad: [C.brassLo, C.brassHi, -1.1, 1.1] }),
+    part(P.torus(1.12, 0.09, 6, 28), C.brassHi, { z: 0.16 }),
+    ...dialParts({ r: 0.98, depth: 0.1, seg: 24 }).map((g) => g.translate(0, 0, 0.16)),
+    part(P.cyl(0.16, 0.16, 0.3, 12), C.brass, { y: 1.28 }),
+    part(P.torus(0.3, 0.06, 6, 16), C.brassHi, { y: 1.62 }),
+  ];
+  for (let i = 0; i < 26; i++) parts.push(part(P.torus(0.1, 0.03, 4, 8), C.brassLo, { y: 1.98 + i * 0.26, ry: (i % 2) * Math.PI / 2, outline: 0.4 }));
+  parts.push(part(P.box(0.05, 30, 0.05), C.brassLo, { y: 8.6 + 15, outline: 0 }));
+  return parts;
+}
+
+// An armillary sphere on an ivory pedestal: the pedestal, its stand and the
+// fixed meridian ring; the rings inside (their own batch) turn and tumble.
+function pedestalParts(top = 1.1) {
+  return [
+    part(P.box(0.9, 0.2, 0.9), C.ivoryLo, { y: 0.1 }),
+    part(P.lathe([[0.3, 0], [0.26, 0.15], [0.18, 0.3], [0.2, top - 0.25], [0.32, top - 0.1], [0.36, top]], 10), null, { y: 0.2, grad: [C.ivoryLo, C.ivoryHi, 0.2, top] }),
+    part(P.cyl(0.42, 0.42, 0.08, 12), C.brass, { y: top + 0.24 }),
+  ];
+}
+function armillaryStandParts() {
+  return [
+    ...pedestalParts(),
+    part(P.cyl(0.04, 0.06, 0.5, 6), C.brassLo, { y: 1.55 }),
+    part(P.torus(0.62, 0.035, 5, 28), C.brass, { y: 2.3, ry: Math.PI / 2 }),
+  ];
+}
+function armillaryRingParts() {
+  return [
+    part(P.torus(0.54, 0.03, 5, 26), C.brassHi, { rx: Math.PI / 2 }),
+    part(P.torus(0.5, 0.028, 5, 26), C.brass, { rx: Math.PI / 2 - 0.41, ry: 0.3 }),
+    part(P.torus(0.46, 0.028, 5, 24), C.brassHi, {}),
+    part(P.cyl(0.012, 0.012, 1.3, 4), C.brassLo, { outline: 0 }),
+    part(P.sphere(0.13, 12, 9), '#e8d0a0', {}),
+  ];
+}
+
+// --- hourglasses that work (see SAND in the shaders) ----------------------------------
+// A wooden plate top and bottom on four brass rods, the glass (its own batch:
+// the glass material), and the sand: a pile resting in the top bulb, a
+// stream, a mound in the bottom one. Everything but the sand is the same
+// turned upside down, so when it turns over it's back where it began.
+const HG_H = 3.0;
+const HG_WAIST = HG_H / 2;
+const HG_FLOOR = 0.26;
+const BULB = [[0.06, 0], [0.55, 0.25], [0.66, 0.6], [0.4, 1.0], [0.07, 1.26]];
+function role(g, k) {
+  g.setAttribute('role', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(k), 1));
+  return g;
+}
+function hourglassParts() {
+  const parts = [];
+  for (const y of [0.12, HG_H - 0.12]) parts.push(part(P.cyl(0.95, 0.95, 0.24, 6), null, { y, grad: [C.wood, C.woodHi, y - 0.12, y + 0.12] }));
+  for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    parts.push(part(P.cyl(0.055, 0.055, HG_H - 0.24, 8), C.brass, { x: x * 0.57, y: HG_H / 2, z: z * 0.57 }));
+    for (const y of [0.3, HG_H - 0.3]) parts.push(part(P.sphere(0.09, 8, 6), C.brassHi, { x: x * 0.57, y, z: z * 0.57 }));
+  }
+  // the sand above, resting in the funnel of the top bulb down to the neck
+  parts.push(role(part(P.lathe([[0, HG_WAIST], [0.06, HG_WAIST], [0.36, 1.76], [0.56, 2.08], [0.32, 2.05], [0, 2.02]], 14), C.sand, { outline: 0.6 }), 1));
+  // the mound below, on the floor of the bottom bulb
+  parts.push(role(part(P.lathe([[0, HG_FLOOR], [0.05, HG_FLOOR], [0.47, 0.5], [0.57, 0.76], [0.38, 0.9], [0, 0.98]], 14), C.sand, { outline: 0.6 }), 2));
+  // the stream (0..1 along y, laid between the two in the shader)
+  parts.push(role(part(P.cyl(0.028, 0.028, 1, 5, 1, true), C.sandHi, { y: 0.5, outline: 0 }), 3));
+  return parts;
+}
+function hourglassGlassParts() {
+  return [
+    part(P.lathe(BULB, 16), '#ffffff', { y: 0.24, outline: 0 }),
+    part(P.lathe(BULB, 16), '#ffffff', { y: HG_H - 0.24, rx: Math.PI, outline: 0 }),
+  ];
+}
+
+// The hands of a grandfather clock standing at (x, d) turned by ry, put at the
+// centre of its dial (2.7 m up, 0.37 m out from its centre, plus dz).
+function gfHands(ry, dz) {
+  return (put, rng, { x, d }) => {
+    const o = { ry, p0: rng.float(0, 1) };
+    const hx = x + Math.sin(ry) * 0.37;
+    const hd = d + dz - Math.cos(ry) * 0.37;
+    put('gfHands', hx, 2.7, hd, o);
+  };
 }
 
 // --- obstacles ------------------------------------------------------------------------
@@ -303,23 +399,10 @@ function crossbarBobs(half) {
   return merge(parts);
 }
 
-// W · An hourglass taller than you, sand running.
-function hourglassGeo() {
-  const parts = [];
-  const H = 3.0;
-  for (const y of [0.12, H - 0.12]) parts.push(part(P.cyl(0.95, 0.95, 0.24, 6), null, { y, grad: [C.wood, C.woodHi, y - 0.12, y + 0.12] }));
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + 0.5;
-    parts.push(part(P.cyl(0.06, 0.06, H - 0.24, 8), C.brass, { x: Math.cos(a) * 0.8, y: H / 2, z: Math.sin(a) * 0.8 }));
-  }
-  const bulb = [[0.06, 0], [0.55, 0.25], [0.66, 0.6], [0.4, 1.0], [0.07, 1.28]];
-  parts.push(part(P.lathe(bulb.map(([r, y]) => [r, y]), 14), C.glass, { y: 0.24 }));
-  parts.push(part(P.lathe(bulb.map(([r, y]) => [r, y]), 14), C.glass, { y: H - 0.24, rx: Math.PI }));
-  parts.push(part(P.lathe([[0, 0], [0.5, 0], [0.55, 0.25], [0.3, 0.5], [0, 0.55]], 14), C.sand, { y: 0.26 }));
-  parts.push(part(P.lathe([[0, 0], [0.3, 0.1], [0.45, 0.32], [0, 0.32]], 14), C.sand, { y: H - 0.9 }));
-  parts.push(part(P.cyl(0.02, 0.02, 0.9, 6), C.sand, { y: 1.3, outline: 0 }));
-  return merge(parts).translate(0, 0, -0.8);
-}
+// W · An hourglass taller than you, sand running (and turning over in its
+// own footprint when it has run through; the glass is a batch of its own).
+const hourglassGeo = () => merge(hourglassParts()).translate(0, 0, -0.8);
+const hourglassGlassGeo = () => merge(hourglassGlassParts()).translate(0, 0, -0.8);
 
 // W · A great clock weight standing on the floor, its chain running up out of sight.
 function weightGeo() {
@@ -356,6 +439,8 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   env: {
+    // how unstuck time is as you come in, and by the doorway out (see game.js)
+    wonk: [0.15, 1.6],
     sky: ['#9ec2ec', '#fff4dc', '#f0e2c8'],
     bloom: ['#ffe2a0', '#cfe0ff', '#ffffff'],
     sun: { dir: [0.2, 0.55, -1], glow: '#fff0c8', disc: '#ffffff', size: 0.05 },
@@ -409,20 +494,44 @@ export default {
   ],
 
   build(b) {
+    // every hand turns at its own pace, either way round, and wonkier the
+    // further you run (wonky: see WONKY in the shaders)
+    // (a clock's two hands are one batch: the minute hand, then the hour hand
+    // marked with role 1, which turns at its own, slower pace)
+    const hands = (name, [len, w, z], [hLen, hW, hZ], o) => {
+      const hour = merge(handParts({ len: hLen, w: hW, z: hZ }));
+      hour.setAttribute('role', new THREE.BufferAttribute(new Float32Array(hour.attributes.position.count).fill(1), 1));
+      b.toon(name, merge([...handParts({ len, w, z }), hour]), { ink: 0.03, wonky: true, ...o, turn: [-0.6, 0, 0, 0] });
+    };
+    const SKY = { anim: 'liftFar', wobble: [0, 0.8, 0.25, 0] };
+    const WATCH = { anim: 'liftFar', wobble: [0, 0.6, 0.4, 0] };
+    const HG = (z, period) => [period, HG_WAIST, z, HG_WAIST - HG_FLOOR];
+
     b.ground('ground', groundStrip(14, 16, '#ffffff', 8), 8);
     b.toon('bay', bayGeo(), { cap: 72, anim: 'rise', ink: 0.05 });
     b.toon('bracket', merge([part(P.box(0.9, 0.9, 1.6), C.ivoryLo, { y: 0.45 }), part(P.cyl(0.6, 0.7, 0.3, 12), C.brass, { y: 1.0 })]), { cap: 24, anim: 'pop', ink: 0.04 });
     b.toon('wallClock', merge(dialParts({ r: 2.6, depth: 0.4 })), { cap: 24, anim: 'pop', ink: 0.05 });
-    // hands: the minute hand sweeps round, the hour hand creeps
-    b.toon('handM', merge(handParts({ len: 2.1, w: 0.14, z: 0.32 })), { cap: 24, anim: 'pop', ink: 0.03, turn: [-0.35, 0, 0, 0] });
-    b.toon('handH', merge(handParts({ len: 1.4, w: 0.19, z: 0.4 })), { cap: 24, anim: 'pop', ink: 0.03, turn: [-0.03, 0, 0, 0] });
+    hands('hands', [2.1, 0.14, 0.32], [1.4, 0.19, 0.4], { cap: 24, anim: 'pop' });
     b.toon('gear', merge(gearParts({ r: 3.2, teeth: 22, t: 0.4 })), { cap: 24, anim: 'lift', ink: 0.05, turn: [0.12, 0, 0, 0] });
     b.toon('gearB', merge(gearParts({ r: 2.0, teeth: 14, t: 0.36, color: C.brassLo, hi: C.brass })), { cap: 24, anim: 'lift', ink: 0.05, turn: [-0.2, 0, 0, 0] });
     b.toon('grandfather', merge(grandfatherParts(true)), { cap: 40, anim: 'pop', ink: 0.045 });
+    hands('gfHands', [0.3, 0.03, 0.03], [0.2, 0.04, 0.05], { cap: 64, anim: 'pop', ink: 0.015 });
     b.toon('pendulum', merge(bigPendulumParts(6.2)), { cap: 20, anim: 'pop', ink: 0.04, turn: [0, 0.28, 1.4, 0] });
-    b.toon('cloud', merge(cloudParts({ r: 3, lo: '#e2e8f4', hi: '#ffffff' })), { cap: 120, anim: 'lift', wobble: [0, 0.5, 0.3, 0], ink: 0.04 });
-    b.toon('skyDial', merge(floatDialParts()), { cap: 24, anim: 'liftFar', wobble: [0, 0.8, 0.25, 0], ink: 0.05 });
-    b.toon('skyGear', merge(gearParts({ r: 5, teeth: 28, t: 0.5 })), { cap: 24, anim: 'liftFar', ink: 0.05, turn: [0.06, 0, 0, 0] });
+    b.toon('armillary', merge(armillaryStandParts()), { cap: 24, anim: 'pop', ink: 0.04 });
+    b.toon('armillaryRings', merge(armillaryRingParts()), { cap: 24, anim: 'pop', ink: 0.025, turn: [0.35, 0, 0, 0.22] });
+    b.toon('pedestal', merge(pedestalParts()), { cap: 24, anim: 'pop', ink: 0.04 });
+    b.toon('hourglassSmall', merge(hourglassParts()), { cap: 24, anim: 'pop', ink: 0.03, sand: HG(0, 7) });
+    b.glass('hourglassSmallGlass', merge(hourglassGlassParts()), { cap: 24, anim: 'pop', sand: HG(0, 7) });
+    b.toon('cloud', merge(cloudParts({ r: 3, lo: '#e2e8f4', hi: '#ffffff' })), { cap: 140, anim: 'lift', wobble: [0, 0.5, 0.3, 0], ink: 0.04 });
+    b.toon('skyDial', merge(dialParts({ r: 3.2, depth: 0.4 })), { cap: 40, ink: 0.05, ...SKY });
+    hands('skyHands', [2.3, 0.16, 0.3], [1.6, 0.2, 0.36], { cap: 40, ...SKY });
+    b.toon('skyGear', merge(gearParts({ r: 5, teeth: 28, t: 0.5 })), { cap: 32, anim: 'liftFar', ink: 0.05, turn: [0.06, 0, 0, 0] });
+    b.toon('skyHourglass', merge(hourglassParts()), { cap: 16, ink: 0.04, sand: HG(0, 9), ...SKY });
+    b.glass('skyHourglassGlass', merge(hourglassGlassParts()), { cap: 16, sand: HG(0, 9), ...SKY });
+    b.toon('watch', merge(watchParts()), { cap: 24, ink: 0.04, ...WATCH });
+    hands('watchHands', [0.8, 0.07, 0.27], [0.55, 0.09, 0.31], { cap: 24, ...WATCH });
+    // little cogs drifting high over the walk
+    b.toon('cog', merge(gearParts({ r: 0.7, teeth: 10, t: 0.18, spokes: 4 })), { cap: 40, anim: 'liftFar', ink: 0.03, turn: [0.5, 0.3, 0.4, 0.15], fly: [0, 0, 0.9, 0.22] });
     b.glow('glow', { cap: 40, anim: 'pop' });
     b.shadow('shadow', { cap: 120, anim: 'pop' });
 
@@ -434,20 +543,27 @@ export default {
     b.toon('crossbarWide', crossbarGeo(4.15), { cap: 10, anim: 'popEarly', ink: 0.04 });
     b.toon('crossbarWideBobs', crossbarBobs(4.15).translate(0, CONFIG.duckLine + 1.35, 0), { cap: 10, anim: 'popEarly', ink: 0.035 });
     b.toon('clockW', merge(grandfatherParts(true)).translate(0, 0, -0.35), { cap: 24, anim: 'popEarly', ink: 0.045 });
-    b.toon('hourglass', hourglassGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    b.toon('hourglass', hourglassGeo(), { cap: 24, anim: 'popEarly', ink: 0.04, sand: HG(-0.8, 6) });
+    b.glass('hourglassGlass', hourglassGlassGeo(), { cap: 24, anim: 'popEarly', sand: HG(-0.8, 6) });
     b.toon('weight', weightGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
 
     b.toon('gateFrame', gateGeo(OPENING, GATE_DEPTH), { cap: 2, stencil: false, ink: 0.06 });
-    b.toon('gateHandM', merge(handParts({ len: 2.4, w: 0.16, z: 0 })).translate(0, gateTop(OPENING) + 3.3, GATE_DEPTH / 2 + 0.36), { cap: 2, stencil: false, ink: 0.03 });
+    hands('gateHands', [2.4, 0.16, 0.08], [1.6, 0.22, 0.16], { cap: 2, stencil: false });
     b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff', knob: C.brassHi })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
-  gateExtras: ['gateHandM'],
+  // (the hands of the clock over the doorway out, at its centre)
+  gateExtras: [['gateHands', 0, gateTop(OPENING) + 3.3, -(GATE_DEPTH / 2 + 0.25)]],
 
   obstacles: {
     L: [{ name: 'fallenHand', len: 0.6 }, { name: 'dialSection', len: 0.45 }],
     H: [{ name: 'crossbar', with: ['crossbarBobs'], len: 0.5 }],
-    W: [{ name: 'clockW', len: 1.0 }, { name: 'hourglass', len: 1.6 }, { name: 'weight', len: 1.3 }],
+    W: [
+      // (its dial's hands turning, like every other clock's)
+      { name: 'clockW', len: 1.0, extras: gfHands(0, 0.35) },
+      { name: 'hourglass', with: ['hourglassGlass'], len: 1.6 },
+      { name: 'weight', len: 1.3 },
+    ],
     LW: { name: 'fallenMinute', len: 0.6 },
     HW: { name: 'crossbarWide', with: ['crossbarWideBobs'], len: 0.5 },
   },
@@ -455,14 +571,35 @@ export default {
   chunk(ctx) {
     const { rng } = ctx;
     ctx.put('ground', 0, 0, 0, { p0: ctx.d0 % 4096 });
+    const put = (name, x, y, z, o) => ctx.put(name, x, y, z, o);
     for (const s of [-1, 1]) {
       const ry = s < 0 ? 0 : Math.PI;
       // the colonnade: a bay every 8 m (each arch reaching back to the next column)
       for (const z of [4, 12]) ctx.put('bay', s * WALL_X, 0, z, { ry });
-      // in the bays: a grandfather clock, or a great pendulum swinging along the run
+      // in the bays: a grandfather clock, a great pendulum swinging along the
+      // run, or a pedestal with an hourglass or an armillary sphere on it
       const bay = (ctx.index * 2 + (s > 0 ? 1 : 0)) % 5;
-      if (bay === 1 || bay === 3) ctx.put('grandfather', s * (WALL_X - 1.1), 0, 8 + rng.float(-1.5, 1.5), { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2 });
-      else if (bay === 0) ctx.put('pendulum', s * (WALL_X + 0.2), 11.2, 8, { ry: 0, p0: rng.float(0, 1) });
+      const face = s < 0 ? Math.PI / 2 : -Math.PI / 2;
+      if (bay === 1 || bay === 3) {
+        const gx = s * (WALL_X - 1.1);
+        const gz = 8 + rng.float(-1.5, 1.5);
+        ctx.put('grandfather', gx, 0, gz, { ry: face });
+        gfHands(face, 0)(put, rng, { x: gx, d: gz });
+      } else if (bay === 0) ctx.put('pendulum', s * (WALL_X + 0.2), 11.2, 8, { ry: 0, p0: rng.float(0, 1) });
+      else {
+        const px = s * (WALL_X - 1.0);
+        const pz = 8 + rng.float(-1, 1);
+        if (rng.chance(0.5)) {
+          const o = { ry: rng.float(0, 6.28), p0: rng.float(0, 1) };
+          ctx.put('armillary', px, 0, pz, o);
+          ctx.put('armillaryRings', px, 2.3, pz, o);
+        } else {
+          const o = { ry: face, p0: rng.float(0, 6.28), s: 0.42 };
+          ctx.put('pedestal', px, 0, pz, { ry: face });
+          ctx.put('hourglassSmall', px, 1.4, pz, o);
+          ctx.put('hourglassSmallGlass', px, 1.4, pz, o);
+        }
+      }
       // a great clock up on the cornice, every other chunk on alternating sides
       if ((ctx.index + (s > 0 ? 1 : 0)) % 2 === 0) {
         const y = 15.6;
@@ -470,19 +607,43 @@ export default {
         const o = { ry: s < 0 ? Math.PI / 2 - 0.75 : -Math.PI / 2 + 0.75, p0: rng.float(0, 1) };
         ctx.put('wallClock', s * WALL_X, y, 8, o);
         ctx.put('bracket', s * WALL_X, 12.3, 8, {});
-        ctx.put('handM', s * WALL_X, y, 8, { ...o, p0: rng.float(0, 1) });
-        ctx.put('handH', s * WALL_X, y, 8, { ...o, p0: rng.float(0, 1) });
+        ctx.put('hands', s * WALL_X, y, 8, { ...o, p0: rng.float(0, 1) });
       }
       // great gears half sunk behind the balustrade
-      if (rng.chance(0.4)) ctx.put(rng.chance(0.5) ? 'gear' : 'gearB', s * rng.float(9, 12), rng.float(0.5, 2.5), rng.float(0, 16), { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1), s: rng.float(0.8, 1.3) });
-      // the heavenly sky beyond: clouds, and dials and gears adrift
-      if (rng.chance(0.7)) {
+      if (rng.chance(0.45)) ctx.put(rng.chance(0.5) ? 'gear' : 'gearB', s * rng.float(9, 12), rng.float(0.5, 2.5), rng.float(0, 16), { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1), s: rng.float(0.8, 1.3) });
+      // the heavenly sky beyond: clouds, and dials, gears and hourglasses adrift
+      if (rng.chance(0.75)) {
         ctx.put('cloud', s * rng.float(16, 70), rng.float(-6, 10), rng.float(0, 16), { s: rng.float(0.8, 2.2), ry: rng.float(0, 6.28) });
       }
-      if (rng.chance(0.14)) ctx.put('skyDial', s * rng.float(22, 60), rng.float(8, 26), rng.float(0, 16), { s: rng.float(1, 2.2), ry: s * rng.float(-1.2, -0.4) });
-      if (rng.chance(0.14)) ctx.put('skyGear', s * rng.float(24, 70), rng.float(6, 30), rng.float(0, 16), { s: rng.float(0.8, 2), ry: s * rng.float(-1.3, -0.3), p0: rng.float(0, 1) });
+      if (rng.chance(0.28)) {
+        const o = { s: rng.float(0.9, 2), ry: s * rng.float(-1.2, -0.4), p0: rng.float(0, 1) };
+        const x = s * rng.float(16, 55);
+        const y = rng.float(7, 24);
+        const z = rng.float(0, 16);
+        ctx.put('skyDial', x, y, z, o);
+        ctx.put('skyHands', x, y, z, o);
+      }
+      if (rng.chance(0.2)) ctx.put('skyGear', s * rng.float(20, 70), rng.float(6, 30), rng.float(0, 16), { s: rng.float(0.8, 2), ry: s * rng.float(-1.3, -0.3), p0: rng.float(0, 1) });
+      if (rng.chance(0.1)) {
+        const o = { s: rng.float(1.4, 2.6), ry: rng.float(0, 6.28), p0: rng.float(0, 6.28) };
+        const x = s * rng.float(15, 45);
+        const y = rng.float(5, 18);
+        const z = rng.float(0, 16);
+        ctx.put('skyHourglass', x, y, z, o);
+        ctx.put('skyHourglassGlass', x, y, z, o);
+      }
+      // a pocket watch dangling out of the sky on its chain
+      if (rng.chance(0.16)) {
+        const o = { s: rng.float(0.9, 1.5), ry: s < 0 ? rng.float(0.3, 1.1) : -rng.float(0.3, 1.1), p0: rng.float(0, 1) };
+        const x = s * rng.float(9, 22);
+        const y = rng.float(9, 15);
+        const z = rng.float(0, 16);
+        ctx.put('watch', x, y, z, o);
+        ctx.put('watchHands', x, y, z, o);
+      }
       // later laps: the midnight dials glow
       if (ctx.visit >= 2 && (ctx.index + (s > 0 ? 1 : 0)) % 2 === 0) ctx.put('glow', s * (WALL_X - 0.5), 15.6, 8, { s: 7, c: [0.6, 0.7, 1] });
     }
+    if (rng.chance(0.3)) ctx.put('cog', rng.float(-4, 4), rng.float(9.5, 13), rng.float(0, 16), { s: rng.float(0.7, 1.4), p0: rng.float(0, 6.28) });
   },
 };

@@ -23,9 +23,10 @@ import { shared } from '../render/shaders.js';
 // and the breathing in the object vertex shader), so the stretch of road the
 // player is actually reading — and every obstacle on it — is always true.
 //
-// Coming through a doorway sends a bloom of the new world's own colours out
-// from the centre of the screen (and a swell racing down the road); as the
-// trip takes over, the bloom turns to rainbow.
+// Coming through a doorway sends a burst of the new world's own colours out
+// from the centre of the screen and off its edges in a fraction of a second
+// (and a swell racing down the road); as the trip takes over, the burst turns
+// to rainbow.
 
 // [name, amount at full strength, cap, weight when picking, part of the
 // colour trip]; when each one joins and how long it takes to grow is
@@ -136,6 +137,7 @@ export class Dream {
     this.now = blank();
     this.rush = 0;
     this.rushAmt = 0;
+    this.swellAmt = 0;
     this.rushTrip = 0;
     this.motion = 1;
     this.bloom = [new THREE.Color(), new THREE.Color(), new THREE.Color()];
@@ -160,28 +162,29 @@ export class Dream {
     this.now.level = a.level + (b.level - a.level) * t;
   }
 
-  // Coming through a doorway into world def (lit as env): a bloom of its
-  // colours and a swell racing ahead. Into a world that drains (Hell) the
-  // bloom is ash and smoke — it bursts into the drain rather than into
-  // colour; out of one (fromDrain), the colour comes back at full strength.
+  // Coming through a doorway into world def (lit as env): a burst of its
+  // colours and a swell racing ahead. Into a world that drains (Hell) there's
+  // no colour to burst — its colour is sapped away instead (see game.js), and
+  // only the swell runs; out of one (fromDrain), the colour has just welled
+  // back, and a lighter burst rides out over it.
   doorway(def, env, fromDrain = false) {
     this.rush = 1;
     const R = CONFIG.dream;
-    this.rushAmt = fromDrain ? 1 : R.rushBase + (1 - R.rushBase) * Math.min(1, this.now.level);
+    const amt = R.rushBase + (1 - R.rushBase) * Math.min(1, this.now.level);
+    this.rushAmt = env.drain ? 0 : fromDrain ? amt * 0.7 : amt;
+    this.swellAmt = Math.max(amt, 0.8);
     this.rushTrip = env.drain ? 0 : this.now.trip;
-    if (env.drain) {
-      for (let i = 0; i < 3; i++) this.bloom[i].set(env.bloom[i]);
-    } else bloomColors(def, env, this.bloom);
+    bloomColors(def, env, this.bloom);
   }
 
   update(dt) {
     this.rush = Math.max(0, this.rush - dt / CONFIG.dream.rushTime);
     const n = this.now;
     const m = this.motion;
-    const rush = this.rush * this.rush * (3 - 2 * this.rush) * this.rushAmt;
+    const ease = this.rush * this.rush * (3 - 2 * this.rush);
     shared.uDream.value.set(n.twist * m, n.waves * m, n.melt * m, n.breathe * m);
-    shared.uDream2.value.set(n.rings, n.swirl, n.neon, rush * Math.max(m, 0.5));
-    shared.uDream3.value.set(n.hue, n.sat, 1 - this.rush, rush * m);
+    shared.uDream2.value.set(n.rings, n.swirl, n.neon, ease * this.rushAmt * Math.max(m, 0.5));
+    shared.uDream3.value.set(n.hue, n.sat, 1 - this.rush, ease * this.swellAmt * m);
     // the bloom: the new world's colours, turning to rainbow as the trip deepens
     shared.uBloom.value.set(1 - 0.75 * this.rushTrip, this.rushTrip, 0, 0);
     for (let i = 0; i < 3; i++) shared.uBloomCol.value[i].copy(this.bloom[i]);

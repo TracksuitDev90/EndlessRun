@@ -1,3 +1,4 @@
+import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   P, part, merge, mix,
   cloudParts, wallDoorParts, gateFrameParts, gateLeafParts, gateTop,
@@ -6,7 +7,7 @@ import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.
 import { crystal, stepCut, octagon, bezelParts, nugget, hexPrism, FACE } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
-import { paintingsGeo, glimpsesGeo, Deck, PAINTING_COUNT, GLIMPSE_COUNT } from './hall-art.js';
+import { paintingsGeo, Deck, PAINTING_COUNT } from './hall-art.js';
 
 // IV · The Hall of Doors — a coral corridor with a checkerboard floor,
 // open to the sky, lined with doors of every color. Nested door frames
@@ -17,12 +18,13 @@ import { paintingsGeo, glimpsesGeo, Deck, PAINTING_COUNT, GLIMPSE_COUNT } from '
 //
 // Nine different paintings hang between the doors, dealt from a shuffled
 // deck so no two neighbours match and no run of them repeats. Now and then a
-// door stands ajar: a little under half of those open onto a glimpse of some
-// other world (the sea floor, a snowy night, the desert, deep space, an
-// autumn wood, islands in a pink sky) — scenery only, never a way in — and
-// the rest just spill a coloured glow. And books flutter up off the shelves
-// and stacks in the way: rarely at first, more each time the hall comes round
-// (they're only decoration: nothing to hit, nothing in the lanes).
+// door stands ajar on nothing but light — each in its own colour, a hint of
+// some other world beyond (sea teal, forest green, night blue, ember red,
+// sunlit gold, rose, violet, ice) that you never see and never reach — the
+// light pouring over the threshold and pooling on the floor. And books
+// flutter up off the shelves and stacks in the way: rarely at first, more
+// each time the hall comes round (they're only decoration: nothing to hit,
+// nothing in the lanes).
 
 const C = {
   wall: '#e27b5e',
@@ -39,10 +41,15 @@ const C = {
 };
 const DOOR_TINTS = ['#2fa59a', '#e8b13a', '#3456b8', '#8fd6b6', '#8a4a8a', '#c8402e', '#7fb8e0', '#f08a5d', '#4a8a5a', '#f2d06b'];
 const BOOKS = ['#c8402e', '#3456b8', '#e8b13a', '#2fa59a', '#f6ecd4', '#8a4a8a', '#4a8a5a', '#f08a5d'];
-// the glow spilling from doors that open on nothing you can see
-const GLOWS = [[1, 0.78, 0.45], [1, 0.62, 0.56], [0.6, 0.84, 1], [0.8, 0.7, 1], [1, 0.9, 0.6], [0.66, 1, 0.8]];
+// the light spilling from a door left ajar: a colour for each world it
+// might open on — sea teal, forest green, night blue, ember red, sunlit gold,
+// rose, violet, ice — dealt like the paintings, so neighbours never match
+const GLOWS = [
+  [0.22, 0.9, 0.88], [0.42, 1, 0.42], [0.4, 0.5, 1], [1, 0.36, 0.18],
+  [1, 0.8, 0.3], [1, 0.48, 0.72], [0.74, 0.42, 1], [0.72, 0.94, 1],
+];
 const paintings = new Deck(PAINTING_COUNT);
-const glimpses = new Deck(GLIMPSE_COUNT);
+const glows = new Deck(GLOWS.length);
 
 // Books flying up off a shelf or a stack (obstacle spec extras): purely for
 // show, above head height, a little past the obstacle so its own outline
@@ -162,19 +169,47 @@ function hallWallsGeo() {
 }
 
 function openDoorGeo() {
-  // Ajar door spilling warm light from the room beyond.
+  // A door standing open on light: just its frame here (the light, and the
+  // door swung back into the room beyond, are their own batch, doorLightGeo).
   const w = 1.5;
   const h = 3.1;
-  const parts = [
+  return merge([
     part(P.box(0.18, h + 0.18, 0.26), C.cream, { x: -w / 2 - 0.09, y: (h + 0.18) / 2 }),
     part(P.box(0.18, h + 0.18, 0.26), C.cream, { x: w / 2 + 0.09, y: (h + 0.18) / 2 }),
     part(P.box(w + 0.36, 0.18, 0.26), C.cream, { y: h + 0.09 }),
-  ];
-  // (what shows through it — a glow or another world — is its own batch)
-  // leaf hinged on the right jamb, swung ~63° out into the hall
-  const a = 1.1;
-  parts.push(part(P.box(w, h, 0.12), '#ffffff', { x: w / 2 - (w / 2) * Math.cos(a), y: h / 2, z: 0.06 + (w / 2) * Math.sin(a), ry: a, tint: 1 }));
-  return merge(parts);
+    part(P.box(w + 0.2, 0.05, 0.3), C.creamDark, { y: 0.025, z: 0.05 }),
+  ]);
+}
+
+// The light in an open door (tinted per door): the doorway full of it,
+// brightest low down where it pours over the threshold, and the door itself
+// swung back into the room beyond — its dark shape cut out against the
+// light, a bright edge where the light catches it. (Flat on the wall: from
+// down the hall a door swung out would hide the light.)
+function doorLightGeo() {
+  const leaf = new THREE.Shape();
+  leaf.moveTo(0.75, 0);
+  leaf.lineTo(0.75, 3.1);
+  leaf.lineTo(0.3, 2.84);
+  leaf.lineTo(0.3, 0.18);
+  leaf.closePath();
+  return merge([
+    part(P.box(1.5, 3.1, 0.05, 1, 4, 1), null, { y: 1.55, z: -0.06, emit: 1, tint: 1, outline: 0, grad: ['#ffffff', '#6e6a7a', 0.1, 3.1] }),
+    part(new THREE.ShapeGeometry(leaf), [0.24, 0.24, 0.3], { z: -0.02, emit: 1, tint: 1, outline: 0 }),
+    part(P.box(0.035, 2.64, 0.01), '#ffffff', { x: 0.3, y: 1.51, z: -0.012, emit: 1, tint: 0.35, outline: 0 }),
+  ]);
+}
+
+// The light pouring out of an open door into the hall: a soft volume (an
+// additive beam, tinted per door) the shape of the doorway where it leaves
+// it, spreading as it comes out.
+function doorShaftGeo() {
+  const len = 2.5;
+  const g = new THREE.CylinderGeometry(0.66, 1.05, len, 16, 1, true);
+  g.scale(1, 1, 2.1);
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 1.5, len / 2 - 0.05);
+  return merge([part(g, '#ffffff', { tint: 1, outline: 0 })]);
 }
 
 function sconceGeo() {
@@ -388,6 +423,8 @@ export default {
     shadowDecal: [0.5, 0.43, 0.58],
     cast: [-0.62, 0.37],
     glowGain: 0.7,
+    // (the light pouring out of the open doors)
+    beam: { color: '#ffffff', amount: 0.28 },
     particles: { color: '#fff1d0', size: 1.7, drift: [0.05, 0.08, 0], opacity: 0.7 },
   },
 
@@ -434,9 +471,8 @@ export default {
     b.toon('door', merge(wallDoorParts({ w: 1.5, h: 3.1, depth: 0.2 })), { cap: 200, anim: 'pop' });
     b.toon('openDoor', openDoorGeo(), { cap: 60, anim: 'pop' });
     b.toon('painting', paintingsGeo(), { cap: 120, anim: 'pop', kinds: true, ink: 0 });
-    b.toon('glimpse', glimpsesGeo(), { cap: 40, anim: 'pop', kinds: true, ink: 0 });
-    // (brightest low down, where the light spills over the threshold)
-    b.toon('doorPane', merge([part(P.box(1.5, 3.1, 0.05, 1, 4, 1), null, { y: 1.55, z: -0.06, emit: 1, tint: 1, outline: 0, grad: ['#ffffff', '#8e8a9a', 0.2, 3.1] })]), { cap: 40, anim: 'pop', ink: 0 });
+    b.toon('doorPane', doorLightGeo(), { cap: 48, anim: 'pop', ink: 0 });
+    b.beam('doorShaft', doorShaftGeo(), { cap: 48, anim: 'pop' });
     // books off the shelves: some flutter fast and close, some glide in wide loops
     b.toon('shelfBook', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [1.1, 11, 0.45, 0.95], ink: 0.035 });
     b.toon('shelfBookB', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [0.65, 5.5, 1.1, 0.42], ink: 0.035 });
@@ -493,18 +529,16 @@ export default {
           if (dz > 15.5) continue;
           const x = s * (WALL_X - 0.08);
           const tint = rng.pick(DOOR_TINTS);
-          if (rng.chance(0.2)) {
-            // an open door: about 45% show a glimpse of another world, the
-            // rest a coloured glow (decided as it's placed, and kept)
+          if (rng.chance(0.24)) {
+            // a door ajar on nothing but coloured light, a hint of some other
+            // world beyond it: the light in the doorway, a glow round it and
+            // more of it pooled on the floor in front
+            const g = GLOWS[glows.deal(rng)];
             ctx.put('openDoor', x, 0, dz, { ry, c: tint });
-            if (rng.chance(0.45)) {
-              ctx.put('glimpse', x, 0, dz, { ry, p1: glimpses.deal(rng) });
-              ctx.put('glow', s * (WALL_X - 1.2), 1.6, dz, { s: 2.6, c: [0.85, 0.85, 0.9] });
-            } else {
-              const g = rng.pick(GLOWS);
-              ctx.put('doorPane', x, 0, dz, { ry, c: g });
-              ctx.put('glow', s * (WALL_X - 1.2), 1.6, dz, { s: 3.4, c: g });
-            }
+            ctx.put('doorPane', x, 0, dz, { ry, c: g });
+            ctx.put('doorShaft', x, 0, dz, { ry, c: g });
+            ctx.put('glow', s * (WALL_X - 0.9), 1.7, dz, { s: 3.0, c: [g[0] * 0.75, g[1] * 0.75, g[2] * 0.75] });
+            ctx.put('glow', s * (WALL_X - 1.3), 0.25, dz, { s: 2.6, c: [g[0] * 0.5, g[1] * 0.5, g[2] * 0.5] });
           } else {
             ctx.put('door', x, 0, dz, { ry, c: tint });
           }

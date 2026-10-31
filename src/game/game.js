@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { CONFIG } from '../config.js';
-import { shared, copyEnvUniforms, lerpEnvUniforms } from '../render/shaders.js';
+import { shared, copyEnvUniforms, lerpEnvUniforms, DRAIN_NONE, DRAIN_ALL } from '../render/shaders.js';
 import { Particles } from '../render/particles.js';
 import { World } from '../world/world.js';
 import { WORLD_DEFS } from '../world/index.js';
@@ -116,7 +116,7 @@ export class Game {
     this.ui.setGemColor(this.current.def.gem?.color);
 
     this.player.reset();
-    this.startDrain(this.current, 2.4);
+    this.startDrain(this.current, 'settle');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
 
@@ -316,25 +316,71 @@ export class Game {
 
   // --- the colour drain ---------------------------------------------------------
   // A world whose env asks for it (Hell) is seen through its doorway in full
-  // colour; come through and the colour drains out of it, spreading from the
-  // centre of the screen, leaving black, grey and white — only what burns
-  // (and the runner's cape) keeps its colour. Leaving, the next world is in
-  // full colour through the doorway, and the runner's own colour comes back
-  // as they run up to it (the env blend carries the drain).
-  startDrain(world, at = 0) {
-    this.drainWorld = world.def.env.drain ? world : null;
-    this.drainR = at;
-    if (this.drainWorld) world.u.uDrain.value.set(1, at, 0, 0);
+  // colour; come through and its colour is sapped away down a plughole in the
+  // middle of the screen, the front closing in on it in spiral arms, leaving
+  // black, grey and white — only what burns (and the runner's cape) keeps its
+  // colour. Leaving, it runs backwards: the world beyond the doorway out is
+  // grey too, until, on the last stretch of the run-up, its colour wells up
+  // out of the middle of the doorway and spirals out to fill it, sweeping
+  // over the runner (see updateDoor).
+  // mode: 'in' sap it away, 'settle' just set where it ends up.
+  startDrain(world, mode) {
+    const u = world.u.uDrain.value;
+    const drains = !!world.def.env.drain;
+    this.drainWorld = null;
+    if (mode !== 'in' || !drains) {
+      u.set(drains ? 1 : 0, drains ? DRAIN_ALL : DRAIN_NONE, 0, 0);
+      return;
+    }
+    this.drainWorld = world;
+    this.drainT = 0;
+    u.set(1, CONFIG.drain.inFrom, 1, 1);
   }
 
   updateDrain(dt) {
     const w = this.drainWorld;
     if (!w) return;
-    this.drainR = Math.min(2.4, this.drainR + dt * (0.35 + this.drainR * 1.1));
-    w.u.uDrain.value.y = this.drainR;
-    // the runner drains with it (until the run-up to the doorway out blends it back)
-    if (w === this.current && !this.portal.active) this.player.u.uDrain.value.copy(w.u.uDrain.value);
-    if (this.drainR >= 2.4) this.drainWorld = null;
+    const D = CONFIG.drain;
+    const u = w.u.uDrain.value;
+    this.drainT = Math.min(1, this.drainT + dt / D.inTime);
+    // slow to start, then sucked away faster and faster down the hole
+    u.y = D.inFrom + (DRAIN_ALL - D.inFrom) * Math.pow(this.drainT, 1.35);
+    if (this.drainT >= 1) this.startDrain(w, 'settle');
+    // the runner drains with it
+    if (w === this.current && !this.portal.active) this.player.u.uDrain.value.copy(u);
+  }
+
+  // Out of a drained world (t: 0..1 over the run-up to the doorway): the world
+  // beyond stays grey (but for a hint of its colour) until the last stretch,
+  // then its colour wells up out of the middle of the doorway — by then
+  // filling the screen — and spirals out to the edges, the runner's with it.
+  wellUp(t) {
+    const D = CONFIG.drain;
+    const w = smooth01(D.wellFrom, 1, t);
+    const live = w > 0 && w < 1 ? 1 : 0;
+    const y = w > 0 ? D.outFrom + (D.outTo - D.outFrom) * Math.pow(w, 1.25) : DRAIN_ALL;
+    this.next.u.uDrain.value.set(w > 0 ? 1 : D.hint, y, -1, live);
+    this.player.u.uDrain.value.set(1, y, -1, live);
+  }
+
+  // --- time coming unstuck ------------------------------------------------------
+  // A world whose env asks for it (env.wonk: [at the start, by the end], the
+  // Gallery of Hours) has its clock hands spin wonkier and wonkier the
+  // further you run through it — and a little wonkier each time it comes
+  // round. Seen through a doorway, it's as calm as it starts.
+  wonkOf(world, seg, t) {
+    const w = world.def.env.wonk;
+    if (!w) return 0;
+    return Math.min(2.2, w[0] + (w[1] - w[0]) * t + 0.3 * (seg?.visit || 0));
+  }
+
+  updateWonk() {
+    const seg = this.course.segAt(this.dist);
+    if (seg.world === this.current) {
+      const t = Math.min(1, Math.max(0, (this.dist - seg.start) / Math.max(1, seg.end - seg.start)));
+      this.current.u.uWonk.value = this.wonkOf(this.current, seg, t);
+    }
+    if (this.next && this.door) this.next.u.uWonk.value = this.wonkOf(this.next, this.door.seg, 0);
   }
 
   // --- doorways ---------------------------------------------------------------
@@ -348,7 +394,7 @@ export class Game {
       if (b && b.from.world === this.current && b.d - this.dist < CONFIG.viewAhead + 24) {
         this.next = b.to.world;
         this.next.applyVisit(b.to.visit);
-        this.next.u.uDrain.value.set(this.next.def.env.drain ? 1 : 0, -1, 0, 0);
+        this.next.u.uDrain.value.set(this.next.def.env.drain ? 1 : 0, DRAIN_NONE, 0, 0);
         this.door = { d: b.d, quadD: b.d + this.current.def.gate.depth / 2, seg: b.to };
         this.portal.setShape(this.current.def.gate);
         this.portal.setTrip(this.current.u.uTrip.value);
@@ -362,6 +408,7 @@ export class Game {
       this.portal.place(-(door.quadD - this.origin));
       const t = smooth01(55, 0, door.quadD - this.dist);
       lerpEnvUniforms(this.player.u, this.current.u, this.next.u, t);
+      if (this.current.def.env.drain && !this.next.def.env.drain) this.wellUp(t);
       this.setParticles(this.current.env, this.next.env, t);
       this.dream.set(this.course.prevOf(door.seg)?.dream ?? door.seg.dream, door.seg.dream, t);
       if (this.camDist() >= door.quadD - 0.45) this.crossDoor();
@@ -382,6 +429,7 @@ export class Game {
     this.current.setStencil(false);
     this.sceneMain.add(this.current.root);
     this.portal.active = false;
+    this.startDrain(this.current, 'in');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
     this.announceWorld(this.door.seg);
@@ -389,7 +437,6 @@ export class Game {
     this.depth = this.door.seg.ordinal;
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
     this.dream.doorway(this.current.def, this.current.env, !!old.def.env.drain);
-    this.startDrain(this.current, 0);
     this.audio.door();
     this.door = null;
   }
@@ -418,7 +465,7 @@ export class Game {
     this.obstacles.reset(this.rng, d, false);
     this.gems.reset(new RNG(this.seed ^ 0x2c1b3c6d ^ Math.floor(d)), d);
     this.ui.setGemColor(this.current.def.gem?.color);
-    this.startDrain(this.current, 2.4);
+    this.startDrain(this.current, 'settle');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
   }
@@ -485,6 +532,7 @@ export class Game {
     this.cam.update(dt, this.player, pz, this.speed, this.time);
     shared.uCamPos.value.copy(this.cam.camera.position);
     this.updateDoor();
+    this.updateWonk();
     shared.uCamPos.value.copy(this.cam.camera.position);
 
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);
