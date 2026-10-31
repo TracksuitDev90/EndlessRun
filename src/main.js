@@ -48,6 +48,9 @@ async function boot() {
     throw e;
   }
   renderer.autoClear = false;
+  // (checking every program's compile log is a blocking round trip to the GPU
+  // process on Android; only worth it when debugging)
+  renderer.debug.checkShaderErrors = params.debug;
   renderer.setClearColor(0x000000, 1);
   renderer.info.autoReset = false;
 

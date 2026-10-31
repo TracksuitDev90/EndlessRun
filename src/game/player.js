@@ -495,6 +495,7 @@ export class Player {
     this.invulnT = CONFIG.reviveInvulnerable;
     this.vy = 0;
     this.y = 0;
+    this.vx = 0;
     this.grounded = true;
     this.slideT = 0;
     this.lane = Math.round((this.x - CONFIG.laneX[0]) / 2.4);
@@ -504,11 +505,22 @@ export class Player {
   update(dt, speed, groundAt) {
     this.time += dt;
     this.speed = speed;
-    // lanes
+    // lanes: a critically damped spring toward the lane, solved exactly (the
+    // same path at any frame rate). Velocity is continuous — a dodge eases
+    // in over a couple of frames instead of starting at full speed, and a
+    // quick reversal swings back through rather than snapping round — yet
+    // it clears a lane's obstacle as soon as the old first-order follow did.
     const tx = CONFIG.laneX[this.lane];
-    const nx = this.crashed ? this.x : damp(this.x, tx, CONFIG.laneRate, dt);
-    this.vx = (nx - this.x) / Math.max(dt, 1e-4);
-    this.x = nx;
+    if (this.crashed) {
+      this.vx = 0;
+    } else {
+      const w = CONFIG.laneSpring;
+      const e = Math.exp(-w * dt);
+      const d = this.x - tx;
+      const j = (this.vx + w * d) * dt;
+      this.x = tx + (d + j) * e;
+      this.vx = (this.vx - w * j) * e;
+    }
 
     // vertical
     const ground = groundAt ? groundAt(this.x) : 0;
@@ -516,8 +528,9 @@ export class Player {
     if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
     if (!this.grounded) {
       const prevY = this.y;
+      // (exact for constant gravity: the same arc and airtime at any frame rate)
+      this.y += this.vy * dt - 0.5 * G * dt * dt;
       this.vy -= G * dt;
-      this.y += this.vy * dt;
       // land only when arriving from above; running into a ledge is a hit, not a mantle
       if (this.y <= ground && this.vy <= 0 && prevY >= ground - 0.3) {
         this.y = ground;

@@ -554,6 +554,10 @@ export class Game {
 
     this.current.flush(this.origin);
     if (this.next) this.next.flush(this.origin);
+    const camDist = this.camDist();
+    const twisting = shared.uDream.value.x !== 0;
+    this.current.cull(camDist, twisting);
+    if (this.next) this.next.cull(camDist, twisting);
 
     // tutorial hints
     if (st === 'running' && !this.tutorialDone) {
@@ -588,7 +592,12 @@ export class Game {
     this.cam.resize(w, h);
   }
 
-  // Compile every shader up front so the first doorway never hitches.
+  // Compile every shader up front so the first doorway never hitches; while
+  // the GPU compiles, index every world's geometry (see weld in geo.js); then
+  // draw everything once, out of sight under the loading screen, so every
+  // buffer and texture is on the GPU and every program has been used before
+  // the run begins (otherwise each world uploads its geometry the first time
+  // its doorway comes into view).
   async precompile() {
     const scene = new THREE.Scene();
     const roots = [];
@@ -599,8 +608,23 @@ export class Game {
     }
     scene.add(this.player.root, this.player.shadow, this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
     try {
-      if (this.renderer.compileAsync) await this.renderer.compileAsync(scene, this.cam.camera);
-      else this.renderer.compile(scene, this.cam.camera);
+      const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
+      let t = performance.now();
+      for (const w of this.worlds) {
+        for (const _ of w.weldAll()) {
+          if (performance.now() - t > 12) {
+            await new Promise((r) => setTimeout(r, 0));
+            t = performance.now();
+          }
+        }
+      }
+      await compiling;
+      const r = this.renderer;
+      r.setScissorTest(true);
+      r.setScissor(0, 0, 1, 1);
+      r.render(scene, this.cam.camera);
+      r.setScissorTest(false);
+      r.clear(true, true, true);
     } finally {
       for (const w of this.worlds) w.setAllVisibleForCompile(false);
       for (const [root, parent] of roots) {

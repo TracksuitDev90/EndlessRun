@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { Batch, makeItem } from '../render/batch.js';
+import { Batch, KindBatch, makeItem } from '../render/batch.js';
 import {
   makeEnvUniforms,
   writeEnvUniforms,
@@ -68,7 +68,7 @@ export class World {
 
     const skyMat = makeSkyMaterial(this.u);
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16), skyMat);
-    this.sky.renderOrder = -5;
+    this.sky.renderOrder = 50; // last of the opaque things (see VS_SKY)
     this.sky.frustumCulled = false;
     this.root.add(this.sky);
     this.track(skyMat, true);
@@ -77,6 +77,41 @@ export class World {
     def.build(b);
     if (def.gem) b.gems(def.gem);
     this.markObstacles();
+    this.markHidden();
+  }
+
+  // Props that rise up out of the ground (anim mode 2) are flattened to
+  // nothing until the camera nears them, and those that lift up out of the
+  // depths (mode 4) are sunk out of sight below the ground: those far
+  // instances are left out of the draw (see Batch.cull). (Except that when
+  // the dream twists the far road about its axis, it can swing what lies
+  // sunk beside it up into view, so then the lifted ones are all drawn.)
+  markHidden() {
+    this.cullRise = [];
+    this.cullLift = [];
+    for (const b of this.batches.values()) {
+      const anim = b.materials[0].uniforms.uAnim?.value;
+      if (!anim || !(b instanceof Batch)) continue;
+      const mode = Math.round(anim.x);
+      if (mode === 2 || mode === 4) {
+        b.hideUntilNear(anim.z, mode === 2);
+        (mode === 2 ? this.cullRise : this.cullLift).push(b);
+      }
+    }
+  }
+
+  cull(camDist, twisting) {
+    for (const b of this.cullRise) b.cull(camDist);
+    for (const b of this.cullLift) b.cull(twisting ? Infinity : camDist);
+  }
+
+  // Index every batch's geometry (see weld in geo.js), a batch at a time;
+  // yields between batches so loading stays responsive.
+  *weldAll() {
+    for (const b of this.batches.values()) {
+      b.weld();
+      yield;
+    }
   }
 
   // What you play against is kept readable however deep the dream goes: an
@@ -197,16 +232,7 @@ export class World {
   }
 
   setAllVisibleForCompile(on) {
-    for (const b of this.batches.values()) {
-      if (on) {
-        b._wasVisible = b.mesh.visible;
-        b.mesh.visible = true;
-        if (b.ink) b.ink.visible = true;
-      } else {
-        b.mesh.visible = b._wasVisible;
-        if (b.ink) b.ink.visible = b._wasVisible;
-      }
-    }
+    for (const b of this.batches.values()) b.setCompileVisible(on);
   }
 }
 
@@ -222,7 +248,7 @@ class WorldBuilder {
   toon(name, geometry, o = {}) {
     const mat = makeToonMaterial(this.u, o);
     const ink = o.ink === 0 ? null : makeInkMaterial(mat, o.ink ?? 0.045);
-    const b = new Batch(name, geometry, mat, ink, o.cap ?? 64);
+    const b = o.kinds ? new KindBatch(name, geometry, mat, ink, o.cap ?? 64) : new Batch(name, geometry, mat, ink, o.cap ?? 64);
     if (o.order) b.renderOrder = o.order;
     return this.world.addBatch(name, b, o.stencil ?? true);
   }
@@ -293,7 +319,7 @@ class WorldBuilder {
     ).scale(size, size, size);
     const o = { spin: spec.motion, look: spec.look };
     const mat = makeGemMaterial(this.u, { ...o, kinds: kinds.map((k) => k.texture || {}) });
-    this.world.addBatch('gems', new Batch('gems', geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), 220));
+    this.world.addBatch('gems', new KindBatch('gems', geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), 220));
     for (const [name, gain, pool] of [['gemGlow', spec.glow, false], ['gemPool', spec.pool, true]]) {
       const g = part(quadGeo(), '#ffffff', { outline: 0 });
       const b = new Batch(name, g, makeGemGlowMaterial(this.u, { ...o, gain, pool }), null, 220);

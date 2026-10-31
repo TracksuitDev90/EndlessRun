@@ -50,7 +50,9 @@ export const CONFIG = {
   // no lower than duckLine so the gap under them always reads as passable.
   duckLine: 1.14,
   fastFall: 22, // downward velocity when swiping down in the air
-  laneRate: 16, // lane-change responsiveness (higher = snappier)
+  // lane changes follow a critically damped spring of this rate (1/s): about
+  // 80% of the way across in 0.1 s, settled in 0.2 s (higher = snappier)
+  laneSpring: 32,
   inputBuffer: 0.16, // seconds a jump pressed in mid-air is remembered
 
   // Score: every meter run is worth `perMeter` points times the depth you're

@@ -591,11 +591,14 @@ varying vec3 vPos;
 varying vec2 vUv;
 varying vec3 vFx;
 ` + SKY_FN + /* glsl */ `
-// Low-lying mist by true height, then distance fog into the sky color.
+// Low-lying mist by true height, then distance fog into the sky color. (The
+// near part of the world — most of the screen — has no fog at all: it skips
+// working out the sky's colour there, since none of it would show.)
 vec3 atmos(vec3 col, vec3 v, float dist, float emissive) {
   float mh = 1.0 - smoothstep(uMistH.x - uMistH.y, uMistH.x, vPos.y);
   float md = smoothstep(uMistH.z, uMistH.w, dist);
   col = mix(col, uMist.rgb, mh * md * uMist.a * (1.0 - emissive * 0.6) * (1.0 - 0.7 * uClear));
+  if (dist <= uFog.x) return col;
   float f = smoothstep(uFog.x, uFog.y, dist);
   f *= (1.0 - emissive * uFog.z) * (1.0 - 0.45 * uClear);
   return mix(col, skyColor(v / dist), f);
@@ -896,8 +899,14 @@ void main() {
     base = mix(base, vec3(0.62, 0.59, 0.56) * (0.85 + 0.3 * c3), ashTop);
     vein *= (1.0 - ashTop) * uCrust.x;
   #else
-    float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
-    base = mix(base, base * 0.64, m);
+    // (most parts carry no marks: skip the texture there — its derivatives
+    // taken outside the branch, where they are always defined)
+    vec2 muv = vUv * uMarkRepeat;
+    vec2 mdx = dFdx(muv), mdy = dFdy(muv);
+    if (vFx.x > 0.0) {
+      float m = textureGrad(uMarks, muv, mdx, mdy).a * vFx.x;
+      base = mix(base, base * 0.64, m);
+    }
   #endif
 
   vec3 V = v / dist;
@@ -1527,11 +1536,15 @@ void main() {
 `;
 
 // --- Sky dome ---------------------------------------------------------------
+// (drawn after everything opaque, on the far plane: the depth test then
+// leaves it only the pixels nothing else covered, instead of shading the
+// whole screen and painting the world over it)
 const VS_SKY = /* glsl */ `
 varying vec3 vDir;
 void main() {
   vDir = position;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  gl_Position.z = gl_Position.w * 0.99999;
 }
 `;
 const FS_SKY = /* glsl */ `

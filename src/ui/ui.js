@@ -34,6 +34,7 @@ export class UI {
     this.scoreEl = $('score-num');
     this.multEl = $('score-mult');
     this.scoreShown = -1;
+    this.scoreAt = 0;
     this.multShown = -1;
     this.gemEl = $('gem-num');
     this.gemPill = $('gem-pill');
@@ -88,11 +89,15 @@ export class UI {
     $('scorebox').classList.toggle('show', !on);
   }
 
-  // Called every frame; only touches the DOM when a shown digit changes.
+  // Called every frame; only touches the DOM when a shown digit changes, and
+  // at most 15 times a second (the digits are a blur faster than that anyway,
+  // and each change is a layout and repaint on the page's main thread).
   setScore(score, mult) {
     const n = Math.floor(score);
-    if (n !== this.scoreShown) {
+    const now = performance.now();
+    if (n !== this.scoreShown && (now - this.scoreAt > 66 || n < this.scoreShown)) {
       this.scoreShown = n;
+      this.scoreAt = now;
       this.scoreEl.textContent = fmt.format(n);
     }
     if (mult !== this.multShown) {
