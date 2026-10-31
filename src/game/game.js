@@ -343,10 +343,12 @@ export class Game {
     const D = CONFIG.drain;
     const u = w.u.uDrain.value;
     this.drainT = Math.min(1, this.drainT + dt / D.inTime);
-    // slow to start, then sucked away faster and faster down the hole
-    u.y = D.inFrom + (DRAIN_ALL - D.inFrom) * Math.pow(this.drainT, 1.35);
+    // lingering round the edges at first, then sucked away faster and faster
+    // down the hole
+    u.y = D.inFrom + (DRAIN_ALL - D.inFrom) * Math.pow(this.drainT, D.inEase);
     if (this.drainT >= 1) this.startDrain(w, 'settle');
-    // the runner drains with it
+    // the runner drains with it (while the doorway's still on screen, the
+    // runner, already through it, takes the world beyond's uniforms anyway)
     if (w === this.current && !this.portal.active) this.player.u.uDrain.value.copy(u);
   }
 
@@ -411,6 +413,12 @@ export class Game {
       if (this.current.def.env.drain && !this.next.def.env.drain) this.wellUp(t);
       this.setParticles(this.current.env, this.next.env, t);
       this.dream.set(this.course.prevOf(door.seg)?.dream ?? door.seg.dream, door.seg.dream, t);
+      // into a world that drains, its colour starts going the moment the
+      // runner reaches the doorway, not when the camera follows them through
+      if (!door.drained && this.next.def.env.drain && this.dist >= door.d) {
+        door.drained = true;
+        this.startDrain(this.next, 'in');
+      }
       if (this.camDist() >= door.quadD - 0.45) this.crossDoor();
     }
   }
@@ -429,7 +437,7 @@ export class Game {
     this.current.setStencil(false);
     this.sceneMain.add(this.current.root);
     this.portal.active = false;
-    this.startDrain(this.current, 'in');
+    if (!this.door.drained) this.startDrain(this.current, 'in');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
     this.announceWorld(this.door.seg);
@@ -536,7 +544,10 @@ export class Game {
     shared.uCamPos.value.copy(this.cam.camera.position);
 
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);
-    shared.uBend.value.set(CONFIG.bend, sway, 0, CONFIG.bendStart);
+    // the world is kept true out to where the runner will be in a few seconds
+    const [rs, r0, r1] = CONFIG.dream.read;
+    const read = Math.min(r1, Math.max(r0, CONFIG.camera.back + Math.max(this.speed, CONFIG.speed.start) * rs));
+    shared.uBend.value.set(CONFIG.bend, sway, read, CONFIG.bendStart);
     this.particles.update(this.dist);
     this.particles2.update(this.dist);
     for (const w of this.worlds) w.sky.position.copy(this.cam.camera.position);

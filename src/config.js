@@ -36,6 +36,12 @@ export const CONFIG = {
     breatherEvery: [5, 8], // patterns between longer rests
     breatherMul: 1.9,
     tutorialGap: 3.3,
+    // A breather world (def.calm: the Cypress Lane) on every lap: it is laid
+    // at only `diff` of the run's difficulty, every gap is stretched by
+    // `space`, it never deals a pattern that unlocks past `most` (no zigzags,
+    // tunnels, sweeps or hop-duck doubles), and lone obstacles come up
+    // `lone` times as often.
+    calm: { diff: 0.55, space: 1.12, most: 0.3, lone: 1.5 },
   },
 
   jump: { height: 1.6, time: 0.64 }, // apex height (m), total airtime (s)
@@ -121,6 +127,11 @@ export const CONFIG = {
       swirl: [8, 16], rings: [9, 17], palette: [10, 18], neon: [11, 18], twist: [12, 19],
     },
     lucidChance: 0.18,
+    // read: [seconds, min m, max m] — how far ahead the world is kept true:
+    // the shape warps (waves, melt, twist, breathing) only start past the
+    // road the runner will cover in this many seconds, so obstacles and gems
+    // are always where they look while you can still react to them
+    read: [3.0, 40, 96],
     rushTime: 0.65,
     rushBase: 0.75,
     reducedMotion: 0.3,
@@ -128,12 +139,14 @@ export const CONFIG = {
 
   // The colour drain (Hell, see game.js). The front is a radius from the
   // centre of the screen (1 = the corners) inside which the colour still
-  // holds out. Coming in it closes from inFrom down the plughole over inTime
-  // seconds. Going out, the world beyond the doorway shows only a hint of its
+  // holds out. Coming in it starts the moment the runner reaches the doorway,
+  // already eating in from the corners (inFrom), lingers as it swirls round
+  // the edges of the screen, then gathers speed down the plughole (inEase:
+  // how much it holds back at first), all over inTime seconds. Going out, the world beyond the doorway shows only a hint of its
   // colour (hint: how grey it is) until wellFrom of the way through the
   // run-up (the last ~55 m), then the colour wells back out from outFrom to
   // outTo as you reach the doorway.
-  drain: { inTime: 1.25, inFrom: 1.12, hint: 0.88, wellFrom: 0.55, outFrom: -0.05, outTo: 1.55 },
+  drain: { inTime: 1.0, inFrom: 0.95, inEase: 1.6, hint: 0.88, wellFrom: 0.55, outFrom: -0.05, outTo: 1.55 },
 
   // Camera
   camera: { back: 6.6, height: 4.1, lookAhead: 7.5, lookHeight: 0.95, minFov: 52, maxFov: 76, coverHalfWidth: 3.0 },

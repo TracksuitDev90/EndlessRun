@@ -566,7 +566,10 @@ export default {
   env: {
     drain: true,
     sky: ['#020102', '#6a1a0a', '#060202'],
-    sun: { dir: [0, 0.06, -1], glow: '#c8300c', disc: '#e0c0a8', size: 0.04 },
+    // no sun: a total eclipse hangs over the road ahead, a black hole of a
+    // thing ringed in fire, the sky bent round it (see FS_SKY)
+    sun: { dir: [0, 0.2, -1], glow: '#c8300c', disc: '#000000', size: 0.075 },
+    eclipse: [1, 1, 1],
     stars: 0,
     // a ceiling of smoke with dry lightning in it
     skyFx: { rays: 0.1, clouds: 0, smoke: 1 },
@@ -597,11 +600,13 @@ export default {
         particles: { color: '#ffa040', size: 3.2, drift: [0.6, 1.5, 0], opacity: 1 },
       },
     },
-    // the eclipse: a black sun ringed in fire
+    // the eclipse swells: the black sun hangs bigger and lower, bending the
+    // sky harder round it, its corona streaming further
     {
       env: {
         sky: ['#010001', '#5a1210', '#0a0204'],
-        sun: { dir: [0, 0.14, -1], glow: '#ff3a20', disc: '#080404', size: 0.07 },
+        sun: { dir: [0, 0.17, -1], glow: '#ff3a20', disc: '#000000', size: 0.1 },
+        eclipse: [1, 1.3, 1.3],
         skyFx: { rays: 0.9, smoke: 0.8 },
         rim: [1.0, 0.3, 0.15, 0.55],
         particles2: { color: '#e6e2de', size: 2.0, drift: [0.2, -0.4, 0], opacity: 0.9 },

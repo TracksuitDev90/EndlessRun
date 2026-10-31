@@ -110,7 +110,7 @@ export class GemField {
   at(d, dist, runTime) {
     const game = this.game;
     const eta = runTime + Math.max(0, d - dist) / Math.max(game.speed, 6);
-    return [game.speedAt(eta), game.obstacles.difficultyAt(eta)];
+    return [game.speedAt(eta), game.obstacles.difficultyFor(d, eta)];
   }
 
   spacing(v) {

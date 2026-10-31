@@ -21,13 +21,13 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 
 | # | World | Light | Inspired by |
 |---|-------|-------|-------------|
-| I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
-| II | **The Deepwood** — colossal mossy trunks on buttress roots under a canopy that closes overhead, a trodden path through long grass, ferns, wildflowers, glowing mushrooms; the way out is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
+| I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane through a lived-in neighbourhood: now and then a greengrocer's or a bakery café on a ground floor, picket fences round front gardens of raspberry canes, a market stall on the verge, benches, post boxes, a bike with a basket of apples, the bus stop's shelter; and the market spilling into the road (see [The breather](#the-breather-the-cypress-lane)) | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
+| II | **The Deepwood** — colossal mossy trunks on buttress roots under a canopy that closes overhead, a trodden path through long grass, ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; the way out is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
 | III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
-| IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
+| IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
 | V | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
-| VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke, a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dark, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and your cape still in colour | fire and brimstone |
+| VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black hole of a thing ringed in fire, the sky bent round it (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dark, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and your cape still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck: an ivory walk inlaid with brass clock-ticks between colonnades of ivory arches, oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 
 The first lap always nests inward in that order; after that the order shuffles
@@ -39,12 +39,17 @@ one hangs before any repeats, never twice side by side, and the order changes
 every round). All nine are one instanced batch: every design's triangles are
 marked with its index and each instance folds away all but its own in the
 vertex shader (toon option `kinds`), so they cost one draw call, not nine. The
-doors standing open show nothing at all — only light, each door its own colour
+doors standing open show nothing beyond them at all — only light, each door its own colour
 (sea teal, forest green, night blue, ember red, sunlit gold, rose, violet,
 ice: hints of the worlds that might lie beyond), dealt from a deck too so no
-two neighbours match. The door stands swung back into the room beyond, its
-dark shape cut out against the light, and the light pours out into the hall
-as a soft coloured shaft (an additive beam) and pools on the floor.
+two neighbours match. The light fills the doorway edge to edge (it stands
+proud of the wall's wainscot and rails, so nothing of the wall shows through
+it), the door itself — panelled, in its own colour, its edge catching the
+light — stands swung out into the hall on the jamb further down it, so it
+never hides the light from down the hall, and the light pours out into the
+hall as a soft coloured shaft (an additive beam) and pools on the floor.
+The book stacks in the way are bright cloth bindings, their gilt spines
+turned to you, a fat volume lying open on one of them.
 The books that flutter up off a bookshelf or a stack are an obstacle's
 decoration (`extras` on its spec): above head height, a little past it,
 nothing to hit — rare the first time through the hall and more each time it
@@ -54,16 +59,18 @@ comes round.
 
 Hell is the one world that takes your colour away. Through its doorway it
 looks the way you'd expect — a red sky over black ash, fire on the horizon —
-but come through and, instead of the usual burst of colour, the colour is
+but the moment the runner reaches the doorway (before the camera has followed
+them through), instead of the usual burst of colour, the colour is
 *sapped* out of the world, sucked away down a plughole in the middle of the
-screen: the front closes in from the edges in spiral arms that wind round as
-they go, under a dark rim, streaks of colour dragged in after it, the colour
-left inside squeezed more vivid as it's pulled toward the hole — slowly at
-first, then faster and faster, about a second and a quarter in all — until
+screen: the front is eating in from the corners from the very first frame,
+and closes in in spiral arms that creep round as they go, under a dark rim,
+streaks of colour dragged in after it, the colour left inside squeezed more
+vivid as it's pulled toward the hole — lingering round the edges of the screen
+at first, then faster and faster down the hole, a second in all — until
 everything is black, grey and white: the sky, the ash, the rock, the gems and
 the runner. Only what burns keeps its colour — the lava, the glowing fissures
 and the fire in the cracks of the rock, the embers on the wind, the souls'
-eyes — and the runner's orange cape. The road is kept pale and the rock dark,
+eyes, the eclipse's ring of fire and its corona — and the runner's orange cape. The road is kept pale and the rock dark,
 ashen on top and veined with fire (and the grey is given a little extra
 contrast), so the dark stones and the obstacles still read at a glance.
 
@@ -84,6 +91,24 @@ in `CONFIG.drain`.
 ![Into Hell: the Sky Road's doorway shows it burning; come through and the colour is sucked away down a whirlpool in the middle of the screen until only the lava, the fire in the rock, the embers and the cape are left in colour](docs/hell.jpg)
 
 ![The Gallery of Hours (an hourglass mid-run, a pocket watch dangling out of the sky; then, late in the gallery, the hands spinning wild and a floating hourglass turning over), and Hell once the colour has gone: a basalt column and a charred beam veined with fire, a lava fissure spitting, a gibbet, lost souls, a pool of lava splashing](docs/new-worlds.jpg)
+
+### The eclipse
+
+There's no sun over Hell: a total eclipse hangs over the road ahead instead,
+and whatever is blotting the sun out is heavier than any moon. The light from
+behind it is bent round it the way a black hole bends it — the sky near it is
+drawn out into arcs, a mirror image of the far side wrapped round its rim, and
+each colour is bent by its own amount, so where they part there are rainbow
+fringes, and a broken spectral halo wheels slowly round it. A ring of fire
+hugs the black disc, flaring brighter on the side turning toward you, with a
+fainter second ring just outside it (the light that went once round), and a
+corona streams out of it in flickering tongues. It all burns, so it keeps its
+colour when the rest of Hell has drained to grey. On the third visit the
+eclipse swells, hanging bigger and bending the sky harder. (Sky option
+`env.eclipse: [amount, bending, corona reach]`; the sky behind it is sampled
+along bent rays, once per colour, only round the disc.)
+
+![Hell's eclipse, the light bent round it; the Deepwood's campfires (a teepee, a crib under a pot, a star fire with a kettle) and its creek; an open door in the Hall of Doors, swung out on its hinge with nothing beyond it but light, and a stack of books in the way](docs/eclipse-campfires.jpg)
 
 ### Hell's fire, and its ghosts
 
@@ -154,7 +179,7 @@ rolls in slow waves:
 | Hall of Doors | the books take flight | a tea party at dusk: teal-and-cream floor, teacups and teapots adrift | violet night, the shadows swap sides, clocks float past |
 | Glasshouse | butterflies over the beds, pink petals | dusk, rose glass, giant blooms in the beds | bioluminescent night, glowing spores, aurora |
 | Sky Road | flocks of birds | a ringed planet in a pink sky | whales swimming through the clouds |
-| Hell | an ember storm: more fire on the wind, the plain alight | the eclipse: a black sun ringed in fire, ash falling thick | the colours begin to drift |
+| Hell | an ember storm: more fire on the wind, the plain alight | the eclipse swells, the sky bending harder round it, ash falling thick | the colours begin to drift |
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
 
 ![The Hall of Doors on four visits](docs/laps.jpg)
@@ -208,11 +233,18 @@ Every so often a deeper world comes up *lucid* — as calm as one several doors
 shallower, a breather — before it gets strange again. Once the trip is a third
 of the way in, the camera starts to sway a little, too.
 
-Two rules keep it fair and readable: every shape distortion grows with distance
-from the camera, so the stretch of road you're actually reacting to — and every
-obstacle on it — is always exactly where it looks (things far off firm up into
-their true shape as they approach); and the runner keeps their own colours
-however far the palette shifts, so you never lose yourself. If your system asks
+A few rules keep it fair and readable, however deep it goes. The shape
+distortions (the swells, the melt, the corkscrew, the breathing) only start
+past the stretch of road you'll cover in the next three seconds — further out
+the faster you run (`CONFIG.dream.read`) — and grow from there, so every
+obstacle and gem is exactly where it looks from the moment it stands up in the
+distance until you reach it (things far off firm up into their true shape
+well before they matter). Obstacles never breathe, so a hurdle never swells
+into a wall or a wall squashes into a hurdle; and obstacles and gems cut
+through the low mist and the distance fog more than the scenery round them
+(`uClear`), so they read from far off even in the darkest, haziest worlds.
+And the runner keeps their own colours however far the palette shifts, so you
+never lose yourself. If your system asks
 for reduced motion, the shape warps and camera sway are scaled right down (the
 colour is left alone). Tunables (including when each effect joins) live in
 `CONFIG.dream`.
@@ -369,14 +401,52 @@ a wall, knocks you down. You get one free **Continue** per run (configurable).
 **Speed** starts at 12 m/s and eases toward 28 m/s over several minutes.
 Obstacles start out roughly 3 seconds apart and close in gradually to about a
 second, with the odd longer breather; combinations (two walls, zigzags,
-tunnels) unlock as the run goes on. All of it is tunable in `CONFIG.obstacles`.
+tunnels) unlock as the run goes on — except in the Cypress Lane, the breather
+world (below). All of it is tunable in `CONFIG.obstacles`.
+
+### The breather: the Cypress Lane
+
+Every time the Cypress Lane comes round it's a breather, however far the run
+has got: it's laid at only a share of the run's difficulty, every gap is
+stretched a little more, it never deals the hard combinations (zigzags,
+tunnels, sweeping walls, hop-then-duck doubles) and lone obstacles come up
+more often. It still tightens a little as the run goes on, but late in a run
+its obstacles stand about twice as far apart as anywhere else (around 2.3 s
+against 1.2 s), and the gem routes take it just as easy
+(`CONFIG.obstacles.calm`, switched on by a world's `calm: true`).
+
+Its obstacles are the market spilling into the road, each with its own
+silhouette: two stepped crates heaped with oranges, a raised bed of raspberry
+canes tied to a wire and hung with ripe raspberries (a punnet of picked ones
+on its edge), wicker baskets of pears, lemons and plums with a hand of bananas
+propped in front, and the old clipped hedge — all low and solid, jump them;
+the bus stop's timetable hung over a lane — two green steel posts on bolted
+base plates, braced to a crossbeam, the board hung from it on two rods under a
+live "next bus" display, the route's colour and a bus across its head, a strip
+map of the stops and columns of departure times, the stop's sign on top of
+one post — its yellow kick rail on the duck line and nothing below it but the
+road, slide under it (a pergola is the wide one); and the grapefruit cart
+under its coral canopy (ruby grapefruit heaped in its bed, cut halves turned
+up to show their pink, a cut grapefruit painted on its board), the apple
+barrow under a green-and-cream parasol (tiers of green apples, a few red ones
+in a basket, an apple chalked on its slate), the tall stepped fruit stand
+(bananas, pears, lemons and plums) and the potted cypress — tall and solid, go
+round them. The fruit is storybook-sized, so it reads at a run.
+
+![The Cypress Lane's market: the grapefruit cart, the fruit stand and the apple barrow; crates of oranges, a raspberry bed and baskets of pears, plums and lemons; the bus stop's timetable hung over a lane; and the bus shelter on the verge](docs/market.jpg)
 
 **Reading obstacles.** Every world draws its obstacles with the same grammar:
 *low and solid to the ground* — jump it; *a frame or overhang with clear floor
 beneath, its lowest edge on the same duck line in every world* — slide under
-it; *tall and solid* — go around it. In the Deepwood that's a creek banked with
-stones (jump it — and since it's water, you can't land on it: drop into it and
-you trip), a fallen tree propped on a boulder and a stump, its hanging moss
+it; *tall and solid* — go around it. In the Deepwood that's a campfire in a
+ring of stones — a teepee of logs, a log-cabin crib under a black pot on a
+grate, or a low star fire with a kettle warming beside it, each turned its own
+way round, its flames licking and flickering and its light wavering on the
+ground (jump it — and you can't land in the fire), or the creek right across
+the path, a bright teal ribbon with white riffles and foam along its edges,
+framed in pale sand, its near bank kept low so the water shows and its far
+bank raised with big stones, reeds and ferns (jump it — and since it's water,
+you can't land on it: drop into it and you trip), a fallen tree propped on a boulder and a stump, its hanging moss
 ending on the duck line (slide under it), and giant mossy boulders, one of them
 roped and hung with paper streamers like a shrine stone (go around). In Hell:
 a low basalt ridge, or a lava fissure between crusted lips (jump — you can't
@@ -614,7 +684,9 @@ src/render/                   shaders, geometry kit, instanced batches, textures
 src/world/                    world runtime + one file per world (art, lighting, lap
                               variations, layout, obstacles, gem, doorway); whimsy.js holds
                               the shared later-lap props and light volumes, gems.js the
-                              gem kit (cleaved crystal habits, lofts, settings)
+                              gem kit (cleaved crystal habits, lofts, settings),
+                              lane-art.js the Cypress Lane's fruit, market obstacles,
+                              timetable and street furniture
 src/game/                     game loop, player (animation, IK legs, secondary
                               motion, movement), outfit (palette, cape), cloth,
                               runner asset loader, camera, course (world order),
@@ -638,7 +710,7 @@ each 16 m chunk and can check `ctx.visit` to add later-lap props; `obstacles`
 maps the three gameplay kinds (L = jump over, H = slide under, W = go around)
 to your themed props — keep H obstacles' lowest edge at `CONFIG.duckLine`.
 An obstacle spec can also bring companion batches drawn with another material
-(`with: ['creekWater']`), lower its collision top (`top`), skip its contact
+(`with: ['creekWideWater']`), lower its collision top (`top`), skip its contact
 shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
 true })` gives a surface the running-water shader, and ground pattern 6 is the
 forest's long grass, 7 Hell's ash (fissures glowing beyond the road) and 8 the
@@ -653,6 +725,11 @@ ash, scale]` textures rock, charred wood and obsidian (each part picks its kind
 with its `mark` flag: 0, 0.5, 1), `splash: true` makes a part list of droplets
 from `splashGeo` leap and fall, and `sand: [seconds, waist, depth, floor]`
 (on a toon and its `b.glass`) makes an hourglass run and turn over.
+`flame: true` makes a prop's fully self-lit parts lick and flicker like fire
+(each tongue's beat in its `uv.x`, how far up it in `uv.y`), and `b.pool(…, {
+color, flicker })` gives a pool of light its own colour, wavering like
+firelight. A world with `calm: true` is a breather (see above), and
+`env.eclipse` puts a total eclipse in place of the sun.
 `env.drain` makes the world drain of colour once you're in it, `skyFx.smoke`
 lays a ceiling of smoke with dry lightning in it over the sky, and
 `env.particles2` adds a second layer of motes (Hell's falling ash under its

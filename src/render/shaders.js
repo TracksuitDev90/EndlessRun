@@ -9,7 +9,9 @@ THREE.ColorManagement.enabled = false;
 export const shared = {
   uCamPos: { value: new THREE.Vector3() },
   uTime: { value: 0 },
-  uBend: { value: new THREE.Vector4(0.00085, 0, 0, 10) }, // x: bend, y: sway, w: start
+  // x: bend, y: sway, z: how far ahead of the camera the world is kept true
+  // (the dream's shape warps start past it, see bendPos), w: where the bend starts
+  uBend: { value: new THREE.Vector4(0.00085, 0, 40, 10) },
   uMarks: { value: null },
   uNoise: { value: null },
   uPixelRatio: { value: 1 },
@@ -35,8 +37,10 @@ uniform vec4 uTrip; // x hue shift, y far-world undulation, z hue drift
 uniform vec4 uDream;
 uniform vec4 uDream3;
 // The curved world, plus everything the dream does to the shape of it. All of
-// it grows with distance, so the stretch of road you're actually reading is
-// always true.
+// the dream's warps start only past uBend.z — the stretch of road the runner
+// covers in the next few seconds, longer the faster they run — and grow from
+// there, so every obstacle and gem is where it looks from the moment you can
+// see it until you reach it, however deep the dream.
 vec3 bendPos(vec3 wp) {
   vec3 o = wp;
   float a = uCamPos.z - wp.z;
@@ -44,24 +48,25 @@ vec3 bendPos(vec3 wp) {
   float d2 = d * d;
   wp.y -= uBend.x * d2;
   wp.x += uBend.y * d2;
-  float wv = uTrip.y + uDream.y;
+  float far = clamp(a - uBend.z, 0.0, 320.0);
+  float wv = clamp(uTrip.y + uDream.y, -1.2, 1.2);
   if (wv != 0.0) {
     // the distant world breathes in slow waves rolling toward you
-    float k = d * 0.0125;
+    float k = far * 0.0125;
     k *= k;
     wp.y += sin(a * 0.045 - uTime * 0.7) * wv * k * 5.0;
     wp.x += sin(a * 0.028 + uTime * 0.45) * wv * k * 8.0;
   }
   if (uDream.z != 0.0) {
     // melt: the far world wobbles like jelly, the tall things most
-    float k = smoothstep(12.0, 70.0, d) * uDream.z;
+    float k = smoothstep(0.0, 58.0, far) * uDream.z;
     float h = max(o.y, 0.0);
     wp.x += sin(o.y * 0.42 + uTime * 1.3 + a * 0.05) * k * (0.45 + h * 0.26);
     wp.y += sin(o.x * 0.35 + uTime * 0.9 + a * 0.03) * k * h * 0.1;
   }
   if (uDream.x != 0.0) {
     // twist: the road ahead corkscrews about its own axis
-    float k = smoothstep(14.0, 130.0, d);
+    float k = smoothstep(0.0, 116.0, far);
     float ang = uDream.x * k * (0.75 + 0.45 * sin(uTime * 0.16));
     vec2 c = vec2(0.0, 1.5 - uBend.x * d2);
     vec2 r = wp.xy - c;
@@ -186,9 +191,10 @@ vec3 grade(vec3 c, vec4 trip, float dist) {
       float lr = log(ra + 0.035);
       // log spirals: turning with time, they also slide in (or out) along
       // themselves
-      float arms = sin(th * 3.0 + lr * 7.0 + uTime * 7.0 * dir);
+      // (turning a little slowly, so the swirl creeps rather than spins)
+      float arms = sin(th * 3.0 + lr * 7.0 + uTime * 5.0 * dir);
       e -= arms * live * 0.085 * smoothstep(-0.15, 0.3, uDrain.y);
-      float lines = smoothstep(0.35, 0.95, sin(th * 5.0 + lr * 11.0 + uTime * 12.0 * dir));
+      float lines = smoothstep(0.35, 0.95, sin(th * 5.0 + lr * 11.0 + uTime * 8.5 * dir));
       streak = lines * exp(-max(e, 0.0) * 4.5) * step(0.0, e) * live;
     }
     float gone = smoothstep(-0.04, 0.1, e);
@@ -432,6 +438,17 @@ void main() {
   if (uWobble.y != 0.0) {
     lp.y += sin(uTime * uWobble.z * 0.8 + phase * 1.7) * uWobble.y;
   }
+  #ifdef FLAME
+    // a fire's tongues (its fully self-lit parts) lick and flicker, each on
+    // its own beat (uv.x), more and more toward its tip (uv.y)
+    if (fx.y > 0.95) {
+      float k = clamp(uv.y, 0.0, 1.0);
+      float t = uTime * (6.5 + uv.x * 3.5) + uv.x * 17.0 + phase * 5.0;
+      lp.x += (sin(t) * 0.07 + sin(t * 2.7 + 1.3) * 0.03) * k * k;
+      lp.z += sin(t * 1.3 + 2.0) * 0.045 * k * k;
+      lp.y += (sin(t * 1.9 + 0.7) * 0.5 + 0.5) * 0.14 * k;
+    }
+  #endif
 
   vec3 wp = (M * vec4(lp, 1.0)).xyz;
   vec3 wn = normalize(mat3(M) * ln);
@@ -468,7 +485,7 @@ void main() {
   if (uDream.w * uDreamK > 0.0) {
     // breathe: props in the distance swell and settle like living things,
     // and firm up into their true shape as they come close
-    float k = smoothstep(26.0, 64.0, aP) * uDream.w * uDreamK;
+    float k = smoothstep(max(26.0, uBend.z - 10.0), max(64.0, uBend.z + 28.0), aP) * uDream.w * uDreamK;
     float b = sin(uTime * 1.6 + phase * 2.0 + aP * 0.06) * k;
     wp.y = pivot.y + (wp.y - pivot.y) * (1.0 + b * 0.34);
     wp.xz = pivot.xz + (wp.xz - pivot.xz) * (1.0 - b * 0.12);
@@ -564,6 +581,9 @@ uniform vec4 uFog;
 uniform vec4 uMist;  // rgb, amount
 uniform vec4 uMistH; // x top height, y thickness, z near, w far
 uniform vec4 uTrip;
+// 1 for what you play against (obstacles and gems): it cuts through the low
+// mist and the distance fog more than the scenery does, so it reads far off
+uniform float uClear;
 varying vec3 vColor;
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -575,9 +595,9 @@ varying vec3 vFx;
 vec3 atmos(vec3 col, vec3 v, float dist, float emissive) {
   float mh = 1.0 - smoothstep(uMistH.x - uMistH.y, uMistH.x, vPos.y);
   float md = smoothstep(uMistH.z, uMistH.w, dist);
-  col = mix(col, uMist.rgb, mh * md * uMist.a * (1.0 - emissive * 0.6));
+  col = mix(col, uMist.rgb, mh * md * uMist.a * (1.0 - emissive * 0.6) * (1.0 - 0.7 * uClear));
   float f = smoothstep(uFog.x, uFog.y, dist);
-  f *= 1.0 - emissive * uFog.z;
+  f *= (1.0 - emissive * uFog.z) * (1.0 - 0.45 * uClear);
   return mix(col, skyColor(v / dist), f);
 }
 `;
@@ -1490,14 +1510,18 @@ void main() {
 }
 `;
 
-// Additive pool of light on the ground under a lamp.
+// Additive pool of light on the ground under a lamp (or round a fire).
 const FS_POOL = /* glsl */ `
 uniform vec3 uPool;
+uniform float uTime;
 varying vec2 vUv;
 varying float vFade;
 void main() {
   float r = length(vUv - 0.5) * 2.0;
   float a = pow(max(1.0 - r, 0.0), 1.6);
+  #ifdef FLICKER
+    a *= 0.82 + 0.1 * sin(uTime * 9.0) + 0.08 * sin(uTime * 23.0 + 1.3);
+  #endif
   gl_FragColor = vec4(uPool * a * vFade, 1.0);
 }
 `;
@@ -1513,6 +1537,9 @@ void main() {
 const FS_SKY = /* glsl */ `
 uniform float uTime;
 uniform vec4 uSkyFx2; // x sun rays, y cloud bands, z aurora, w planet ring (moon drawn full)
+// a total eclipse in place of the sun (env.eclipse): x how much, y how hard
+// it bends the light from behind it, z the corona's reach
+uniform vec4 uEclipse;
 uniform vec4 uTrip;
 uniform vec3 uSunDisc;
 uniform vec3 uMoonDir;
@@ -1525,21 +1552,15 @@ float hash13(vec3 p) {
   p += dot(p, p.zyx + 31.32);
   return fract((p.x + p.y) * p.z);
 }
-void main() {
-  vec3 d = normalize(vDir);
-  float sw = uDream2.y;
-  if (sw > 0.0) {
-    // a swirling sky: azimuth and elevation stirred like paint
-    float az0 = atan(d.x, -d.z);
-    float el = asin(clamp(d.y, -1.0, 1.0));
-    az0 += sw * 0.6 * sin(el * 7.0 + uTime * 0.25);
-    el += sw * 0.12 * sin(az0 * 4.0 - uTime * 0.3) * cos(el);
-    d = vec3(sin(az0) * cos(el), sin(el), -cos(az0) * cos(el));
-  }
+// Everything in the sky behind the sun: its gradient, the moon, stars, rays,
+// clouds, smoke and lightning, aurora (an eclipse samples it along bent rays).
+vec3 skyBack(vec3 d) {
   vec3 c = skyColor(d);
   float sd = dot(d, uSunDir);
-  float sun = smoothstep(uSkyFx.y - 0.00012, uSkyFx.y + 0.00012, sd);
-  c = mix(c, uSunDisc, sun);
+  if (uEclipse.x <= 0.0) {
+    float sun = smoothstep(uSkyFx.y - 0.00012, uSkyFx.y + 0.00012, sd);
+    c = mix(c, uSunDisc, sun);
+  }
   if (uSkyFx.z < 1.0) {
     float md = dot(d, uMoonDir);
     float disc = smoothstep(uSkyFx.z - 0.00012, uSkyFx.z + 0.00012, md);
@@ -1609,7 +1630,7 @@ void main() {
     float low = 1.0 - smoothstep(0.03, 0.4, d.y);
     vec3 smoke = vec3(0.05, 0.035, 0.032) * (0.6 + 1.6 * smoothstep(0.4, 0.85, s2) + 0.8 * s3);
     smoke += (uSunColor * 0.5 + uSkyHorizon * 0.35) * low * (1.0 - smoothstep(0.35, 0.75, sn));
-    c = mix(c, smoke, cover * min(uSkyFx.w, 1.0));
+    c = mix(c, smoke, cover * min(uSkyFx.w, 1.0) * (1.0 - 0.55 * uEclipse.x * pow(max(sd, 0.0), 30.0)));
     vec4 L = lightning();
     if (L.x > 0.0) {
       float daz = az - L.y;
@@ -1631,7 +1652,92 @@ void main() {
     vec3 ac = mix(vec3(0.25, 1.0, 0.65), vec3(0.85, 0.35, 0.95), smoothstep(0.2, 0.5, d.y));
     c += ac * curtain * streak * uSkyFx2.z;
   }
-  if (sw > 0.0) c = hueRot(c, sw * 1.3 * sin(az * 3.0 + d.y * 9.0 + uTime * 0.35));
+  return c;
+}
+void main() {
+  vec3 d = normalize(vDir);
+  float sw = uDream2.y;
+  if (sw > 0.0) {
+    // a swirling sky: azimuth and elevation stirred like paint
+    float az0 = atan(d.x, -d.z);
+    float el = asin(clamp(d.y, -1.0, 1.0));
+    az0 += sw * 0.6 * sin(el * 7.0 + uTime * 0.25);
+    el += sw * 0.12 * sin(az0 * 4.0 - uTime * 0.3) * cos(el);
+    d = vec3(sin(az0) * cos(el), sin(el), -cos(az0) * cos(el));
+  }
+  vec3 c = skyBack(d);
+  if (uEclipse.x > 0.0 && dot(d, uSunDir) > 0.5) {
+    // A total eclipse, the sun gone black — and something heavier than the
+    // moon in front of it: the light from behind is bent round the hole like
+    // round a black hole, so the sky near it is drawn out in arcs, a mirror of
+    // the far side wrapped round its rim, each colour bent by its own amount
+    // (rainbow fringes where they part); a ring of fire hugs the black disc,
+    // flaring brighter where it turns toward you; and a corona streams out of
+    // it. All of it burns, so it keeps its colour when the world drains.
+    vec3 rt = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
+    vec3 upv = cross(rt, uSunDir);
+    vec2 pq = vec2(dot(d, rt), dot(d, upv));
+    float R = sqrt(max(1.0 - uSkyFx.y * uSkyFx.y, 1e-6));
+    float r = length(pq);
+    float x = r / R; // in disc radii
+    vec2 dir2 = pq / max(r, 1e-5);
+    float ang = atan(dir2.y, dir2.x);
+    float spin = uTime * 0.12;
+    if (x < 9.0) {
+      float E = 1.55 * uEclipse.y;
+      float fall = 1.0 - smoothstep(3.5, 9.0, x);
+      vec3 lensed;
+      for (int k = 0; k < 3; k++) {
+        float e = E * (1.0 + (float(k) - 1.0) * 0.14);
+        float xs = clamp(x - e * e / max(x, 0.2), -7.0, 9.0);
+        xs = mix(x, xs, fall);
+        // the bent light also swirls a little round the hole, dragged by it
+        float a2 = ang + 0.5 * uEclipse.y * fall / max(x * x, 1.0) + spin * fall * 0.3;
+        vec2 q2 = vec2(cos(a2), sin(a2)) * xs * R;
+        vec3 dd = normalize(uSunDir + rt * q2.x + upv * q2.y);
+        lensed[k] = skyBack(dd)[k];
+      }
+      c = mix(c, lensed, uEclipse.x);
+      // a faint shimmer of shifted hue in the bent light, redder near the hole
+      float shift = exp(-(x - 1.0) * 0.7) * fall * uEclipse.x;
+      c = mix(c, hueRot(c, 0.9 * sin(ang * 2.0 + spin * 3.0) - 0.4), 0.35 * shift);
+      gKeep = max(gKeep, 0.75 * shift);
+    }
+    // the corona: streamers of fire flowing out of the disc
+    float st = texture2D(uNoise, vec2(ang * 0.48 + spin * 0.2, x * 0.05 - uTime * 0.02)).g;
+    float st2 = texture2D(uNoise, vec2(ang * 1.27 - spin * 0.3, x * 0.11 + 0.37)).g;
+    float streamers = smoothstep(0.35, 0.85, st * 0.6 + st2 * 0.5);
+    float out1 = max(x - 1.0, 0.0);
+    float corona = exp(-out1 * (2.6 / max(uEclipse.z, 0.2))) * (0.45 + 0.9 * streamers) * step(1.0, x);
+    corona += exp(-out1 * 0.7 / max(uEclipse.z, 0.2)) * 0.18 * streamers;
+    vec3 coronaCol = mix(vec3(0.75, 0.08, 0.02), vec3(1.0, 0.48, 0.12), exp(-out1 * 1.8));
+    c += coronaCol * corona * uEclipse.x;
+    // the ring of fire hugging the rim, flaring where it turns toward you
+    float doppler = 0.55 + 0.45 * cos(ang - 2.4 + spin);
+    float flick = 0.85 + 0.15 * sin(ang * 13.0 + uTime * 3.1) * sin(ang * 7.0 - uTime * 2.3);
+    float ring = exp(-pow((x - 1.04) / (0.045 + 0.03 * doppler), 2.0)) * flick;
+    vec3 ringCol = mix(vec3(1.0, 0.22, 0.04), vec3(1.0, 0.9, 0.62), doppler);
+    c += ringCol * ring * (0.7 + 1.3 * doppler) * uEclipse.x;
+    // the second, fainter ring of light that went once round the hole
+    float ring2 = exp(-pow((x - 1.22) / 0.03, 2.0)) * (0.5 + 0.5 * doppler);
+    c += vec3(1.0, 0.55, 0.25) * ring2 * 0.35 * uEclipse.x;
+    // light split into its colours as it's bent: a broken spectral fringe
+    // round the rim, red inside to violet out, slowly wheeling
+    float ft = (x - 1.3) / (0.75 * max(uEclipse.y, 0.5));
+    float fringe = smoothstep(0.0, 0.15, ft) * (1.0 - smoothstep(0.75, 1.0, ft));
+    fringe *= smoothstep(0.3, 0.75, texture2D(uNoise, vec2(ang * 0.32 - spin * 0.5, 0.71)).g * 0.7 + 0.35 * doppler);
+    vec3 spec = clamp(abs(fract(ft * 0.8 + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+    c = mix(c, c * 0.5 + spec * 0.55, fringe * 0.5 * uEclipse.x);
+    gKeep = max(gKeep, fringe * 0.9);
+    // the hole itself
+    float hole = 1.0 - smoothstep(0.96, 1.0, x);
+    c = mix(c, vec3(0.0), hole * uEclipse.x);
+    gKeep = max(gKeep, min(1.0, max(ring * 1.3, corona * 1.6)) * (1.0 - hole));
+  }
+  if (sw > 0.0) {
+    float az = atan(d.x, -d.z);
+    c = hueRot(c, sw * 1.3 * sin(az * 3.0 + d.y * 9.0 + uTime * 0.35));
+  }
   c += (texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5) * 0.02;
   gl_FragColor = vec4(grade(c, uTrip), 1.0);
 }
@@ -2102,7 +2208,7 @@ export function makeEnvUniforms(env) {
     uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
-    uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 },
+    uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(),
   };
   writeEnvUniforms(u, env);
   return u;
@@ -2121,6 +2227,8 @@ export function writeEnvUniforms(u, env) {
   const sk = env.skyFx || {};
   u.uSkyFx.value.set(env.stars || 0, env.sun.size ? Math.cos(env.sun.size) : 2, env.moon ? Math.cos(env.moon.size) : 2, sk.smoke || 0);
   u.uSkyFx2.value.set(sk.rays || 0, sk.clouds || 0, sk.aurora || 0, sk.ring || 0);
+  const ec = env.eclipse || [0, 0, 1];
+  u.uEclipse.value.set(ec[0], ec[1] ?? 1, ec[2] ?? 1, 0);
   u.uLightDir.value.copy(dir(L.dir));
   setColor(u.uShadowTint.value, L.shadow);
   setColor(u.uHiTint.value, L.hi);
@@ -2208,6 +2316,7 @@ export function makeToonMaterial(env, o = {}) {
   const uniforms = withShared(env, {
     uAnim: { value: anim },
     uDreamK: { value: o.dream ?? (breathes ? 1 : 0) },
+    uClear: { value: o.clear ?? 0 },
     uWobble: { value: new THREE.Vector4(...(o.wobble || [0, 0, 1, 0])) },
     uFly: { value: new THREE.Vector4(...(o.fly || [0, 0, 0, 0])) },
     uMarkRepeat: { value: new THREE.Vector2(...(o.marks || [3, 3])) },
@@ -2219,6 +2328,7 @@ export function makeToonMaterial(env, o = {}) {
   if (o.kinds) defines.KINDS = '';
   if (o.splash) defines.SPLASH = '';
   if (o.wonky) defines.WONKY = '';
+  if (o.flame) defines.FLAME = '';
   if (o.sand) {
     // [seconds to run through, waist height, waist depth, floor below the waist]
     defines.SAND = '';
@@ -2247,7 +2357,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -2340,10 +2450,14 @@ export function makeBeamMaterial(env, o = {}) {
   });
 }
 
+// o.color: a light of its own colour rather than the world's (env.pool);
+// o.flicker: firelight, wavering.
 export function makePoolMaterial(env, o = {}) {
   const uniforms = withShared(env, { uAnim: { value: animVector(o.anim) } });
+  if (o.color) uniforms.uPool = { value: new THREE.Color(o.color) };
   return new THREE.ShaderMaterial({
     uniforms,
+    defines: o.flicker ? { FLICKER: '' } : {},
     vertexShader: VS_SHADOW,
     fragmentShader: FS_POOL,
     transparent: true,
@@ -2429,6 +2543,7 @@ export function makeGemMaterial(env, o = {}) {
     uKindC: v4((k) => [...rgbOf(k.second ?? '#ffffff'), k.rings === 'nested' ? 2 : k.rings ? 1 : 0]),
     uKindD: v4((k) => [...rgbOf(k.veinColor ?? '#ffffff'), k.veinColor ? 1 : 0]),
     uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, 0]),
+    uClear: { value: 1 },
   });
   return new THREE.ShaderMaterial({
     uniforms,

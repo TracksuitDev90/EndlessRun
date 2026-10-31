@@ -76,6 +76,29 @@ export class World {
     const b = new WorldBuilder(this);
     def.build(b);
     if (def.gem) b.gems(def.gem);
+    this.markObstacles();
+  }
+
+  // What you play against is kept readable however deep the dream goes: an
+  // obstacle never breathes (a hurdle swelling into a wall, or a wall
+  // squashing into a hurdle, would lie about what it is) and it cuts through
+  // the mist and fog more than the scenery round it (uClear).
+  markObstacles() {
+    const o = this.def.obstacles || {};
+    const names = new Set();
+    for (const spec of [...(o.L || []), ...(o.H || []), ...(o.W || []), o.LW, o.HW, o.SW]) {
+      if (!spec) continue;
+      names.add(spec.name);
+      if (spec.frame) names.add(spec.frame);
+      for (const n of spec.with || []) names.add(n);
+    }
+    for (const name of names) {
+      if (!this.batches.has(name)) continue;
+      for (const m of this.batches.get(name).materials) {
+        if (m.uniforms.uDreamK) m.uniforms.uDreamK.value = 0;
+        if (m.uniforms.uClear) m.uniforms.uClear.value = 1;
+      }
+    }
   }
 
   // Re-light for the n-th return to this world (0 = first time).
