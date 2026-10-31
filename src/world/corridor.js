@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import {
-  P, part, merge, mix,
+  P, part, merge, mix, moved,
   cloudParts, wallDoorParts, gateFrameParts, gateLeafParts, gateTop,
 } from './shapes.js';
 import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.js';
@@ -168,35 +168,51 @@ function hallWallsGeo() {
   return merge(parts);
 }
 
-function openDoorGeo() {
-  // A door standing open on light: just its frame here (the light, and the
-  // door swung back into the room beyond, are their own batch, doorLightGeo).
-  const w = 1.5;
-  const h = 3.1;
-  return merge([
-    part(P.box(0.18, h + 0.18, 0.26), C.cream, { x: -w / 2 - 0.09, y: (h + 0.18) / 2 }),
-    part(P.box(0.18, h + 0.18, 0.26), C.cream, { x: w / 2 + 0.09, y: (h + 0.18) / 2 }),
-    part(P.box(w + 0.36, 0.18, 0.26), C.cream, { y: h + 0.09 }),
-    part(P.box(w + 0.2, 0.05, 0.3), C.creamDark, { y: 0.025, z: 0.05 }),
-  ]);
+// A door standing open on light: its frame, deep enough to stand proud of
+// the wall's wainscot and rails (so none of them run across the opening),
+// and the door itself — panelled, in its own colour (tinted per door) — swung
+// out into the hall on the jamb further down it (hinge: which side that is,
+// +1 on the left wall, -1 on the right), so it never hides the light from
+// down the hall. The light is its own batch (doorLightGeo).
+const DOOR_W = 1.5;
+const DOOR_H = 3.1;
+function openDoorGeo(hinge) {
+  const w = DOOR_W;
+  const h = DOOR_H;
+  const parts = [
+    part(P.box(0.2, h + 0.2, 0.42), C.cream, { x: -w / 2 - 0.1, y: (h + 0.2) / 2, z: 0.06 }),
+    part(P.box(0.2, h + 0.2, 0.42), C.cream, { x: w / 2 + 0.1, y: (h + 0.2) / 2, z: 0.06 }),
+    part(P.box(w + 0.4, 0.2, 0.42), C.cream, { y: h + 0.1, z: 0.06 }),
+    part(P.box(w + 0.2, 0.05, 0.44), C.creamDark, { y: 0.025, z: 0.08 }),
+  ];
+  // the leaf, built hinged at the origin (reaching across to -hinge), then
+  // swung open about its hinge
+  const t = 0.09;
+  const k = -hinge;
+  const leaf = [part(P.box(w, h - 0.04, t), '#ffffff', { x: k * w / 2, y: (h - 0.04) / 2, tint: 1 })];
+  const pw = w * 0.32;
+  const ph = h * 0.3;
+  for (const face of [-1, 1]) {
+    for (const px of [w * 0.28, w * 0.72]) {
+      for (const py of [h * 0.27, h * 0.68]) {
+        leaf.push(part(P.box(pw, ph, 0.03), '#d0d0d0', { x: k * px, y: py, z: face * (t / 2 + 0.01), tint: 1, outline: 0.6 }));
+      }
+    }
+    leaf.push(part(P.sphere(0.06, 8, 6), C.gold, { x: k * w * 0.88, y: h * 0.47, z: face * (t / 2 + 0.05) }));
+  }
+  // the edge that faced the light picks it up
+  leaf.push(part(P.box(0.02, h - 0.1, t + 0.01), '#fff6dc', { x: k * (w - 0.005), y: h / 2, emit: 0.6, outline: 0 }));
+  parts.push(...moved(leaf, { x: hinge * (w / 2), z: 0.24, ry: hinge * 0.98 }));
+  return merge(parts);
 }
 
-// The light in an open door (tinted per door): the doorway full of it,
-// brightest low down where it pours over the threshold, and the door itself
-// swung back into the room beyond — its dark shape cut out against the
-// light, a bright edge where the light catches it. (Flat on the wall: from
-// down the hall a door swung out would hide the light.)
+// The light in an open door (tinted per door): the doorway brimming with it,
+// brightest low down where it pours over the threshold. It stands in front of
+// the wall's trim and fills the opening edge to edge, so nothing of the wall
+// shows through: there's nothing beyond the door but light.
 function doorLightGeo() {
-  const leaf = new THREE.Shape();
-  leaf.moveTo(0.75, 0);
-  leaf.lineTo(0.75, 3.1);
-  leaf.lineTo(0.3, 2.84);
-  leaf.lineTo(0.3, 0.18);
-  leaf.closePath();
   return merge([
-    part(P.box(1.5, 3.1, 0.05, 1, 4, 1), null, { y: 1.55, z: -0.06, emit: 1, tint: 1, outline: 0, grad: ['#ffffff', '#6e6a7a', 0.1, 3.1] }),
-    part(new THREE.ShapeGeometry(leaf), [0.24, 0.24, 0.3], { z: -0.02, emit: 1, tint: 1, outline: 0 }),
-    part(P.box(0.035, 2.64, 0.01), '#ffffff', { x: 0.3, y: 1.51, z: -0.012, emit: 1, tint: 0.35, outline: 0 }),
+    part(P.box(DOOR_W + 0.06, DOOR_H + 0.04, 0.05, 1, 4, 1), null, { y: (DOOR_H + 0.04) / 2, z: 0.08, emit: 1, tint: 1, outline: 0, grad: ['#ffffff', '#cfc8dc', 0.2, DOOR_H] }),
   ]);
 }
 
@@ -254,18 +270,46 @@ function armchairGeo(width) {
   return merge(parts).translate(0, 0, -0.5);
 }
 
+// L · Stacks of books across the lane: bright cloth bindings, their spines
+// turned to you with gilt bands, now and then one turned to show its cream
+// page edges, a fat volume lying open on top of a stack.
+const BINDINGS = ['#e8402e', '#2f6ae0', '#f2c230', '#1fb8a6', '#b04ac8', '#3fae4a', '#ff8a3d', '#e84a8a'];
+function bookParts(parts, x, y, z, w, h, d, color, ry, pagesOut) {
+  const l = [
+    part(P.box(w, h, d), color, { outline: 0.7 }),
+    // the pages, set in from the cover on three sides
+    part(P.box(w - 0.05, h * 0.7, d - 0.03), '#fbf4e2', { z: pagesOut ? 0.016 : -0.016, outline: 0 }),
+  ];
+  if (!pagesOut) {
+    // the spine toward you: gilt bands and a label
+    for (const bx of [-w * 0.36, w * 0.36]) l.push(part(P.box(0.022, h * 0.86, 0.012), '#f6d46a', { x: bx, z: d / 2 + 0.005, outline: 0 }));
+    l.push(part(P.box(w * 0.34, h * 0.46, 0.012), '#fbf0d0', { z: d / 2 + 0.005, outline: 0 }));
+  }
+  parts.push(...moved(l, { x, y: y + h / 2, z, ry }));
+}
 function booksGeo() {
   const rnd = seeded(31);
   const parts = [];
-  for (const sx of [-0.62, 0, 0.62]) {
+  const xs = [-0.7, -0.23, 0.23, 0.7];
+  xs.forEach((sx, k) => {
     let y = 0;
-    const n = 5 + Math.floor(rnd() * 3);
-    for (let i = 0; i < n && y < 0.8; i++) {
-      const h = 0.1 + rnd() * 0.07;
-      parts.push(part(P.box(0.5 + rnd() * 0.12, h, 0.38 + rnd() * 0.1), BOOKS[Math.floor(rnd() * BOOKS.length)], { x: sx + (rnd() - 0.5) * 0.08, y: y + h / 2, ry: (rnd() - 0.5) * 0.4, outline: 0.7 }));
+    const top = 0.78 + rnd() * 0.12;
+    for (let i = 0; y < top - 0.08; i++) {
+      const h = Math.min(0.09 + rnd() * 0.07, top - y);
+      const w = 0.4 + rnd() * 0.08;
+      const d = 0.3 + rnd() * 0.08;
+      bookParts(parts, sx + (rnd() - 0.5) * 0.06, y, 0, w, h, d, BINDINGS[Math.floor(rnd() * BINDINGS.length)], (rnd() - 0.5) * 0.35, rnd() < 0.2);
       y += h;
     }
-  }
+    if (k === 1) {
+      // a big volume lying open on top
+      const oy = y;
+      for (const s of [-1, 1]) {
+        parts.push(part(P.box(0.3, 0.035, 0.36), '#8a2a2a', { x: sx + s * 0.15, y: oy + 0.04, rz: -s * 0.12, outline: 0.6 }));
+        parts.push(part(P.box(0.27, 0.03, 0.33), '#fffaf0', { x: sx + s * 0.14, y: oy + 0.07, rz: -s * 0.12, outline: 0.4 }));
+      }
+    }
+  });
   return merge(parts).translate(0, 0, -0.3);
 }
 
@@ -469,7 +513,8 @@ export default {
     b.toon('cloudSea', groundStrip(420, 16, '#f3f7fb', 8, { y: -16 }), { ink: 0, cap: 40 });
     b.toon('walls', hallWallsGeo(), { cap: 40, ink: 0.04, anim: 'rise' });
     b.toon('door', merge(wallDoorParts({ w: 1.5, h: 3.1, depth: 0.2 })), { cap: 200, anim: 'pop' });
-    b.toon('openDoor', openDoorGeo(), { cap: 60, anim: 'pop' });
+    b.toon('openDoor', openDoorGeo(1), { cap: 40, anim: 'pop' });
+    b.toon('openDoorR', openDoorGeo(-1), { cap: 40, anim: 'pop' });
     b.toon('painting', paintingsGeo(), { cap: 120, anim: 'pop', kinds: true, ink: 0 });
     b.toon('doorPane', doorLightGeo(), { cap: 48, anim: 'pop', ink: 0 });
     b.beam('doorShaft', doorShaftGeo(), { cap: 48, anim: 'pop' });
@@ -534,7 +579,7 @@ export default {
             // world beyond it: the light in the doorway, a glow round it and
             // more of it pooled on the floor in front
             const g = GLOWS[glows.deal(rng)];
-            ctx.put('openDoor', x, 0, dz, { ry, c: tint });
+            ctx.put(s < 0 ? 'openDoor' : 'openDoorR', x, 0, dz, { ry, c: tint });
             ctx.put('doorPane', x, 0, dz, { ry, c: g });
             ctx.put('doorShaft', x, 0, dz, { ry, c: g });
             ctx.put('glow', s * (WALL_X - 0.9), 1.7, dz, { s: 3.0, c: [g[0] * 0.75, g[1] * 0.75, g[2] * 0.75] });

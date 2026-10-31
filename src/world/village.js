@@ -4,6 +4,10 @@ import {
 } from './shapes.js';
 import { shaftParts, giantFlowerParts } from './whimsy.js';
 import { crystal, stone, barrel, nugget, blade, lumps, rough } from './gems.js';
+import {
+  orangeCratesGeo, raspberryBedGeo, fruitBasketsGeo, grapefruitCartGeo, appleCartGeo, fruitStandGeo, busTimetableGeo,
+  shopfrontParts, marketStallGeo, busShelterGeo, benchGeo, postboxGeo, bikeGeo, gardenFenceGeo,
+} from './lane-art.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
@@ -116,7 +120,8 @@ const BLOSSOM = ['#ffb3c8', '#ffd0dc', '#ffffff', '#f6a8c8'];
 const PETALS = ['#ffffff', '#ffe36a', '#ff9ab8', '#c8a0ff', '#ff8a5a', '#8fd0ff'];
 const GATE_DEPTH = 1.8;
 
-function houseGeo({ w, h, d, roofH, floors, cols, lit, chimney, seed }) {
+// A house facing the road; shop: its ground floor is left for a shopfront.
+function houseParts({ w, h, d, roofH, floors, cols, lit, chimney, seed, shop = false }) {
   const parts = [];
   parts.push(part(P.box(w, h, d), '#ffffff', { y: h / 2, tint: 1 }));
   parts.push(part(P.box(w + 0.14, 0.4, d + 0.14), C.stoneDark, { y: 0.2 }));
@@ -139,19 +144,24 @@ function houseGeo({ w, h, d, roofH, floors, cols, lit, chimney, seed }) {
     const y = 0.6 + floorH * (f + 0.55);
     for (let c = 0; c < cols; c++) {
       const x = (c - (cols - 1) / 2) * (w / cols);
-      if (f === 0 && c === Math.floor(cols / 2) && cols % 2 === 1) continue;
+      if (f === 0 && (shop || (c === Math.floor(cols / 2) && cols % 2 === 1))) continue;
       win(x, y, d / 2 + 0.02, 0);
     }
     win(w / 2 + 0.02, y, 0, Math.PI / 2);
     win(-w / 2 - 0.02, y, 0, Math.PI / 2);
   }
+  if (shop) return parts;
   // front door with a little awning
   const dx = cols % 2 === 1 ? 0 : w * 0.25;
   parts.push(part(P.box(0.95, 1.75, 0.14), C.frame, { x: dx, y: 0.95, z: d / 2 + 0.02 }));
   parts.push(part(P.box(0.75, 1.6, 0.18), C.door, { x: dx, y: 0.88, z: d / 2 + 0.02 }));
   parts.push(part(P.box(1.25, 0.12, 0.6), C.mossLo, { x: dx, y: 1.95, z: d / 2 + 0.3, mark: 0.4 }));
-  return merge(parts);
+  return parts;
 }
+const houseGeo = (o) => merge(houseParts(o));
+// A house with a shop on its ground floor (kind: 'grocer' or 'bakery').
+const SHOP = { w: 3.8, h: 4.6, d: 3.3, roofH: 2.0, floors: 2, cols: 3, lit: 0.3, chimney: false };
+const shopGeo = (kind, seed) => merge([...houseParts({ ...SHOP, seed, shop: true }), ...shopfrontParts({ w: SHOP.w, d: SHOP.d, kind })]);
 
 function hedgeGeo(width) {
   const r = 0.42;
@@ -168,48 +178,6 @@ function hedgeGeo(width) {
   return merge(parts).translate(0, 0, -0.45);
 }
 
-function cratesGeo() {
-  const parts = [];
-  const crate = (x, w, h, d, ry) => {
-    parts.push(part(P.box(w, h, d), C.wood, { x, y: h / 2, ry }));
-    for (const yy of [0.18, h - 0.18]) parts.push(part(P.box(w + 0.04, 0.1, d + 0.04), C.woodDark, { x, y: yy, ry, outline: 0.5 }));
-  };
-  crate(-0.48, 0.9, 0.78, 0.86, 0.1);
-  crate(0.5, 0.82, 0.62, 0.8, -0.12);
-  for (let i = 0; i < 7; i++) {
-    parts.push(part(P.sphere(0.12, 8, 6), C.orange, { x: 0.38 + (i % 3) * 0.2 - 0.1, y: 0.7 + Math.floor(i / 3) * 0.06, z: (i % 2) * 0.2 - 0.12, outline: 0.6 }));
-  }
-  return merge(parts).translate(0, 0, -0.45);
-}
-
-function signGeo() {
-  // Painted shop sign slung between two posts. Its bottom edge (and the leafy
-  // garland along it) sits on the duck line, with open road beneath.
-  const D = CONFIG.duckLine;
-  const top = 2.75;
-  const boardH = 0.78;
-  const by = D + 0.05 + boardH / 2;
-  const parts = [
-    part(P.box(0.16, top, 0.16), C.woodDark, { x: -0.98, y: top / 2 }),
-    part(P.box(0.16, top, 0.16), C.woodDark, { x: 0.98, y: top / 2 }),
-    part(P.box(2.3, 0.18, 0.2), C.wood, { y: top - 0.1 }),
-    part(P.box(0.03, top - 0.1 - (by + boardH / 2), 0.03), '#333', { x: -0.6, y: (top - 0.1 + by + boardH / 2) / 2, outline: 0 }),
-    part(P.box(0.03, top - 0.1 - (by + boardH / 2), 0.03), '#333', { x: 0.6, y: (top - 0.1 + by + boardH / 2) / 2, outline: 0 }),
-    part(P.box(1.72, boardH + 0.1, 0.1), C.woodDark, { y: by }),
-    part(P.box(1.56, boardH - 0.06, 0.14), C.canopy, { y: by }),
-    part(P.sphere(0.22, 10, 8), C.leafLo, { x: -0.35, y: by, z: 0.07, sz: 0.3 }),
-    part(P.sphere(0.12, 8, 6), C.orange, { x: 0.12, y: by + 0.06, z: 0.08, sz: 0.4 }),
-    part(P.sphere(0.12, 8, 6), C.orange, { x: 0.42, y: by - 0.05, z: 0.08, sz: 0.4 }),
-  ];
-  // leafy trim hanging along the bottom edge marks the duck line
-  for (let i = 0; i < 9; i++) {
-    const x = -0.8 + (1.6 * i) / 8;
-    parts.push(part(P.sphere(0.1, 7, 5), null, { x, y: D + 0.1, z: 0.02, sy: 0.85, grad: [C.bushLo, C.bushHi, D, D + 0.2], mark: 0.6 }));
-    if (i % 2 === 1) parts.push(part(P.sphere(0.055, 6, 4), i % 4 === 1 ? '#ffffff' : '#ffb3c8', { x, y: D + 0.12, z: 0.11, outline: 0.5 }));
-  }
-  return merge(parts).translate(0, 0, -0.15);
-}
-
 function pergolaGeo() {
   const parts = [];
   for (const x of [-3.95, 3.95]) parts.push(part(P.box(0.24, 2.6, 0.24), C.woodDark, { x, y: 1.3 }));
@@ -223,31 +191,6 @@ function pergolaGeo() {
     if (i % 2 === 0) parts.push(part(P.sphere(0.09, 6, 4), i % 4 === 0 ? '#ffffff' : '#ffb3c8', { x: x + 0.15, y: fy - 0.2, z: 0.35, outline: 0.5 }));
   }
   return merge(parts).translate(0, 0, -0.2);
-}
-
-function cartGeo() {
-  const parts = [];
-  const L = 3.0;
-  parts.push(part(P.box(1.7, 0.8, L), C.wood, { y: 0.95 }));
-  parts.push(part(P.box(1.76, 0.12, L + 0.06), C.woodDark, { y: 1.38 }));
-  for (const z of [-L * 0.3, L * 0.3]) {
-    for (const x of [-0.92, 0.92]) parts.push(part(P.cyl(0.46, 0.46, 0.12, 12), C.woodDark, { x, y: 0.46, z, rz: Math.PI / 2 }));
-  }
-  for (const x of [-0.78, 0.78]) {
-    for (const z of [-L / 2 + 0.1, L / 2 - 0.1]) parts.push(part(P.box(0.08, 1.4, 0.08), C.woodDark, { x, y: 2.05, z }));
-  }
-  // striped canopy
-  parts.push(part(P.prism(2.1, 0.6, L + 0.4), C.canopy, { y: 2.72 }));
-  for (let i = 0; i < 5; i++) {
-    parts.push(part(P.box(2.14, 0.08, 0.32), C.cream, { y: 2.74, z: -L / 2 + 0.1 + i * 0.7, outline: 0 }));
-  }
-  // produce
-  for (let i = 0; i < 12; i++) {
-    const z = -L / 2 + 0.35 + (i % 6) * 0.45;
-    const x = i < 6 ? -0.35 : 0.35;
-    parts.push(part(P.sphere(0.17, 8, 6), i % 3 === 0 ? C.canopy : C.orange, { x, y: 1.55, z, outline: 0.6 }));
-  }
-  return merge(parts).translate(0, 0, -L / 2);
 }
 
 // A long low bed of mixed flowers for the verge on later laps.
@@ -305,6 +248,9 @@ export default {
   doorColor: '#f2b93b',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
+  // the breather world: on every lap its obstacles come further apart and its
+  // combinations stay simple (CONFIG.obstacles.calm)
+  calm: true,
   env: {
     sky: ['#7cbf46', '#eef8b4', '#3d8a36'],
     bloom: ['#f2b93b', '#a6e04a', '#3fb8b0'], // the colours its doorway bloom is made of
@@ -385,6 +331,15 @@ export default {
     b.toon('bush', merge(bushParts({ r: 0.85, lo: C.bushLo, hi: C.bushHi })), { cap: 300, anim: 'pop', marks: [2.2, 1.6], wobble: [0.006, 0, 1.4, 0] });
     b.toon('houseA', houseGeo({ w: 2.9, h: 5.0, d: 3.0, roofH: 1.9, floors: 2, cols: 2, lit: 0.25, chimney: true, seed: 11 }), { cap: 80, anim: 'pop', marks: [1, 1] });
     b.toon('houseB', houseGeo({ w: 3.8, h: 4.1, d: 3.3, roofH: 2.0, floors: 2, cols: 3, lit: 0.3, chimney: false, seed: 23 }), { cap: 80, anim: 'pop', marks: [1, 1] });
+    // the neighbourhood: shops, a market stall, the bus stop, street furniture
+    b.toon('shopGrocer', shopGeo('grocer', 31), { cap: 24, anim: 'pop', marks: [1, 1] });
+    b.toon('shopBakery', shopGeo('bakery', 37), { cap: 24, anim: 'pop', marks: [1, 1] });
+    b.toon('stall', marketStallGeo(), { cap: 16, anim: 'pop', marks: [2, 2] });
+    b.toon('shelter', busShelterGeo(), { cap: 8, anim: 'pop', marks: [2, 2] });
+    b.toon('bench', benchGeo(), { cap: 24, anim: 'pop' });
+    b.toon('postbox', postboxGeo(), { cap: 16, anim: 'pop' });
+    b.toon('bike', bikeGeo(), { cap: 16, anim: 'pop', ink: 0.03 });
+    b.toon('fence', gardenFenceGeo(), { cap: 40, anim: 'pop', marks: [2.4, 2] });
     b.toon('cypress', merge(cypressParts({ h: 9.6, r: 1.5, lo: C.leafLo, hi: C.leafHi, trunk: C.trunk, seg: 9 })), { cap: 420, anim: 'pop', marks: [3, 2.6], wobble: [0.0007, 0, 1.2, 0], ink: 0.05 });
     b.toon('cypressFar', merge(cypressParts({ h: 9.6, r: 1.5, lo: C.leafLo, hi: C.leafHi, trunk: C.trunk, seg: 7, mark: 0.6 })), { cap: 260, anim: 'pop', marks: [3, 2.6], ink: 0 });
     b.toon('lamp', merge(lanternPostParts({ h: 3.1, pole: C.frame })), { cap: 40, anim: 'pop' });
@@ -406,21 +361,33 @@ export default {
     // obstacles
     b.toon('hedge', hedgeGeo(1.9), { cap: 24, anim: 'popEarly', marks: [1, 1] });
     b.toon('hedgeWide', hedgeGeo(7.6), { cap: 10, anim: 'popEarly', marks: [1, 1] });
-    b.toon('crates', cratesGeo(), { cap: 24, anim: 'popEarly' });
-    b.toon('sign', signGeo(), { cap: 24, anim: 'popEarly', marks: [2, 2] });
+    b.toon('crates', orangeCratesGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
+    b.toon('raspberries', raspberryBedGeo(), { cap: 16, anim: 'popEarly', marks: [2.4, 2] });
+    b.toon('baskets', fruitBasketsGeo(), { cap: 16, anim: 'popEarly', marks: [3, 3] });
+    b.toon('timetable', busTimetableGeo(), { cap: 24, anim: 'popEarly', marks: [2, 2] });
     b.toon('pergola', pergolaGeo(), { cap: 10, anim: 'popEarly', marks: [2.2, 1.6] });
-    b.toon('cart', cartGeo(), { cap: 24, anim: 'popEarly' });
-    b.toon('topiary', topiaryGeo(), { cap: 24, anim: 'popEarly', marks: [3, 2.6] });
+    b.toon('grapefruitCart', grapefruitCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('appleCart', appleCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('fruitStand', fruitStandGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('topiary', topiaryGeo(), { cap: 16, anim: 'popEarly', marks: [3, 2.6] });
 
     // threshold
     b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, marks: [1, 1], ink: 0.06 });
     b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
+  // The market in the road: low crates, baskets and raspberry beds to jump,
+  // the bus stop's timetable hung over a lane to slide under, and fruit carts,
+  // a fruit stand and potted cypresses to go round.
   obstacles: {
-    L: [{ name: 'hedge', len: 0.9 }, { name: 'crates', len: 0.9 }],
-    H: [{ name: 'sign', len: 0.35 }],
-    W: [{ name: 'cart', len: 3.0 }, { name: 'topiary', len: 1.5 }],
+    L: [{ name: 'hedge', len: 0.9 }, { name: 'crates', len: 0.9 }, { name: 'raspberries', len: 0.8 }, { name: 'baskets', len: 0.85 }],
+    H: [{ name: 'timetable', len: 0.35 }],
+    W: [
+      { name: 'grapefruitCart', len: 3.0 },
+      { name: 'appleCart', len: 2.2 },
+      { name: 'fruitStand', len: 1.4, tints: ['#ffffff', '#bff0d0', '#ffd0c8', '#d8e8ff'] },
+      { name: 'topiary', len: 1.5 },
+    ],
     LW: { name: 'hedgeWide', len: 0.9 },
     HW: { name: 'pergola', len: 0.4 },
   },
@@ -442,31 +409,67 @@ export default {
     for (const s of [-1, 1]) {
       ctx.put('curb', s * 4.62, 0, 0);
       const lampHere = (ctx.index + (s > 0 ? 1 : 0)) % 3 === 0;
+      // The verge's set pieces, each taking the place of what would stand
+      // there (hedge balls, flowers), never adding to it: now and then the bus
+      // stop's shelter, or a market stall; a bench, a post box or a parked
+      // bike in place of a hedge ball.
+      const shelterHere = !lampHere && (ctx.index + (s > 0 ? 5 : 0)) % 11 === 4;
+      const stallAt = !shelterHere && rng.chance(0.16) ? rng.float(3.5, 12.5) : -99;
+      const verge = shelterHere ? [3.6, 8.6] : stallAt > 0 ? [stallAt - 2, stallAt + 2] : [-99, -99];
+      const clear = (dz, pad = 0) => dz < verge[0] - pad || dz > verge[1] + pad;
+      if (shelterHere) {
+        ctx.put('shelter', s * 7.05, 0, 6.1, { ry: -s * Math.PI / 2 });
+        ctx.put('shadow', s * 7.0, 0.03, 6.1, { sx: 2.4, sz: 4 });
+      } else if (stallAt > 0) {
+        ctx.put('stall', s * 7.35, 0, stallAt, { ry: -s * 0.55 });
+        ctx.put('shadow', s * 7.35, 0.03, stallAt, { sx: 2.6, sz: 2.6 });
+      }
+      const furnAt = rng.int(0, 3);
+      const furn = rng.weighted([[null, 5], ['bench', 1.4], ['postbox', 0.7], ['bike', 1]]);
       // hedge balls along the lane
       for (let i = 0; i < 4; i++) {
         const dz = 1.5 + i * 3.8 + rng.float(-0.6, 0.6);
         if (lampHere && Math.abs(dz - 8) < 1.6) continue;
         const sc = rng.float(0.75, 1.2);
         const tone = rng.float(0.88, 1.08);
-        ctx.put('bush', s * rng.float(5.35, 5.9), 0, dz, { s: sc, ry: rng.float(0, 6.28), c: [tone, 1, tone * 0.95] });
+        const ry = rng.float(0, 6.28);
+        const x = s * rng.float(5.35, 5.9);
+        if (!clear(dz, 0.6)) continue;
+        if (i === furnAt && furn) {
+          if (furn === 'bench') ctx.put('bench', s * 5.75, 0, dz, { ry: -s * (Math.PI / 2 - 0.45) });
+          else if (furn === 'postbox') ctx.put('postbox', s * 5.55, 0, dz, { ry: -s * 0.7 });
+          else ctx.put('bike', s * 5.5, 0, dz, { ry: s * (Math.PI / 2 - 0.25) });
+          continue;
+        }
+        ctx.put('bush', x, 0, dz, { s: sc, ry, c: [tone, 1, tone * 0.95] });
       }
       if (lampHere) {
         ctx.put('lamp', s * 5.05, 0, 8, { ry: rng.float(0, 1) });
         ctx.put('glow', s * 5.05, 3.3, 8, { s: 2.2, c: [1, 0.78, 0.4] });
       }
-      // houses facing the lane
+      // houses facing the lane, now and then a shop on a ground floor
       {
+        const shopOf = () => (rng.chance(0.16) ? (rng.chance(0.55) ? 'shopGrocer' : 'shopBakery') : null);
         let dz = rng.float(0.5, 3);
+        let shop = shopOf();
         while (dz < 15) {
-          const wide = rng.chance(0.4);
+          const wide = shop ? true : rng.chance(0.4);
           const tint = mix(rng.pick(HOUSE_TINTS), '#ffffff', rng.float(0, 0.12));
-          const x = s * (wide ? rng.float(10.2, 11.4) : rng.float(9.6, 10.8));
-          ctx.put(wide ? 'houseB' : 'houseA', x, 0, dz + (wide ? 1.8 : 1.6), { ry: rng.float(-0.16, 0.16), c: tint, s: rng.float(0.92, 1.06) });
+          const x = s * (shop ? rng.float(10.9, 11.6) : wide ? rng.float(10.2, 11.4) : rng.float(9.6, 10.8));
+          ctx.put(shop || (wide ? 'houseB' : 'houseA'), x, 0, dz + (wide ? 1.8 : 1.6), { ry: rng.float(-0.16, 0.16) * (shop ? 0.5 : 1), c: tint, s: rng.float(0.92, 1.06) });
           ctx.put('shadow', x + s * 0.6, 0.03, dz + 1.8, { sx: wide ? 5.6 : 4.6, sz: 4.8 });
-          if (rng.chance(0.5)) ctx.put('pot', s * (x * s - (wide ? 2.3 : 1.8)), 0, dz + 3.1 + rng.float(0, 0.8), { s: rng.float(0.8, 1.1) });
+          // a front garden: a picket fence along the lane, raspberry canes
+          // grown up behind it; or a pot by the door
+          const fence = !shop && rng.chance(0.22);
+          if (fence) ctx.put('fence', s * 8.1, 0, dz + 1.7, { ry: -s * Math.PI / 2 });
+          else if (!shop && rng.chance(0.5)) ctx.put('pot', s * (x * s - (wide ? 2.3 : 1.8)), 0, dz + 3.1 + rng.float(0, 0.8), { s: rng.float(0.8, 1.1) });
           const gap = wide ? rng.float(5.8, 7.6) : rng.float(4.8, 6.6);
-          // a cypress (or, on later laps, a blossom tree) in the gap between houses
-          if (ctx.visit >= 1 && rng.chance(0.35)) {
+          const next = shopOf();
+          // a cypress (or, on later laps, a blossom tree) in the gap between
+          // houses — left out in front of a shop, to keep its pavement clear
+          if (next) {
+            // (nothing)
+          } else if (ctx.visit >= 1 && rng.chance(0.35)) {
             ctx.put('blossomTree', s * rng.float(8.8, 9.6), 0, dz + gap - 0.6, { s: rng.float(0.8, 1.0), c: mix(rng.pick(BLOSSOM), '#ffffff', 0.35), ry: rng.float(0, 6.28) });
           } else if (rng.chance(0.65)) {
             const sc = rng.float(1.0, 1.35);
@@ -474,18 +477,24 @@ export default {
             ctx.put('shadow', s * 9.1, 0.03, dz + gap - 0.6, { sx: 2.6, sz: 2.6 });
           }
           dz += gap;
+          shop = next;
         }
       }
       // flowers in the verge (a lot more of them on later laps)
       const blooms = ctx.visit >= 1 ? 6 : 2;
       for (let i = 0; i < blooms; i++) {
-        ctx.put('flowers', s * rng.float(6.2, 7.8), 0, rng.float(0, 16), { s: rng.float(0.8, 1.4), ry: rng.float(0, 6.28) });
+        const dz = rng.float(0, 16);
+        const x = s * rng.float(6.2, 7.8);
+        const o = { s: rng.float(0.8, 1.4), ry: rng.float(0, 6.28) };
+        if (clear(dz, 0.8)) ctx.put('flowers', x, 0, dz, o);
       }
       // sun shafts slanting down between the trees
       if (rng.chance(0.55)) ctx.put('shaft', s * rng.float(6.5, 12), 6.2, rng.float(2, 14), { c: [rng.float(0.6, 1), 1, 1], s: rng.float(0.8, 1.25) });
       if (ctx.visit >= 1) {
         // flower beds along the verge, blossom trees among the cypresses
-        ctx.put('flowerBed', s * 7.05, 0, rng.float(4, 12), { ry: rng.float(-0.1, 0.1), s: rng.float(0.9, 1.15) });
+        const bed = rng.float(4, 12);
+        const o = { ry: rng.float(-0.1, 0.1), s: rng.float(0.9, 1.15) };
+        if (clear(bed, 2.6)) ctx.put('flowerBed', s * 7.05, 0, bed, o);
         if (rng.chance(0.6)) ctx.put('blossomTree', s * rng.float(12.5, 16), 0, rng.float(0, 16), { s: rng.float(0.9, 1.3), c: mix(rng.pick(BLOSSOM), '#ffffff', 0.4), ry: rng.float(0, 6.28) });
       }
       if (ctx.visit >= 2 && rng.chance(0.75)) {

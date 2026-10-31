@@ -136,6 +136,20 @@ export class ObstacleField {
     return 1 - Math.exp(-Math.max(0, t) / CONFIG.obstacles.ramp);
   }
 
+  // The difficulty a stretch of road at d is laid at. A breather world
+  // (def.calm, the Cypress Lane) takes only a share of it on every lap, so its
+  // obstacles stay further apart and its combinations simpler than anywhere
+  // else, while still tightening a little as the run goes on.
+  difficultyFor(d, t) {
+    const calm = this.calmAt(d);
+    return this.difficultyAt(t) * (calm ? calm.diff : 1);
+  }
+
+  // The breather settings (CONFIG.obstacles.calm) if the world at d is one.
+  calmAt(d) {
+    return this.game.course.segAt(d).world.def.calm ? CONFIG.obstacles.calm : null;
+  }
+
   clear() {
     for (const g of this.groups) g.world.removeOwner(g);
     this.groups.length = 0;
@@ -197,10 +211,12 @@ export class ObstacleField {
     }
     const eta = runTime + (d - dist) / Math.max(game.speed, 6);
     const v = game.speedAt(eta);
-    const diff = this.difficultyAt(eta);
+    const calm = this.calmAt(d);
+    const diff = this.difficultyFor(d, eta);
     const tutorial = this.tutorial.length > 0;
-    const rows = tutorial ? [this.tutorial.shift()] : this.pick(diff);
-    const rowGap = lerp(o.rowGapEasy, o.rowGapHard, diff);
+    const rows = tutorial ? [this.tutorial.shift()] : this.pick(diff, calm);
+    const space = calm ? calm.space : 1;
+    const rowGap = lerp(o.rowGapEasy, o.rowGapHard, diff) * space;
     let last = null;
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -219,7 +235,7 @@ export class ObstacleField {
       }
     }
     // rest before the next pattern: long at first, tightening with the run
-    let gap = tutorial ? o.tutorialGap : lerp(o.gapEasy, o.gapHard, diff) * r.float(o.gapJitter[0], o.gapJitter[1]);
+    let gap = tutorial ? o.tutorialGap : lerp(o.gapEasy, o.gapHard, diff) * space * r.float(o.gapJitter[0], o.gapJitter[1]);
     if (!tutorial && --this.untilBreather <= 0) {
       gap *= o.breatherMul;
       this.untilBreather = r.int(o.breatherEvery[0], o.breatherEvery[1]);
@@ -228,10 +244,13 @@ export class ObstacleField {
     this.nextD = d + Math.max(12, v * gap);
   }
 
-  pick(diff) {
+  // calm (a breather world): only the gentler patterns, however far the run
+  // has got (calm.most: the hardest pattern's unlock it still deals), with
+  // lone obstacles dealt more often.
+  pick(diff, calm) {
     const r = this.rng;
-    const avail = PATTERNS.filter((p) => diff >= p.min);
-    const p = r.weighted(avail.map((p) => [p, p.w]));
+    const avail = PATTERNS.filter((p) => diff >= p.min && (!calm || p.min <= calm.most));
+    const p = r.weighted(avail.map((p) => [p, p.w * (calm && p.min === 0 ? calm.lone : 1)]));
     return p.make(r);
   }
 

@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
+import { P, part, merge, moved, rod, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
 import { shaftParts } from './whimsy.js';
 import { crystal, stone, crystalPoint, rough, nugget, octahedron } from './gems.js';
 import { groundStrip } from '../render/geo.js';
@@ -257,10 +257,10 @@ function boulderGeo(r, seed, detail = 1) {
 }
 
 // A boulder sitting on the ground (bottom near y = 0), mossy on top.
-function rockPart({ r, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, seed = 1, detail = 1, moss = true, ry = 0 }) {
+function rockPart({ r, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, seed = 1, detail = 1, moss = true, ry = 0, tint = 0 }) {
   const cy = y + r * sy * 0.78;
   return part(boulderGeo(r, seed, detail), null, {
-    x, y: cy, z, sx, sy, sz, ry,
+    x, y: cy, z, sx, sy, sz, ry, tint,
     grad: moss ? [C.rockLo, C.mossHi, cy - r * sy * 0.2, cy + r * sy * 1.05] : [C.rockLo, C.rockHi, cy - r * sy, cy + r * sy],
     mark: moss ? 0.55 : 0.2,
   });
@@ -310,64 +310,192 @@ function pondShapeGeo(rx, rz, seed, grow = 0) {
 }
 
 // A water surface ready for a batch (tinted per instance, no ink).
-function waterGeo(shape, y = 0) {
-  return merge([part(shape, C.water, { y, tint: 1, outline: 0 })]);
-}
-
-// Stones strung along a bank from x0 to x1 at depth z.
-function bankStones(parts, rnd, x0, x1, z, { big = 0.26, step = 0.42, seed = 0 } = {}) {
-  for (let x = x0; x < x1; x += step * (0.75 + rnd() * 0.5)) {
-    const r = big * (0.45 + rnd() * 0.6);
-    parts.push(rockPart({ r, x, y: -r * 0.3, z: z + (rnd() - 0.5) * 0.14, sx: 1.2, sy: 0.75, seed: seed + x * 7.3, detail: 0, moss: rnd() < 0.5, ry: rnd() * 6 }));
-  }
+function waterGeo(shape, y = 0, color = C.water, emit = 0) {
+  return merge([part(shape, color, { y, tint: 1, outline: 0, emit })]);
 }
 
 // --- obstacles ------------------------------------------------------------------
-// L · A little creek across one lane, banked with stones (jump it). The water
-// itself is its own batch (creekWater), drawn with the water material.
-const CREEK_W = 2.1;
-function creekStonesGeo(half, seed) {
+// LW · The creek across the whole path (jump it — it's water, you can't land
+// in it). Seen from the run it's a band lying almost edge-on, so everything
+// about it is made to read at a glance: the water a bright teal ribbon with
+// glints and pale foam along both edges, framed in pale sand and shingle; the
+// near bank kept low (so nothing hides the water) and the far bank raised — an
+// earth lip with big stones, reeds and ferns standing along it — a dark
+// backdrop the water shows up against. The water itself is its own batch
+// (creekWideWater), drawn with the water material.
+const CREEK_W = 2.6;
+const CREEK_WATER = '#2f93a2';
+function foamStrip(parts, x0, x1, z, w, seed) {
+  parts.push(part(creekShapeGeo(x0, x1, w, seed, 0.06), '#dff7f2', { y: 0.05, z, emit: 0.55, outline: 0 }));
+}
+function creekWideStonesGeo(seed) {
   const rnd = seeded(seed);
-  const parts = [];
-  // wet earth framing the water
-  parts.push(part(creekShapeGeo(-half - 0.1, half + 0.1, CREEK_W, seed, 0.1, -0.12), C.mud, { y: 0.012, outline: 0 }));
-  bankStones(parts, rnd, -half + 0.05, half, -0.06, { seed });
-  bankStones(parts, rnd, -half + 0.05, half, -CREEK_W + 0.06, { seed: seed + 3 });
-  // the stream runs in under a big stone at either end
-  for (const s of [-1, 1]) {
-    parts.push(rockPart({ r: 0.42, x: s * (half + 0.12), y: -0.1, z: -CREEK_W / 2 + s * 0.1, sx: 1.1, sy: 0.9, sz: 1.3, seed: seed + s * 11 }));
-    for (let i = 0; i < 3; i++) {
-      const h = 0.45 + rnd() * 0.3;
-      const rx = s * (half + 0.2 + rnd() * 0.35);
-      const rz = -0.25 - rnd() * (CREEK_W - 0.5);
-      parts.push(part(P.cyl(0.012, 0.016, h, 3), C.fern, { x: rx, y: h / 2, z: rz, rz: (rnd() - 0.5) * 0.3, outline: 0 }));
-      parts.push(part(P.capsule(0.035, 0.12, 2, 5), '#5a3a22', { x: rx, y: h - 0.05, z: rz, outline: 0.5 }));
+  const half = 14;
+  const W = CREEK_W;
+  const parts = [
+    // pale sand and shingle round the water, shaping its edge
+    part(creekShapeGeo(-half, half, W, seed, 0.22, -0.3), '#9a8a5c', { y: 0.014, outline: 0 }),
+    part(creekShapeGeo(-half, half, W, seed, 0.22, -0.12), '#6a5c3c', { y: 0.02, outline: 0 }),
+  ];
+  foamStrip(parts, -half, half, -0.04, 0.2, seed + 1);
+  foamStrip(parts, -half, half, -W + 0.3, 0.22, seed + 2);
+  // white riffles where the stream runs fast, standing a little proud of the
+  // water so they catch the eye even with the creek seen nearly edge-on
+  for (let x = -half + 0.3; x < half; x += 0.55 + rnd() * 0.5) {
+    for (const zz of [0.35 + rnd() * 0.3, 1.2 + rnd() * 0.4, 1.85 + rnd() * 0.25]) {
+      if (rnd() < 0.35) continue;
+      parts.push(part(P.sphere(0.16 + rnd() * 0.1, 7, 3), '#c8eeec', { x, y: 0.045, z: -zz, sx: 2.4, sy: 0.12, sz: 0.22, ry: (rnd() - 0.5) * 0.25, emit: 0.45, outline: 0 }));
     }
+  }
+  // the near bank: flat pebbles, low enough that the water shows over them
+  for (let x = -half + 0.2; x < half; x += 0.34 * (0.7 + rnd() * 0.6)) {
+    const r = 0.09 + rnd() * 0.08;
+    parts.push(rockPart({ r, x, y: -r * 0.55, z: 0.04 + (rnd() - 0.5) * 0.12, sx: 1.4, sy: 0.5, seed: seed + x * 7.3, detail: 0, moss: false, ry: rnd() * 6 }));
+  }
+  // the far bank: an earth lip, big stones on it, reeds and ferns
+  const fz = -W - 0.12;
+  parts.push(part(P.cyl(0.42, 0.42, half * 2, 8, 1), null, { y: 0.02, z: fz - 0.16, rz: Math.PI / 2, sy: 0.66, grad: ['#2a2016', C.grassLo, -0.1, 0.3], mark: 0.4, outline: 0.6 }));
+  for (let x = -half + 0.3; x < half; x += 0.58 * (0.7 + rnd() * 0.6)) {
+    const r = 0.22 + rnd() * 0.2;
+    parts.push(rockPart({ r, x, y: -r * 0.2, z: fz + (rnd() - 0.5) * 0.18, sx: 1.25, sy: 0.9, seed: seed + x * 3.1, detail: 0, moss: rnd() < 0.35, ry: rnd() * 6 }));
+  }
+  for (let x = -half + 0.6; x < half; x += 1.1 + rnd() * 0.9) {
+    // a clump of reeds and cattails standing behind the water
+    for (let i = 0; i < 4; i++) {
+      const h = 0.75 + rnd() * 0.45;
+      const rx = x + (rnd() - 0.5) * 0.35;
+      const rz = fz - 0.2 - rnd() * 0.25;
+      const lean = (rnd() - 0.5) * 0.3;
+      parts.push(part(P.cyl(0.014, 0.02, h, 3), C.fern, { x: rx, y: h / 2, z: rz, rz: lean, outline: 0 }));
+      if (i < 2) parts.push(part(P.capsule(0.038, 0.14, 2, 5), '#5a3a22', { x: rx - Math.sin(lean) * h * 0.5, y: h - 0.04, z: rz, rz: lean, outline: 0.5 }));
+      else parts.push(part(P.cone(0.05, h * 0.9, 3), C.fernHi, { x: rx + 0.06, y: h * 0.45, z: rz, rz: -lean * 2, sz: 0.3, outline: 0 }));
+    }
+  }
+  // bigger rocks where the stream leaves the path, ferns beyond
+  for (const s of [-1, 1]) {
+    parts.push(rockPart({ r: 0.55, x: s * 4.9, y: -0.15, z: fz + 0.1, sx: 1.2, sy: 0.85, seed: seed + s * 3 }));
+    for (let i = 0; i < 3; i++) parts.push(...fernParts({ n: 7, len: 0.8, seed: seed + i * 13 + (s > 0 ? 50 : 0) }).map((g) => g.translate(s * (6.5 + i * 2.6), 0, fz - 0.5)));
   }
   return merge(parts);
 }
 
-function creekWideStonesGeo(seed) {
-  const rnd = seeded(seed);
-  const half = 14;
-  const parts = [part(creekShapeGeo(-half, half, CREEK_W, seed, 0.14, -0.14), C.mud, { y: 0.012, outline: 0 })];
-  bankStones(parts, rnd, -half + 0.2, half, -0.06, { seed, step: 0.5 });
-  bankStones(parts, rnd, -half + 0.2, half, -CREEK_W + 0.06, { seed: seed + 5, step: 0.5 });
-  // bigger rocks where the stream leaves the path, reeds and ferns beyond
-  for (const s of [-1, 1]) {
-    parts.push(rockPart({ r: 0.55, x: s * 4.9, y: -0.15, z: -0.15, sx: 1.2, sy: 0.85, seed: seed + s * 3 }));
-    parts.push(rockPart({ r: 0.45, x: s * 5.7, y: -0.12, z: -CREEK_W + 0.1, sx: 1.1, sy: 0.85, seed: seed + s * 5 }));
-    for (let i = 0; i < 9; i++) {
-      const h = 0.6 + rnd() * 0.5;
-      const rx = s * (5 + rnd() * 8);
-      const rz = rnd() < 0.5 ? 0.1 + rnd() * 0.3 : -CREEK_W - 0.1 - rnd() * 0.3;
-      parts.push(part(P.cyl(0.012, 0.016, h, 3), C.fern, { x: rx, y: h / 2, z: rz, rz: (rnd() - 0.5) * 0.3, outline: 0 }));
-      parts.push(part(P.capsule(0.035, 0.12, 2, 5), '#5a3a22', { x: rx, y: h - 0.05, z: rz, outline: 0.5 }));
-    }
-    for (let i = 0; i < 3; i++) parts.push(...fernParts({ n: 7, len: 0.8, seed: seed + i * 13 + (s > 0 ? 50 : 0) }).map((g) => g.translate(s * (6.5 + i * 2.6), 0, i % 2 ? 0.4 : -CREEK_W - 0.4)));
+// L · A campfire in a ring of stones (jump it — you can't land in the fire).
+// Three builds, each turned its own way round where it's laid, so no two
+// look quite alike: a teepee of logs under tall flames; a log-cabin crib
+// burning under a black pot on a grate; and a low star fire, its logs pushed
+// in like spokes, a kettle warming on a flat stone. The flames lick and
+// flicker on the GPU (toon option `flame`), a warm glow hangs over each fire
+// and its light wavers on the ground round it (spec extras).
+const CAMP = 0.94; // the ring's outer radius
+const CAMP_LEN = CAMP * 2;
+function flameTongue(parts, x, z, h, r, seed, hot) {
+  const y0 = 0.08;
+  const prof = [[0, 0], [r * 0.75, h * 0.1], [r, h * 0.3], [r * 0.82, h * 0.55], [r * 0.4, h * 0.82], [0, h]];
+  const g = part(P.lathe(prof, 7), null, {
+    x, y: y0, z,
+    grad: hot ? ['#fff8c8', '#ffc83a', y0, y0 + h] : ['#ffa42a', '#ff3a12', y0 + h * 0.2, y0 + h],
+    emit: 1, outline: 0,
+  });
+  // uv: x its own beat, y how far up the tongue (the flicker grows to the tip)
+  const uv = g.attributes.uv.array;
+  const pos = g.attributes.position.array;
+  for (let i = 0; i < uv.length / 2; i++) {
+    uv[i * 2] = seed;
+    uv[i * 2 + 1] = (pos[i * 3 + 1] - y0) / h;
   }
-  return merge(parts);
+  parts.push(g);
 }
+function campfireBase(parts, rnd, seed, { big = [] } = {}) {
+  parts.push(part(P.cyl(CAMP - 0.2, CAMP - 0.1, 0.05, 16), '#2e2924', { y: 0.025, outline: 0 }));
+  parts.push(part(P.cyl(0.42, 0.5, 0.07, 12), '#4a3a30', { y: 0.05, outline: 0 }));
+  // embers in the ash, glowing
+  for (let i = 0; i < 9; i++) {
+    const a = rnd() * Math.PI * 2;
+    const rr = 0.12 + rnd() * 0.36;
+    parts.push(part(P.dodeca(0.04 + rnd() * 0.03), rnd() < 0.5 ? '#ff6a1a' : '#ffb03a', { x: Math.cos(a) * rr, y: 0.08, z: Math.sin(a) * rr, emit: 0.9, outline: 0 }));
+  }
+  const n = 12;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rnd() * 0.2;
+    const b = big.find(([k]) => k === i);
+    const r = b ? b[1] : 0.15 + rnd() * 0.07;
+    const rr = CAMP - 0.17;
+    parts.push(rockPart({ r, x: Math.cos(a) * rr, y: -r * 0.25, z: Math.sin(a) * rr, sx: 1.15, sy: b ? b[2] : 0.72, seed: seed + i * 5, detail: 0, moss: rnd() < 0.25, ry: a, tint: 1 }));
+  }
+}
+function log(parts, a, b, r = 0.065) {
+  rod(parts, a, b, r, '#5a4030', 0.6);
+  // a pale sawn end on the outer one, charred black at the inner
+  parts.push(part(P.sphere(r * 1.02, 6, 4), '#1e1814', { x: b[0], y: b[1], z: b[2], outline: 0 }));
+}
+function campfireGeo(kind, seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  if (kind === 'teepee') {
+    campfireBase(parts, rnd, seed);
+    const apex = [0.03, 0.8, -0.02];
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + 0.3;
+      log(parts, [Math.cos(a) * 0.46, 0.04, Math.sin(a) * 0.46], [apex[0] + Math.cos(a) * 0.05, apex[1] - rnd() * 0.06, apex[2] + Math.sin(a) * 0.05], 0.055);
+    }
+    flameTongue(parts, 0, -0.08, 0.95, 0.24, 0.1, false);
+    flameTongue(parts, -0.18, -0.04, 0.68, 0.17, 0.45, false);
+    flameTongue(parts, 0.2, -0.06, 0.74, 0.17, 0.8, false);
+    flameTongue(parts, -0.06, 0.16, 0.5, 0.16, 0.3, true);
+    flameTongue(parts, 0.12, 0.18, 0.42, 0.13, 0.65, true);
+  } else if (kind === 'crib') {
+    campfireBase(parts, rnd, seed, { big: [[0, 0.26, 1.35], [6, 0.26, 1.35]] });
+    for (let k = 0; k < 3; k++) {
+      const y = 0.12 + k * 0.11;
+      for (const s of [-1, 1]) {
+        if (k % 2 === 0) log(parts, [-0.36, y, s * 0.26], [0.36, y, s * 0.26]);
+        else log(parts, [s * 0.26, y, -0.36], [s * 0.26, y, 0.36]);
+      }
+    }
+    flameTongue(parts, 0, -0.04, 0.78, 0.22, 0.2, false);
+    flameTongue(parts, -0.14, 0.04, 0.6, 0.16, 0.55, false);
+    flameTongue(parts, 0.15, 0.02, 0.56, 0.16, 0.9, false);
+    flameTongue(parts, 0.02, 0.2, 0.42, 0.15, 0.4, true);
+    // a grate across the ring on two stones, a black pot on it
+    for (const z of [-0.15, -0.05, 0.05, 0.15]) parts.push(part(P.box(1.5, 0.022, 0.026), '#2a2a2a', { y: 0.52, z, outline: 0.4 }));
+    for (const x of [-0.6, 0.6]) parts.push(part(P.box(0.03, 0.03, 0.4), '#2a2a2a', { x, y: 0.52, outline: 0.4 }));
+    const pot = [
+      part(P.lathe([[0, 0], [0.16, 0.01], [0.21, 0.08], [0.22, 0.2], [0.19, 0.27], [0.2, 0.29]], 12), '#26231f', { outline: 0.8 }),
+      part(P.cyl(0.19, 0.19, 0.02, 12), '#3a3530', { y: 0.28, outline: 0 }),
+      part(P.sphere(0.03, 5, 4), '#3a3530', { y: 0.3, outline: 0.4 }),
+      part(P.torus(0.2, 0.012, 3, 12, Math.PI), '#26231f', { y: 0.29, sy: 0.9, outline: 0.4 }),
+    ];
+    parts.push(...moved(pot, { x: -0.36, y: 0.53, z: 0.0, ry: 0.3 }));
+  } else {
+    campfireBase(parts, rnd, seed, { big: [[1, 0.27, 0.6]] });
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.5;
+      log(parts, [Math.cos(a) * 0.9, 0.07, Math.sin(a) * 0.9], [Math.cos(a) * 0.12, 0.12, Math.sin(a) * 0.12], 0.07);
+    }
+    flameTongue(parts, -0.05, -0.05, 0.62, 0.2, 0.15, false);
+    flameTongue(parts, 0.17, -0.1, 0.5, 0.17, 0.5, false);
+    flameTongue(parts, -0.22, 0.02, 0.46, 0.16, 0.85, false);
+    flameTongue(parts, 0.05, 0.14, 0.36, 0.17, 0.35, true);
+    flameTongue(parts, -0.15, 0.15, 0.3, 0.12, 0.7, true);
+    // a kettle on the flat stone
+    const a = (1 / 12) * Math.PI * 2;
+    const kx = Math.cos(a) * (CAMP - 0.17);
+    const kz = Math.sin(a) * (CAMP - 0.17);
+    const kettle = [
+      part(P.lathe([[0, 0], [0.12, 0.005], [0.15, 0.06], [0.14, 0.15], [0.08, 0.2], [0.05, 0.23], [0, 0.24]], 10), '#3a5a6a', { outline: 0.8 }),
+      part(P.cyl(0.02, 0.03, 0.18, 5), '#3a5a6a', { x: 0.17, y: 0.12, rz: -0.9, outline: 0.5 }),
+      part(P.torus(0.1, 0.012, 3, 10, Math.PI), '#2a2a2a', { y: 0.2, outline: 0.4 }),
+    ];
+    parts.push(...moved(kettle, { x: kx, y: 0.3, z: kz, ry: 2.4 }));
+  }
+  return merge(parts).translate(0, 0, -CAMP);
+}
+// the glow over a fire and its light on the ground round it
+const fireLight = (put, rng, { x, d }) => {
+  put('fireGlow', x, 0.75, d + CAMP, { s: rng.float(2.2, 2.8), c: [1, 0.5, 0.16] });
+  put('firelight', x, 0.06, d + CAMP, { sx: 5.4, sz: 5.4, c: [rng.float(0.8, 1), 1, 1] });
+};
+const STONE_TINTS = ['#ffffff', '#e8e2d4', '#d8dee6', '#f0e6dc'];
 
 // Moss hanging off the underside of a log, the longest strands ending on the
 // duck line so the clear space below always reads the same.
@@ -596,7 +724,7 @@ export default {
     beam: { color: '#fff0b0', amount: 0.3 },
     pool: '#8a7030',
     ink: '#0a1f14',
-    fog: [30, 150],
+    fog: [38, 168],
     ground: ['#163a19', '#4c8a2e', '#3e2f1e'],
     shadowDecal: [0.5, 0.6, 0.55],
     cast: [-0.3, -0.3],
@@ -713,11 +841,12 @@ export default {
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', fly: [0, 0, 1.6, 0.22], wobble: [0.05, 0.4, 1.1, 0], ink: 0.02 });
 
     // obstacles
-    b.toon('creekWater', waterGeo(creekShapeGeo(-1.12, 1.12, CREEK_W, 3), 0.035), { cap: 24, ink: 0, water: true, anim: 'popEarly' });
-    b.toon('creekStones', creekStonesGeo(1.05, 3), { cap: 24, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03 });
-    b.toon('creekWaterB', waterGeo(creekShapeGeo(-1.12, 1.12, CREEK_W, 8), 0.035), { cap: 24, ink: 0, water: true, anim: 'popEarly' });
-    b.toon('creekStonesB', creekStonesGeo(1.05, 8), { cap: 24, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03 });
-    b.toon('creekWideWater', waterGeo(creekShapeGeo(-14, 14, CREEK_W, 5, 0.14), 0.035), { cap: 10, ink: 0, water: true, anim: 'popEarly' });
+    b.toon('campfireA', campfireGeo('teepee', 3), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true });
+    b.toon('campfireB', campfireGeo('crib', 8), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true });
+    b.toon('campfireC', campfireGeo('star', 13), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true });
+    b.glow('fireGlow', { cap: 30, anim: 'popEarly' });
+    b.pool('firelight', { cap: 30, anim: 'popEarly', color: '#ff9a4a', flicker: true });
+    b.toon('creekWideWater', waterGeo(creekShapeGeo(-14, 14, CREEK_W, 5, 0.22), 0.035, CREEK_WATER, 0.35), { cap: 10, ink: 0, water: true, anim: 'popEarly' });
     b.toon('creekWideStones', creekWideStonesGeo(5), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03 });
     b.toon('fallenLog', fallenLogGeo(), { cap: 24, anim: 'popEarly', marks: [1.6, 1.6] });
     b.toon('fallenTree', fallenTreeGeo(), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6] });
@@ -731,8 +860,9 @@ export default {
 
   obstacles: {
     L: [
-      { name: 'creekStones', with: ['creekWater'], len: CREEK_W, top: 0.6, wade: true, flat: true },
-      { name: 'creekStonesB', with: ['creekWaterB'], len: CREEK_W, top: 0.6, wade: true, flat: true },
+      { name: 'campfireA', len: CAMP_LEN, top: 0.8, wade: true, flat: true, flip: true, tints: STONE_TINTS, extras: fireLight },
+      { name: 'campfireB', len: CAMP_LEN, top: 0.8, wade: true, flat: true, flip: true, tints: STONE_TINTS, extras: fireLight },
+      { name: 'campfireC', len: CAMP_LEN, top: 0.8, wade: true, flat: true, flip: true, tints: STONE_TINTS, extras: fireLight },
     ],
     H: [{ name: 'fallenLog', len: 0.8 }],
     W: [{ name: 'boulder', len: 2.0 }, { name: 'shrineRock', len: 2.0 }],

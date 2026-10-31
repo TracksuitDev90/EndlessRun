@@ -183,4 +183,44 @@ export function lanternPostParts({ h = 3.2, pole = '#1f3a2c', glass = '#ffd27a',
   ];
 }
 
+
+// Move a list of finished parts as one piece (their ink normals turn too).
+const _q = new THREE.Quaternion();
+const _e = new THREE.Euler();
+const _v = new THREE.Vector3();
+const _m = new THREE.Matrix4();
+const _one = new THREE.Vector3(1, 1, 1);
+export function moved(list, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0 } = {}) {
+  _q.setFromEuler(_e.set(rx, ry, rz, 'YXZ'));
+  _m.compose(_v.set(x, y, z), _q, _one);
+  for (const g of list) {
+    g.applyMatrix4(_m);
+    const o = g.attributes.onrm;
+    for (let i = 0; i < o.count; i++) {
+      _v.set(o.getX(i), o.getY(i), o.getZ(i)).applyQuaternion(_q);
+      o.setXYZ(i, _v.x, _v.y, _v.z);
+    }
+  }
+  return list;
+}
+
+// A rod from a to b (points [x, y, z]) of radius r.
+const _up = new THREE.Vector3(0, 1, 0);
+export function rod(parts, a, b, r, color, outline = 0.5) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const dz = b[2] - a[2];
+  const len = Math.hypot(dx, dy, dz);
+  const g = part(P.cyl(r, r, len, 5), color, { outline });
+  _q.setFromUnitVectors(_up, _v.set(dx / len, dy / len, dz / len));
+  _m.compose(_v.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), _q, _one);
+  g.applyMatrix4(_m);
+  const o = g.attributes.onrm;
+  for (let i = 0; i < o.count; i++) {
+    _v.set(o.getX(i), o.getY(i), o.getZ(i)).applyQuaternion(_q);
+    o.setXYZ(i, _v.x, _v.y, _v.z);
+  }
+  parts.push(g);
+}
+
 export { P, part, merge, rgb, mix, scaleColor };
