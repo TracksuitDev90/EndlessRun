@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, moved, rod } from './shapes.js';
+import { P, part, merge, moved, rod, rgb, mix } from './shapes.js';
 import { CONFIG } from '../config.js';
 
 // The Cypress Lane's market and street: storybook fruit (a little larger than
@@ -44,6 +44,33 @@ export const F = {
   soil: '#4a3220',
   cream: '#fff3d0',
   slate: '#2e3a36',
+  melon: '#4a8a32',
+  melonHi: '#8cc450',
+  melonDark: '#24521e',
+  rind: '#eef4c8',
+  melonFlesh: '#ff4a58',
+  seed: '#2a1a14',
+  strawberry: '#d81e34',
+  strawberryHi: '#ff5a5a',
+  seedY: '#ffe08a',
+  cherry: '#9a0c26',
+  cherryHi: '#e8344a',
+  grapeG: '#9cc63a',
+  grapeGHi: '#dcf07a',
+  grapeP: '#4a1e5a',
+  grapePHi: '#9a58b0',
+  pineapple: '#e0a030',
+  pineHi: '#f8d458',
+  pineLo: '#9a6018',
+  pineLeaf: '#2e6e34',
+  peach: '#ffc070',
+  peachBlush: '#f05a3e',
+  lime: '#4a9a24',
+  limeHi: '#a6dc48',
+  pom: '#a8142a',
+  pomHi: '#e84a4a',
+  blueberry: '#2e3a8a',
+  blueberryHi: '#7a8ad8',
 };
 
 const seeded = (seed) => {
@@ -173,6 +200,174 @@ export function raspberry(parts, x, y, z, { s = 1, tilt = 0 } = {}) {
   l.push(part(P.cyl(r * 0.5, r * 0.3, 0.012, 6), '#9ab84a', { y: cy + r * 1.05, outline: 0 }));
   parts.push(...moved(l, { x, y, z, rz: tilt }));
 }
+
+// Colour a finished part face by face: fn(cx, cy, cz) gets each triangle's
+// centre and returns its colour (stripes, a pineapple's scales).
+function paint(g, fn) {
+  const pos = g.attributes.position.array;
+  const col = g.attributes.color.array;
+  for (let i = 0; i < pos.length; i += 9) {
+    const c = rgb(fn((pos[i] + pos[i + 3] + pos[i + 6]) / 3, (pos[i + 1] + pos[i + 4] + pos[i + 7]) / 3, (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3));
+    for (let k = 0; k < 9; k += 3) {
+      col[i + k] = c[0];
+      col[i + k + 1] = c[1];
+      col[i + k + 2] = c[2];
+    }
+  }
+  return g;
+}
+
+// A watermelon lying on its side, striped dark and light along its length
+// (rolled round its long axis by roll, the long axis turned by ry).
+export function watermelon(parts, x, y, z, { r = 0.19, ry = 0, roll = 0 } = {}) {
+  const n = detail ? 14 : 10;
+  const body = paint(part(P.sphere(r, n, detail ? 8 : 5), null, { sy: 1.32 }), (cx, cy, cz) => {
+    const a = Math.atan2(cz, cx) + Math.PI;
+    const band = Math.floor((a / (Math.PI * 2)) * n + 0.5) % 2;
+    return band ? F.melonDark : mix(F.melon, F.melonHi, Math.min(1, Math.max(0, (cx + cz) / (r * 2.4) + 0.5)));
+  });
+  const l = [body];
+  if (detail) l.push(part(P.cyl(0.012, 0.016, 0.04, 4), F.stem, { y: r * 1.32, outline: 0 }));
+  parts.push(...moved(l, { x, y: y + r * 0.92, z, rz: Math.PI / 2, rx: roll, ry }));
+}
+
+// A half-moon slice of watermelon standing on its cut edge, its face toward
+// +z (turned by ry): green skin, a pale rind, red flesh and black seeds.
+export function melonSlice(parts, x, y, z, { r = 0.17, t = 0.06, ry = 0, rx = 0 } = {}) {
+  const seg = detail ? 12 : 8;
+  const half = (rr, tt, c) => part(P.cyl(rr, rr, tt, seg, 1, false, -Math.PI / 2, Math.PI), c, { rx: -Math.PI / 2, outline: rr === r ? 0.6 : 0 });
+  const l = [half(r, t, F.melonDark), half(r * 0.92, t + 0.008, F.rind), half(r * 0.82, t + 0.016, F.melonFlesh)];
+  l.push(part(P.box(r * 2, 0.012, t), F.melonFlesh, { y: 0.006, outline: 0 }));
+  if (detail) {
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 5; i++) {
+        const a = -0.95 + i * 0.475;
+        l.push(part(P.sphere(0.012, 4, 3), F.seed, { x: Math.sin(a) * r * 0.55, y: Math.cos(a) * r * 0.55, z: s * (t / 2 + 0.009), sy: 1.5, sz: 0.4, rz: -a, outline: 0 }));
+      }
+    }
+  }
+  parts.push(...moved(l, { x, y, z, ry, rx }));
+}
+
+// A strawberry, point down, a star of green leaves on its shoulders and its
+// little pale seeds dotted over it.
+const STRAWB = [[0, 0], [0.022, 0.012], [0.042, 0.038], [0.053, 0.066], [0.05, 0.088], [0.032, 0.1], [0, 0.102]];
+export function strawberry(parts, x, y, z, { s = 1, rx = 0, rz = 0, ry = 0 } = {}) {
+  const l = [part(P.lathe(STRAWB, detail ? 8 : 6), null, { s, grad: [F.strawberry, F.strawberryHi, 0, 0.1 * s], outline: 0.6 })];
+  const k = detail ? 5 : 3;
+  for (let i = 0; i < k; i++) {
+    const a = (i / k) * Math.PI * 2;
+    l.push(part(P.sphere(0.03 * s, 4, 3), F.leaf, { x: Math.cos(a) * 0.025 * s, y: 0.1 * s, z: Math.sin(a) * 0.025 * s, sx: 1, sy: 0.25, sz: 0.45, ry: -a, outline: 0 }));
+  }
+  if (detail) {
+    for (let i = 0; i < 6; i++) {
+      const a = i * 2.4;
+      const h = 0.03 + (i % 3) * 0.022;
+      const rr = STRAWB[Math.min(6, Math.round(h / 0.017))][0] * s;
+      l.push(part(P.sphere(0.006 * s, 3, 2), F.seedY, { x: Math.cos(a) * rr, y: h * s, z: Math.sin(a) * rr, outline: 0 }));
+    }
+  }
+  parts.push(...moved(l, { x, y, z, rx, rz, ry }));
+}
+
+// A pair of cherries on stalks joined at the top, a leaf at the join.
+export function cherries(parts, x, y, z, { ry = 0, s = 1 } = {}) {
+  const r = 0.04 * s;
+  const l = [];
+  for (const k of [-1, 1]) {
+    l.push(part(ball(r), null, { x: k * r * 1.05, y: r, grad: [F.cherry, F.cherryHi, 0, r * 2], outline: 0.6 }));
+    rod(l, [k * r * 1.05, r * 1.9, 0], [k * 0.006, r * 4.4, 0], 0.005, F.stem, 0);
+  }
+  if (detail) leaf(l, 0.02, r * 4.4, 0, 0.4, 0.8);
+  parts.push(...moved(l, { x, y, z, ry }));
+}
+
+// A bunch of grapes hanging from its stalk (the stalk at the top, the bunch
+// tapering down; lay it in a crate with rx), green or purple.
+export function grapes(parts, x, y, z, { purple = false, s = 1, ry = 0, rx = 0 } = {}) {
+  const r = 0.034 * s;
+  const lo = purple ? F.grapeP : F.grapeG;
+  const hi = purple ? F.grapePHi : F.grapeGHi;
+  const l = [];
+  const rows = detail ? [5, 4, 4, 3, 2, 1] : [4, 3, 2, 1];
+  rows.forEach((n, j) => {
+    const ring = n === 1 ? 0 : r * (0.5 + n * 0.32);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + j * 0.6;
+      l.push(part(P.sphere(r, detail ? 6 : 5, 4), null, { x: Math.cos(a) * ring, y: -j * r * 1.45, z: Math.sin(a) * ring, sy: 1.1, grad: [lo, hi, -j * r * 1.45 - r, -j * r * 1.45 + r], outline: 0.4 }));
+    }
+  });
+  l.push(part(P.cyl(0.007, 0.01, 0.08 * s, 4), F.stem, { y: r * 1.6, rz: 0.3, outline: 0 }));
+  if (detail) leaf(l, 0.03, r * 1.4, 0, 1.2, 1.1);
+  parts.push(...moved(l, { x, y, z, ry, rx }));
+}
+
+// A pineapple: a gold body in diamond scales and a spiky crown of leaves.
+export function pineapple(parts, x, y, z, { s = 1, ry = 0, rz = 0 } = {}) {
+  const r = 0.1 * s;
+  const n = detail ? 10 : 7;
+  const rows = detail ? 8 : 6;
+  const body = paint(part(P.sphere(r, n, rows), null, { y: r * 1.3, sy: 1.3 }), (cx, cy, cz) => {
+    const a = Math.floor(((Math.atan2(cz, cx) + Math.PI) / (Math.PI * 2)) * n);
+    const b = Math.floor((1 - Math.acos(Math.max(-1, Math.min(1, (cy - r * 1.3) / (r * 1.3)))) / Math.PI) * rows);
+    const t = Math.min(1, Math.max(0, cy / (r * 2.6)));
+    return (a + b) % 2 ? mix(F.pineLo, F.pineapple, t) : mix(F.pineapple, F.pineHi, t);
+  });
+  const l = [body];
+  const k = detail ? 7 : 5;
+  for (let i = 0; i < k; i++) {
+    const a = (i / k) * Math.PI * 2;
+    const tall = i % 2 ? 0.16 : 0.22;
+    // each leaf leans out from the middle, its blade facing out
+    l.push(part(P.cone(0.028 * s, tall * s, 4), null, { x: Math.cos(a) * 0.02 * s, y: r * 2.55 + tall * s * 0.42, z: Math.sin(a) * 0.02 * s, sx: 0.35, ry: Math.PI - a, rz: 0.32, grad: [F.pineLeaf, F.leafHi, r * 2.5, r * 2.5 + tall * s], outline: 0.4 }));
+  }
+  l.push(part(P.cone(0.03 * s, 0.24 * s, 4), null, { y: r * 2.55 + 0.11 * s, sx: 0.35, grad: [F.pineLeaf, F.leafHi, r * 2.5, r * 2.5 + 0.24 * s], outline: 0.4 }));
+  parts.push(...moved(l, { x, y, z, ry, rz }));
+}
+
+// A peach: soft gold flushed red on one side, the crease down it, a leaf.
+export function peach(parts, x, y, z, { r = 0.072, ry = 0, leafy = false } = {}) {
+  const l = [part(ball(r), null, { y: r * 0.95, sy: 0.95, grad: [F.peachBlush, F.peach, r * 0.2, r * 1.7], outline: 0.6 })];
+  if (detail) {
+    // the crease, running over the top
+    l.push(part(P.torus(r * 1.0, 0.006, 3, 10, Math.PI * 0.7), F.peachBlush, { y: r * 0.95, sy: 0.95, ry: Math.PI / 2, rz: Math.PI * 0.15, outline: 0 }));
+    l.push(part(P.cyl(0.007, 0.009, 0.03, 4), F.stem, { y: r * 1.9, outline: 0 }));
+    if (leafy) leaf(l, 0.01, r * 1.95, 0, 0.8);
+  }
+  parts.push(...moved(l, { x, y, z, ry }));
+}
+
+export function lime(parts, x, y, z, { ry = 0 } = {}) {
+  parts.push(part(ball(0.06), null, { x, y: y + 0.056, z, sx: 1.12, sy: 0.94, ry, grad: [F.lime, F.limeHi, y, y + 0.11], outline: 0.6 }));
+  if (detail) parts.push(part(P.cone(0.016, 0.026, 5), F.lime, { x: x + Math.cos(ry) * 0.075, y: y + 0.056, z: z - Math.sin(ry) * 0.075, ry, rz: -Math.PI / 2, outline: 0 }));
+}
+
+// A pomegranate: a deep red ball with its little crown.
+export function pomegranate(parts, x, y, z, { r = 0.085 } = {}) {
+  parts.push(part(ball(r), null, { x, y: y + r * 0.92, z, sy: 0.92, grad: [F.pom, F.pomHi, y, y + r * 1.8], outline: 0.6 }));
+  parts.push(part(P.cyl(r * 0.28, r * 0.18, r * 0.36, detail ? 6 : 4), F.pom, { x, y: y + r * 1.9, z, outline: 0.4 }));
+}
+
+// A punnet (a little green tray, base at y) heaped with berries.
+function punnet(parts, x, y, z, berry, { ry = 0, w = 0.3, d = 0.22, color = '#3f9a5a' } = {}) {
+  const l = [part(P.box(w, 0.09, d), color, { y: 0.045, outline: 0.5 })];
+  berry(l, w, d);
+  parts.push(...moved(l, { x, y, z, ry }));
+}
+const blueberries = (l, w, d) => {
+  l.push(part(P.box(w - 0.03, 0.03, d - 0.03), F.blueberry, { y: 0.09, outline: 0 }));
+  lowDetail(() => {
+    for (let i = 0; i < 7; i++) l.push(part(P.sphere(0.024, 5, 4), null, { x: ((i % 4) - 1.5) * 0.06, y: 0.115, z: (Math.floor(i / 4) - 0.5) * 0.06 + (i % 2) * 0.01, grad: [F.blueberry, F.blueberryHi, 0.09, 0.14], outline: 0 }));
+  });
+};
+const strawberries = (l, w, d) => {
+  l.push(part(P.box(w - 0.03, 0.03, d - 0.03), F.strawberry, { y: 0.09, outline: 0 }));
+  for (let i = 0; i < 5; i++) strawberry(l, ((i % 3) - 1) * 0.085, 0.1, (Math.floor(i / 3) - 0.4) * 0.08, { rx: 1.4 + (i % 2) * 0.3, ry: i * 1.3, s: 1.05 });
+};
+const cherryPunnet = (l, w, d) => {
+  l.push(part(P.box(w - 0.03, 0.03, d - 0.03), F.cherry, { y: 0.09, outline: 0 }));
+  for (let i = 0; i < 3; i++) cherries(l, (i - 1) * 0.08, 0.075, (i % 2) * 0.05 - 0.02, { ry: i * 1.1, s: 0.95 });
+};
 
 // --- containers -------------------------------------------------------------------
 
@@ -314,6 +509,52 @@ export function fruitBasketsGeo() {
   return merge(parts).translate(0, 0, -0.42);
 }
 
+// A low crate of striped watermelons, a slice propped against its front,
+// another melon lying in the road beside it and a second slice by that.
+export function melonCrateGeo() {
+  const parts = [];
+  crate(parts, { x: -0.36, w: 1.16, h: 0.42, d: 0.82, ry: 0.05, label: F.melonFlesh }, (l, w, h) => {
+    watermelon(l, -0.27, h - 0.12, 0.0, { r: 0.2, ry: Math.PI / 2 + 0.1, roll: 0.3 });
+    watermelon(l, 0.27, h - 0.12, 0.02, { r: 0.19, ry: Math.PI / 2 - 0.08, roll: 1.4 });
+  });
+  melonSlice(parts, -0.52, 0, 0.47, { ry: 0.15, rx: -0.25 });
+  watermelon(parts, 0.62, 0, 0.1, { r: 0.21, ry: 0.4, roll: 0.8 });
+  melonSlice(parts, 0.56, 0, 0.52, { ry: -0.3, rx: -0.1 });
+  return merge(parts).translate(0, 0, -0.48);
+}
+
+// A shallow wooden flat (base at y): a floor and four low sides.
+function flat(parts, { x = 0, y = 0, z = 0, w, h, d }) {
+  parts.push(part(P.box(w - 0.04, 0.04, d - 0.04), F.woodDark, { x, y: y + 0.02, z, outline: 0 }));
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(w, h, 0.04), F.woodPale, { x, y: y + h / 2, z: z + s * (d / 2 - 0.02), mark: 0.2 }));
+    parts.push(part(P.box(0.04, h, d), F.wood, { x: x + s * (w / 2 - 0.02), y: y + h / 2, z }));
+  }
+}
+
+// Wooden flats on a pallet: at the back, one raised on a crate and packed with
+// punnets of strawberries, blueberries and cherries; at the front, a low one
+// with bunches of green and purple grapes laid along it.
+export function berryFlatsGeo() {
+  const parts = [];
+  parts.push(part(P.box(1.84, 0.1, 0.8), F.woodPale, { y: 0.09, mark: 0.2 }));
+  for (const z of [-0.32, 0, 0.32]) parts.push(part(P.box(1.84, 0.05, 0.12), F.woodDark, { y: 0.025, z, outline: 0.4 }));
+  flat(parts, { y: 0.14, w: 1.78, h: 0.1, d: 0.36, z: 0.2 });
+  crate(parts, { y: 0.14, z: -0.17, w: 1.7, h: 0.22, d: 0.42 });
+  flat(parts, { y: 0.36, w: 1.74, h: 0.07, d: 0.46, z: -0.17 });
+  const kinds = [strawberries, blueberries, cherryPunnet, strawberries, blueberries];
+  for (let j = 0; j < 2; j++) {
+    for (let i = 0; i < 5; i++) {
+      const fill = kinds[(i + j * 2) % kinds.length];
+      const put = () => punnet(parts, (i - 2) * 0.32, 0.39, -0.28 + j * 0.21, fill, { w: 0.28, d: 0.19, ry: (i % 2 ? 0.04 : -0.03) });
+      if (j === 0) lowDetail(put);
+      else put();
+    }
+  }
+  for (let i = 0; i < 4; i++) grapes(parts, -0.6 + i * 0.4, 0.27, 0.07, { purple: i % 2 === 0, rx: -Math.PI / 2, ry: (i - 1.5) * 0.12, s: 1.05 });
+  return merge(parts).translate(0, 0, -0.42);
+}
+
 // --- the obstacles: tall (go around) -------------------------------------------------
 
 // Two cart wheels and an axle at depth z (spoked, iron-rimmed).
@@ -393,6 +634,42 @@ export function grapefruitCartGeo() {
 // bed stepped up in tiers of green apples (a few red ones in a basket at the
 // front), a slate with an apple chalked on it.
 export function appleCartGeo() {
+  return barrowGeo({
+    tiers: [0, 0, 0].map(() => (l, x, y, z, rnd) => apple(l, x, y, z, { s: 1 + rnd() * 0.12, leafy: rnd() < 0.15, ry: rnd() * 6 })),
+    basket: (l, i, x, y, z) => apple(l, x, y, z, { color: F.appleRed, hi: '#ff8a5a', s: 0.9 }),
+    parasol: '#3f9a52',
+    parasolIn: '#2a6a3a',
+    emblem: (p, x, y, z) => {
+      p.push(part(P.cyl(0.12, 0.12, 0.01, 16), F.apple, { x, y: y - 0.02, z, rx: Math.PI / 2, sx: 1.08, outline: 0 }));
+      p.push(part(P.box(0.016, 0.08, 0.01), F.cream, { x: x + 0.01, y: y + 0.12, z, rz: -0.3, outline: 0 }));
+      p.push(part(P.sphere(0.05, 6, 4), '#5ab040', { x: x + 0.06, y: y + 0.13, z, sy: 0.45, sz: 0.2, rz: 0.4, outline: 0 }));
+    },
+  });
+}
+
+// The summer barrow: the same barrow under a rose-and-cream parasol, its tiers
+// of peaches, limes and pomegranates, a basket of cherries at the front and a
+// peach chalked on its slate.
+export function peachCartGeo() {
+  return barrowGeo({
+    tiers: [
+      (l, x, y, z, rnd) => peach(l, x, y, z, { r: 0.08 + rnd() * 0.008, ry: rnd() * 6, leafy: rnd() < 0.2 }),
+      (l, x, y, z, rnd) => lime(l, x, y, z, { ry: rnd() * 6 }),
+      (l, x, y, z, rnd) => pomegranate(l, x, y, z, { r: 0.082 + rnd() * 0.01 }),
+    ],
+    basket: (l, i, x, y, z) => cherries(l, x, y + 0.02, z, { ry: i * 1.4, s: 0.95 }),
+    parasol: '#e0607a',
+    parasolIn: '#a83a54',
+    emblem: (p, x, y, z) => {
+      p.push(part(P.cyl(0.12, 0.12, 0.01, 16), F.peach, { x, y: y - 0.02, z, rx: Math.PI / 2, outline: 0 }));
+      p.push(part(P.cyl(0.075, 0.075, 0.012, 14), F.peachBlush, { x: x - 0.035, y: y - 0.04, z: z + 0.003, rx: Math.PI / 2, outline: 0 }));
+      p.push(part(P.box(0.012, 0.2, 0.01), F.peachBlush, { x: x + 0.01, y: y - 0.02, z: z + 0.006, rz: 0.15, outline: 0 }));
+      p.push(part(P.sphere(0.05, 6, 4), '#5ab040', { x: x + 0.06, y: y + 0.12, z, sy: 0.45, sz: 0.2, rz: 0.4, outline: 0 }));
+    },
+  });
+}
+
+function barrowGeo({ tiers: fruit, basket: inBasket, parasol, parasolIn, emblem }) {
   const parts = [];
   const L = 2.2;
   // the bed on its wheels and front legs
@@ -407,35 +684,28 @@ export function appleCartGeo() {
     parts.push(part(P.box(1.58, 0.05, 0.05), F.woodDark, { y: ty, z: tz + 0.31, outline: 0.4 }));
   }
   const rnd = seeded(23);
-  tiers.forEach(([ty, tz]) => {
+  tiers.forEach(([ty, tz], k) => {
     for (let j = 0; j < 2; j++) {
       for (let i = 0; i < 7; i++) {
         const x = (i - 3) * 0.205 + (j % 2) * 0.06;
         const z = tz + 0.15 - j * 0.24;
-        apple(parts, x, ty - 0.01 + j * 0.012, z, { s: 1 + rnd() * 0.12, leafy: rnd() < 0.15, ry: rnd() * 6 });
+        fruit[k](parts, x, ty - 0.01 + j * 0.012, z, rnd);
       }
     }
   });
   basket(parts, { x: 0.5, y: 1.12, z: 0.86, r: 0.2, h: 0.17, handle: 0.42, ry: -0.3 }, (l, r, h) => {
-    for (let i = 0; i < 4; i++) apple(l, Math.cos(i * 1.57 + 0.4) * 0.08, h - 0.08, Math.sin(i * 1.57 + 0.4) * 0.08, { color: F.appleRed, hi: '#ff8a5a', s: 0.9 });
+    for (let i = 0; i < 4; i++) inBasket(l, i, Math.cos(i * 1.57 + 0.4) * 0.08, h - 0.08, Math.sin(i * 1.57 + 0.4) * 0.08);
   });
-  // the parasol: eight panels, green and cream, a finial on top
+  // the parasol: eight panels in two colours, a finial on top
   parts.push(part(P.cyl(0.035, 0.035, 2.0, 6), F.woodDark, { y: 2.0, z: -0.25 }));
   for (let i = 0; i < 8; i++) {
     const a0 = (i / 8) * Math.PI * 2;
-    parts.push(part(P.cyl(0.04, 1.12, 0.46, 1, 1, true, a0, Math.PI / 4), i % 2 ? F.cream : '#3f9a52', { y: 2.98, z: -0.25, outline: 1 }));
+    parts.push(part(P.cyl(0.04, 1.12, 0.46, 1, 1, true, a0, Math.PI / 4), i % 2 ? F.cream : parasol, { y: 2.98, z: -0.25, outline: 1 }));
   }
-  parts.push(part(P.cone(1.1, 0.45, 8), '#2a6a3a', { y: 2.975, z: -0.25, outline: 0 }));
+  parts.push(part(P.cone(1.1, 0.45, 8), parasolIn, { y: 2.975, z: -0.25, outline: 0 }));
   parts.push(part(P.sphere(0.07, 8, 6), F.woodPale, { y: 3.24, z: -0.25 }));
-  // a slate on the front with a green apple chalked on it
-  emblemBoard(parts, {
-    y: 0.82, z: L / 2 + 0.02, w: 0.56, h: 0.4,
-    emblem: (p, x, y, z) => {
-      p.push(part(P.cyl(0.12, 0.12, 0.01, 16), F.apple, { x, y: y - 0.02, z, rx: Math.PI / 2, sx: 1.08, outline: 0 }));
-      p.push(part(P.box(0.016, 0.08, 0.01), F.cream, { x: x + 0.01, y: y + 0.12, z, rz: -0.3, outline: 0 }));
-      p.push(part(P.sphere(0.05, 6, 4), '#5ab040', { x: x + 0.06, y: y + 0.13, z, sy: 0.45, sz: 0.2, rz: 0.4, outline: 0 }));
-    },
-  });
+  // a slate on the front with the fruit chalked on it
+  emblemBoard(parts, { y: 0.82, z: L / 2 + 0.02, w: 0.56, h: 0.4, emblem });
   return merge(parts).translate(0, 0, -L / 2);
 }
 
@@ -443,6 +713,20 @@ export function appleCartGeo() {
 // a scalloped valance and a painted sign — bananas on the bottom shelf,
 // pears on the next, lemons and plums on the top.
 export function fruitStandGeo() {
+  return standGeo({
+    valance: '#e8a83a',
+    sign: [F.orange, F.apple, F.rasp],
+    classic: true,
+  });
+}
+
+// The far-off fruit stand: the same stand, a teal valance, pineapples on the
+// bottom shelf, bunches of grapes on the next, peaches and pomegranates on top.
+export function exoticStandGeo() {
+  return standGeo({ valance: '#2a9a8a', sign: [F.pineapple, F.grapeP, F.peachBlush], classic: false });
+}
+
+function standGeo({ valance, sign, classic }) {
   const parts = [];
   const L = 1.4;
   const W = 1.8;
@@ -466,26 +750,36 @@ export function fruitStandGeo() {
   for (const [y0, y1, z] of [[0.47, 0.82, 0.68], [0.82, 1.26, 0.21], [1.26, 1.7, -0.21]]) {
     parts.push(part(P.box(W - 0.14, y1 - y0, 0.04), F.wood, { y: (y0 + y1) / 2, z, mark: 0.2 }));
   }
-  // bananas on the bottom shelf
-  for (const [x, ry] of [[-0.78, 0.25], [-0.22, -0.1], [0.34, 0.2]]) bananas(parts, x, 0.8, 0.42, { ry, n: 4 });
-  // pears in a row
-  for (let i = 0; i < 7; i++) pear(parts, -0.66 + i * 0.22, 1.23, (i % 2) * 0.1 - 0.05, { rz: (i % 3 - 1) * 0.12 });
-  // lemons and plums on the top shelf
-  for (let i = 0; i < 6; i++) lemon(parts, -0.72 + i * 0.13, 1.67, -0.42 + (i % 2) * 0.08, { ry: i * 0.7 });
-  for (let i = 0; i < 5; i++) plum(parts, 0.14 + i * 0.13, 1.67, -0.42 + (i % 2) * 0.08);
+  if (classic) {
+    // bananas on the bottom shelf
+    for (const [x, ry] of [[-0.78, 0.25], [-0.22, -0.1], [0.34, 0.2]]) bananas(parts, x, 0.8, 0.42, { ry, n: 4 });
+    // pears in a row
+    for (let i = 0; i < 7; i++) pear(parts, -0.66 + i * 0.22, 1.23, (i % 2) * 0.1 - 0.05, { rz: (i % 3 - 1) * 0.12 });
+    // lemons and plums on the top shelf
+    for (let i = 0; i < 6; i++) lemon(parts, -0.72 + i * 0.13, 1.67, -0.42 + (i % 2) * 0.08, { ry: i * 0.7 });
+    for (let i = 0; i < 5; i++) plum(parts, 0.14 + i * 0.13, 1.67, -0.42 + (i % 2) * 0.08);
+  } else {
+    // pineapples standing along the bottom shelf
+    for (let i = 0; i < 5; i++) pineapple(parts, -0.62 + i * 0.31, 0.79, 0.42 + (i % 2) * 0.05, { ry: i * 1.3, s: 0.95, rz: (i % 2 - 0.5) * 0.12 });
+    // bunches of grapes laid along the next, green and purple
+    for (let i = 0; i < 5; i++) grapes(parts, -0.64 + i * 0.32, 1.3, -0.06, { purple: i % 2 === 1, rx: -Math.PI / 2, ry: (i - 2) * 0.1 });
+    // peaches and pomegranates on the top shelf
+    for (let i = 0; i < 5; i++) peach(parts, -0.72 + i * 0.15, 1.67, -0.42 + (i % 2) * 0.08, { ry: i, leafy: i % 2 === 0 });
+    for (let i = 0; i < 4; i++) pomegranate(parts, 0.18 + i * 0.17, 1.67, -0.42 + (i % 2) * 0.08, { r: 0.075 });
+  }
   // the roof, its scalloped valance and the sign
   for (const x of [-W / 2 + 0.05, W / 2 - 0.05]) parts.push(part(P.box(0.07, 1.1, 0.07), F.woodDark, { x, y: 2.25, z: L / 2 - 0.15 }));
   parts.push(part(P.box(W + 0.24, 0.1, L + 0.1), F.woodDark, { y: 2.82, z: 0.04 }));
   for (let i = 0; i < 9; i++) {
     const x = -W / 2 - 0.02 + (i + 0.5) * ((W + 0.04) / 9);
-    parts.push(part(P.cyl(0.11, 0.11, 0.03, 10, 1, false, -Math.PI / 2, Math.PI), i % 2 ? F.cream : '#e8a83a', { x, y: 2.77, z: L / 2 + 0.1, rx: Math.PI / 2, outline: 0.4 }));
+    parts.push(part(P.cyl(0.11, 0.11, 0.03, 10, 1, false, -Math.PI / 2, Math.PI), i % 2 ? F.cream : valance, { x, y: 2.77, z: L / 2 + 0.1, rx: Math.PI / 2, outline: 0.4 }));
   }
-  parts.push(part(P.box(W + 0.24, 0.06, 0.06), '#e8a83a', { y: 2.79, z: L / 2 + 0.1, outline: 0.4 }));
+  parts.push(part(P.box(W + 0.24, 0.06, 0.06), valance, { y: 2.79, z: L / 2 + 0.1, outline: 0.4 }));
   parts.push(part(P.box(1.5, 0.46, 0.08), F.cream, { y: 3.12, z: 0.1 }));
   parts.push(part(P.box(1.58, 0.54, 0.06), F.woodDark, { y: 3.12, z: 0.07 }));
-  for (const [x, c] of [[-0.45, F.orange], [0, F.apple], [0.45, F.rasp]]) {
-    parts.push(part(P.cyl(0.13, 0.13, 0.02, 14), c, { x, y: 3.12, z: 0.15, rx: Math.PI / 2, outline: 0 }));
-  }
+  sign.forEach((c, i) => {
+    parts.push(part(P.cyl(0.13, 0.13, 0.02, 14), c, { x: (i - 1) * 0.45, y: 3.12, z: 0.15, rx: Math.PI / 2, outline: 0 }));
+  });
   return merge(parts).translate(0, 0, -L / 2);
 }
 
@@ -624,19 +918,27 @@ function shopfrontPartsFull({ w, d, kind }) {
   parts.push(part(P.sphere(0.04, 5, 4), '#e8b84a', { x: dx - 0.3, y: 1.0, z: fz + 0.11, outline: 0 }));
   awning(parts, { w: w - 0.1, y: 2.36, z: fz + 0.1, colors: grocer ? ['#3f9a52', F.cream] : ['#d8463a', F.cream], n: 9 });
   if (grocer) {
-    // in the window: a pyramid of oranges; out front: a bench of crates
-    for (let i = 0; i < 5; i++) orange(parts, wx - 0.5 + i * 0.25, 0.64, fz + 0.12);
-    for (let i = 0; i < 3; i++) orange(parts, wx - 0.38 + i * 0.25, 0.83, fz + 0.12);
+    // in the window: a pyramid of oranges, limes and peaches, a pineapple on
+    // top; out front: a bench of crates
+    const win = [orange, lime, peach];
+    for (let i = 0; i < 5; i++) win[i % 3](parts, wx - 0.5 + i * 0.25, 0.64, fz + 0.12, {});
+    for (let i = 0; i < 3; i++) win[(i + 1) % 3](parts, wx - 0.38 + i * 0.25, 0.83, fz + 0.12, {});
+    pineapple(parts, wx - 0.13, 1.0, fz + 0.12, { s: 0.9 });
     parts.push(part(P.box(ww + 0.3, 0.06, 0.62), F.woodDark, { x: wx, y: 0.5, z: fz + 0.62 }));
     for (const lx of [-1, 1]) parts.push(part(P.box(0.06, 0.5, 0.5), F.woodDark, { x: wx + lx * (ww / 2), y: 0.25, z: fz + 0.62 }));
     const goods = [
       (l, w2, h, d2) => heap(l, (l2, x, y, z) => apple(l2, x, y, z), w2, d2, h - 0.04, 0.2, 0.04, 2),
-      (l, w2, h, d2) => heap(l, (l2, x, y, z) => grapefruit(l2, x, y, z, { r: 0.12 }), w2, d2, h - 0.08, 0.24, 0.03, 4),
-      (l, w2, h, d2) => heap(l, (l2, x, y, z) => lemon(l2, x, y, z), w2, d2, h - 0.04, 0.18, 0.03, 6),
+      (l, w2, h) => {
+        for (let i = 0; i < 3; i++) grapes(l, (i - 1) * w2 * 0.3, h + 0.05, -0.08, { purple: i !== 1, rx: -Math.PI / 2, ry: (i - 1) * 0.2 });
+      },
+      (l, w2, h, d2) => heap(l, (l2, x, y, z) => peach(l2, x, y, z), w2, d2, h - 0.04, 0.17, 0.03, 6),
     ];
     goods.forEach((fill, i) => crate(parts, { x: wx + (i - 1) * (ww / 3), y: 0.53, z: fz + 0.62, w: ww / 3 - 0.06, h: 0.24, d: 0.5, ry: (i - 1) * 0.05 }, fill));
     for (let i = 0; i < 3; i++) raspberry(parts, dx - 0.05 + i * 0.1, 0.12, fz + 0.75, { s: 0.8 });
     parts.push(part(P.box(0.4, 0.08, 0.2), '#3f9a5a', { x: dx + 0.05, y: 0.04, z: fz + 0.75 }));
+    // and a watermelon by the door, a slice cut from it
+    watermelon(parts, dx - 0.35, 0, fz + 0.5, { r: 0.18, ry: 0.5 });
+    melonSlice(parts, dx - 0.05, 0, fz + 0.55, { r: 0.15, ry: -0.3, rx: -0.2 });
   } else {
     // bread in the window; a café table, two chairs and a chalk board out front
     parts.push(part(P.box(ww - 0.1, 0.05, 0.3), F.woodPale, { x: wx, y: 1.15, z: fz + 0.08, outline: 0 }));
@@ -670,22 +972,42 @@ function shopfrontPartsFull({ w, d, kind }) {
 
 // A market stall for the verge: a trestle table skirted in cloth under a
 // sloping striped awning, crates of green apples, grapefruit and oranges on
-// it, a punnet of raspberries, and a chalk board on a stick.
+// it, a punnet of raspberries, and a chalk board on a stick. The other stall
+// (kind 1), under a teal awning over a rose skirt, sells watermelons, grapes
+// and pineapples, with punnets of strawberries and cherries.
 export const marketStallGeo = (...a) => lowDetail(() => marketStallGeoFull(...a));
-function marketStallGeoFull() {
+function marketStallGeoFull(kind = 0) {
   const parts = [];
   const W = 2.2;
   const D = 0.9;
   parts.push(part(P.box(W, 0.06, D), F.woodPale, { y: 0.84 }));
   parts.push(part(P.box(W - 0.04, 0.62, 0.02), '#f6ecd0', { y: 0.52, z: D / 2 - 0.01, outline: 0.5 }));
-  for (let i = 0; i < 6; i++) parts.push(part(P.box(W / 12, 0.6, 0.025), '#7ac0a8', { x: -W / 2 + (W / 6) * (i + 0.25), y: 0.52, z: D / 2, outline: 0 }));
+  for (let i = 0; i < 6; i++) parts.push(part(P.box(W / 12, 0.6, 0.025), kind ? '#e88a9a' : '#7ac0a8', { x: -W / 2 + (W / 6) * (i + 0.25), y: 0.52, z: D / 2, outline: 0 }));
   for (const x of [-W / 2 + 0.08, W / 2 - 0.08]) for (const z of [-D / 2 + 0.08, D / 2 - 0.08]) parts.push(part(P.box(0.06, 0.82, 0.06), F.woodDark, { x, y: 0.41, z }));
   for (const x of [-W / 2 + 0.04, W / 2 - 0.04]) {
     parts.push(part(P.box(0.07, 2.36, 0.07), F.woodDark, { x, y: 1.18, z: D / 2 + 0.25 }));
     parts.push(part(P.box(0.07, 2.7, 0.07), F.woodDark, { x, y: 1.35, z: -D / 2 }));
   }
-  awning(parts, { w: W + 0.2, y: 2.72, z: -D / 2 - 0.05, out: D + 0.45, drop: 0.36, colors: ['#e8a83a', F.cream], n: 8 });
-  const goods = [
+  awning(parts, { w: W + 0.2, y: 2.72, z: -D / 2 - 0.05, out: D + 0.45, drop: 0.36, colors: [kind ? '#2a9a8a' : '#e8a83a', F.cream], n: 8 });
+  if (kind) {
+    const goodsB = [
+      (l, w2, h) => {
+        watermelon(l, -0.1, h - 0.1, 0, { r: 0.17, ry: Math.PI / 2, roll: 0.4 });
+        watermelon(l, 0.14, h - 0.1, 0.02, { r: 0.15, ry: Math.PI / 2 + 0.2, roll: 1.2 });
+        melonSlice(l, 0, h + 0.14, 0.2, { r: 0.14, rx: -0.2 });
+      },
+      (l, w2, h) => {
+        for (let i = 0; i < 3; i++) grapes(l, (i - 1) * 0.17, h + 0.03, -0.08, { purple: i !== 1, rx: -Math.PI / 2, ry: (i - 1) * 0.15 });
+      },
+      (l, w2, h) => {
+        for (let i = 0; i < 3; i++) pineapple(l, (i - 1) * 0.18, h - 0.06, (i % 2) * 0.08 - 0.04, { s: 0.85, ry: i * 1.7 });
+      },
+    ];
+    goodsB.forEach((fill, i) => crate(parts, { x: (i - 1) * 0.68, y: 0.87, z: -0.08, w: 0.6, h: 0.26, d: 0.55, ry: (i - 1) * 0.08, label: [F.melonFlesh, F.grapeP, F.pineapple][i] }, fill));
+    punnet(parts, 0.2, 0.87, 0.3, strawberries, { ry: -0.2 });
+    punnet(parts, 0.55, 0.87, 0.28, cherryPunnet, { ry: 0.15 });
+  }
+  const goods = kind ? [] : [
     (l, w2, h, d2) => heap(l, (l2, x, y, z, rnd) => apple(l2, x, y, z, { leafy: rnd() < 0.2, ry: rnd() * 6 }), w2, d2, h - 0.04, 0.2, 0.05, 3),
     (l, w2, h, d2) => {
       heap(l, (l2, x, y, z) => grapefruit(l2, x, y, z, { r: 0.13 }), w2, d2, h - 0.1, 0.25, 0.04, 5);
@@ -694,9 +1016,11 @@ function marketStallGeoFull() {
     (l, w2, h, d2) => heap(l, (l2, x, y, z, rnd) => orange(l2, x, y, z, { leafy: rnd() < 0.2, ry: rnd() * 6 }), w2, d2, h - 0.05, 0.21, 0.05, 7),
   ];
   goods.forEach((fill, i) => crate(parts, { x: (i - 1) * 0.68, y: 0.87, z: -0.08, w: 0.6, h: 0.26, d: 0.55, ry: (i - 1) * 0.08, label: [F.apple, F.grapefruit, F.orange][i] }, fill));
-  const pl = [part(P.box(0.3, 0.08, 0.2), '#3f9a5a', { y: 0.04 })];
-  for (let i = 0; i < 6; i++) raspberry(pl, ((i % 3) - 1) * 0.085, 0.19, (Math.floor(i / 3) - 0.5) * 0.08, { s: 0.85 });
-  parts.push(...moved(pl, { x: 0.35, y: 0.87, z: 0.3, ry: -0.2 }));
+  if (!kind) {
+    const pl = [part(P.box(0.3, 0.08, 0.2), '#3f9a5a', { y: 0.04 })];
+    for (let i = 0; i < 6; i++) raspberry(pl, ((i % 3) - 1) * 0.085, 0.19, (Math.floor(i / 3) - 0.5) * 0.08, { s: 0.85 });
+    parts.push(...moved(pl, { x: 0.35, y: 0.87, z: 0.3, ry: -0.2 }));
+  }
   // chalk board on a stick
   parts.push(part(P.box(0.04, 1.3, 0.04), F.woodDark, { x: -W / 2 - 0.3, y: 0.65, z: D / 2 }));
   parts.push(part(P.box(0.5, 0.36, 0.04), F.woodDark, { x: -W / 2 - 0.3, y: 1.32, z: D / 2 + 0.03 }));

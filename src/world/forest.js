@@ -31,7 +31,6 @@ const C = {
   water: '#123a3a',
   mud: '#2a2418',
   wood: '#c9a46c',
-  woodRing: '#8a6a3e',
   floor: '#183a1a',
   stem: '#efe7d2',
   straw: '#d6c287',
@@ -185,31 +184,61 @@ function mushroomParts({ n = 4, seed = 5, glow = 1 } = {}) {
   return parts;
 }
 
+// --- wood ---------------------------------------------------------------------
+// Bark and sawn wood are drawn in the shader (toon option `bark`): a part
+// marked BARK gets furrowed, plated bark, one marked GRAIN (a cylinder's cap)
+// the rings of a sawn end. asBark marks a part as bark and lays out its uv:
+// x runs 0..16 round it (from its own uv, which runs round a lathe, a
+// cylinder or a sphere), y the plates along it, measured by along(x, y, z).
+const BARK = 0.4;
+const GRAIN = 0.3;
+function asBark(g, along = (x, y) => y, plate = 0.7) {
+  const uv = g.attributes.uv.array;
+  const pos = g.attributes.position.array;
+  const fx = g.attributes.fx.array;
+  for (let i = 0; i < uv.length / 2; i++) {
+    uv[i * 2] *= 16;
+    uv[i * 2 + 1] = along(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]) / plate;
+    fx[i * 3] = BARK;
+  }
+  return g;
+}
+// measure along a part's own y axis, turned by the euler angles it was placed with
+function axisOf(rx = 0, ry = 0, rz = 0) {
+  const v = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(rx, ry, rz, 'YXZ'));
+  return (x, y, z) => x * v.x + y * v.y + z * v.z;
+}
+const alongX = (x) => x;
+const alongZ = (x, y, z) => z;
+// A sawn end facing along the y axis (turn it with o), its rings drawn by the shader.
+const sawnEnd = (r, o) => part(P.cyl(r, r, 0.04, 16), C.wood, { outline: 0.4, ...o, mark: GRAIN });
+
 // --- trees --------------------------------------------------------------------
-// A colossal trunk rising out of view: a flared, mossy foot on buttress roots.
-function trunkParts({ r = 1, h = 30, seg = 10, roots = 5, seed = 1, mark = 0.55 } = {}) {
+// A colossal trunk rising out of view: a flared, mossy foot on buttress roots,
+// in deep-furrowed bark.
+function trunkParts({ r = 1, h = 30, seg = 10, roots = 5, seed = 1 } = {}) {
   const rnd = seeded(seed);
   const prof = [[1.5, 0], [1.2, 0.55], [1.06, 1.4], [1.0, 2.6], [0.97, 6], [0.9, 14], [0.82, 22], [0.76, h]];
   const lower = prof.filter(([, y]) => y <= 2.6).map(([a, y]) => [a * r, y]);
   const upper = prof.filter(([, y]) => y >= 2.6).map(([a, y]) => [a * r, y]);
   const parts = [
-    part(P.lathe(lower, seg), null, { grad: [C.moss, C.bark, 0.2, 2.8], mark, tint: 1, uvScale: [3, 2] }),
-    part(P.lathe(upper, seg), null, { grad: [C.bark, C.barkHi, 2.6, h * 0.55], mark, tint: 1, uvScale: [3, 12] }),
+    asBark(part(P.lathe(lower, seg), null, { grad: [C.moss, C.bark, 0.2, 2.8], tint: 1 }), undefined, 0.7 * r),
+    asBark(part(P.lathe(upper, seg), null, { grad: [C.bark, C.barkHi, 2.6, h * 0.55], tint: 1 }), undefined, 0.7 * r),
   ];
   for (let i = 0; i < roots; i++) {
     const a = (i / roots) * 6.283 + rnd() * 0.6;
     const len = r * (1.0 + rnd() * 0.6);
-    parts.push(part(P.sphere(1, 6, 4), null, {
+    parts.push(asBark(part(P.sphere(1, 6, 4), null, {
       x: Math.cos(a) * r * 1.05, y: 0.25 * r, z: Math.sin(a) * r * 1.05,
       sx: 0.34 * r, sy: 0.8 * r, sz: len, ry: Math.PI / 2 - a, rx: 0.42,
-      grad: [C.moss, C.bark, -0.2, 1.6 * r], mark, tint: 1,
-    }));
+      grad: [C.moss, C.bark, -0.2, 1.6 * r], tint: 1,
+    }), (x, y, z) => Math.hypot(x, z), 0.5 * r));
   }
   // a broken-off branch or two
   for (let i = 0; i < 2; i++) {
     const a = rnd() * 6.283;
     const y = 6 + rnd() * 7;
-    parts.push(part(P.cyl(0.08 * r, 0.2 * r, 1.6 * r, 6), C.bark, { x: Math.cos(a) * r * 1.05, y, z: Math.sin(a) * r * 1.05, ry: Math.PI / 2 - a, rx: 1.0, tint: 1 }));
+    parts.push(asBark(part(P.cyl(0.08 * r, 0.2 * r, 1.6 * r, 6), C.bark, { x: Math.cos(a) * r * 1.05, y, z: Math.sin(a) * r * 1.05, ry: Math.PI / 2 - a, rx: 1.0, tint: 1 }), axisOf(1.0, Math.PI / 2 - a), 0.3 * r));
   }
   return parts;
 }
@@ -424,8 +453,15 @@ function campfireBase(parts, rnd, seed, { big = [] } = {}) {
   }
 }
 function log(parts, a, b, r = 0.065) {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  const d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len, (b[2] - a[2]) / len];
   rod(parts, a, b, r, '#5a4030', 0.6);
+  asBark(parts[parts.length - 1], (x, y, z) => x * d[0] + y * d[1] + z * d[2], 0.12);
   // a pale sawn end on the outer one, charred black at the inner
+  rod(parts, [a[0] - d[0] * 0.012, a[1] - d[1] * 0.012, a[2] - d[2] * 0.012], [a[0] + d[0] * 0.004, a[1] + d[1] * 0.004, a[2] + d[2] * 0.004], r * 0.86, C.wood, 0);
+  parts[parts.length - 1].attributes.fx.array.forEach((v, i, f) => {
+    if (i % 3 === 0) f[i] = GRAIN;
+  });
   parts.push(part(P.sphere(r * 1.02, 6, 4), '#1e1814', { x: b[0], y: b[1], z: b[2], outline: 0 }));
 }
 function campfireGeo(kind, seed) {
@@ -518,14 +554,13 @@ function fallenLogGeo() {
   const cy = under + r;
   const half = 1.45;
   const parts = [
-    part(P.cyl(r, r * 1.06, half * 2, 12), null, { y: cy, rz: Math.PI / 2, grad: ['#2a1f17', C.barkHi, under, cy + r], mark: 0.55, uvScale: [2, 3] }),
+    asBark(part(P.cyl(r, r * 1.06, half * 2, 16), null, { y: cy, rz: Math.PI / 2, grad: ['#2a1f17', C.barkHi, under, cy + r] }), alongX, 0.45),
     part(P.sphere(1, 12, 6), null, { y: cy + r * 0.74, sx: half * 0.82, sy: 0.15, sz: r * 0.72, grad: [C.moss, C.mossHi, cy + r * 0.5, cy + r * 0.95], mark: 0.7 }),
   ];
-  // sawn ends showing pale wood and a ring
+  // sawn ends: pale wood, its rings showing
   for (const s of [-1, 1]) {
     const rr = s < 0 ? r : r * 1.06;
-    parts.push(part(P.cyl(rr * 0.86, rr * 0.86, 0.05, 14), C.wood, { x: s * (half + 0.005), y: cy, rz: Math.PI / 2, outline: 0.4 }));
-    parts.push(part(P.torus(rr * 0.5, 0.022, 3, 14), C.woodRing, { x: s * (half + 0.035), y: cy, ry: Math.PI / 2, outline: 0 }));
+    parts.push(sawnEnd(rr * 0.88, { x: s * (half + 0.005), y: cy, rz: Math.PI / 2 }));
   }
   // bracket fungus on the side
   for (let i = 0; i < 3; i++) {
@@ -533,7 +568,7 @@ function fallenLogGeo() {
   }
   hangingMoss(parts, rnd, -half + 0.2, half - 0.2, under + 0.1);
   parts.push(rockPart({ r: 0.55, x: -1.02, y: -0.1, sx: 0.85, sy: (under + 0.12) / (0.55 * 1.78), sz: 0.9, seed: 7 }));
-  parts.push(part(P.cyl(0.3, 0.38, under + 0.02, 9), null, { x: 1.04, y: (under + 0.02) / 2, grad: ['#2a1f17', C.barkHi, 0, under], mark: 0.5 }));
+  parts.push(asBark(part(P.cyl(0.3, 0.38, under + 0.02, 12), null, { x: 1.04, y: (under + 0.02) / 2, grad: ['#2a1f17', C.barkHi, 0, under] }), undefined, 0.35));
   parts.push(part(P.cyl(0.3, 0.3, 0.04, 9), C.moss, { x: 1.04, y: under + 0.03, outline: 0.4 }));
   return merge(parts).translate(0, 0, -r);
 }
@@ -551,7 +586,7 @@ function fallenTreeGeo() {
   const rAt = (x) => r0 + ((r1 - r0) * (x - x0)) / (x1 - x0);
   const cy = under + rAt(-4.4);
   const parts = [
-    part(P.cyl(r0, r1, x1 - x0, 14), null, { x: (x0 + x1) / 2, y: cy, rz: Math.PI / 2, grad: ['#2a1f17', C.barkHi, cy - r0, cy + r0], mark: 0.55, uvScale: [3, 10] }),
+    asBark(part(P.cyl(r0, r1, x1 - x0, 16), null, { x: (x0 + x1) / 2, y: cy, rz: Math.PI / 2, grad: ['#2a1f17', C.barkHi, cy - r0, cy + r0] }), alongX, 0.8),
     part(P.sphere(1, 16, 6), null, { x: -0.5, y: cy + 0.7, sx: 8.5, sy: 0.2, sz: 0.62, grad: [C.moss, C.mossHi, cy + 0.45, cy + 0.9], mark: 0.7 }),
   ];
   // the root plate, torn up with the earth still on it
@@ -570,7 +605,7 @@ function fallenTreeGeo() {
     const g = P.cyl(0.1, 0.24, len, 6);
     g.translate(0, len / 2, 0);
     const bz = (rnd() - 0.5) * 1.2;
-    parts.push(part(g, C.bark, { x: x1 - 0.2, y: cy, z: bz, rz: -Math.PI / 2 + a }));
+    parts.push(asBark(part(g, C.bark, { x: x1 - 0.2, y: cy, z: bz, rz: -Math.PI / 2 + a }), axisOf(0, 0, -Math.PI / 2 + a), 0.4));
     parts.push(part(P.sphere(1.0 + rnd() * 0.5, 9, 6), null, { x: x1 + Math.cos(a) * len, y: cy + Math.sin(a) * len, z: bz, sy: 0.7, grad: [C.leafLo, C.leafHi, cy - 1, cy + 2], mark: 0.85 }));
   }
   hangingMoss(parts, rnd, -4.3, 4.3, under + 0.12, 0.34, 0.3);
@@ -797,29 +832,31 @@ export default {
   build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 6);
     b.toon('floor', groundStrip(420, 16, C.floor, 8, { y: -0.03, mark: 0.45 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
-    b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 340, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
+    b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 520, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
+    b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a' })), { cap: 260, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
     b.toon('grassTuft', merge(grassParts({ n: 8, h: [0.2, 0.42], spread: 0.22, w: 0.035, seed: 8 })), { cap: 260, ink: 0, anim: 'popLate', wobble: [0.12, 0, 1.9, 0] });
     b.toon('fern', merge(fernParts({ n: 9, len: 1.1, seed: 5 })), { cap: 160, anim: 'pop', wobble: [0.04, 0, 1.3, 0], ink: 0 });
     b.toon('flowers', merge(flowerPatchParts({ seed: 6 })), { cap: 120, anim: 'pop', marks: [2, 2], wobble: [0.08, 0, 1.6, 0], ink: 0 });
-    b.toon('trunk', merge(trunkParts({ r: 1, h: 32, seed: 2 })), { cap: 170, anim: 'pop', marks: [1, 1], ink: 0.06 });
-    b.toon('trunkB', merge(trunkParts({ r: 1, h: 32, roots: 4, seed: 9 })), { cap: 120, anim: 'pop', marks: [1, 1], ink: 0.06 });
-    b.toon('trunkFar', merge(trunkParts({ r: 1, h: 34, seg: 7, roots: 0, seed: 4, mark: 0.3 })), { cap: 200, anim: 'pop', marks: [1, 1], ink: 0 });
+    b.toon('trunk', merge(trunkParts({ r: 1, h: 32, seed: 2 })), { cap: 170, anim: 'pop', marks: [1, 1], ink: 0.06, bark: true });
+    b.toon('trunkB', merge(trunkParts({ r: 1, h: 32, roots: 4, seed: 9 })), { cap: 120, anim: 'pop', marks: [1, 1], ink: 0.06, bark: true });
+    b.toon('trunkFar', merge(trunkParts({ r: 1, h: 34, seg: 7, roots: 0, seed: 4 })), { cap: 200, anim: 'pop', marks: [1, 1], ink: 0, bark: true });
     b.toon('canopy', canopyGeo(11), { cap: 140, anim: 'popEarly', marks: [2.4, 2], wobble: [0, 0.15, 0.4, 0], ink: 0.05 });
     b.toon('canopyB', canopyGeo(23), { cap: 140, anim: 'popEarly', marks: [2.4, 2], wobble: [0, 0.15, 0.35, 0], ink: 0.05 });
     b.toon('mushrooms', merge(mushroomParts({ n: 5, seed: 2 })), { cap: 90, anim: 'pop', ink: 0.025 });
     b.glow('glow', { cap: 90, anim: 'pop' });
     b.toon('rock', merge([rockPart({ r: 0.7, sx: 1.2, sy: 0.8, seed: 41 })]), { cap: 60, anim: 'pop', marks: [1.6, 1.6] });
     b.toon('stump', merge([
-      part(P.cyl(0.55, 0.7, 0.9, 10), null, { y: 0.45, grad: ['#2a1f17', C.barkHi, 0, 0.9], mark: 0.5 }),
-      part(P.cyl(0.5, 0.5, 0.04, 12), C.wood, { y: 0.91, outline: 0.5 }),
-      part(P.torus(0.3, 0.02, 3, 14), C.woodRing, { y: 0.935, rx: Math.PI / 2, outline: 0 }),
+      asBark(part(P.cyl(0.55, 0.7, 0.9, 16), null, { y: 0.45, grad: ['#2a1f17', C.barkHi, 0, 0.9] }), undefined, 0.4),
+      sawnEnd(0.5, { y: 0.91, outline: 0.5 }),
       ...mushroomParts({ n: 3, seed: 14, glow: 0 }).map((g) => g.translate(0.45, 0, 0.35)),
-    ]), { cap: 40, anim: 'pop' });
+    ]), { cap: 40, anim: 'pop', bark: true });
     b.toon('log', merge([
-      part(P.cyl(0.42, 0.46, 5.5, 12), null, { y: 0.4, rx: Math.PI / 2, grad: ['#2a1f17', C.barkHi, 0, 0.85], mark: 0.55, uvScale: [2, 4] }),
+      asBark(part(P.cyl(0.42, 0.46, 5.5, 16), null, { y: 0.4, rx: Math.PI / 2, grad: ['#2a1f17', C.barkHi, 0, 0.85] }), alongZ, 0.5),
+      sawnEnd(0.42 * 0.88, { y: 0.4, z: 2.755, rx: Math.PI / 2 }),
+      sawnEnd(0.46 * 0.88, { y: 0.4, z: -2.755, rx: Math.PI / 2 }),
       part(P.sphere(1, 12, 6), null, { y: 0.74, sx: 0.32, sy: 0.12, sz: 2.2, grad: [C.moss, C.mossHi, 0.6, 0.9], mark: 0.7 }),
       ...fernParts({ n: 6, len: 0.7, seed: 21 }).map((g) => g.translate(0.5, 0, 1.4)),
-    ]), { cap: 40, anim: 'pop' });
+    ]), { cap: 40, anim: 'pop', bark: true });
     b.toon('pond', waterGeo(pondShapeGeo(2.4, 1.6, 5)), { cap: 24, ink: 0, water: true, anim: 'pop' });
     {
       const rnd = seeded(77);
@@ -841,20 +878,20 @@ export default {
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', fly: [0, 0, 1.6, 0.22], wobble: [0.05, 0.4, 1.1, 0], ink: 0.02 });
 
     // obstacles
-    b.toon('campfireA', campfireGeo('teepee', 3), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true });
-    b.toon('campfireB', campfireGeo('crib', 8), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true });
-    b.toon('campfireC', campfireGeo('star', 13), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true });
+    b.toon('campfireA', campfireGeo('teepee', 3), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true, bark: true });
+    b.toon('campfireB', campfireGeo('crib', 8), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true, bark: true });
+    b.toon('campfireC', campfireGeo('star', 13), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true, bark: true });
     b.glow('fireGlow', { cap: 30, anim: 'popEarly' });
     b.pool('firelight', { cap: 30, anim: 'popEarly', color: '#ff9a4a', flicker: true });
     b.toon('creekWideWater', waterGeo(creekShapeGeo(-14, 14, CREEK_W, 5, 0.22), 0.035, CREEK_WATER, 0.35), { cap: 10, ink: 0, water: true, anim: 'popEarly' });
     b.toon('creekWideStones', creekWideStonesGeo(5), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03 });
-    b.toon('fallenLog', fallenLogGeo(), { cap: 24, anim: 'popEarly', marks: [1.6, 1.6] });
-    b.toon('fallenTree', fallenTreeGeo(), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6] });
+    b.toon('fallenLog', fallenLogGeo(), { cap: 24, anim: 'popEarly', marks: [1.6, 1.6], bark: true });
+    b.toon('fallenTree', fallenTreeGeo(), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6], bark: true });
     b.toon('boulder', boulderObstacleGeo(), { cap: 24, anim: 'popEarly', marks: [1.4, 1.4] });
     b.toon('shrineRock', shrineRockGeo(), { cap: 24, anim: 'popEarly', marks: [1.4, 1.4] });
 
     // threshold
-    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, marks: [1, 1], ink: 0.06 });
+    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, marks: [1, 1], ink: 0.06, bark: true });
     b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
@@ -912,9 +949,13 @@ export default {
     }
 
     for (const s of [-1, 1]) {
-      // long grass and ferns crowding the verge
-      for (let i = 0; i < 9; i++) {
-        ctx.put('grassTall', s * rng.float(4.45, 8.8), 0, rng.float(0, 16), { s: rng.float(0.8, 1.35), ry: rng.float(-0.6, 0.6), c: [1, 1, 1] });
+      // long grass and ferns crowding the verge, taller still in among the
+      // trunks behind
+      for (let i = 0; i < 14; i++) {
+        ctx.put('grassTall', s * rng.float(4.45, 9.5), 0, rng.float(0, 16), { s: rng.float(0.8, 1.35), ry: rng.float(-0.6, 0.6), c: [1, 1, 1] });
+      }
+      for (let i = 0; i < 6; i++) {
+        ctx.put('grassTaller', s * rng.float(5.2, 12), 0, rng.float(0, 16), { s: rng.float(0.85, 1.3), ry: rng.float(-0.6, 0.6), c: [1, 1, 1] });
       }
       for (let i = 0; i < 3; i++) {
         ctx.put('fern', s * rng.float(4.8, 9.5), 0, rng.float(0, 16), { s: rng.float(0.8, 1.3), ry: rng.float(0, 6.28) });

@@ -102,6 +102,9 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec4 uGrade; // x saturation, y contrast, z vignette, w exposure
 uniform vec3 uVignette;
+// the vignette's shape (env.grade.edge): x where it starts, y where it's full
+// (0 the centre of the screen, 1 the corners; the sides are about 0.7)
+uniform vec4 uVigShape;
 uniform vec2 uResolution;
 uniform vec4 uDream2;
 uniform vec4 uDream3;
@@ -215,12 +218,14 @@ vec3 grade(vec3 c, vec4 trip, float dist) {
     float rim = live * uDrain.x * (1.0 - smoothstep(0.0, 0.08, abs(e - 0.02))) * (1.0 - gKeep);
     c = dir > 0.0 ? c * (1.0 - 0.45 * rim) : c + rim * 0.22;
   }
+  float vg = smoothstep(uVigShape.x, uVigShape.y, r) * uGrade.z;
   if (uSkyFx.w > 0.0) {
-    // a lightning flash lights the whole world for an instant
+    // a lightning flash lights the whole world for an instant, a cold white
+    // light thrown right out into the dark at the edges
     float fl = lightning().x;
-    c += (c * 0.7 + vec3(0.05, 0.05, 0.07)) * fl * (1.0 - gEmit);
+    c += (c * 1.1 + vec3(0.07, 0.07, 0.1)) * fl * (1.0 - gEmit);
+    vg *= 1.0 - 0.6 * fl;
   }
-  float vg = smoothstep(0.42, 0.95, r) * uGrade.z;
   return mix(c, c * uVignette, vg);
 }
 vec3 grade(vec3 c, vec4 trip) {
@@ -247,6 +252,11 @@ uniform vec4 uAnim;
 uniform vec4 uWobble;
 uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
 uniform float uDreamK; // 1 for props that may breathe (see makeToonMaterial)
+#ifdef CLOTH
+// washing in the breeze (toon option cloth): x how far a hem sways, y how
+// fast, z the line's height, w how far the washing hangs below it
+uniform vec4 uCloth;
+#endif
 #ifdef TURN
 // x spin about the local z axis (rad/s; gears, clock hands), y swing about the
 // local x axis (radians; a pendulum hung from the origin), z swing rate, w
@@ -444,6 +454,30 @@ void main() {
   if (uWobble.y != 0.0) {
     lp.y += sin(uTime * uWobble.z * 0.8 + phase * 1.7) * uWobble.y;
   }
+  #ifdef CLOTH
+    // washing on the line (uv.y > 0.5, each garment on its own beat in uv.x)
+    // stirs in the breeze: it swings gently on its pegs and billows, ripples
+    // running across it, more and more the further it hangs below the line;
+    // a swing only ever lifts the hem
+    if (uv.y > 0.5) {
+      float hang = clamp((uCloth.z - lp.y) / uCloth.w, 0.0, 1.0);
+      float t = uTime * uCloth.y + uv.x * 6.2831 + phase * 2.0;
+      float sway = sin(t) * 0.65 + sin(t * 2.1 + 1.3) * 0.35;
+      float ra = t * 1.7 - lp.x * 5.0 + hang * 3.0;
+      float rip = sin(ra);
+      float dz = uCloth.x * (hang * hang * sway + 0.3 * hang * rip);
+      // (sideways too, the hem fluttering more than the rest)
+      float dx = uCloth.x * hang * hang * (0.55 * sin(t * 0.8 + 2.0) + 0.2 * sin(t * 2.9 - lp.x * 3.0));
+      lp.z += dz;
+      lp.x += dx;
+      lp.y += (dz * dz + dx * dx) / (2.0 * max(uCloth.z - lp.y, 0.3));
+      // tilt the cloth's normals with the billow
+      float dzdy = -uCloth.x * (2.0 * hang * sway + 0.3 * rip + 0.9 * hang * cos(ra)) / uCloth.w;
+      float dzdx = -uCloth.x * 1.5 * hang * cos(ra);
+      ln.xy -= vec2(dzdx, dzdy) * ln.z;
+      ln = normalize(ln);
+    }
+  #endif
   #ifdef FLAME
     // a fire's tongues (its fully self-lit parts) lick and flicker, each on
     // its own beat (uv.x), more and more toward its tip (uv.y)
@@ -636,6 +670,58 @@ float hash12(vec2 p) {
 uniform vec4 uCrust;
 float tri(vec3 p, vec3 an) {
   return texture2D(uNoise, p.yz).g * an.x + texture2D(uNoise, p.xz).g * an.y + texture2D(uNoise, p.xy).g * an.z;
+}
+#endif
+#ifdef BARK
+// Bark and sawn wood (toon option bark), each part picking its kind with its
+// mark flag (fx.x: 0.4 bark, 0.3 a sawn end; anything else gets the usual
+// marks). Both return how much to darken the part's own colour.
+//
+// Bark, its uv laid out round the trunk or log (x: 0..16 round it, y: plates
+// along it; see asBark in forest.js): rounded ridges between deep V-shaped
+// furrows, two dozen round the trunk, wandering along the grain at two
+// scales; here and there a furrow splits a ridge down its middle; the ridges
+// break across now and then into corky plates, each its own shade, the cracks
+// slanting; a fibrous streak runs through it all, and pale-green lichen grows
+// in patches. The detail eases off to an even tone where it would shimmer.
+vec3 barkTex(vec2 p) {
+  float w1 = texture2D(uNoise, vec2(p.x * 0.0625, p.y * 0.05)).g;
+  float w2 = texture2D(uNoise, vec2(p.x * 0.25 + 0.37, p.y * 0.18)).g;
+  float fx = p.x * 1.5 + (w1 - 0.5) * 3.0 + (w2 - 0.5) * 1.1;
+  float col = mod(floor(fx), 24.0);
+  float f = fract(fx);
+  float ridge = pow(sin(3.14159 * f), 0.7);
+  float split = smoothstep(0.55, 0.7, texture2D(uNoise, vec2(p.x * 0.125 + 0.71, p.y * 0.07)).g);
+  ridge *= 1.0 - split * (1.0 - smoothstep(0.0, 0.16, abs(f - 0.5)));
+  float far = smoothstep(0.25, 0.6, max(fwidth(fx), fwidth(p.y)));
+  ridge = mix(ridge, 0.6, far);
+  float py = p.y + hash12(vec2(col, 1.7)) * 5.0 + (f - 0.5) * 0.35 + (w2 - 0.5) * 0.8;
+  float pc = floor(py);
+  float pf = fract(py);
+  float crack = (1.0 - smoothstep(0.0, 0.045, min(pf, 1.0 - pf))) * step(0.5, hash12(vec2(col, pc) + 0.7));
+  crack *= smoothstep(0.3, 0.7, ridge) * (1.0 - far);
+  float tone = mix(hash12(vec2(col, pc) + 3.1), 0.5, far);
+  float grain = texture2D(uNoise, vec2(p.x * 0.5, p.y * 0.45) + 0.5).g;
+  float k = mix(0.3, 1.08, ridge) * (0.88 + 0.24 * tone) * (1.0 - 0.45 * crack) * (0.88 + 0.24 * grain);
+  float lich = smoothstep(0.6, 0.78, texture2D(uNoise, vec2(p.x * 0.0625 + 0.21, p.y * 0.07 + 0.6)).g) * ridge;
+  return mix(vec3(k), vec3(k * 1.12, k * 1.3, k * 1.02), lich * 0.6);
+}
+// A sawn end, its uv a cylinder's cap (centred on 0.5): growth rings round a
+// pith a little off-centre, wavering; darker heartwood in the middle, pale
+// sapwood out by the bark, and checks split in from the rim as it dried.
+float endGrain(vec2 uv) {
+  vec2 q = uv - 0.5 + vec2(0.035, -0.025);
+  float r = length(q) * 2.0;
+  float a = atan(q.y, q.x);
+  float wob = texture2D(uNoise, vec2(a * 0.15915 + 0.5, 0.37)).g - 0.5;
+  float rings = (r + wob * 0.14 * r) * 11.0;
+  float rf = fract(rings);
+  float fw = fwidth(rings);
+  float late = smoothstep(0.55, 0.85, rf) * (1.0 - smoothstep(0.85, 1.0, rf));
+  late = mix(late, 0.25, smoothstep(0.25, 0.7, fw));
+  float k = (1.0 - 0.3 * late) * mix(0.72, 1.0, smoothstep(0.0, 0.32, r)) * (1.0 + 0.08 * smoothstep(0.7, 0.92, r));
+  float ck = smoothstep(0.99, 0.998, cos(a * 3.0 + 0.7 + wob * 2.0)) * smoothstep(0.3, 0.85, r);
+  return k * (1.0 - 0.55 * ck * (1.0 - smoothstep(0.25, 0.7, fw)));
 }
 #endif
 #ifdef GROUND
@@ -929,8 +1015,19 @@ void main() {
     base = mix(base, vec3(0.62, 0.59, 0.56) * (0.85 + 0.3 * c3), ashTop);
     vein *= (1.0 - ashTop) * uCrust.x;
   #else
-    float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
-    base = mix(base, base * 0.64, m);
+    #ifdef BARK
+      if (abs(vFx.x - 0.4) < 0.02) {
+        base *= barkTex(vUv);
+      } else if (abs(vFx.x - 0.3) < 0.02) {
+        base *= endGrain(vUv);
+      } else {
+        float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+        base = mix(base, base * 0.64, m);
+      }
+    #else
+      float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+      base = mix(base, base * 0.64, m);
+    #endif
   #endif
 
   vec3 V = v / dist;
@@ -1574,8 +1671,8 @@ void main() {
 const FS_SKY = /* glsl */ `
 uniform float uTime;
 uniform vec4 uSkyFx2; // x sun rays, y cloud bands, z aurora, w planet ring (moon drawn full)
-// a total eclipse in place of the sun (env.eclipse): x how much, y how hard
-// it bends the light from behind it, z the corona's reach
+// a total eclipse in place of the sun (env.eclipse): x how much, y how bright
+// its ring of fire burns, z the corona's reach
 uniform vec4 uEclipse;
 uniform vec4 uTrip;
 uniform vec3 uSunDisc;
@@ -1590,7 +1687,7 @@ float hash13(vec3 p) {
   return fract((p.x + p.y) * p.z);
 }
 // Everything in the sky behind the sun: its gradient, the moon, stars, rays,
-// clouds, smoke and lightning, aurora (an eclipse samples it along bent rays).
+// clouds, smoke and lightning, aurora.
 vec3 skyBack(vec3 d) {
   vec3 c = skyColor(d);
   float sd = dot(d, uSunDir);
@@ -1667,7 +1764,7 @@ vec3 skyBack(vec3 d) {
     float low = 1.0 - smoothstep(0.03, 0.4, d.y);
     vec3 smoke = vec3(0.05, 0.035, 0.032) * (0.6 + 1.6 * smoothstep(0.4, 0.85, s2) + 0.8 * s3);
     smoke += (uSunColor * 0.5 + uSkyHorizon * 0.35) * low * (1.0 - smoothstep(0.35, 0.75, sn));
-    c = mix(c, smoke, cover * min(uSkyFx.w, 1.0) * (1.0 - 0.55 * uEclipse.x * pow(max(sd, 0.0), 30.0)));
+    c = mix(c, smoke, cover * min(uSkyFx.w, 1.0) * (1.0 - 0.55 * uEclipse.x * pow(max(sd, 0.0), 90.0)));
     vec4 L = lightning();
     if (L.x > 0.0) {
       float daz = az - L.y;
@@ -1703,71 +1800,38 @@ void main() {
     d = vec3(sin(az0) * cos(el), sin(el), -cos(az0) * cos(el));
   }
   vec3 c = skyBack(d);
-  if (uEclipse.x > 0.0 && dot(d, uSunDir) > 0.5) {
-    // A total eclipse, the sun gone black — and something heavier than the
-    // moon in front of it: the light from behind is bent round the hole like
-    // round a black hole, so the sky near it is drawn out in arcs, a mirror of
-    // the far side wrapped round its rim, each colour bent by its own amount
-    // (rainbow fringes where they part); a ring of fire hugs the black disc,
-    // flaring brighter where it turns toward you; and a corona streams out of
-    // it. All of it burns, so it keeps its colour when the world drains.
+  if (uEclipse.x > 0.0 && dot(d, uSunDir) > 0.95) {
+    // A total eclipse, the sun gone black: a ring of fire hugs the rim of the
+    // disc where the last of the light spills past it, hottest at its inner
+    // edge, tongues of flame licking off it and flickering; round it a short
+    // corona streams out in flickering wisps. All of it burns, so it keeps its
+    // colour when the world drains.
     vec3 rt = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
     vec3 upv = cross(rt, uSunDir);
     vec2 pq = vec2(dot(d, rt), dot(d, upv));
     float R = sqrt(max(1.0 - uSkyFx.y * uSkyFx.y, 1e-6));
-    float r = length(pq);
-    float x = r / R; // in disc radii
-    vec2 dir2 = pq / max(r, 1e-5);
-    float ang = atan(dir2.y, dir2.x);
+    float x = length(pq) / R; // in disc radii
+    float ang = atan(pq.y, pq.x);
     float spin = uTime * 0.12;
-    if (x < 9.0) {
-      float E = 1.55 * uEclipse.y;
-      float fall = 1.0 - smoothstep(3.5, 9.0, x);
-      vec3 lensed;
-      for (int k = 0; k < 3; k++) {
-        float e = E * (1.0 + (float(k) - 1.0) * 0.14);
-        float xs = clamp(x - e * e / max(x, 0.2), -7.0, 9.0);
-        xs = mix(x, xs, fall);
-        // the bent light also swirls a little round the hole, dragged by it
-        float a2 = ang + 0.5 * uEclipse.y * fall / max(x * x, 1.0) + spin * fall * 0.3;
-        vec2 q2 = vec2(cos(a2), sin(a2)) * xs * R;
-        vec3 dd = normalize(uSunDir + rt * q2.x + upv * q2.y);
-        lensed[k] = skyBack(dd)[k];
-      }
-      c = mix(c, lensed, uEclipse.x);
-      // a faint shimmer of shifted hue in the bent light, redder near the hole
-      float shift = exp(-(x - 1.0) * 0.7) * fall * uEclipse.x;
-      c = mix(c, hueRot(c, 0.9 * sin(ang * 2.0 + spin * 3.0) - 0.4), 0.35 * shift);
-      gKeep = max(gKeep, 0.75 * shift);
-    }
-    // the corona: streamers of fire flowing out of the disc
+    // the corona: wisps of fire streaming a little way out of the rim
     float st = texture2D(uNoise, vec2(ang * 0.48 + spin * 0.2, x * 0.05 - uTime * 0.02)).g;
     float st2 = texture2D(uNoise, vec2(ang * 1.27 - spin * 0.3, x * 0.11 + 0.37)).g;
     float streamers = smoothstep(0.35, 0.85, st * 0.6 + st2 * 0.5);
     float out1 = max(x - 1.0, 0.0);
-    float corona = exp(-out1 * (2.6 / max(uEclipse.z, 0.2))) * (0.45 + 0.9 * streamers) * step(1.0, x);
-    corona += exp(-out1 * 0.7 / max(uEclipse.z, 0.2)) * 0.18 * streamers;
-    vec3 coronaCol = mix(vec3(0.75, 0.08, 0.02), vec3(1.0, 0.48, 0.12), exp(-out1 * 1.8));
+    float reach = max(uEclipse.z, 0.2);
+    float corona = exp(-out1 * (3.4 / reach)) * (0.35 + 0.9 * streamers) * step(1.0, x);
+    corona += exp(-out1 * 1.6 / reach) * 0.1 * streamers;
+    vec3 coronaCol = mix(vec3(0.6, 0.06, 0.02), vec3(1.0, 0.45, 0.1), exp(-out1 * 2.5));
     c += coronaCol * corona * uEclipse.x;
-    // the ring of fire hugging the rim, flaring where it turns toward you
-    float doppler = 0.55 + 0.45 * cos(ang - 2.4 + spin);
-    float flick = 0.85 + 0.15 * sin(ang * 13.0 + uTime * 3.1) * sin(ang * 7.0 - uTime * 2.3);
-    float ring = exp(-pow((x - 1.04) / (0.045 + 0.03 * doppler), 2.0)) * flick;
-    vec3 ringCol = mix(vec3(1.0, 0.22, 0.04), vec3(1.0, 0.9, 0.62), doppler);
-    c += ringCol * ring * (0.7 + 1.3 * doppler) * uEclipse.x;
-    // the second, fainter ring of light that went once round the hole
-    float ring2 = exp(-pow((x - 1.22) / 0.03, 2.0)) * (0.5 + 0.5 * doppler);
-    c += vec3(1.0, 0.55, 0.25) * ring2 * 0.35 * uEclipse.x;
-    // light split into its colours as it's bent: a broken spectral fringe
-    // round the rim, red inside to violet out, slowly wheeling
-    float ft = (x - 1.3) / (0.75 * max(uEclipse.y, 0.5));
-    float fringe = smoothstep(0.0, 0.15, ft) * (1.0 - smoothstep(0.75, 1.0, ft));
-    fringe *= smoothstep(0.3, 0.75, texture2D(uNoise, vec2(ang * 0.32 - spin * 0.5, 0.71)).g * 0.7 + 0.35 * doppler);
-    vec3 spec = clamp(abs(fract(ft * 0.8 + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
-    c = mix(c, c * 0.5 + spec * 0.55, fringe * 0.5 * uEclipse.x);
-    gKeep = max(gKeep, fringe * 0.9);
-    // the hole itself
-    float hole = 1.0 - smoothstep(0.96, 1.0, x);
+    // the ring of fire: flames licking off the rim, flickering
+    float lick = texture2D(uNoise, vec2(ang * 0.95 + spin * 0.6, uTime * 0.05)).g;
+    float flick = 0.82 + 0.18 * sin(ang * 13.0 + uTime * 3.1) * sin(ang * 7.0 - uTime * 2.3);
+    float w = 0.06 + 0.08 * smoothstep(0.35, 0.8, lick);
+    float ring = exp(-pow(max(x - 1.0, 0.0) / w, 2.0) - pow(min(x - 1.0, 0.0) / 0.012, 2.0)) * flick;
+    vec3 ringCol = mix(vec3(1.0, 0.25, 0.04), vec3(1.0, 0.86, 0.55), exp(-pow((x - 1.0) / 0.035, 2.0)));
+    c += ringCol * ring * 1.8 * uEclipse.y * uEclipse.x;
+    // the black disc itself
+    float hole = 1.0 - smoothstep(0.985, 1.0, x);
     c = mix(c, vec3(0.0), hole * uEclipse.x);
     gKeep = max(gKeep, min(1.0, max(ring * 1.3, corona * 1.6)) * (1.0 - hole));
   }
@@ -2245,7 +2309,7 @@ export function makeEnvUniforms(env) {
     uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
-    uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(),
+    uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(), uVigShape: v4(),
   };
   writeEnvUniforms(u, env);
   return u;
@@ -2285,6 +2349,8 @@ export function writeEnvUniforms(u, env) {
   const gr = env.grade || {};
   u.uGrade.value.set(gr.sat ?? 1, gr.contrast ?? 1, gr.vignette ?? 0, gr.exposure ?? 1);
   setColor(u.uVignette.value, gr.tint || '#000000');
+  const edge = gr.edge || [0.42, 0.95];
+  u.uVigShape.value.set(edge[0], edge[1], 0, 0);
   const tr = env.trip || [0, 0, 0];
   u.uTrip.value.set(tr[0], tr[1], tr[2], 0);
   setColor(u.uGroundA.value, env.ground[0]);
@@ -2371,6 +2437,11 @@ export function makeToonMaterial(env, o = {}) {
   if (o.splash) defines.SPLASH = '';
   if (o.wonky) defines.WONKY = '';
   if (o.flame) defines.FLAME = '';
+  if (o.bark) defines.BARK = '';
+  if (o.cloth) {
+    defines.CLOTH = '';
+    uniforms.uCloth = { value: new THREE.Vector4(...o.cloth) };
+  }
   if (o.sand) {
     // [seconds to run through, waist height, waist depth, floor below the waist]
     defines.SAND = '';
@@ -2399,7 +2470,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
