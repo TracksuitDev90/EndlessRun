@@ -99,6 +99,10 @@ export class Cloth {
     this.cFloor = 0;
     // gusts grow toward the hem
     this.gustRow = Float32Array.from({ length: rows }, (_, j) => 0.2 + 0.8 * Math.pow(j / (rows - 1), 1.3));
+    // the soft walls (see collide): how far in front of and behind the pins
+    // the front wall and the sloping ceiling start
+    this.frontOff = 0.15;
+    this.backOff = 0.06;
     this.setRest(bind);
   }
 
@@ -502,8 +506,8 @@ export class Cloth {
       back += p[i * 3 + 2];
     }
     this.cCeil = ceil / cols + lift;
-    this.cFront = back / cols - 0.15;
-    this.cBack = back / cols + 0.06;
+    this.cFront = back / cols - this.frontOff;
+    this.cBack = back / cols + this.backOff;
     this.cFloor = floor;
     this.gatherNear();
     // (the owner lists limbs before the body's own volumes; the last time

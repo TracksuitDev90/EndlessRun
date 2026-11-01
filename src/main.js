@@ -4,6 +4,7 @@ import { shared } from './render/shaders.js';
 import { makeMarksTexture, makeNoiseTexture } from './render/textures.js';
 import { Game } from './game/game.js';
 import { loadRunner } from './game/runner-asset.js';
+import { CHARACTERS } from './game/characters.js';
 import { Input } from './core/input.js';
 import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
@@ -12,7 +13,8 @@ import { Quality, gpuClass } from './core/quality.js';
 
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
 // ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
-// 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god
+// 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god,
+// ?runner=<id> (who runs: wayfarer, explorer)
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
@@ -26,6 +28,7 @@ function parseParams() {
     fps: num('fps'),
     god: q.has('god'),
     manual: q.has('manual'),
+    runner: q.get('runner') || undefined,
   };
 }
 
@@ -58,9 +61,10 @@ async function boot() {
   shared.uNoise.value = makeNoiseTexture();
   const gpu = gpuClass(renderer); // (named in the ?debug overlay)
 
-  await loadRunner();
+  const assets = {};
+  await Promise.all(CHARACTERS.map(async (c) => (assets[c.id] = await loadRunner(c.asset))));
   const audio = new Ambient();
-  const game = new Game({ renderer, ui, audio, params });
+  const game = new Game({ renderer, ui, audio, params, assets });
   window.__game = game;
 
   // --- frame timing and adaptive resolution (see core/pacer.js, core/quality.js) ---
@@ -106,13 +110,21 @@ async function boot() {
       ui.showTitle(false);
     }
   };
+  // choosing who runs (title screen): the cards, the arrow keys or a
+  // sideways swipe
+  const pick = (id) => {
+    if (game.selectRunner(id)) ui.showRunner(game.runnerId);
+  };
+  ui.setRunners(CHARACTERS, game.runnerId);
+  ui.on('pick', pick);
   new Input(canvas, {
     onAction: (a) => {
       if (a === 'pause') {
         togglePause();
         return;
       }
-      if (game.state === 'title') begin();
+      if (game.state === 'title' && (a === 'left' || a === 'right')) pick(ui.runnerBeside(a === 'left' ? -1 : 1));
+      else if (game.state === 'title') begin();
       else game.action(a);
     },
     onTap: () => {
@@ -142,6 +154,12 @@ async function boot() {
     ui.setSound(audio.muted);
   });
   ui.on('continue', () => game.continueRun());
+  ui.on('title', () => {
+    audio.resume();
+    game.toTitle();
+    ui.showRunner(game.runnerId, false);
+    ui.showTitle(true);
+  });
   ui.on('again', () => game.restart());
 
   document.addEventListener('visibilitychange', () => {
