@@ -576,7 +576,8 @@ Append to the URL:
   desktop (see [The runners](#the-runners)). The explorer is the same four
   draw calls (her body, ~25k triangles, and her hair: a 15×12 cloth), costs
   about half as much to simulate, and adds two draw calls for each thing
-  flying out of her backpack while it's in the air (at most six). The cloth solver's phases are
+  flying out of her backpack while it's in the air (at most six), and one
+  for the dust while a slide has any in the air. The cloth solver's phases are
   small methods called with integers only: as one big function of nested
   loops V8 kept cycling it in and out of optimisation, running it mostly
   unoptimised and boxing every float it touched (~50 KB of garbage a frame,
@@ -644,10 +645,10 @@ card and how to make them live in `characters.js`).
 | | Rowan, the wayfarer | Wren, the explorer |
 |---|---|---|
 | Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook |
-| Simulated | the cape (19×19 cloth) | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it |
+| Simulated | the cape (19×19 cloth) | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean |
 | Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked front flip or a corkscrew twist |
-| Slide | feet first, leaning back | a forward roll |
+| Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust |
 | Run | a sure, bounding stride | a quicker, lighter, narrower one, more lean, less bounce |
 
 ### Choosing who runs
@@ -669,7 +670,7 @@ cards; on a wide one the cards stand to the right. The pick is remembered
 
 ### The explorer
 
-![Wren's tucked front flip from the chase camera, her forward roll, and Hell: everything drained to grey but her hair](docs/explorer-moves.jpg)
+![Wren's tucked front flip from the chase camera, her baseball slide kicking up dust, and Hell: everything drained to grey but her hair](docs/explorer-moves.jpg)
 
 `tools/runner/explorer.py` sculpts her to her reference sheet the same way
 `build.py` sculpts him (it borrows its primitives, meshing, skinning and
@@ -726,10 +727,26 @@ frame rate) — and in the air she does a trick, dealt from a shuffled deck so
 the same one never comes twice running: a split leap (one leg reaching out
 straight in front, the other stretched behind, arms flung up), a tucked front
 flip about her hips, or a corkscrew twist about her own axis, legs together,
-arms pulled in. Her slide is a forward roll: a dive into a tight tuck, over
-her back and backpack (riding up over it so she never sinks into the road),
-and up onto her feet. A spin cut short — a fast-fall, landing early, jumping
-out of a roll — whips round to finish quickly rather than snapping back. She
+arms pulled in. A spin cut short — a fast-fall, landing early — whips round
+to finish quickly rather than snapping back.
+
+Her slide is a baseball slide: down on her hip, the lead leg out straight with
+its heel on the road and the toe up, the other folded under its knee, leaning
+back with her chin up, her free hand trailing on the road and the sketchbook
+held up high out of the dirt; she rattles over the road and pops back up onto
+her feet as it ends. She leads with the other leg each time (mirrored, all but
+the arms: the book always stays up). About two slides in three — and every
+one she drops straight into out of the air — kick up dust
+(`src/game/dust.js`): as she hits the road, puffs burst out either side of her
+heel and hip with grit flung up off the heel, then a trail of puffs streams
+from her hip as she skids. They're thrown with a share of her speed and left
+behind in the world, so the still air stops them and she slides on out of the
+cloud; each blooms and thins away like a painted cloud — a lumpy edge, lit from
+above, the colour of the road it came off — and they're lit, fogged and graded
+with the world (grey in Hell). One draw call while there's dust in the air,
+none otherwise.
+
+She
 runs at a quicker cadence on a narrower track with more lean and less bounce,
 her free arm swinging lightly and the one with the sketchbook held closer;
 she lands in a quick soft crouch with her arms out.
@@ -741,7 +758,8 @@ To change either runner, edit their script and regenerate (about 15 and 35
 seconds), then look at them turned round like their reference sheet in
 `tools/runner/view.html?runner=explorer` (also `&pose=idle|run|jump|slide|bind`,
 `&t=` seconds into it, `&trick=leap|flip|twist`, `&jt=` seconds into the jump
-or roll, `&views=front,left,back,right,three`, `&zoom=`, `&y=`):
+or slide, `&side=1|-1` the slide's lead leg, `&views=front,left,back,right,three`,
+`&zoom=`, `&y=`):
 
 ```sh
 pip install numpy scipy scikit-image fast-simplification pillow
@@ -894,8 +912,9 @@ src/game/                     game loop, player (the runners' shared core:
                               animation, IK legs, secondary motion, movement),
                               characters (who you can pick), wayfarer and
                               outfit (his palette, cape, pouch, poses), explorer
-                              (her palette, hair, backpack, moves) and spill
-                              (what flies out of it), kit (body geometry, sheet
+                              (her palette, hair, backpack, moves), spill
+                              (what flies out of it) and dust (what her slides
+                              kick up), kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset
                               loader, camera, course (world order),
                               chunk streaming, obstacle director, gem director

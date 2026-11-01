@@ -6,6 +6,7 @@ import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
 import { Player, C, mirror } from './player.js';
 import { CONFIG } from '../config.js';
 import { Spill } from './spill.js';
+import { Dust } from './dust.js';
 
 // The explorer: a slight girl with a shock of vermilion hair, her sweater's
 // sleeves shoved up, a backpack full of odds and ends and her sketchbook in
@@ -18,7 +19,10 @@ import { Spill } from './spill.js';
 //     down on landing and bounces with every stride. The bun, the fringe and
 //     the locks framing her face bounce on springs;
 //   - her backpack bounces on her back, and now and then its lid pops and
-//     something flies out of it (see spill.js).
+//     something flies out of it (see spill.js);
+//   - she moves lighter than he does: a quicker spring between the lanes and
+//     a side-skip into them, tricks in the air, and a baseball slide that
+//     often kicks up dust (see dust.js).
 
 // Palette slots: 1-12 are the garment ids baked into the mesh, the rest are
 // colours the character shader draws her details with (see CHAR_DETAIL).
@@ -79,6 +83,10 @@ const _p = new THREE.Vector3();
 const _hd = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
+const _dh = new THREE.Vector3();
+const _dp = new THREE.Vector3();
+const _dv = new THREE.Vector3();
+const _dq = new THREE.Vector3();
 
 // The rest fall of the hair, built the way it would lie: each column from its
 // roots under the bun down over the back of the head along the scalp, then
@@ -246,14 +254,16 @@ export class Explorer extends Player {
     this.buildBody();
     this.buildHair();
     this.spill = new Spill(this.u);
+    this.dust = new Dust(this.u);
   }
 
   get objects() {
-    return [this.root, this.shadow, this.spill.group];
+    return [this.root, this.shadow, this.spill.group, this.dust.points];
   }
 
   forCompile(on) {
     this.spill.forCompile(on);
+    this.dust.forCompile(on);
   }
 
   buildHair() {
@@ -307,7 +317,7 @@ export class Explorer extends Player {
     this.lidS.reset();
     this.lidKick = 0;
     this.spins = {
-      pitch: { value: 0, from: 0, to: 0, t: 0, delay: 0, dur: 1, pivot: 0.78, pivotTo: 0.78, lift: 0 },
+      pitch: { value: 0, from: 0, to: 0, t: 0, delay: 0, dur: 1, pivot: 0.78, pivotTo: 0.78 },
       yaw: { value: 0, from: 0, to: 0, t: 0, delay: 0, dur: 1, pivot: 0, pivotTo: 0 },
     };
     this.deck = this.deck || [];
@@ -322,6 +332,9 @@ export class Explorer extends Player {
     this.spillCool = 0;
     this.lastDt = 0;
     this.spill?.clear();
+    this.dust?.clear();
+    this.dustPlan = null;
+    this.landedAt = -9;
   }
 
   // --- the backpack spilling -------------------------------------------------------
@@ -377,13 +390,14 @@ export class Explorer extends Player {
   place(z, dist = 0) {
     super.place(z);
     this.spill.update(this.lastDt, this.root, z, dist);
+    this.dust.update(this.lastDt, this.root, z, dist);
     this.lastDt = 0;
   }
 
   // --- moves -------------------------------------------------------------------
-  // A spin of the whole body (pitch: a flip or a roll, about pivot m up;
-  // yaw: a twist about her own axis): eased from one angle to the next over
-  // dur seconds after a delay; cut short, it whips round to finish quickly.
+  // A spin of the whole body (pitch: a flip, about pivot m up; yaw: a twist
+  // about her own axis): eased from one angle to the next over dur seconds
+  // after a delay; cut short, it whips round to finish quickly.
   spinTo(axis, turns, delay, dur, pivot) {
     const S = this.spins[axis];
     const TAU = Math.PI * 2;
@@ -396,7 +410,6 @@ export class Explorer extends Player {
     S.delay = delay;
     S.dur = dur;
     if (pivot !== undefined) S.pivotTo = pivot;
-    S.lift = axis === 'pitch' && pivot < 0.5 ? 0.24 : 0;
   }
 
   hurry(axis, dur = 0.14) {
@@ -423,16 +436,24 @@ export class Explorer extends Player {
     this.trick = this.deck.pop();
     const T = this.feel.jump.time;
     if (this.trick === 'flip') this.spinTo('pitch', 1, 0.07, T * 0.68, 0.78);
-    else this.hurry('pitch', 0.18); // (out of a roll: finish it on the way up)
+    else this.hurry('pitch', 0.18); // (a flip still going round: finish it on the way up)
     if (this.trick === 'twist') this.spinTo('yaw', this.jumpSide, 0.05, T * 0.72);
     this.onJump();
   }
 
+  // A baseball slide, leading with the other leg each time (base: slideSide
+  // flips with every fresh slide). Now and then it kicks up dust - always
+  // when she drops straight out of the air into it.
   startSlide() {
     const fresh = this.slideT <= 0;
     super.startSlide();
-    // a forward roll under it: dive, tuck, over and up
-    this.spinTo('pitch', 1, fresh ? 0.07 : 0, CONFIG.slide.time * (fresh ? 0.78 : 0.85), 0.34);
+    this.hurry('pitch', 0.1);
+    this.hurry('yaw', 0.1);
+    if (!fresh) return;
+    const fromAir = this.time - this.landedAt < 0.05;
+    const r = Math.random();
+    if (!fromAir && r < 0.35) this.dustPlan = null;
+    else this.dustPlan = { t: 0, hit: false, next: 0, burst: fromAir || r > 0.75 ? 4 : 2, grit: fromAir ? 8 : 5, trail: fromAir || r > 0.75 ? 1 : 0.55 };
   }
 
   onDodge(dir) {
@@ -446,7 +467,8 @@ export class Explorer extends Player {
   }
 
   onLand() {
-    if (!this.sliding) this.hurry('pitch', 0.1);
+    this.landedAt = this.time;
+    this.hurry('pitch', 0.1);
     this.hurry('yaw', 0.1);
     // a hard landing jolts the lid open now and then
     if (!this.crashed && this.spillCool <= 0 && Math.random() < 0.22) this.spillOut(1);
@@ -514,7 +536,7 @@ export class Explorer extends Player {
   }
 
   // Tucked into a ball: knees to her chest, arms wrapped round her shins,
-  // chin down (k: how tight). A flip and a roll both turn about it.
+  // chin down (k: how tight). A flip turns about it.
   poseTuck(j, k) {
     j[C.hipY] = this.HIP_Y - 0.12 * k;
     j[C.hipX] = 0;
@@ -614,12 +636,66 @@ export class Explorer extends Player {
     j[C.sq] = 1;
   }
 
-  // The roll: diving into a tight tuck, over, and unfolding back onto her
-  // feet as it comes round.
-  poseSlide(s) {
+  // The baseball slide: down on her hip, the lead leg out straight with its
+  // heel to the road and toe up, the other folded under its knee; leaning
+  // back, chin up, her free hand trailing on the road and the sketchbook held
+  // up high out of the dirt - rattling over the road, then popping back up
+  // onto her feet. (Posed leading with the left leg; mirrored for the right,
+  // all but the arms: the book stays up.)
+  poseSlide(s, t) {
     const u = 1 - clamp(this.slideT / CONFIG.slide.time, 0, 1);
-    this.poseTuck(s, 0.75 + 0.25 * smooth(0.0, 0.25, u) - 0.35 * smooth(0.75, 1, u));
-    s[C.hipY] = 0.5 - 0.06 * smooth(0, 0.3, u) + 0.12 * smooth(0.8, 1, u);
+    const pop = smooth(0.68, 1, u);
+    const rattle = (Math.sin(t * 47) * 0.6 + Math.sin(t * 29 + 1.3) * 0.4) * (1 - pop);
+    s[C.hipY] = 0.19 + 0.006 * rattle + 0.24 * pop;
+    s[C.hipX] = 0;
+    s[C.hipYaw] = 0.2 * (1 - pop);
+    s[C.hipRoll] = 0.26 * (1 - pop);
+    s[C.hipPitch] = -0.32 + 0.38 * pop;
+    s[C.spLean] = -0.8 + 1.15 * pop + 0.02 * rattle;
+    s[C.spTwist] = -0.2 * (1 - pop);
+    s[C.spSide] = -0.14 * (1 - pop);
+    s[C.chLean] = -0.16 + 0.18 * pop;
+    s[C.chTwist] = -0.1 * (1 - pop);
+    s[C.chSide] = 0;
+    s[C.hdPitch] = -0.95 + 0.85 * pop;
+    s[C.hdYaw] = -0.12 * (1 - pop);
+    s[C.hdRoll] = 0.06;
+    // legs: the lead one out straight, the other tucked under it
+    s[C.thLx] = 1.42 - 0.75 * pop;
+    s[C.knL] = 0.06 + 0.9 * pop;
+    s[C.anL] = 0.5 - 0.3 * pop;
+    s[C.toL] = 0;
+    s[C.thLz] = 0.05;
+    s[C.thLy] = 0;
+    s[C.thRx] = 0.62 + 0.3 * pop;
+    s[C.knR] = 2.25 - 0.9 * pop;
+    s[C.anR] = 0.35;
+    s[C.toR] = 0.2;
+    s[C.thRz] = -0.1 + 0.15 * pop;
+    s[C.thRy] = 0;
+    s[C.bodyPitch] = 0;
+    s[C.bodyZ] = 0;
+    s[C.bodyRoll] = 0;
+    s[C.sq] = 1;
+    if (this.slideSide < 0) mirror(s);
+    // arms: the free hand trailing on the road, the book held up high;
+    // both come forward for balance as she pops up
+    s[C.shLx] = -0.5 + 1.0 * pop;
+    s[C.shLz] = 0.95 - 0.5 * pop;
+    s[C.shLy] = 0;
+    s[C.elL] = 0.15 + 0.6 * pop;
+    s[C.wrL] = -0.6;
+    s[C.wrLz] = 0.1;
+    s[C.clL] = 0;
+    s[C.clLy] = -0.1;
+    s[C.shRx] = 2.45 - 1.9 * pop;
+    s[C.shRz] = 0.32;
+    s[C.shRy] = 0;
+    s[C.elR] = 0.4 + 0.7 * pop;
+    s[C.wrR] = 0.3;
+    s[C.wrRz] = 0;
+    s[C.clR] = 0.22 * (1 - pop);
+    s[C.clRy] = 0.15 * (1 - pop);
   }
 
   // Standing: the shared idle, a little lighter on her feet.
@@ -678,8 +754,8 @@ export class Explorer extends Player {
     Pz[d > 0 ? C.thLz : C.thRz] -= 0.08 * e * this.w.run;
   }
 
-  // The spins go on after the pose: about her hips for a flip, low for a
-  // roll, about her own axis for a twist.
+  // The spins go on after the pose: about her hips for a flip, about her own
+  // axis for a twist.
   afterPose(dt, cw) {
     const P = this.spins.pitch, Y = this.spins.yaw;
     P.pivot += (P.pivotTo - P.pivot) * (1 - Math.exp(-14 * dt));
@@ -702,9 +778,6 @@ export class Explorer extends Player {
     _p.set(0, P.pivot, 0);
     _v.copy(_p).applyQuaternion(_q);
     b.position.applyQuaternion(_q).add(_p).sub(_v);
-    // (a roll goes over her back, which sits further from her middle than
-    // her feet do: she rides up over it)
-    b.position.y += P.lift * 0.5 * (1 - Math.cos(pitch));
   }
 
   // --- secondary motion: backpack, long hair ---------------------------------------
@@ -715,7 +788,59 @@ export class Explorer extends Player {
       this.throwOne();
       this.spillWant--;
     }
+    this.dustStep(dt);
     this.hairStep(dt);
+  }
+
+  // Dust off the slide: a burst as she hits the road - puffs at her heel and
+  // her hip, grit flung up off the heel - then a trail of puffs from her hip
+  // as she skids. Thrown with a share of her own speed: the still air stops
+  // them and she slides on out of the cloud.
+  dustStep(dt) {
+    const P = this.dustPlan;
+    if (!P) return;
+    if (!this.sliding || this.crashed || !this.grounded) {
+      this.dustPlan = null;
+      return;
+    }
+    P.t += dt;
+    const u = 1 - this.slideT / CONFIG.slide.time;
+    const r = Math.random;
+    const heel = _dh.setFromMatrixPosition(this.b[this.slideSide > 0 ? 'footL' : 'footR'].matrixWorld);
+    heel.y = 0.06;
+    heel.z -= 0.08;
+    const hip = _dp.setFromMatrixPosition(this.b.hips.matrixWorld);
+    hip.y = 0.08;
+    hip.z += 0.05;
+    const run = _dv.set(this.vx, 0, -this.speed).applyQuaternion(this.invQ);
+    if (!P.hit && P.t > 0.06) {
+      P.hit = true;
+      for (let k = 0; k < P.burst; k++) {
+        // (out to either side of her, so the cloud shows round her)
+        const at = k % 2 ? hip : heel;
+        const side = k % 2 ? 1 : -1;
+        _p.copy(run).multiplyScalar(0.3 + 0.15 * r());
+        _p.x += side * (0.6 + r() * 1.2);
+        _p.y += 0.5 + r() * 0.9;
+        this.dust.emit(_v.copy(at).add(_dq.set(side * (0.12 + 0.12 * r()), 0, (r() - 0.5) * 0.15)), _p, 0.32 + 0.14 * r());
+      }
+      for (let k = 0; k < P.grit; k++) {
+        _p.copy(run).multiplyScalar(0.55 + 0.2 * r());
+        _p.x += (r() - 0.5) * 3.2;
+        _p.y += 1.8 + r() * 2.2;
+        this.dust.emit(_v.copy(heel), _p, 0.05 + 0.03 * r(), true);
+      }
+    }
+    if (P.hit && u < 0.68) {
+      P.next -= dt;
+      if (P.next <= 0) {
+        P.next = (0.055 + 0.05 * r()) / P.trail;
+        _p.copy(run).multiplyScalar(0.25);
+        _p.x += (r() - 0.5) * 2.0;
+        _p.y += 0.3 + r() * 0.6;
+        this.dust.emit(_v.copy(r() < 0.6 ? hip : heel).add(_dq.set((r() - 0.5) * 0.4, 0, 0)), _p, 0.25 + 0.1 * r());
+      }
+    }
   }
 
   // The backpack bounces on her back with every stride (a drop and a nod as
