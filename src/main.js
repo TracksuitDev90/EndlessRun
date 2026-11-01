@@ -199,6 +199,9 @@ async function boot() {
     renderer.info.reset();
     game.render();
     const js = performance.now() - t0;
+    // (a splash is a second and a half of an extra pass: not a reason to
+    // lower the resolution for good)
+    if (game.splash.active) quality.hold(0.3);
     if (quality.sample(pacer.raw)) resize();
     if (stats) stats(dt, js);
   }

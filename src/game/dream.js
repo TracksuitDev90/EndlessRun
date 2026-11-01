@@ -166,14 +166,17 @@ export class Dream {
   // colours and a swell racing ahead. Into a world that drains (Hell) there's
   // no colour to burst — its colour is sapped away instead (see game.js), and
   // only the swell runs; out of one (fromDrain), the colour has just welled
-  // back, and a lighter burst rides out over it.
+  // back, and a lighter burst rides out over it. Into a world that splashes
+  // (env.splash, the Kelp Deep) the splash is the burst, and only the swell
+  // runs, like a wave racing ahead.
   doorway(def, env, fromDrain = false) {
     this.rush = 1;
     const R = CONFIG.dream;
     const amt = R.rushBase + (1 - R.rushBase) * Math.min(1, this.now.level);
-    this.rushAmt = env.drain ? 0 : fromDrain ? amt * 0.7 : amt;
+    const quiet = env.drain || env.splash;
+    this.rushAmt = quiet ? 0 : fromDrain ? amt * 0.7 : amt;
     this.swellAmt = Math.max(amt, 0.8);
-    this.rushTrip = env.drain ? 0 : this.now.trip;
+    this.rushTrip = quiet ? 0 : this.now.trip;
     bloomColors(def, env, this.bloom);
   }
 

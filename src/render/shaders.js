@@ -124,6 +124,16 @@ float gEmit = 0.0;
 // x stars, y sun disc cos, z moon cos, w smoke (a ceiling of smoke with dry
 // lightning in it, env.skyFx.smoke)
 uniform vec4 uSkyFx;
+// Under the sea (env.sea): x how much of the rippling surface shows overhead,
+// y shafts of light fanning down from it, z how bright the caustics are on
+// everything that faces up, w their scale (per metre)
+uniform vec4 uSea;
+// Deeper toward the bottom of the screen (env.deep): x how much, y where it
+// begins and z where it's full (0 the top of the screen, 1 the bottom); the
+// picture is multiplied toward uDeepTint, so the water darkens and cools the
+// further down you look. What lights itself (gEmit) mostly keeps its glow.
+uniform vec4 uDeep;
+uniform vec3 uDeepTint;
 // Dry lightning in a smoking sky: every 2.3 s there may be a strike. x its
 // flash now (0..1), y the azimuth it strikes at, z the height its bolt comes
 // down from, w which strike it is.
@@ -218,6 +228,13 @@ vec3 grade(vec3 c, vec4 trip, float dist) {
     float rim = live * uDrain.x * (1.0 - smoothstep(0.0, 0.08, abs(e - 0.02))) * (1.0 - gKeep);
     c = dir > 0.0 ? c * (1.0 - 0.45 * rim) : c + rim * 0.22;
   }
+  if (uDeep.x > 0.0) {
+    // the water deepens down the screen: teal at the top, sinking through
+    // green and blue into the dark at the bottom
+    float yb = 1.0 - gl_FragCoord.y / uResolution.y;
+    float dk = smoothstep(uDeep.y, uDeep.z, yb) * uDeep.x * (1.0 - 0.75 * gEmit);
+    c = mix(c, c * uDeepTint, dk);
+  }
   float vg = smoothstep(uVigShape.x, uVigShape.y, r) * uGrade.z;
   if (uSkyFx.w > 0.0) {
     // a lightning flash lights the whole world for an instant, a cold white
@@ -277,8 +294,43 @@ attribute vec4 aInst;
 // clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
 uniform float uWonk;
 #endif
-#if defined(SAND) || defined(WONKY)
+#if defined(SAND) || defined(WONKY) || defined(JELLY)
 attribute float role;
+#endif
+#ifdef CURRENT
+// Swaying in the current (kelp, seagrass, anemones): a wave runs up the prop
+// from its foot, more and more the higher it reaches. x how far it leans
+// across, y how fast, z how quickly the wave travels up it (per metre), w how
+// far it leans along the run. (Nothing moves at the foot.)
+uniform vec4 uCurrent;
+#endif
+#ifdef SCHOOL
+// A school of fish (or a column of bubbles): one instance, every fish its own
+// vertices built nose to +x round the origin, fish.xyz where it swims in the
+// school and fish.w its own beat. x how fast they swim (m/s), y the length of
+// the loop they follow (m), z how far the stream snakes, w the shape: 0 a
+// stream flowing along +x, 1 a ball milling round the y axis, 2 a column
+// rising up y.
+uniform vec4 uSchool;
+attribute vec4 fish;
+#endif
+#ifdef JELLY
+// A jellyfish: the bell (role 0) squeezes and relaxes, a quick beat and a
+// slow ease back, and the arms and tentacles below it (role 1) trail and
+// ripple a beat behind; it lifts a little on each beat and sinks back. x beats
+// per second, y how hard the bell squeezes, z how far the trailing parts
+// ripple, w how far it lifts.
+uniform vec4 uJelly;
+#endif
+#ifdef CROSS
+// Something swimming across the run (a whale): it glides sideways along its
+// own x as the runner comes up to it — uCross.x metres for every metre
+// between them — so that it is right across the road the moment the runner
+// is under it, however fast they run. Its tail half beats up and down (y
+// rate, z how far at the flukes), and while it's far off it rises and dips a
+// little (w). Turned about by its phase (p0 past pi), it swims the other way.
+uniform vec4 uCross;
+uniform vec3 uGemAt;
 #endif
 #ifdef SAND
 // An hourglass that works: its sand runs from the top bulb to the bottom over
@@ -336,6 +388,87 @@ void main() {
     if (abs(uv.x - aInst.y) > 0.5) {
       gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
       return;
+    }
+  #endif
+  #ifdef SCHOOL
+    {
+      // each fish along its loop, turned the way it's heading, its tail
+      // beating; at the ends of a stream's loop they shrink away to nothing,
+      // so its wrapping round never shows
+      float spd = uSchool.x * (0.86 + 0.28 * fract(fish.w * 7.31));
+      float L = uSchool.y;
+      float t = uTime + phase * 13.0;
+      vec3 c;
+      float fade = 1.0;
+      float yaw = 0.0;
+      if (uSchool.w < 0.5) {
+        float s = mod(fish.x + t * spd, L) - 0.5 * L;
+        fade = 1.0 - smoothstep(0.34 * L, 0.5 * L, abs(s));
+        float ph = s * 0.11 + t * 0.35;
+        float ph2 = s * 0.07 - t * 0.21 + 1.7;
+        c = vec3(s, fish.y + sin(ph2) * uSchool.z * 0.35, fish.z + sin(ph) * uSchool.z);
+        yaw = atan(-cos(ph) * 0.11 * uSchool.z, 1.0);
+      } else if (uSchool.w < 1.5) {
+        float r = max(fish.z, 0.5);
+        float a = fish.x / L * 6.2831 + t * spd / r;
+        c = vec3(cos(a) * r, fish.y + sin(a * 2.0 + fish.w * 6.2831) * 0.35, sin(a) * r);
+        yaw = atan(-cos(a), -sin(a));
+      } else {
+        // a column of bubbles rising, wobbling, swelling as they go
+        float s = mod(fish.x + t * spd, L);
+        fade = smoothstep(0.0, 0.05 * L, s) * (1.0 - smoothstep(0.88 * L, L, s)) * (0.65 + 0.7 * s / L);
+        c = vec3(fish.z + sin(t * 3.1 + fish.w * 40.0) * 0.09, s, fish.y + cos(t * 2.7 + fish.w * 31.0) * 0.09);
+      }
+      if (uSchool.w < 1.5) {
+        float wig = sin(uTime * (7.0 + spd * 1.3) + fish.w * 6.2831 - lp.x * 9.0);
+        lp.z += wig * (0.6 * max(-lp.x, 0.0) - 0.08 * max(lp.x, 0.0));
+      }
+      lp *= fade;
+      lp = rotY(lp, yaw);
+      ln = rotY(ln, yaw);
+      #ifdef OUTLINE
+        lo = rotY(lo, yaw) * fade;
+      #endif
+      lp += c;
+    }
+  #endif
+  #ifdef JELLY
+    {
+      // a quick squeeze, a slow ease back
+      float f = fract(uTime * uJelly.x + phase * 0.1592);
+      float con = smoothstep(0.0, 0.16, f) * (1.0 - smoothstep(0.16, 0.8, f));
+      if (role < 0.5) {
+        // the bell: its rim pulls in hardest, its crown stretches up
+        float rim = 1.0 - smoothstep(0.0, 0.9, lp.y);
+        lp.xz *= 1.0 - uJelly.y * con * (0.35 + 0.65 * rim);
+        lp.y *= 1.0 + uJelly.y * 0.55 * con;
+      } else {
+        // the arms and tentacles: drawn in with the bell at the top, rippling
+        // further down, a beat behind
+        float hang = max(-lp.y, 0.0);
+        lp.xz *= 1.0 - uJelly.y * 0.8 * con * clamp(1.0 - hang * 0.6, 0.0, 1.0);
+        float tt = uTime * 1.7 + phase * 3.0 - hang * 1.6;
+        lp.x += sin(tt) * uJelly.z * hang * 0.22;
+        lp.z += sin(tt * 0.83 + 1.9) * uJelly.z * hang * 0.18;
+        lp.y += con * uJelly.y * hang * 0.22;
+      }
+      // it lifts on each beat and sinks slowly back
+      lp.y += uJelly.w * mix(smoothstep(0.0, 0.35, f), 1.0 - smoothstep(0.35, 1.0, f), step(0.35, f));
+    }
+  #endif
+  #ifdef CROSS
+    float crossDir = phase > 3.14159 ? -1.0 : 1.0;
+    {
+      // the tail half beats up and down, more and more toward the flukes, a
+      // wave running back along it
+      float tl = clamp((-lp.x - 2.0) / 7.6, 0.0, 1.0);
+      lp.y += sin(uTime * uCross.y + phase * 2.0 + lp.x * 0.3) * uCross.z * tl * tl;
+      // (turned about, to swim the other way)
+      lp.xz *= crossDir;
+      ln.xz *= crossDir;
+      #ifdef OUTLINE
+        lo.xz *= crossDir;
+      #endif
     }
   #endif
   vec3 pivot = M[3].xyz;
@@ -454,6 +587,15 @@ void main() {
   if (uWobble.y != 0.0) {
     lp.y += sin(uTime * uWobble.z * 0.8 + phase * 1.7) * uWobble.y;
   }
+  #ifdef CURRENT
+    {
+      float h = max(lp.y, 0.0);
+      float k = pow(h * 0.1, 1.3);
+      float tt = uTime * uCurrent.y + phase * 6.2831 - h * uCurrent.z;
+      lp.x += (sin(tt) + 0.35 * sin(tt * 2.3 + 1.1)) * uCurrent.x * k;
+      lp.z += sin(tt * 0.77 + 2.1) * uCurrent.w * k;
+    }
+  #endif
   #ifdef CLOTH
     // washing on the line (uv.y > 0.5, each garment on its own beat in uv.x)
     // stirs in the breeze: it swings gently on its pegs and billows, ripples
@@ -501,6 +643,17 @@ void main() {
     wp += off;
     pivot += off;
   }
+  #ifdef CROSS
+    {
+      // right across the road when the runner is under it, gliding in from
+      // its tail's side and on out past its head's
+      float aR = uGemAt.z - pivot.z;
+      float off = -aR * uCross.x * crossDir;
+      wp.x += off;
+      wp.y += sin(uTime * 0.35 + phase) * uCross.w * smoothstep(30.0, 90.0, aR);
+      pivot.x += off;
+    }
+  #endif
 
   if (mode == 1) {
     // Pop-up book: lies flat (folded away from camera) when far, stands up as it nears.
@@ -645,6 +798,36 @@ vec3 atmos(vec3 col, vec3 v, float dist, float emissive) {
 }
 `;
 
+// Caustics (env.sea, after a shader's uNoise): the light let down through a
+// rippling surface gathers into a bright net that wavers and drifts over
+// everything facing up — two drifting sets of wiggling lines, warped by a
+// slower swell, brightest where they cross. Returns how much light to add (a
+// share of what's there already). The scale (uSea.w) should be a multiple of
+// 1/256, so the net doesn't jump when the world re-bases.
+const CAUSTIC = /* glsl */ `
+float causticLine(float a, float fq, float w) {
+  // the distance to the line, measured along the slope of the noise, so the
+  // line keeps one width on the ground wherever the noise runs steep or flat
+  float d = abs(a - 0.5) / max(fwidth(a) / fq, 0.05);
+  return (1.0 - smoothstep(w, w + fq * 1.5, d)) + 0.22 * (1.0 - smoothstep(0.0, w * 6.0, d));
+}
+float caustic(vec3 p, vec3 n, float dist) {
+  if (uSea.z <= 0.0) return 0.0;
+  float t = uTime;
+  vec2 q = p.xz * uSea.w;
+  float w0 = texture2D(uNoise, q * 0.5 + vec2(t * 0.013, -t * 0.009)).g - 0.5;
+  vec2 qw = q + vec2(w0, -w0) * 0.6;
+  float a = texture2D(uNoise, qw + vec2(t * 0.031, t * 0.017)).g;
+  float b = texture2D(uNoise, qw * 1.5 + vec2(0.37 - t * 0.021, 0.61 + t * 0.027)).g;
+  float fq = max(fwidth(qw.x) + fwidth(qw.y), 1e-4);
+  float la = causticLine(a, fq, 0.011);
+  float lb = causticLine(b, fq * 1.5, 0.014);
+  float c = la * 0.5 + lb * 0.45 + la * lb * 1.6;
+  float up = smoothstep(-0.35, 0.85, n.y);
+  return c * up * uSea.z * (1.0 - smoothstep(26.0, 78.0, dist));
+}
+`;
+
 const FS_TOON = FS_HEAD + /* glsl */ `
 uniform vec3 uLightDir;
 uniform vec3 uShadowTint;
@@ -656,6 +839,7 @@ uniform vec4 uWall;   // wall-cast shadow: x wall x (signed), y wall top, z run 
 uniform sampler2D uMarks;
 uniform sampler2D uNoise;
 uniform vec2 uMarkRepeat;
+` + CAUSTIC + /* glsl */ `
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -722,6 +906,25 @@ float endGrain(vec2 uv) {
   float k = (1.0 - 0.3 * late) * mix(0.72, 1.0, smoothstep(0.0, 0.32, r)) * (1.0 + 0.08 * smoothstep(0.7, 0.92, r));
   float ck = smoothstep(0.99, 0.998, cos(a * 3.0 + 0.7 + wob * 2.0)) * smoothstep(0.3, 0.85, r);
   return k * (1.0 - 0.55 * ck * (1.0 - smoothstep(0.25, 0.7, fw)));
+}
+#endif
+#ifdef PLEATS
+// A whale's skin (toon option pleats, on parts whose mark flag is 0.6; uv.x
+// runs along the body tail to snout, uv.y round it from the spine): long
+// grooves down its throat and belly, pale between dark lines, from the chin
+// back past the flippers; and a few pale scars and barnacle scuffs
+// scattered over the rest. Returns how much to scale the part's colour.
+float pleats(vec2 uv) {
+  float belly = 1.0 - smoothstep(0.15, 0.24, abs(uv.y - 0.5));
+  float along = smoothstep(0.38, 0.5, uv.x) * (1.0 - smoothstep(0.93, 0.98, uv.x));
+  float g = uv.y * 70.0;
+  float fw = fwidth(g);
+  float groove = 1.0 - smoothstep(0.12, 0.12 + fw * 1.5, abs(fract(g) - 0.5));
+  groove *= 1.0 - smoothstep(0.35, 0.8, fw);
+  float k = 1.0 - groove * belly * along * 0.42;
+  float sc = texture2D(uNoise, uv * vec2(9.0, 4.0)).g;
+  float scar = smoothstep(0.7, 0.74, sc) * (1.0 - belly) * smoothstep(0.55, 0.9, uv.x);
+  return k * (1.0 + scar * 0.45);
 }
 #endif
 #ifdef GROUND
@@ -942,6 +1145,54 @@ vec3 groundColor(vec2 p, float dist) {
     c = mix(c, mix(uGroundC, uGroundA, 0.3), border);
     c = mix(c, brass * (0.9 + 0.2 * hash12(cell)), metal);
     return c;
+  #elif GROUND == 9
+    // The ocean floor: a path of pale sand down the middle, rippled by the
+    // current — the ripples run along the path, so they never strobe however
+    // fast you run — strewn with shells and pebbles and now and then a
+    // starfish; beyond it the sand sinks into a darker seabed patched with
+    // seagrass. (p.y runs on from chunk to chunk; every period here divides
+    // the 4096 m it wraps at.)
+    float n1 = texture2D(uNoise, p * 0.0625).g;
+    float n2 = texture2D(uNoise, p * 0.25 + 0.31).g;
+    float n3 = texture2D(uNoise, p * vec2(0.75, 0.1875) + 0.67).g;
+    float rx = p.x * 2.4 + sin(p.y * 0.19635) * 0.8 + (n1 - 0.5) * 5.0 + (n3 - 0.5) * 1.4;
+    float rip = sin(rx * 3.14159);
+    float rk = (1.0 - far * 0.8) * (1.0 - smoothstep(0.4, 1.2, fwidth(rx)));
+    // each ripple's lee a shade darker, its crest catching the light
+    vec3 c = mix(uGroundB, uGroundA, 0.55 + 0.45 * rip * rk);
+    c *= 0.92 + 0.16 * n2;
+    float edgeN = (n1 - 0.5) * 2.0 + (n2 - 0.5) * 0.8;
+    float bed = smoothstep(4.6, 8.0, abs(p.x) + edgeN);
+    float grassP = smoothstep(0.5, 0.62, texture2D(uNoise, p * 0.09375 + 0.53).g);
+    float blade = texture2D(uNoise, vec2(p.x * 2.5, p.y * 0.375) + 0.21).g;
+    vec3 seabed = uGroundC * (0.75 + 0.45 * n2);
+    vec3 grass = mix(vec3(0.16, 0.34, 0.18), vec3(0.42, 0.6, 0.28), blade);
+    seabed = mix(seabed, grass, max(grassP, 0.35) * (0.55 + 0.45 * blade) * (1.0 - far * 0.5));
+    c = mix(c, seabed, bed);
+    // shells and pebbles, pale on the dark and dark on the pale
+    vec2 sq = p / 0.62;
+    vec2 sc = floor(sq);
+    float sh = hash12(sc + 19.0);
+    vec2 so = vec2(hash12(sc + 2.3), hash12(sc + 6.1)) * 0.6 + 0.2;
+    vec2 sd = (fract(sq) - so) * vec2(1.0, 1.0 + hash12(sc + 4.7) * 0.8);
+    float sr = 0.06 + 0.07 * hash12(sc + 8.2);
+    float sfa = fwidth(sq.x) + 0.02;
+    float pebble = (1.0 - smoothstep(sr - sfa, sr + sfa, length(sd))) * step(0.86, sh) * (1.0 - far);
+    vec3 pc = sh > 0.95 ? vec3(0.98, 0.9, 0.84) : sh > 0.91 ? vec3(0.95, 0.72, 0.62) : mix(uGroundC, vec3(0.5, 0.5, 0.48), 0.5);
+    c = mix(c, pc, pebble);
+    // and the odd starfish
+    vec2 fq = p / 2.6;
+    vec2 fc = floor(fq);
+    float fh = hash12(fc + 71.0);
+    vec2 fo = (fract(fq) - vec2(hash12(fc + 3.3), hash12(fc + 5.9)) * 0.6 - 0.2) * 2.6;
+    float fr = length(fo);
+    float fang = atan(fo.y, fo.x) + fh * 6.2831;
+    float arm = 0.08 + 0.18 * pow(0.5 + 0.5 * cos(fang * 5.0), 2.0);
+    float ffa = fwidth(fq.x) * 2.6 + 0.01;
+    float star = (1.0 - smoothstep(arm - ffa, arm + ffa, fr)) * step(0.95, fh) * (1.0 - far);
+    vec3 starC = fh > 0.982 ? vec3(0.62, 0.36, 0.86) : vec3(1.0, 0.5, 0.32);
+    c = mix(c, starC * (0.8 + 0.4 * clamp(1.0 - fr / 0.26, 0.0, 1.0)), star);
+    return mix(c, mix(uGroundA, uGroundC, bed * 0.8 + 0.1), far * 0.5);
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -1024,6 +1275,13 @@ void main() {
         float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
         base = mix(base, base * 0.64, m);
       }
+    #elif defined(PLEATS)
+      if (abs(vFx.x - 0.6) < 0.02) {
+        base *= pleats(vUv);
+      } else {
+        float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+        base = mix(base, base * 0.64, m);
+      }
     #else
       float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
       base = mix(base, base * 0.64, m);
@@ -1056,6 +1314,8 @@ void main() {
       shade *= 1.0 + (smoothstep(0.42, 0.62, dp) - 0.45) * uDapple.x;
     }
   #endif
+  // under the sea, the caustics' net of light over everything facing up
+  shade *= 1.0 + caustic(vPos, n, dist) * (1.0 - vFx.y);
   vec3 col = mix(base * shade, base, max(vFx.y, gEmit));
   gKeep = max(gKeep, vFx.y);
 
@@ -1751,6 +2011,7 @@ uniform vec3 uLightDir;
 uniform vec3 uShadowTint;
 uniform vec4 uRim;
 uniform sampler2D uNoise;
+` + CAUSTIC + /* glsl */ `
 void main() {
   int m = int(vMat + 0.5);
   float unlit = 0.0;
@@ -1803,6 +2064,8 @@ void main() {
   float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
   float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y));
   col += uRim.rgb * base * rim * 0.45 * (1.0 - unlit);
+  // under the sea, the caustics play over the runner too
+  col *= 1.0 + caustic(vPos, n, dist) * 0.8 * (1.0 - unlit);
   col *= 1.0 + (texture2D(uNoise, gl_FragCoord.xy * GRAIN).r - 0.5) * 0.035;
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), 1.0);
@@ -1890,12 +2153,27 @@ void main() {
 const VS_SHADOW = COMMON + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uFog;
+#ifdef CROSS
+// the shadow of something swimming across the run, gliding with it (see
+// CROSS in the object shader)
+uniform vec4 uCross;
+uniform vec3 uGemAt;
+attribute vec4 aInst;
+#endif
 varying vec2 vUv;
 varying float vFade;
 void main() {
   mat4 M = modelMatrix * instanceMatrix;
-  vec3 wp = (M * vec4(position, 1.0)).xyz;
+  vec3 lp = position;
+  #ifdef CROSS
+    float crossDir = aInst.x > 3.14159 ? -1.0 : 1.0;
+    lp.xz *= crossDir;
+  #endif
+  vec3 wp = (M * vec4(lp, 1.0)).xyz;
   vec3 pivot = M[3].xyz;
+  #ifdef CROSS
+    wp.x -= (uGemAt.z - pivot.z) * uCross.x * crossDir;
+  #endif
   float pop = 1.0 - smoothstep(uAnim.y, uAnim.z, uCamPos.z - pivot.z);
   wp = bendPos(wp);
   float dist = length(wp - uCamPos);
@@ -2087,6 +2365,36 @@ vec3 skyBack(vec3 d) {
     vec3 ac = mix(vec3(0.25, 1.0, 0.65), vec3(0.85, 0.35, 0.95), smoothstep(0.2, 0.5, d.y));
     c += ac * curtain * streak * uSkyFx2.z;
   }
+  if (uSea.x > 0.0 && d.y > 0.0) {
+    // Under the sea, the sky is the underside of the surface, far overhead:
+    // a ceiling of light, rippling, its swells drawn in bright wavering
+    // lines, brightest round the sun (the window the light comes in by) and
+    // sinking into the murk toward the horizon.
+    vec2 sp = d.xz / (d.y + 0.08) * 0.05;
+    float s1 = texture2D(uNoise, sp + vec2(uTime * 0.006, uTime * 0.004)).g;
+    float s2 = texture2D(uNoise, sp * 2.3 + vec2(0.31 - uTime * 0.008, uTime * 0.005)).g;
+    float sw = s1 * 0.65 + s2 * 0.45;
+    float lw = abs(sw - 0.55);
+    float lines = 1.0 - smoothstep(0.0, 0.025 + fwidth(sw) * 1.5, lw);
+    float hi = smoothstep(0.08, 0.55, d.y);
+    float win = pow(max(sd, 0.0), 3.0);
+    vec3 surf = mix(uSkyTop, vec3(1.0), 0.25 + 0.3 * win);
+    c = mix(c, surf, hi * (0.2 + 0.35 * smoothstep(0.4, 0.7, sw)) * uSea.x);
+    c += mix(uSkyTop, uSunColor, 0.6) * lines * hi * uSea.x * (0.25 + 0.75 * win);
+    c += uSunColor * pow(max(sd, 0.0), 12.0) * 0.5 * uSea.x;
+  }
+  if (uSea.y > 0.0) {
+    // shafts of light slanting down out of the surface, fanning out from the
+    // sun and reaching far down toward the horizon, drifting slowly
+    vec3 rt = normalize(cross(uSunDir, vec3(0.0, 0.0, 1.0)) + vec3(0.0, 1e-4, 0.0));
+    vec3 upv = cross(rt, uSunDir);
+    float ang = atan(dot(d, upv), dot(d, rt));
+    float r1 = texture2D(uNoise, vec2(ang * 0.7 + uTime * 0.006, 0.17)).g;
+    float r2 = texture2D(uNoise, vec2(ang * 1.9 - uTime * 0.009, 0.59)).g;
+    float rays = smoothstep(0.45, 0.8, r1 * 0.6 + r2 * 0.5);
+    float reach = smoothstep(-0.3, 0.85, sd) * smoothstep(-0.25, 0.12, d.y);
+    c += mix(uSunColor, vec3(1.0), 0.3) * rays * reach * reach * 0.35 * uSea.y;
+  }
   return c;
 }
 void main() {
@@ -2173,10 +2481,20 @@ void main() {
 const FS_PARTICLES = /* glsl */ `
 uniform vec3 uColor;
 uniform float uOpacity;
+// 0 a soft mote; 1 a bubble: a bright rim round a clear middle and a glint
+// up on one side (env.particles.ring)
+uniform float uRing;
 varying float vAlpha;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
-  float a = smoothstep(0.5, 0.1, length(c)) * vAlpha * uOpacity;
+  float r = length(c);
+  float a = smoothstep(0.5, 0.1, r);
+  if (uRing > 0.0) {
+    float rim = smoothstep(0.5, 0.4, r) * smoothstep(0.22, 0.42, r);
+    float glint = smoothstep(0.13, 0.03, length(c - vec2(-0.14, -0.14)));
+    a = mix(a, rim * 0.85 + 0.12 * smoothstep(0.5, 0.3, r) + glint, uRing);
+  }
+  a *= vAlpha * uOpacity;
   gl_FragColor = vec4(uColor * a, a);
 }
 `;
@@ -2232,6 +2550,116 @@ void main() {
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), alpha);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Bubbles under the sea (game/bubbles.js): the ones the runner sheds as they
+// run, breathe, land and slide (positions written by the CPU, a hundred at
+// most), and the swirl of tiny ones the water spins round them, worked out
+// here from the runner's position alone. Each a bubble: a clear middle, a
+// bright rim, a darker edge where it bends the light, and a glint up on one
+// side; fogged and graded like the world.
+// ---------------------------------------------------------------------------
+const VS_BUBBLE = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute vec4 aB; // x radius (m), y opacity, z seed
+varying vec4 vB;
+varying vec3 vStreak;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vStreak = vec3(0.0);
+  vec3 wp = bendPos(position);
+  vPos = wp;
+  vWorld = wp;
+  vec4 mv = viewMatrix * vec4(wp, 1.0);
+  gl_PointSize = clamp(aB.x * 2.0 * projectionMatrix[1][1] * uResolution.y * 0.5 / max(-mv.z, 0.5), 1.0, 160.0);
+  vB = aB;
+  vB.y *= smoothstep(0.8, 2.4, -mv.z);
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const VS_SWIRL = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+// xyz the runner's feet, w how strongly the water swirls (0: not at all)
+uniform vec4 uSwirlAt;
+// x how fast they run (m/s), y how far they lean into a lane change
+uniform vec4 uSwirlRun;
+attribute vec4 aS; // x radius, y height, z spin (rad/s, either way), w phase
+attribute float aSize;
+varying vec4 vB;
+varying vec3 vStreak;
+varying vec3 vWorld;
+varying vec3 vPos;
+// where a mote is, tau of the way through its spiral
+vec3 swirlAt(float tau, float T) {
+  float th = aS.w * 6.2831 + aS.z * tau * T;
+  float r = aS.x * (1.0 + tau * 1.4);
+  return uSwirlAt.xyz + vec3(cos(th) * r - uSwirlRun.y * tau * 0.8, aS.y + tau * (0.35 + aS.x * 0.6), sin(th) * r * 0.75 + tau * (1.0 + uSwirlRun.x * 0.1));
+}
+void main() {
+  // each mote spirals round the runner's body and peels off behind them,
+  // over and over, widening and rising as it goes; most are drawn as a
+  // streak along the way they're going (the swirl made visible), the rest
+  // as little bubbles
+  float T = 0.75 + fract(aS.w * 3.7) * 0.55;
+  float tau = fract(uTime / T + aS.w);
+  vec3 wp = bendPos(swirlAt(tau, T));
+  vPos = wp;
+  vWorld = wp;
+  vec4 mv = viewMatrix * vec4(wp, 1.0);
+  vec4 c0 = projectionMatrix * mv;
+  vec4 c1 = projectionMatrix * viewMatrix * vec4(bendPos(swirlAt(max(tau - 0.055, 0.0), T)), 1.0);
+  vec2 dv = (c0.xy / c0.w - c1.xy / c1.w) * 0.5 * uResolution;
+  float len = min(length(dv), 70.0);
+  float sz = aSize * (0.7 + 0.6 * tau);
+  float bub = clamp(sz * 2.0 * projectionMatrix[1][1] * uResolution.y * 0.5 / max(-mv.z, 0.5), 1.0, 80.0);
+  float streak = step(0.38, fract(aS.w * 13.7)) * len;
+  float ps = bub + streak;
+  gl_PointSize = ps;
+  // (the sprite's own y runs down the screen)
+  vStreak = vec3(normalize(vec2(dv.x, -dv.y) + 1e-5), streak / ps);
+  vB = vec4(bub / ps, sin(3.14159 * tau) * uSwirlAt.w * smoothstep(0.8, 2.4, -mv.z), fract(aS.w * 7.3), 0.0);
+  gl_Position = c0;
+}
+`;
+const FS_BUBBLE = FS_HEAD + /* glsl */ `
+varying vec4 vB;
+varying vec3 vStreak;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  if (vStreak.z > 0.0) {
+    // a streak of swirling water: a thin line along the way it's going,
+    // fading in from its tail to its head — a pale core in a darker fringe
+    // where it bends the light, so it shows on bright sand and dark water
+    float along = dot(c, vStreak.xy);
+    float across = dot(c, vec2(-vStreak.y, vStreak.x));
+    float h = vStreak.z * 0.5;
+    float d = length(vec2(max(abs(along) - h, 0.0), across));
+    float w = vB.x * 0.26;
+    float core = 1.0 - smoothstep(w * 0.3, w * 0.9, d);
+    float fringe = 1.0 - smoothstep(w * 0.9, w * 2.0, d);
+    float k = smoothstep(-h, h * 0.6, along) * vB.y;
+    float a = max(core * 0.6, fringe * 0.28) * k;
+    if (a < 0.004) discard;
+    vec3 sc = mix(uSkyHorizon * 0.5, mix(uSkyHorizon, vec3(1.0), 0.85), core);
+    vec3 sv = vWorld - uCamPos;
+    gl_FragColor = vec4(grade(atmos(sc, sv, length(sv), 0.3), uTrip), a);
+    return;
+  }
+  float r = length(c) * 2.0;
+  if (r > 1.0 || vB.y < 0.004) discard;
+  float rim = smoothstep(0.5, 0.86, r) * (1.0 - smoothstep(0.86, 1.0, r));
+  float edge = smoothstep(0.84, 0.97, r) * (1.0 - smoothstep(0.97, 1.0, r));
+  float glint = 1.0 - smoothstep(0.0, 0.32, length(c - vec2(-0.17, -0.17)) * 2.0);
+  vec3 tint = mix(uSkyHorizon, vec3(1.0), 0.7);
+  vec3 col = mix(tint, vec3(1.0), rim * 0.5 + glint);
+  col = mix(col, uSkyHorizon * 0.35, edge * 0.55);
+  float a = (0.08 + rim * 0.55 + edge * 0.25 + glint * 0.85) * vB.y;
+  vec3 v = vWorld - uCamPos;
+  col = atmos(col, v, length(v), 0.3);
+  gl_FragColor = vec4(grade(col, uTrip), min(a, 1.0));
 }
 `;
 
@@ -2395,6 +2823,7 @@ uniform vec4 uKindB[GEM_KINDS]; // x opaque, y rough, z texture scale (per meter
 uniform vec4 uKindC[GEM_KINDS]; // rgb second colour, w how the bands lie: 0 layers along it, 1 round its heart, 2 nested like its faces (octahedral zoning)
 uniform vec4 uKindD[GEM_KINDS]; // rgb vein colour, w how much veins take it (0: pale cracks)
 uniform vec4 uKindE[GEM_KINDS]; // x glints, y how much the bands wander, z metallic
+uniform float uGemPolish;
 varying vec3 vLocalN;
 varying vec3 vLocal;
 varying float vFlash;
@@ -2526,10 +2955,13 @@ void main() {
     float tw = smoothstep(0.93, 1.0, sin(uTime * 2.7 + seed * 37.0)) * step(0.55, seed);
     col += vec3(g * 1.4 + tw * 0.75) * uGemK.y * uKindE[k].x;
   } else {
-    col = base * mix(uShadowTint, vec3(1.0), lit);
+    // (gem.polish: polished stones that keep their own colour in any light,
+    // a pearl's lustre rather than a mirror's)
+    col = base * mix(mix(uShadowTint, vec3(1.0), lit), vec3(1.0), uGemPolish);
     if (vFx.x > 0.5) {
       col *= 0.75 + 0.5 * smoothstep(-0.3, 0.6, R.y);
-      col += mix(base, vec3(1.0), 0.6) * (pow(max(dot(R, L), 0.0), 18.0) + pow(max(dot(R, L2), 0.0), 22.0) * 0.7);
+      col += mix(base, vec3(1.0), 0.6 - 0.25 * uGemPolish) * (pow(max(dot(R, L), 0.0), 18.0) + pow(max(dot(R, L2), 0.0), 22.0) * 0.7) * (1.0 - 0.45 * uGemPolish);
+      col += base * pow(1.0 - abs(dot(n, V)), 2.0) * 0.35 * uGemPolish;
     }
   }
   col *= 1.0 + vFlash * 0.3;
@@ -2665,6 +3097,7 @@ export function makeEnvUniforms(env) {
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
     uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(), uVigShape: v4(),
+    uSea: v4(), uDeep: v4(), uDeepTint: c(),
   };
   writeEnvUniforms(u, env);
   return u;
@@ -2719,6 +3152,13 @@ export function writeEnvUniforms(u, env) {
   const bc = color(bm.color);
   u.uBeam.value.set(bc.r, bc.g, bc.b, bm.amount);
   setColor(u.uPool.value, env.pool || '#000000');
+  // under the sea: the surface overhead, its shafts of light, the caustics
+  // (scale: a multiple of 1/256 per metre)
+  const sea = env.sea || {};
+  u.uSea.value.set(sea.surface || 0, sea.rays || 0, sea.caustics || 0, sea.scale ?? 0.1875);
+  const deep = env.deep || {};
+  u.uDeep.value.set(deep.amount || 0, deep.from ?? 0.3, deep.to ?? 1, 0);
+  setColor(u.uDeepTint.value, deep.tint || '#ffffff');
   // a draining world starts in full colour: game.js saps it when you come
   // through its doorway
   u.uDrain.value.set(env.drain ? 1 : 0, DRAIN_NONE, 0, 0);
@@ -2811,6 +3251,27 @@ export function makeToonMaterial(env, o = {}) {
     defines.TURN = '';
     uniforms.uTurn = { value: new THREE.Vector4(...o.turn) };
   }
+  // under the sea (see the object shader): [lean across, rate, wave per
+  // metre up, lean along]; [speed, loop, snaking, shape]; [beats per second,
+  // squeeze, ripple, lift]; [glide per metre, beat rate, beat at the flukes,
+  // far rise]
+  if (o.current) {
+    defines.CURRENT = '';
+    uniforms.uCurrent = { value: new THREE.Vector4(...o.current) };
+  }
+  if (o.school) {
+    defines.SCHOOL = '';
+    uniforms.uSchool = { value: new THREE.Vector4(...o.school) };
+  }
+  if (o.jelly) {
+    defines.JELLY = '';
+    uniforms.uJelly = { value: new THREE.Vector4(...o.jelly) };
+  }
+  if (o.cross) {
+    defines.CROSS = '';
+    uniforms.uCross = { value: new THREE.Vector4(...o.cross) };
+  }
+  if (o.pleats) defines.PLEATS = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -2825,7 +3286,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'JELLY', 'CROSS']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -2908,7 +3369,7 @@ export function makeGlowMaterial(env, o = {}) {
 export function makeBeamMaterial(env, o = {}) {
   const uniforms = withShared(env, {
     uAnim: { value: animVector(o.anim) },
-    uWobble: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uWobble: { value: new THREE.Vector4(...(o.wobble || [0, 0, 1, 0])) },
     uFly: { value: new THREE.Vector4() },
   });
   return new THREE.ShaderMaterial({
@@ -2941,9 +3402,14 @@ export function makePoolMaterial(env, o = {}) {
 
 export function makeShadowMaterial(env, o = {}) {
   const uniforms = withShared(env, { uAnim: { value: animVector(o.anim) } });
+  const defines = o.hard ? { HARD: '' } : {};
+  if (o.cross) {
+    defines.CROSS = '';
+    uniforms.uCross = { value: new THREE.Vector4(...o.cross) };
+  }
   return new THREE.ShaderMaterial({
     uniforms,
-    defines: o.hard ? { HARD: '' } : {},
+    defines,
     vertexShader: VS_SHADOW,
     fragmentShader: FS_SHADOW,
     transparent: true,
@@ -3016,6 +3482,7 @@ export function makeGemMaterial(env, o = {}) {
     uKindC: v4((k) => [...rgbOf(k.second ?? '#ffffff'), k.rings === 'nested' ? 2 : k.rings ? 1 : 0]),
     uKindD: v4((k) => [...rgbOf(k.veinColor ?? '#ffffff'), k.veinColor ? 1 : 0]),
     uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, 0]),
+    uGemPolish: { value: o.polish ?? 0 },
     uClear: { value: 1 },
   });
   return new THREE.ShaderMaterial({
@@ -3071,6 +3538,19 @@ export function makeDustMaterial(env) {
   });
 }
 
+// The runner's bubbles (game/bubbles.js), lit by env; swirl: the swirl of
+// tiny ones round them, worked out on the GPU.
+export function makeBubbleMaterial(env, swirl = false) {
+  const extra = swirl ? { uSwirlAt: { value: new THREE.Vector4() }, uSwirlRun: { value: new THREE.Vector4() } } : {};
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, extra),
+    vertexShader: swirl ? VS_SWIRL : VS_BUBBLE,
+    fragmentShader: FS_BUBBLE,
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
 export function makeParticleMaterial() {
   const uniforms = withShared({}, {
     uDistMod: { value: 0 },
@@ -3078,6 +3558,7 @@ export function makeParticleMaterial() {
     uDrift: { value: new THREE.Vector3() },
     uColor: { value: new THREE.Color(1, 1, 1) },
     uOpacity: { value: 0.8 },
+    uRing: { value: 0 },
   });
   return new THREE.ShaderMaterial({
     uniforms,
