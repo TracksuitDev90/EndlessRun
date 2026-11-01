@@ -2182,6 +2182,60 @@ void main() {
 `;
 
 // ---------------------------------------------------------------------------
+// Dust kicked up off the road (the explorer's slide): puffs that bloom and
+// thin out like painted clouds - a lumpy edge, lit from above, the colour of
+// the road they came off - and specks of grit flung up with them. Positions
+// are written by the CPU (a few dozen at most); lit, fogged and graded like
+// the world around them, so they drain to grey in Hell with everything else.
+// ---------------------------------------------------------------------------
+const VS_DUST = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute vec4 aDust; // x size (m), y opacity, z 1 for grit, w seed
+varying vec4 vDust;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 wp = bendPos(position);
+  vPos = wp;
+  vWorld = wp;
+  vec4 mv = viewMatrix * vec4(wp, 1.0);
+  float px = aDust.x * projectionMatrix[1][1] * uResolution.y * 0.5 / max(-mv.z, 0.5);
+  gl_PointSize = clamp(px, 1.5, 360.0);
+  vDust = aDust;
+  // (no giant blobs drifting across the lens)
+  vDust.y *= smoothstep(1.4, 3.2, -mv.z);
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const FS_DUST = FS_HEAD + /* glsl */ `
+uniform vec3 uGroundA;
+uniform vec3 uGroundB;
+uniform vec3 uShadowTint;
+varying vec4 vDust;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float r = length(c);
+  float grit = vDust.z;
+  float a = atan(c.y, c.x);
+  // (the lumps stay inside the sprite, or its square would cut them off)
+  float lump = (0.028 * sin(a * 5.0 + vDust.w * 6.3) + 0.016 * sin(a * 9.0 - vDust.w * 4.1)) * (1.0 - grit);
+  float edge = smoothstep(mix(0.45, 0.5, grit) + lump, mix(0.36, 0.22, grit) + lump, r);
+  float alpha = edge * vDust.y;
+  if (alpha < 0.01) discard;
+  // the road's own colour, paled with dust; lit from above, a shade beneath
+  vec3 dust = mix(mix(uGroundA, uGroundB, 0.5), vec3(0.98, 0.95, 0.88), 0.62);
+  float lit = smoothstep(0.2, -0.25, c.y + 0.06 * sin(a * 3.0 + vDust.w));
+  vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
+  vec3 col = dust * mix(sh, vec3(1.0), 0.35 + 0.65 * lit);
+  col = mix(col, dust * 0.42, grit);
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  col = atmos(col, v, dist, 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), alpha);
+}
+`;
+
+// ---------------------------------------------------------------------------
 // Gems: stones that turn slowly and bob where they hang, unfold out of
 // nothing as they come in range like the rest of the world, and when you run
 // through one, are sucked into you — drawn in faster and faster, stretching
@@ -3003,6 +3057,17 @@ export function makeSparkleMaterial(slots) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+  });
+}
+
+// The dust kicked up off the road (game/dust.js), lit by env.
+export function makeDustMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_DUST,
+    fragmentShader: FS_DUST,
+    transparent: true,
+    depthWrite: false,
   });
 }
 

@@ -57,6 +57,8 @@
           for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
         } else if (pose === 'slide') {
           for (let i = 0; i < 60; i++) runner.update(dt, 14, () => 0);
+          // (&side=1: lead with the left leg, -1 the right)
+          if (q.get('side')) runner.slideSide = -Number(q.get('side'));
           runner.action('down');
           const n = Math.round(Number(q.get('jt') || 0.3) / dt);
           for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
