@@ -10,7 +10,7 @@ import { ChunkStreamer } from './chunks.js';
 import { ObstacleField } from './obstacles.js';
 import { GemField } from './gems.js';
 import { Sparkles } from '../render/sparkles.js';
-import { Player } from './player.js';
+import { CHARACTERS, characterById } from './characters.js';
 import { ChaseCamera } from './camera.js';
 import { Portal } from './portal.js';
 import { Dream } from './dream.js';
@@ -28,7 +28,7 @@ const numeral = (n) => NUMERALS[n - 1] || String(n);
 // Orchestrates one run: streaming, obstacles, the player, doorways between
 // worlds, the camera and the two-pass portal render.
 export class Game {
-  constructor({ renderer, ui, audio, params }) {
+  constructor({ renderer, ui, audio, params, assets }) {
     this.renderer = renderer;
     this.ui = ui;
     this.audio = audio;
@@ -39,7 +39,13 @@ export class Game {
     this.chunks = new ChunkStreamer(this);
     this.obstacles = new ObstacleField(this);
     this.gems = new GemField(this);
-    this.player = new Player(WORLD_DEFS[0].env);
+    // every runner you can pick is built up front (so picking one on the
+    // title screen is instant and never compiles a shader mid-game); only
+    // the one you picked is simulated and drawn
+    this.runners = {};
+    for (const c of CHARACTERS) this.runners[c.id] = c.make(WORLD_DEFS[0].env, assets[c.id]);
+    this.runnerId = characterById(params.runner || readString('er.runner')).id;
+    this.player = this.runners[this.runnerId];
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
@@ -51,7 +57,7 @@ export class Game {
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
-    this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
+    this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
@@ -149,6 +155,34 @@ export class Game {
   restart() {
     this.ui.hideCrash();
     this.newRun(false);
+  }
+
+  // Back to the title screen (from the pause or crash card), to pick again.
+  toTitle() {
+    this.ui.hideCrash();
+    this.ui.showPause(false);
+    this.saveBest();
+    this.newRun(true);
+  }
+
+  // Pick who runs (title screen only): the new runner steps in where the old
+  // one stood, lit by the same world, and says hello.
+  selectRunner(id) {
+    const next = this.runners[characterById(id).id];
+    if (this.state !== 'title' || !next) return false;
+    if (next !== this.player) {
+      this.sceneMain.remove(...this.player.objects);
+      this.player = next;
+      this.runnerId = characterById(id).id;
+      this.player.reset();
+      this.player.mode = 'idle';
+      copyEnvUniforms(this.player.u, this.current.u);
+      this.player.u.uDrain.value.copy(this.current.u.uDrain.value);
+      this.sceneMain.add(...this.player.objects);
+      writeString('er.runner', this.runnerId);
+    }
+    this.player.greet();
+    return true;
   }
 
   pause() {
@@ -537,7 +571,7 @@ export class Game {
     if (this.state === 'running') this.updateScore(dt);
 
     const pz = -(this.dist - this.origin);
-    this.player.place(pz);
+    this.player.place(pz, this.dist);
     shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);
     this.dream.update(dt);
     this.updateDrain(dt);
@@ -611,7 +645,11 @@ export class Game {
       w.setAllVisibleForCompile(true);
       scene.add(w.root);
     }
-    scene.add(this.player.root, this.player.shadow, this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
+    for (const r of Object.values(this.runners)) {
+      scene.add(...r.objects);
+      r.forCompile?.(true);
+    }
+    scene.add(this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
     try {
       const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
       let t = performance.now();
@@ -636,7 +674,11 @@ export class Game {
         root.removeFromParent();
         if (parent) parent.add(root);
       }
-      this.sceneMain.add(this.player.root, this.player.shadow, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
+      for (const r of Object.values(this.runners)) {
+        r.forCompile?.(false);
+        for (const o of r.objects) o.removeFromParent();
+      }
+      this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
       this.scenePortal.add(this.portal.stencilMesh);
     }
   }
@@ -659,6 +701,20 @@ function readNumber(k) {
 function writeNumber(k, v) {
   try {
     localStorage.setItem(k, String(v));
+  } catch {
+    /* storage unavailable (private mode) */
+  }
+}
+function readString(k) {
+  try {
+    return localStorage.getItem(k) || '';
+  } catch {
+    return '';
+  }
+}
+function writeString(k, v) {
+  try {
+    localStorage.setItem(k, v);
   } catch {
     /* storage unavailable (private mode) */
   }

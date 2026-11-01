@@ -1,7 +1,9 @@
 # EndlessRun
 
-An endless runner through worlds within worlds. A young wayfarer in a puffer
-jacket and an orange hooded cape runs into the screen through a storybook world that never stops changing:
+An endless runner through worlds within worlds. Pick who runs — Rowan, a young
+wayfarer in a puffer jacket and an orange hooded cape, or Wren, a nimble
+explorer with a shock of vermilion hair and a backpack that won't stay shut —
+and run into the screen through a storybook world that never stops changing:
 scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
 next world, nested inside this one. Run through, and you're in it. Keep
@@ -27,7 +29,7 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
 | V | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
-| VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and your cape still in colour | fire and brimstone |
+| VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck: an ivory walk inlaid with brass clock-ticks between colonnades of ivory arches, oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 
 The first lap always nests inward in that order; after that the order shuffles
@@ -70,7 +72,7 @@ at first, then faster and faster down the hole, a second in all — until
 everything is black, grey and white: the sky, the ash, the rock, the gems and
 the runner. Only what burns keeps its colour — the lava, the glowing fissures
 and the fire in the cracks of the rock, the embers on the wind, the souls'
-eyes, the eclipse's ring of fire and its corona — and the runner's orange cape. The road is kept pale and the rock dark,
+eyes, the eclipse's ring of fire and its corona — and the wayfarer's orange cape (or the explorer's vermilion hair). The road is kept pale and the rock dark,
 ashen on top and veined with fire (and the grey is given a little extra
 contrast), so the dark stones and the obstacles still read at a glance.
 
@@ -83,7 +85,7 @@ It's one per-world uniform (`uDrain`: how much, the radius from the centre of
 the screen inside which the colour still holds out, which way the front is
 going, and whether it's moving) applied in the shared colour grade, with
 emissive surfaces, the lava material, the ground's glowing cracks, the rock's
-fire and the cape marked to keep their colour — so a world seen through a
+fire and the cape (and the explorer's hair) marked to keep their colour — so a world seen through a
 doorway can be drained or not independently of the one around it, at no extra
 render cost. Any world can ask for it with `env.drain: true`; its timing lives
 in `CONFIG.drain`.
@@ -390,6 +392,11 @@ Swipes fire the moment your finger has travelled far enough — you don't have
 to lift it — which is what makes the controls feel instant. A jump pressed just
 before landing is buffered.
 
+On the title screen, tap a runner's card to pick them (← → / A D, or a
+sideways swipe, steps between them); tap anywhere else, swipe up or press
+Space / Enter to begin. **Choose runner** on the pause and crash cards goes
+back there.
+
 **Hits:** clipping something from the side, or tripping over a low obstacle /
 bumping a high one, makes you *stumble* (ink creeps in from the screen edges
 while you're vulnerable). A second hit within ~4.5 s, or running head-on into
@@ -528,6 +535,7 @@ Append to the URL:
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
+| `?runner=explorer` | who runs (`wayfarer`, `explorer`), over the one remembered |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
@@ -565,7 +573,10 @@ Append to the URL:
   surface the GPU rebuilds from a 19×19 texture of particle positions (the
   only thing uploaded per frame), and the curls and hip pouch are springs;
   animation and simulation together take about half a millisecond on a
-  desktop (see [The runner](#the-runner)). The cloth solver's phases are
+  desktop (see [The runners](#the-runners)). The explorer is the same four
+  draw calls (her body, ~25k triangles, and her hair: a 15×12 cloth), costs
+  about half as much to simulate, and adds two draw calls for each thing
+  flying out of her backpack while it's in the air (at most six). The cloth solver's phases are
   small methods called with integers only: as one big function of nested
   loops V8 kept cycling it in and out of optimisation, running it mostly
   unoptimised and boxing every float it touched (~50 KB of garbage a frame,
@@ -621,7 +632,125 @@ current world draws normally with the doorway "plugged" in the depth buffer,
 so the old world continues around the door frame while the new one shows
 through it.
 
-## The runner
+## The runners
+
+Two runners, chosen on the title screen. Each is sculpted offline
+(`tools/runner/`), skinned to the same skeleton and driven by the same core —
+lanes, jumps, slides, the IK running legs, weight and follow-through
+(`src/game/player.js`) — and each dresses it, hangs a simulated sheet off it
+and moves in their own way (`wayfarer.js`, `explorer.js`; who they are, their
+card and how to make them live in `characters.js`).
+
+| | Rowan, the wayfarer | Wren, the explorer |
+|---|---|---|
+| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook |
+| Simulated | the cape (19×19 cloth) | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it |
+| Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked front flip or a corkscrew twist |
+| Slide | feet first, leaning back | a forward roll |
+| Run | a sure, bounding stride | a quicker, lighter, narrower one, more lean, less bounce |
+
+### Choosing who runs
+
+![The title screen, choosing Wren; and Wren from the front, her left side, the back and her right side](docs/runners.jpg)
+
+The title screen deals a card for each runner: their front view, cut out of
+their reference sheet (`tools/characters/<id>-sheet.jpg`, cut by
+`tools/characters/cards.py` into `assets/characters/<id>.webp`) and stood up
+out of a card washed in their colours like a pop-up book — a paper keyline and
+an ink shadow round the figure, a sunburst behind, their name on a paper plate.
+The one you've picked stands taller, bobs, and wears an orange seal; picking
+one swaps the live runner on the road behind the cards (every runner is built,
+and their shaders compiled, at boot, so it's instant), and they say hello —
+a gust catches Rowan's cape, Wren's backpack pops and a page flutters out. On
+a tall screen the title camera stands back so the runner shows above the
+cards; on a wide one the cards stand to the right. The pick is remembered
+(`localStorage`).
+
+### The explorer
+
+![Wren's tucked front flip from the chase camera, her forward roll, and Hell: everything drained to grey but her hair](docs/explorer-moves.jpg)
+
+`tools/runner/explorer.py` sculpts her to her reference sheet the same way
+`build.py` sculpts him (it borrows its primitives, meshing, skinning and
+export): about five heads tall, the head big and round with huge green eyes
+(drawn by the shader: a gold ring round the pupil, two catch-lights, a heavy
+upper lash line flicking out at the corner, thick brows lifting toward the
+middle); a close cap of hair under a messy bun with wisps escaping it, a long
+fringe falling to her brows in fine points and a lock either side framing her
+face; an oversized rose sweater with a peach band across the chest and round
+the upper sleeves, ribbed collar and hem, its sleeves shoved up past the
+elbows into bunched rolls; the hem of a peach tee under it; charcoal shorts
+with a rolled hem and pockets; long thin legs with a plaster on her right
+knee; pink socks slouched in rolls over chunky cream trainers with grey
+panels, heel counters and laces; a small grey backpack (zips round its lid
+and front pocket, a mesh bottle pocket) on webbing straps with buckles at the
+chest; and her green spiral sketchbook, a doodled cat on its cover, gripped in
+her right hand.
+
+**Her hair is simulated the way his cape is** (`cloth.js`, the same solver):
+a sheet growing from under the bun round the back of her head, its roots
+pinned to the head, the rows over her scalp leashed to it and the rest free,
+kept off her head, neck, shoulders, arms, sweater and backpack by their own
+volumes. It's lighter in the air than wool and quicker to answer every push:
+it streams back in the headwind, swings out and lags across a lane change,
+flies up through a jump and slaps down on landing, bounces with every stride
+(it's carried with only a third of the head's bob) and sways in the breeze
+when she stands. The GPU draws it as a slab full at the crown and thinning to
+the tips, strands drawn down its length; toward its ends it parts into
+pointed locks of uneven length, each edged in ink. The bun, the fringe and the
+two face-framing locks bounce on their own springs. Her hair keeps its colour
+through Hell's drain, as his cape does.
+
+**The backpack** rides on a bone off her chest, bouncing, nodding and swaying
+on springs with each footfall and lane change. Every so often — on a timer
+while she runs (every 6–13 s), on one landing in five, in a burst when she
+stumbles or crashes, now and then while she stands about, and when you pick her
+— its lid pops open and something flies out (`src/game/spill.js`): a page torn
+from her sketchbook (ruled, a doodled hill under a sun), a folded map (a river,
+woods, a dotted way to an X), a magnifying glass, a compass, a pencil, a brass
+key, a spyglass, a sticking plaster, a pressed leaf. They're small models
+drawn with the runners' own shader, thrown up and back from the pack's mouth at
+her own speed and left behind in the world: the flat ones catch the still air
+on their faces — gliding edge-on, dropping slowly face-down, turning over and
+over — while the heavy ones arc, bounce and skid; they fall away past the
+camera. At most six fly at once (two draw calls each; none at rest).
+
+**She plays lighter.** Lanes are a quicker spring (40/s against 32/s) and she
+side-skips into them — a little hop off the outside foot, legs spreading toward
+the move, arms flung out for balance, a hard lean. Her jump has exactly his
+apex and airtime, so every gap is as fair, but it's shaped differently: she
+pops up faster, gravity eases off within 3.2 m/s of the top so she hangs
+there, then she drops (the arc is solved piecewise and exactly, the same at any
+frame rate) — and in the air she does a trick, dealt from a shuffled deck so
+the same one never comes twice running: a split leap (one leg reaching out
+straight in front, the other stretched behind, arms flung up), a tucked front
+flip about her hips, or a corkscrew twist about her own axis, legs together,
+arms pulled in. Her slide is a forward roll: a dive into a tight tuck, over
+her back and backpack (riding up over it so she never sinks into the road),
+and up onto her feet. A spin cut short — a fast-fall, landing early, jumping
+out of a roll — whips round to finish quickly rather than snapping back. She
+runs at a quicker cadence on a narrower track with more lean and less bounce,
+her free arm swinging lightly and the one with the sketchbook held closer;
+she lands in a quick soft crouch with her arms out.
+
+Her simulation costs about half his per frame (the hair grid is smaller than
+the cape's); her mesh is about 25k triangles to his 23k.
+
+To change either runner, edit their script and regenerate (about 15 and 35
+seconds), then look at them turned round like their reference sheet in
+`tools/runner/view.html?runner=explorer` (also `&pose=idle|run|jump|slide|bind`,
+`&t=` seconds into it, `&trick=leap|flip|twist`, `&jt=` seconds into the jump
+or roll, `&views=front,left,back,right,three`, `&zoom=`, `&y=`):
+
+```sh
+pip install numpy scipy scikit-image fast-simplification pillow
+python3 tools/runner/build.py      # the wayfarer -> assets/runner/
+python3 tools/runner/explorer.py   # the explorer -> assets/explorer/
+python3 tools/characters/cards.py  # the title screen's cards
+```
+
+### The wayfarer
 
 ![The wayfarer: front, three-quarter, side, back and mid-stride](docs/runner.jpg)
 
@@ -761,13 +890,22 @@ src/world/                    world runtime + one file per world (art, lighting,
                               gem kit (cleaved crystal habits, lofts, settings),
                               lane-art.js the Cypress Lane's fruit, market obstacles,
                               timetable and street furniture
-src/game/                     game loop, player (animation, IK legs, secondary
-                              motion, movement), outfit (palette, cape), cloth,
-                              runner asset loader, camera, course (world order),
+src/game/                     game loop, player (the runners' shared core:
+                              animation, IK legs, secondary motion, movement),
+                              characters (who you can pick), wayfarer and
+                              outfit (his palette, cape, pouch, poses), explorer
+                              (her palette, hair, backpack, moves) and spill
+                              (what flies out of it), kit (body geometry, sheet
+                              surfaces and colliders), cloth, runner asset
+                              loader, camera, course (world order),
                               chunk streaming, obstacle director, gem director
                               (gems.js: the ghost route and pick-up), portal, dream
                               (depth recipes and the shared warp uniforms)
-tools/runner/build.py         offline sculpt of the runner -> assets/runner/
+tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
+tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
+tools/runner/view.html        a runner turned round like their reference sheet
+tools/characters/             the reference sheets and the cut-out of the
+                              title screen's cards -> assets/characters/
 vendor/three/                 three.js r185 (MIT)
 ```
 
@@ -839,6 +977,6 @@ light on the road and the motes they leave a colour of their own.
 
 ## Not in yet (on purpose)
 
-Keys, power-ups, extra characters and most sound effects are left for the
+Keys, power-ups, more runners and most sound effects are left for the
 next pass; the ambient soundtrack (and the gems' chimes) is generated live
 with Web Audio.

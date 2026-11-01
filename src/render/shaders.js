@@ -1276,7 +1276,16 @@ void main() {
       vec3 ev = safeNormalize(Tv - nC * dot(nC, Tv));
       e = safeNormalize(aEdge.x * eu + aEdge.y * ev);
     }
-    lp = P + nC * (side * uCapeGrid.z);
+    #ifdef EXPLORER
+      // long hair: the inside lies on the simulated surface and the outside
+      // stands off it, full at the crown and thinning to the tips, in clumps
+      float gv = aCape.y / (uCapeGrid.y - 1.0);
+      float gu = aCape.x / (uCapeGrid.x - 1.0);
+      float th = uCapeGrid.z * mix(1.5, 0.45, smoothstep(0.15, 1.0, gv)) * (0.8 + 0.2 * cos(gu * 50.0 + gv * 3.0));
+      lp = P + nC * (th * (side + 1.0));
+    #else
+      lp = P + nC * (side * uCapeGrid.z);
+    #endif
     ln = aCape.w > 1.5 ? e : nC * side;
     #ifdef OUTLINE
       lo = (aCape.w > 0.5 ? safeNormalize(nC * side + e) : nC * side) * 0.6;
@@ -1321,9 +1330,13 @@ void main() {
 // Palette slots beyond the garment ids (see COL in game/outfit.js).
 const CHAR_DETAIL = /* glsl */ `
 uniform vec3 uPal[32];
-// [0]: x sock line, y boot x offset, z sleeve cuff start, w shorts hem;
-// [1]: x boot collar height over the ankle, y its rise toward the heel, z sole height
-uniform vec4 uRig[2];
+// wayfarer: [0]: x sock line, y boot x offset, z sleeve cuff start, w shorts
+// hem; [1]: x boot collar height over the ankle, y its rise toward the heel,
+// z sole height. explorer: [0]: x sock top, y shoe x offset, z where the
+// sleeves bunch, w shorts hem; [1]: x shoe collar height, y its rise toward
+// the heel, z sole height, w knee height; [2]: x, y the band across the
+// chest, z the sweater's hem.
+uniform vec4 uRig[3];
 varying vec3 vRest;
 varying vec4 vD;
 varying float vMat;
@@ -1356,6 +1369,72 @@ float band(float d, float halfw) {
 float lines(float x, float halfw) {
   return band(abs(fract(x + 0.5) - 0.5), halfw);
 }
+#if defined(ITEMS)
+// --- the things that fly out of the explorer's backpack -------------------------
+// (d: x, y across the part, z which face: 1 the front, 2 the back, 0 an edge)
+#define I_INK 14
+#define I_RIVER 15
+#define I_GREEN 16
+#define I_RED 10
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  float front = step(0.5, d.z) * step(d.z, 1.5);
+  if (m == 1) {
+    // a page torn from her sketchbook: ruled lines, a margin, a doodled hill
+    // under a sun
+    c = mix(c, uPal[I_RIVER] * 1.15, lines(d.y * 13.0, 0.05) * step(0.08, d.y) * front * 0.55);
+    c = mix(c, uPal[I_RED], band(d.x - 0.14, 0.004) * front * 0.7);
+    vec2 g = d.xy - vec2(0.58, 0.42);
+    float hill = band(g.y + 0.16 - 0.5 * abs(g.x) * (1.0 + 0.6 * sin(g.x * 9.0)), 0.006) * step(abs(g.x), 0.3);
+    float sun = band(length(d.xy - vec2(0.75, 0.68)) - 0.06, 0.006);
+    c = mix(c, uPal[I_INK], max(hill, sun) * front * 0.8);
+  } else if (m == 2) {
+    // a map: a river winding across it, woods, a dotted way to an X; folds
+    float rv = d.y - 0.5 - 0.18 * sin(d.x * 7.0 + 1.0);
+    c = mix(c, uPal[I_RIVER], fill(abs(rv) - 0.025) * front);
+    float wood = fill(length((d.xy - vec2(0.25, 0.75)) * vec2(1.0, 1.4)) - 0.11) + fill(length((d.xy - vec2(0.8, 0.25)) * vec2(1.0, 1.5)) - 0.09);
+    c = mix(c, uPal[I_GREEN], min(1.0, wood) * front * 0.85);
+    float py = 0.25 + 0.5 * d.x + 0.08 * sin(d.x * 11.0);
+    float path = band(d.y - py, 0.008) * step(0.5, fract(d.x * 22.0)) * step(0.08, d.x) * step(d.x, 0.82);
+    c = mix(c, uPal[I_RED], path * front);
+    vec2 xq = abs(d.xy - vec2(0.86, 0.68));
+    c = mix(c, uPal[I_RED], band(xq.x - xq.y, 0.012) * step(max(xq.x, xq.y), 0.045) * front);
+    c = mix(c, c * 0.78, band(abs(fract(d.x * 3.0 + 0.5) - 0.5), 0.012));
+  } else if (m == 4) {
+    // glass: pale, bright, a streak of light across it
+    float k = fract(d.x * 0.8 + d.y * 0.6);
+    c = mix(c, vec3(1.0), smoothstep(0.42, 0.47, k) * (1.0 - smoothstep(0.55, 0.6, k)) * 0.8);
+    unlit = 0.55;
+  } else if (m == 5) {
+    c = mix(c, c * 0.78, lines(d.x * 9.0 + sin(d.y * 20.0) * 0.2, 0.1) * 0.6);
+  } else if (m == 6) {
+    // the pencil's painted sides, a darker line down each edge
+    c = mix(c, c * 0.8, lines(d.x * 6.0, 0.06));
+  } else if (m == 9) {
+    // the compass's face: ticks round it, N, the needle (red to the north)
+    vec2 q = d.xy - 0.5;
+    float a = atan(q.y, q.x);
+    float rr = length(q);
+    c = mix(c, uPal[I_INK], band(rr - 0.4, 0.012));
+    c = mix(c, uPal[I_INK], lines(a / 6.2832 * 16.0, 0.08) * step(0.33, rr) * step(rr, 0.39));
+    vec2 nq = vec2(abs(q.x) * 4.0, q.y);
+    float needle = step(nq.x, 0.3 - abs(q.y) * 0.9) * step(abs(q.y), 0.3);
+    c = mix(c, mix(uPal[3] * 0.4, uPal[I_RED], step(0.0, q.y)), needle);
+    c = mix(c, uPal[3], fill(rr - 0.04));
+  } else if (m == 12) {
+    // a sticking plaster: the pad in the middle, little holes either side
+    c = mix(c, c * 0.88, fill(abs(d.x - 0.5) - 0.17));
+    vec2 h = fract(d.xy * vec2(14.0, 4.0)) - 0.5;
+    c = mix(c, c * 0.8, fill(length(h) - 0.12) * step(0.2, abs(d.x - 0.5)) * front);
+  } else if (m == 13) {
+    // a pressed leaf: its midrib and veins
+    float mid = band(d.y - 0.5, 0.012);
+    float vein = band(abs(fract((d.x + abs(d.y - 0.5) * 0.8) * 6.0) - 0.5), 0.05) * step(0.12, d.x) * step(d.x, 0.92);
+    c = mix(c, c * 0.72, max(mid, vein * 0.6) * front);
+  }
+  return c;
+}
+#elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
 // brown eyes under relaxed lids (the upper lid sits a little over the iris, so
 // they read content rather than startled), a heavy upper lash line, soft
@@ -1471,6 +1550,200 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#else
+// --- the explorer -------------------------------------------------------------
+#define E_STRIPE 13
+#define E_RIB 14
+#define E_SOCK 15
+#define E_PANEL 16
+#define E_SOLE 17
+#define E_SOLE_LINE 18
+#define E_LACE 19
+#define E_HAIR_DEEP 20
+#define E_HAIR_IN 21
+#define E_EYE 22
+#define E_IRIS 23
+#define E_INK 24
+#define E_MOUTH 25
+#define E_BLUSH 26
+#define E_IRIS_IN 27
+#define E_SEAM 28
+#define E_ZIP 29
+#define E_PLASTER 31
+// Her face, drawn on the front of the head: huge round eyes, green with a
+// gold ring round the pupil and two catch-lights, under a heavy upper lash
+// line that flicks out at the corner; thick dark brows a little raised in the
+// middle (earnest, a touch worried); a tiny nose, a small mouth and a hint of
+// blush. (r: the rest position, the head being sculpted where it sits.)
+vec3 drawFace(vec3 base, vec3 r, inout float unlit) {
+  float front = smoothstep(-0.05, -0.08, r.z);
+  if (front <= 0.0) return base;
+  vec2 f = vec2(abs(r.x), r.y);
+  vec3 c = base;
+  // blush
+  vec2 bq = (f - vec2(0.063, 1.236)) / vec2(0.02, 0.011);
+  c = mix(c, uPal[E_BLUSH], 0.28 * (1.0 - smoothstep(0.3, 1.0, length(bq))) * front);
+  // the eye: a tall, round opening, its top a little flattened by the lid
+  vec2 E = vec2(0.046, 1.267);
+  vec2 q = f - E;
+  float lidY = 0.0245 - 2.0 * (q.x + 0.002) * (q.x + 0.002);
+  float dA = (length(q / vec2(0.0285, 0.0315)) - 1.0) * 0.029;
+  float dS = max(dA, q.y - lidY);
+  float eye = fill(dS) * front;
+  c = mix(c, uPal[E_EYE], eye);
+  unlit = max(unlit, eye * 0.4);
+  // iris: green, a gold ring round the pupil, a dark rim
+  vec2 ic = q - vec2(-0.0012, -0.0008);
+  float ir = length(ic);
+  float iris = fill(max(ir - 0.0222, dS)) * front;
+  c = mix(c, uPal[E_IRIS], iris);
+  c = mix(c, mix(uPal[E_IRIS], uPal[E_INK], 0.55), fill(max(abs(ir - 0.0203) - 0.002, dS)) * front);
+  c = mix(c, uPal[E_IRIS_IN], fill(max(ir - 0.0128, dS)) * front * 0.9);
+  c = mix(c, uPal[E_INK], fill(max(ir - 0.0078, dS)) * front);
+  // catch-lights
+  float hl = fill(max(length(q - vec2(-0.0068, 0.0085)) - 0.0055, dS)) * front;
+  hl = max(hl, fill(max(length(q - vec2(0.0075, -0.0085)) - 0.0025, dS)) * front * 0.85);
+  c = mix(c, vec3(1.0), hl);
+  unlit = max(unlit, hl);
+  // the upper lash line: heavy along the lid, flicking out past the corner
+  float onTop = step(0.0, q.y) * step(abs(q.x), 0.0305);
+  float lash = band(q.y - lidY - 0.0009, 0.002 + 0.0013 * smoothstep(-0.01, 0.027, q.x)) * onTop;
+  lash = max(lash, band(dA + 0.0009, 0.0018) * step(0.005, q.y) * step(abs(q.x), 0.029));
+  float flick = band(q.y - 0.019 - (q.x - 0.027) * 0.55, 0.0019) * step(0.025, q.x) * step(q.x, 0.037);
+  c = mix(c, uPal[E_INK], max(lash, flick) * front);
+  // a fine lower lash line, and a soft crease over the lid
+  float lower = band(dA, 0.0008) * step(q.y, -0.014) * step(abs(q.x), 0.021);
+  c = mix(c, mix(base, uPal[E_INK], 0.55), lower * front);
+  float crease = band(length((q - vec2(0.0, -0.004)) / vec2(0.032, 0.037)) - 1.0, 0.035) * step(0.014, q.y) * step(abs(q.x), 0.024);
+  c = mix(c, mix(base, uPal[E_MOUTH], 0.35), crease * front * 0.5);
+  // brows: thick and dark, lifting a little toward the middle
+  vec2 bc = f - vec2(0.048, 1.323);
+  float by = bc.y + 0.12 * bc.x + 2.0 * bc.x * bc.x;
+  float bw = 0.0048 - 0.0018 * smoothstep(-0.01, 0.028, bc.x);
+  float brow = band(by, bw) * step(-0.024, bc.x) * step(bc.x, 0.029);
+  c = mix(c, mix(uPal[E_INK], uPal[2], 0.2), brow * front);
+  // nose: a small hook of line
+  vec2 nq = r.xy - vec2(0.0, 1.252);
+  float nose = band(length(nq - vec2(0.003, 0.004)) - 0.005, 0.0008) * step(nq.y, 0.003) * step(-0.0005, nq.x);
+  c = mix(c, mix(base, uPal[E_MOUTH], 0.7), nose * front * 0.8);
+  // mouth: small and closed, a short line with a shade under the lower lip
+  vec2 m = r.xy - vec2(0.0, 1.214);
+  float mouth = band(m.y + 18.0 * m.x * m.x - 0.0006, 0.0011) * step(abs(m.x), 0.0085);
+  c = mix(c, uPal[E_MOUTH], mouth * front);
+  float lip = band(length(m / vec2(1.0, 0.6) + vec2(0.0, 0.0065)) - 0.006, 0.0012) * step(m.y, -0.002);
+  c = mix(c, mix(base, uPal[E_MOUTH], 0.4), lip * front * 0.6);
+  return c;
+}
+// Strands drawn along a lock: a few darker lines that wander a little.
+float strands(float u, float v, float k) {
+  float s = u * k + 0.35 * sin(v * 7.0 + u * 13.0);
+  return lines(s, 0.07) * smoothstep(0.02, 0.18, v);
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    c = drawFace(base, d.xyz, unlit);
+  } else if (m == 3) {
+    // the sweater: rose knit, a peach band across the chest (and round the
+    // upper sleeves), ribbed collar and hem, the shoved-up sleeves bunched
+    // in rolls of rib (d: x rib, z on the body, w down the arm)
+    float torso = d.z;
+    float stripeT = fill(abs(r.y - 0.5 * (uRig[2].x + uRig[2].y)) - 0.5 * (uRig[2].y - uRig[2].x));
+    float stripeS = fill(abs(d.w - 0.118) - 0.022);
+    c = mix(c, uPal[E_STRIPE], mix(stripeS, stripeT, torso));
+    float cuff = smoothstep(uRig[0].z - 0.035, uRig[0].z - 0.025, d.w) * (1.0 - torso);
+    float rib = max(d.x, cuff);
+    c = mix(c, uPal[E_RIB], rib * 0.85);
+    float ribLines = lines(atan(r.z, r.x) * 30.0, 0.18) * d.x + lines(atan(r.z, abs(r.x) - 0.2) * 22.0, 0.16) * cuff;
+    c = mix(c, uPal[E_RIB] * 0.85, ribLines * 0.5);
+  } else if (m == 5) {
+    // shorts: the rolled hem, a side seam, the front pockets' openings
+    c = mix(c, uPal[E_SEAM], band(r.y - uRig[0].w - 0.016, 0.0014));
+    float side = abs(r.x);
+    c = mix(c, uPal[E_SEAM], band(r.z - 0.006 + (side - 0.12) * 0.0, 0.0012) * step(0.1, side) * 0.6);
+    vec2 pk = vec2(side - 0.05, r.y - 0.79);
+    float pocket = band(length(pk / vec2(1.0, 1.3)) - 0.06, 0.0014) * step(r.z, -0.02) * step(pk.x, 0.06) * step(pk.y, 0.0);
+    c = mix(c, uPal[E_SEAM], pocket * 0.8);
+  } else if (m == 6) {
+    // legs: pink socks slouched round the ankles, folds between their
+    // rolls; a plaster on her right knee
+    float sock = fill(r.y - (uRig[0].x + 0.003 * sin(atan(r.z, r.x) * 5.0)));
+    c = mix(c, uPal[E_SOCK], sock);
+    c = mix(c, uPal[E_SOCK] * 0.8, lines(r.y / 0.025 + 0.3, 0.06) * sock * step(0.13, r.y));
+    vec2 kq = vec2(r.x - 0.069, r.y - uRig[1].w + 0.01);
+    float ca = 0.866, sa = 0.5;
+    kq = vec2(ca * kq.x - sa * kq.y, sa * kq.x + ca * kq.y);
+    float knee = step(0.0, r.x) * smoothstep(-0.01, -0.025, r.z);
+    vec2 kb = abs(kq) - vec2(0.022, 0.0075);
+    float plaster = fill(length(max(kb, 0.0)) + min(max(kb.x, kb.y), 0.0) - 0.004) * knee;
+    c = mix(c, uPal[E_PLASTER], plaster);
+    float pad = fill(max(abs(kq.x) - 0.0075, abs(kq.y) - 0.0072)) * knee;
+    c = mix(c, uPal[E_PLASTER] * 0.86, pad);
+  } else if (m == 7) {
+    // chunky trainers: thick cream soles striped grey low down, grey panels
+    // down the sides and round the heel, grey laces over the tongue
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float x = r.x - side * uRig[0].y;
+    float y = r.y - 0.026 * pow(smoothstep(-0.07, -0.18, r.z), 2.0);
+    float heel = fill(0.03 - r.z + max(0.0, y - 0.11) * 0.8) * step(uRig[1].z, y);
+    float swoosh = fill(abs(y - 0.078 - (r.z + 0.03) * 0.3) - 0.011) * step(0.033, abs(x)) * step(-0.11, r.z) * step(r.z, 0.035);
+    float toe = fill(r.z + 0.15 + max(0.0, y - 0.062) * 0.6) * step(uRig[1].z, y);
+    c = mix(c, uPal[E_PANEL], max(max(heel, swoosh), toe * 0.85));
+    c = mix(c, uPal[E_SOLE], fill(y - uRig[1].z));
+    c = mix(c, uPal[E_SOLE_LINE], fill(y - 0.012) * 0.9);
+    c = mix(c, uPal[E_SOLE_LINE], band(y - uRig[1].z, 0.0012) * 0.7);
+    float collar = uRig[1].x + uRig[1].y * r.z;
+    float onTongue = step(r.z, -0.07 + (r.y - 0.085) * 0.7) * step(abs(x), 0.024) * step(0.085, r.y) * step(r.y, collar + 0.012);
+    float lace = max(band(abs(fract((r.y + x * 0.9) / 0.02 + 0.5) - 0.5), 0.12), band(abs(fract((r.y - x * 0.9) / 0.02 + 0.5) - 0.5), 0.12));
+    c = mix(c, uPal[E_LACE], lace * onTongue * step(abs(x), 0.02));
+  } else if (m == 9) {
+    // the backpack: zips round the lid and the front pocket, a mesh
+    // bottle pocket, the dark inside under the lid (d: x lid, y pocket,
+    // z bottle pocket, w the opening)
+    c = mix(c, c * 1.08, d.x);
+    c = mix(c, uPal[E_ZIP], band(d.x - 0.5, 0.08) * 0.9);
+    c = mix(c, uPal[E_ZIP], band(d.y - 0.5, 0.08) * 0.9);
+    float mesh = max(lines((r.y + r.z) * 90.0, 0.12), lines((r.y - r.z) * 90.0, 0.12));
+    c = mix(c, uPal[E_ZIP], mesh * smoothstep(0.4, 0.7, d.z) * 0.6);
+    c = mix(c, uPal[E_ZIP] * 0.45, d.w);
+  } else if (m == 11) {
+    // the sketchbook: sage covers, a doodle of a little cat on the front,
+    // cream pages showing at the edges (d: x across, y down, z out of the
+    // cover, w the spiral)
+    float cover = smoothstep(0.55, 0.8, abs(d.z));
+    c = mix(uPal[E_EYE] * 0.95, c, cover);
+    c = mix(c, uPal[E_EYE] * 0.8, lines(d.z * 6.0, 0.12) * (1.0 - cover) * 0.6);
+    vec2 g = vec2(d.x * 0.068, d.y * 0.184 - 0.1);
+    float head = band(length(g / vec2(1.0, 0.85)) - 0.026, 0.0012);
+    float ears = band(abs(abs(g.x) - 0.016) + (g.y + 0.026) * 0.5 - 0.008, 0.0012) * step(g.y, -0.012) * step(-0.034, g.y);
+    float eyes = fill(length(vec2(abs(g.x) - 0.009, g.y + 0.002)) - 0.0028);
+    float doodle = max(max(head, ears), eyes) * step(0.8, d.z);
+    c = mix(c, c * 0.62, doodle);
+  } else if (m == 12) {
+    // webbing straps, a ridge down them; plastic buckles a shade lighter
+    c = mix(c, c * 1.3, d.x);
+  } else if (m == 10) {
+    // the long hair (d: x across, y down, w the inside): strands down its
+    // length, deeper toward the tips and on the inside
+    c = mix(c, uPal[E_HAIR_DEEP], strands(d.x, d.y, 26.0) * 0.45);
+    c = mix(c, uPal[E_HAIR_DEEP], smoothstep(0.55, 1.0, d.y) * 0.25);
+    c = mix(c, uPal[E_HAIR_IN], step(0.5, d.w) * 0.8);
+  }
+  return c;
+}
+// The long hair parts into pointed locks toward its ends: > 0 past a lock's
+// edge (d.x across the sheet, d.y down it).
+float hairCut(vec4 d) {
+  float n = 11.0;
+  float k = d.x * n;
+  float i = floor(k);
+  float h = fract(sin(i * 12.9898 + 4.1) * 43758.5453);
+  float x = abs(fract(k) - 0.5) * 2.0;
+  float end = 0.985 - 0.09 * h;
+  float depth = 0.16 + 0.1 * fract(h * 7.31);
+  return d.y - (end - depth * pow(x, 1.4));
+}
+#endif
 `;
 
 const FS_CHAR = FS_HEAD + CHAR_DETAIL + /* glsl */ `
@@ -1481,8 +1754,21 @@ uniform sampler2D uNoise;
 void main() {
   int m = int(vMat + 0.5);
   float unlit = 0.0;
-  gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
+  #if defined(EXPLORER) && !defined(ITEMS)
+    #ifdef CAPE
+      // (the long hair's ends part into locks; a dark edge where they do)
+      float cut = hairCut(vD);
+      if (cut > 0.0) discard;
+    #endif
+    // (her hair burns on through a drain, as his cape does)
+    gKeep = (m == 2 || m == 10) ? 1.0 : 0.0;
+  #else
+    gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
+  #endif
   vec3 base = charDetail(m, uPal[m], vRest, vD, unlit);
+  #if defined(EXPLORER) && defined(CAPE)
+    base = mix(base, uPal[m] * 0.32, smoothstep(-0.016, -0.003, cut) * 0.85);
+  #endif
   vec3 n = normalize(vNormal);
   n = gl_FrontFacing ? n : -n;
   vec3 v = vWorld - uCamPos;
@@ -1490,7 +1776,11 @@ void main() {
   vec3 V = v / dist;
   // one broad, crisp shadow shape (softer on the cape, so its folds shade in
   // soft gradients like the cloth they are)
-  float soft = m == 10 ? 0.16 : m == 9 ? 0.09 : 0.045;
+  #ifdef EXPLORER
+    float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
+  #else
+    float soft = m == 10 ? 0.16 : m == 9 ? 0.09 : 0.045;
+  #endif
   float lit = smoothstep(-soft, soft, dot(n, uLightDir) + 0.15);
   vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
   vec3 col = base * mix(sh, vec3(1.0), max(lit, unlit));
@@ -1500,7 +1790,11 @@ void main() {
     float fold = smoothstep(0.8, 4.0, vFx.x) - 0.25 * smoothstep(1.0, 5.0, -vFx.x);
     col *= mix(vec3(1.0), mix(sh, vec3(1.0), 0.3), clamp(fold, -0.3, 1.0) * 0.7);
   }
+  #ifdef EXPLORER
+  if (m == 2 || m == 10) {
+  #else
   if (m == 2) {
+  #endif
     // one restrained lighter tone where the curls face the light from above
     float hl = smoothstep(0.58, 0.64, dot(n, uLightDir)) * smoothstep(0.25, 0.5, n.y);
     col = mix(col, uPal[30], hl * 0.8);
@@ -1518,7 +1812,14 @@ void main() {
 const FS_CHAR_INK = FS_HEAD + CHAR_DETAIL + /* glsl */ `
 void main() {
   int m = int(vMat + 0.5);
-  gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
+  #if defined(EXPLORER) && !defined(ITEMS)
+    #ifdef CAPE
+      if (hairCut(vD) > 0.0) discard;
+    #endif
+    gKeep = (m == 2 || m == 10) ? 1.0 : 0.0;
+  #else
+    gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
+  #endif
   vec3 ink = uPal[m] * 0.3;
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
@@ -2486,11 +2787,15 @@ export function makeInkMaterial(toon, width) {
 // garment constants (sock line, boot offset, sleeve cuff start). cape: the
 // particle texture and grid (Vector4: cols, rows, half thickness) the cape's
 // pair of materials rebuild its surface from.
-export function makeCharacterMaterials(env, pal, rig, outline, cape) {
+export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // The runner keeps their own colours however deep the dream goes (uDream3
   // carries the palette shift; its doorway-swell terms never reach this close).
-  const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }); // rig: [Vector4, Vector4]
-  const make = (defines, extra) => {
+  // o.style: 'explorer' draws her details (see CHAR_DETAIL).
+  while (rig.length < 3) rig.push(new THREE.Vector4());
+  const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }); // rig: [Vector4 x 3]
+  const style = o.style === 'explorer' ? { EXPLORER: '' } : o.style === 'items' ? { ITEMS: '' } : {};
+  const make = (defines0, extra) => {
+    const defines = Object.assign({}, style, defines0);
     const u = Object.assign({}, uniforms, extra);
     return [
       new THREE.ShaderMaterial({ uniforms: u, defines, vertexShader: VS_CHAR, fragmentShader: FS_CHAR }),
@@ -2504,6 +2809,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape) {
     ];
   };
   const [mat, ink] = make({}, {});
+  if (!cape) return { mat, ink };
   const [capeMat, capeInk] = make({ CAPE: '' }, { uCape: { value: cape.texture }, uCapeGrid: { value: cape.grid } });
   return { mat, ink, capeMat, capeInk };
 }

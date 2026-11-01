@@ -1,28 +1,26 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { CONFIG } from '../config.js';
-import { makeEnvUniforms, makeCharacterMaterials } from '../render/shaders.js';
+import { makeEnvUniforms } from '../render/shaders.js';
 import { TAU, damp, clamp, smooth, Spring } from './rig.js';
-import { Cloth } from './cloth.js';
-import { runner } from './runner-asset.js';
-import { RIG, CAPE, configureRig, capeBind, capeColliders, setColliders, capeGeometry, bodyGeometry, palette } from './outfit.js';
+import { bodyGeometry } from './kit.js';
 
-// The runner: a young wayfarer in a hooded cape. The body and clothes are
-// sculpted offline (tools/runner/build.py, loaded by runner-asset.js) as
-// continuous surfaces skinned to this skeleton; the cape is built in
-// outfit.js. One skinned mesh and the cape, each with its ink hull: four draw
-// calls. The run's legs are placed by IK, the jump / slide / idle poses are
-// keyed (idle on planted feet), and on top sits a layer of weight and
-// secondary motion:
+// A runner: what every character shares, whoever they are. The body and
+// clothes are sculpted offline (tools/runner/, loaded by runner-asset.js) as
+// continuous surfaces skinned to this skeleton; each character (wayfarer.js,
+// explorer.js) dresses it, hangs their own simulated sheet off it (a cape,
+// long hair) and moves in their own way. Shared here: lane / jump / slide
+// movement, the run's legs placed by IK, idle on planted feet, and a layer of
+// weight and secondary motion on top of every pose:
 //   - torso, head and arms ride on the pelvis like loose springs, kicked by
 //     each footfall, lane change, take-off and landing, and trail their own
 //     posed motion so they lag and overshoot; the chest turns against the
 //     hips and the shoulders roll forward and back with the arms;
-//   - the cape is a cloth simulation (cloth.js): sewn under the collar, held
-//     to the shoulders by a leash that loosens down the back, kept off the
-//     body by its own volumes, streaming back in the headwind, swayed by a
-//     shifting breeze and lagging every lane change, take-off and landing;
-//   - curls bounce on springs; the hip pouch is a pendulum, its flap lifting.
-// Also owns lane / jump / slide movement.
+//   - locks of hair bounce on springs.
+// A character supplies (see Wayfarer for the full set): buildLook (materials,
+// body and sheet), buildSim / resetSim / simulate (their secondary motion),
+// poseJump and poseSlide; and may reshape the rest through its kit (gait,
+// feel) and the overlay hooks (landOverlay, laneOverlay, afterPose).
+
 // --- pose channels -----------------------------------------------------------
 // Lateral channels (z / twist) for limbs are stored as per-side magnitudes
 // (positive = outward) and get the side's sign when applied.
@@ -34,9 +32,9 @@ const NAMES = [
   'thLx', 'thRx', 'thLz', 'thRz', 'thLy', 'thRy', 'knL', 'knR', 'anL', 'anR', 'toL', 'toR',
   'bodyPitch', 'bodyZ', 'bodyRoll', 'sq',
 ];
-const C = {};
+export const C = {};
 NAMES.forEach((n, i) => (C[n] = i));
-const N = NAMES.length;
+export const N = NAMES.length;
 const PAIRS = [
   ['clL', 'clR'], ['clLy', 'clRy'], ['shLx', 'shRx'], ['shLy', 'shRy'], ['shLz', 'shRz'], ['elL', 'elR'], ['wrL', 'wrR'], ['wrLz', 'wrRz'],
   ['thLx', 'thRx'], ['thLz', 'thRz'], ['thLy', 'thRy'], ['knL', 'knR'], ['anL', 'anR'], ['toL', 'toR'],
@@ -48,7 +46,7 @@ const ARM_CH = [
 ];
 const NEGATE = ['hipX', 'hipYaw', 'hipRoll', 'spTwist', 'spSide', 'chTwist', 'chSide', 'hdYaw', 'hdRoll', 'bodyRoll'].map((n) => C[n]);
 
-function mirror(p) {
+export function mirror(p) {
   for (const [a, b] of PAIRS) {
     const t = p[a];
     p[a] = p[b];
@@ -59,7 +57,7 @@ function mirror(p) {
 
 // Running legs are placed, not keyed (phase pi = the left foot's mid-stance,
 // the right foot half a stride later). While a foot is down, the ball of the
-// boot is pinned to the ground and carried back at exactly the ground speed as
+// foot is pinned to the ground and carried back at exactly the ground speed as
 // the heel peels up over it; in the air the ankle follows a designed path —
 // the heel kicks up under the hips, the knee drives through, the foot reaches
 // and paws back down — and a two-bone solve turns the ankle's position into
@@ -70,58 +68,59 @@ function mirror(p) {
 // leg can reach (no slip at all at the start speed), but never shorter than
 // minContact so the planted pose always reaches the screen — any slip that
 // leaves at top speed is straight back along the run, inside those frames.
-const STRIDE = {
-  reach: 0.58, // m of ground the ball can cover while planted
-  minContact: 0.04, // s
-  maxDuty: 0.36, // of the cycle, at a jog
-  ballZ: -0.02, // middle of the planted stretch (forward of the hips)
-  heelLift: 0.75, // rad, the foot's pitch at toe-off
-  hipY: 0.69, // pelvis height at mid-stance (the knee bends ~45 degrees)
-  bob: 0.03, // pelvis rise in flight
-  trackX: 0.074, // planted feet land a little inside the hips...
-  swingX: 0.096, // ...and pass wide of each other
-  toeOut: 0.06, // rad
-};
-// The ankle's path through the air (root space, s = 0 at toe-off .. 1 at
-// touchdown): [s, z, y, z per unit speed, y per unit speed].
-const SWING = [
-  [0.16, 0.36, 0.29, 0.03, 0.03], // the heel rises behind
-  [0.4, 0.2, 0.44, 0.0, 0.08], // tucked up under the hips
-  [0.65, -0.15, 0.36, -0.04, 0.03], // the knee drives through, the foot following
-  [0.84, -0.28, 0.24, -0.02, 0.0], // reach...
-];
-// Arms swing with the opposite leg's phase.
-const ARM = {
-  // a compact swing (the bent elbow carries the hand up and through)
-  swing: [0.16, 0.5, 0.58, 0.36, -0.1, -0.44, -0.54, -0.32],
-  abd: [0.44, 0.38, 0.37, 0.41, 0.45, 0.49, 0.5, 0.48], // held out clear of the puffer
-  elbow: [1.35, 1.65, 1.78, 1.6, 1.25, 1.0, 0.95, 1.1],
+// A gait is a character's way of running: these numbers (the wayfarer's) are
+// the defaults every kit's gait is laid over.
+export const GAIT = {
+  cadence: [1.5, 0.055], // strides a second: base + per m/s
+  stride: {
+    reach: 0.58, // m of ground the ball can cover while planted
+    minContact: 0.04, // s
+    maxDuty: 0.36, // of the cycle, at a jog
+    ballZ: -0.02, // middle of the planted stretch (forward of the hips)
+    heelLift: 0.75, // rad, the foot's pitch at toe-off
+    hipY: 0.69, // pelvis height at mid-stance (the knee bends ~45 degrees)
+    bob: 0.03, // pelvis rise in flight
+    trackX: 0.074, // planted feet land a little inside the hips...
+    swingX: 0.096, // ...and pass wide of each other
+    toeOut: 0.06, // rad
+  },
+  // The ankle's path through the air (root space, s = 0 at toe-off .. 1 at
+  // touchdown): [s, z, y, z per unit speed, y per unit speed].
+  swing: [
+    [0.16, 0.36, 0.29, 0.03, 0.03], // the heel rises behind
+    [0.4, 0.2, 0.44, 0.0, 0.08], // tucked up under the hips
+    [0.65, -0.15, 0.36, -0.04, 0.03], // the knee drives through, the foot following
+    [0.84, -0.28, 0.24, -0.02, 0.0], // reach...
+  ],
+  // Arms swing with the opposite leg's phase.
+  arm: {
+    // a compact swing (the bent elbow carries the hand up and through)
+    swing: [0.16, 0.5, 0.58, 0.36, -0.1, -0.44, -0.54, -0.32],
+    abd: [0.44, 0.38, 0.37, 0.41, 0.45, 0.49, 0.5, 0.48], // held out clear of the puffer
+    elbow: [1.35, 1.65, 1.78, 1.6, 1.25, 1.0, 0.95, 1.1],
+    amp: [0.88, 0.22], // swing amplitude: at the start pace + extra at full tilt
+  },
+  // the body over the legs: [base, per unit of pace] lean of the spine
+  lean: [0.17, 0.12],
+  hipYaw: 0.2,
+  hipRoll: 0.07,
+  spTwist: 0.17,
+  chTwist: 0.13,
 };
 
-// Proportions come with the generated rig (see configure()).
-let HIP_Y, HIP_JOINT, THIGH, SHIN, UPPER_ARM, FOREARM;
-let ANKLE_H, TOE_D, TOE_F; // ankle height over the ground; ball of the foot below and ahead of it
-
-function configure() {
-  configureRig();
-  HIP_Y = RIG.hipY;
-  HIP_JOINT = { x: RIG.hipJoint[0], y: RIG.hipJoint[1] };
-  THIGH = RIG.thigh;
-  SHIN = RIG.shin;
-  UPPER_ARM = RIG.upperArm;
-  FOREARM = RIG.forearm;
-  ANKLE_H = HIP_JOINT.y - THIGH - SHIN;
-  TOE_D = RIG.toe[0];
-  TOE_F = RIG.toe[1];
-}
+// How a character handles: the lanes' spring (1/s; see update), how far they
+// lean and turn into a lane change, and their jump (apex height, airtime).
+export const FEEL = {
+  laneSpring: CONFIG.laneSpring,
+  lean: [0.035, 0.4], // roll per m/s of sideways speed, limit
+  turn: [0.025, 0.35], // yaw per m/s, limit
+  jump: CONFIG.jump,
+};
 
 const wrapAngle = (a) => a - TAU * Math.floor((a + Math.PI) / TAU);
 
-const G = (8 * CONFIG.jump.height) / (CONFIG.jump.time * CONFIG.jump.time);
-const V0 = (4 * CONFIG.jump.height) / CONFIG.jump.time;
-
 // Catmull-Rom through a cyclic list of keys, sampled at phase p (radians).
-function cyc(keys, p) {
+export function cyc(keys, p) {
   const n = keys.length;
   let u = (p / TAU) * n;
   u = ((u % n) + n) % n;
@@ -149,9 +148,6 @@ function hermite(ts, vs, m0, m1, t) {
   return (2 * u3 - 3 * u2 + 1) * vs[i] + (u3 - 2 * u2 + u) * a + (-2 * u3 + 3 * u2) * vs[i + 1] + (u3 - u2) * b;
 }
 
-const _st = new Float64Array(SWING.length + 2);
-const _sz = new Float64Array(SWING.length + 2);
-const _sy = new Float64Array(SWING.length + 2);
 const _hips = new THREE.Matrix4();
 const _hipsInv = new THREE.Matrix4();
 const _eul = new THREE.Euler();
@@ -162,48 +158,40 @@ const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
-const _q2 = new THREE.Quaternion();
 const _m = new THREE.Matrix4();
-const DOWN = new THREE.Vector3(0, -1, 0);
-
-// Curvature of the cloth through particle o between its neighbours a and b,
-// along the normal there (1/m; > 0 bending toward the outside).
-function curve(P, N, o, a, b) {
-  const lx = P[a] + P[b] - 2 * P[o], ly = P[a + 1] + P[b + 1] - 2 * P[o + 1], lz = P[a + 2] + P[b + 2] - 2 * P[o + 2];
-  const dx = P[b] - P[a], dy = P[b + 1] - P[a + 1], dz = P[b + 2] - P[a + 2];
-  return (4 * (lx * N[o] + ly * N[o + 1] + lz * N[o + 2])) / Math.max(1e-6, dx * dx + dy * dy + dz * dz);
-}
-const UP = new THREE.Vector3(0, 1, 0);
 
 // A spring kicked by a change of velocity (an impulse, so it hits as hard at
 // any frame rate), and a soft saturation of its output.
 const kick = (spr, c, d, live) => (spr.v += c * d * live);
 const soft = (x, m) => m * Math.tanh(x / m);
 
+const merge = (base, over) => {
+  const out = { ...base };
+  for (const k in over || {}) {
+    const v = over[k];
+    out[k] = v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object' ? merge(base[k], v) : v;
+  }
+  return out;
+};
+
 export class Player {
-  constructor(envDef) {
-    configure();
+  // envDef: the world env the runner is first lit by; asset: their sculpted
+  // mesh and rig (runner-asset.js); kit: { gait, feel } laid over GAIT, FEEL.
+  constructor(envDef, asset, kit = {}) {
+    this.asset = asset;
+    this.rig = asset.meta.rig;
+    this.gait = merge(GAIT, kit.gait);
+    this.feel = merge(FEEL, kit.feel);
+    // the swing path's keys, with the toe-off and touchdown at either end
+    this.swingT = new Float64Array(this.gait.swing.length + 2);
+    this.swingZ = new Float64Array(this.gait.swing.length + 2);
+    this.swingY = new Float64Array(this.gait.swing.length + 2);
+    this.configure();
     this.u = makeEnvUniforms(envDef);
-    const rig = [
-      new THREE.Vector4(RIG.sockY, RIG.bootX, RIG.cuffU, RIG.shortsHem),
-      new THREE.Vector4(RIG.bootCollar[0], RIG.bootCollar[1], RIG.soleH, 0),
-    ];
-    // the cape's particles, as the shader reads them (runner space)
-    this.capeData = new Float32Array(CAPE.cols * CAPE.rows * 4);
-    this.capeTex = new THREE.DataTexture(this.capeData, CAPE.cols, CAPE.rows, THREE.RGBAFormat, THREE.FloatType);
-    this.capeTex.magFilter = this.capeTex.minFilter = THREE.NearestFilter;
-    this.capeTex.needsUpdate = true;
-    const grid = new THREE.Vector4(CAPE.cols, CAPE.rows, CAPE.thick / 2, 0);
-    const mats = makeCharacterMaterials(this.u, palette(), rig, 0.0105, { texture: this.capeTex, grid });
-    this.mat = mats.mat;
-    this.inkMat = mats.ink;
-    this.capeMat = mats.capeMat;
-    this.capeInkMat = mats.capeInk;
     this.root = new THREE.Group();
     this.root.name = 'player';
     this.buildSkeleton();
-    this.buildBody();
-    this.buildCape();
+    this.buildLook();
     this.buildShadow();
     this.buildSim();
 
@@ -232,10 +220,36 @@ export class Player {
     this.poseP = new THREE.Vector3();
     this.poseV = new THREE.Vector3();
     this.breeze = new THREE.Vector3();
-    this.hairBones = RIG.hair.map((h) => ({ name: h.name, dir: new THREE.Vector3(...h.dir) }));
+    // locks of hair on springs: [name, unit direction from the head, and
+    // optionally how they swing: stiffness (Hz), damping, how far the air
+    // and the head's motion push them, how far they may turn]
+    this.hairBones = this.rig.hair.map((h) => ({
+      name: h.name,
+      dir: new THREE.Vector3(...h.dir),
+      f: h.f ?? 3.1,
+      z: h.z ?? 0.18,
+      k: h.k ?? 1,
+      lim: h.lim ?? 0.45,
+    }));
     this.hair = this.hairBones.map(() => ({ x: new Spring(), y: new Spring(), z: new Spring() }));
-    this.lid = new Spring();
     this.reset();
+  }
+
+  // Proportions that come with the generated rig.
+  configure() {
+    const R = this.rig;
+    this.HIP_Y = R.hipY;
+    this.HIP_JOINT = { x: R.hipJoint[0], y: R.hipJoint[1] };
+    this.THIGH = R.thigh;
+    this.SHIN = R.shin;
+    this.UPPER_ARM = R.upperArm;
+    this.FOREARM = R.forearm;
+    this.ANKLE_H = this.HIP_JOINT.y - this.THIGH - this.SHIN; // ankle height over the ground
+    this.TOE_D = R.toe[0]; // ball of the foot below...
+    this.TOE_F = R.toe[1]; // ...and ahead of the ankle
+    const J = this.feel.jump;
+    this.G = (8 * J.height) / (J.time * J.time);
+    this.V0 = (4 * J.height) / J.time;
   }
 
   // --- skeleton -----------------------------------------------------------------
@@ -253,7 +267,7 @@ export class Player {
     };
     // the sculpted body's skeleton, bound as it was modelled (arms a little
     // out); the poses set absolute rotations, so the bind angles never show
-    for (const d of runner().meta.bones) {
+    for (const d of this.asset.meta.bones) {
       const b = new THREE.Bone();
       // (yaw outermost: the thighs turn against the pelvis so a planted foot
       // keeps pointing down the track; the collarbones roll forward and back
@@ -276,8 +290,9 @@ export class Player {
   }
 
   // --- the model ------------------------------------------------------------------
+  // (a character's buildLook makes this.mat / this.inkMat and calls this)
   buildBody() {
-    const geo = bodyGeometry();
+    const geo = bodyGeometry(this.asset);
     this.mesh = new THREE.SkinnedMesh(geo, this.mat);
     this.inkMesh = new THREE.SkinnedMesh(geo, this.inkMat);
     for (const m of [this.mesh, this.inkMesh]) {
@@ -290,21 +305,8 @@ export class Player {
     this.inkMesh.bind(this.skeleton, this.mesh.bindMatrix);
     this.boneInv = {};
     this.bones.forEach((b, i) => (this.boneInv[b.name] = this.skeleton.boneInverses[i]));
-  }
-
-  // The cape: its rest drape settles onto the body as bound, then the render
-  // mesh is laid out over that.
-  buildCape() {
-    this.capeDefs = capeColliders(this.bindPos);
-    this.capeRest = capeBind(this.capeDefs);
-    const geo = capeGeometry(this.capeRest);
-    this.capeMesh = new THREE.Mesh(geo, this.capeMat);
-    this.capeInk = new THREE.Mesh(geo, this.capeInkMat);
-    for (const m of [this.capeMesh, this.capeInk]) {
-      m.frustumCulled = false;
-      m.renderOrder = -20;
-      this.root.add(m);
-    }
+    // a bone's skinning matrix (current pose * inverse bind), in root space
+    this.boneM = (bone) => _m.multiplyMatrices(this.b[bone].matrixWorld, this.boneInv[bone]);
   }
 
   buildShadow() {
@@ -323,31 +325,8 @@ export class Player {
   }
 
   // --- secondary-motion state ------------------------------------------------------
+  // (a character's buildSim adds its own, then calls this)
   buildSim() {
-    // the cape: row 0 sewn under the collar; the rows over the shoulders and
-    // under the hood leashed to where the chest would carry them, tightly at
-    // first and looser by the shoulder blades; free from there down
-    const { cols, rows } = CAPE;
-    this.cloth = new Cloth(cols, rows, this.capeRest);
-    let s = 0;
-    for (let j = 1; j < rows; j++) {
-      const a = ((j - 1) * cols + (cols >> 1)) * 3, b = (j * cols + (cols >> 1)) * 3;
-      s += Math.hypot(this.capeRest[a] - this.capeRest[b], this.capeRest[a + 1] - this.capeRest[b + 1], this.capeRest[a + 2] - this.capeRest[b + 2]);
-      this.cloth.leash[j] = s < 0.3 ? 0.003 + 3 * Math.max(0, s - 0.08) ** 2 : Infinity;
-    }
-    this.cloth.setColliderCount(this.capeDefs.length);
-    this.capeFold = new Float32Array(cols * rows);
-    this.capeM = (bone) => _m.multiplyMatrices(this.b[bone].matrixWorld, this.boneInv[bone]);
-    this.wind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.2, draw: 0.7, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.4, floor: 0, lift: 0.1, t: 0 };
-
-    this.pouchSim = {
-      local: new THREE.Vector3(...RIG.pouch).sub(this.bindPos.hips),
-      len: 0.05,
-      p: new THREE.Vector3(),
-      q: new THREE.Vector3(),
-      vy: 0,
-    };
-    this.anchor = new THREE.Vector3();
     this.frameVel = new THREE.Vector3();
     this.frameAcc = new THREE.Vector3();
     this.gravity = new THREE.Vector3();
@@ -357,21 +336,13 @@ export class Player {
     this.headPos = new THREE.Vector3();
     this.headVel = new THREE.Vector3();
     this.headAcc = new THREE.Vector3();
-    this.hipsInv = new THREE.Matrix4();
-    this.chestM = new THREE.Matrix4();
-    this.chestPrev = new THREE.Vector3();
   }
 
   resetSim() {
-    const ps = this.pouchSim;
-    ps.p.set(RIG.pouch[0] - 0.01, RIG.pouch[1] - ps.len, RIG.pouch[2]);
-    ps.q.copy(ps.p);
-    ps.vy = 0;
     this.frameVel.set(0, 0, 0);
     this.frameAcc.set(0, 0, 0);
     this.headVel.set(0, 0, 0);
     this.headAcc.set(0, 0, 0);
-    this.cloth.collidersMoved = false;
     this.simReady = false;
   }
 
@@ -413,7 +384,6 @@ export class Player {
       h.y.reset();
       h.z.reset();
     }
-    this.lid.reset();
     this.root.visible = true;
     this.resetSim();
   }
@@ -433,6 +403,7 @@ export class Player {
       if (next !== this.lane) {
         this.prevLane = this.lane;
         this.lane = next;
+        this.onDodge(a === 'left' ? -1 : 1);
       }
     } else if (a === 'up') {
       if (this.grounded) this.jump();
@@ -444,12 +415,18 @@ export class Player {
         this.vy = Math.min(this.vy, -CONFIG.fastFall);
         this.slideQueued = true;
         this.jumpBuffer = 0;
+        this.onFastFall();
       }
     }
   }
 
+  // hooks for a character's flourishes
+  onDodge() {}
+  onFastFall() {}
+  onLand() {}
+
   jump() {
-    this.vy = V0;
+    this.vy = this.V0;
     this.grounded = false;
     this.slideT = 0;
     this.slideQueued = false;
@@ -502,6 +479,13 @@ export class Player {
     this.prevLane = this.lane;
   }
 
+  // In the air: (exact for constant gravity: the same arc and airtime at any
+  // frame rate). A character may shape their own arc (see Explorer).
+  fall(dt) {
+    this.y += this.vy * dt - 0.5 * this.G * dt * dt;
+    this.vy -= this.G * dt;
+  }
+
   update(dt, speed, groundAt) {
     this.time += dt;
     this.speed = speed;
@@ -514,7 +498,7 @@ export class Player {
     if (this.crashed) {
       this.vx = 0;
     } else {
-      const w = CONFIG.laneSpring;
+      const w = this.feel.laneSpring;
       const e = Math.exp(-w * dt);
       const d = this.x - tx;
       const j = (this.vx + w * d) * dt;
@@ -528,15 +512,14 @@ export class Player {
     if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
     if (!this.grounded) {
       const prevY = this.y;
-      // (exact for constant gravity: the same arc and airtime at any frame rate)
-      this.y += this.vy * dt - 0.5 * G * dt * dt;
-      this.vy -= G * dt;
+      this.fall(dt);
       // land only when arriving from above; running into a ledge is a hit, not a mantle
       if (this.y <= ground && this.vy <= 0 && prevY >= ground - 0.3) {
         this.y = ground;
         this.vy = 0;
         this.grounded = true;
         this.landT = 1;
+        this.onLand();
         if (this.crashed) {
           // stay down
         } else if (this.jumpBuffer > 0) {
@@ -573,7 +556,7 @@ export class Player {
   animate(dt, speed) {
     const sp = clamp((speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start), 0, 1);
     const running = this.mode === 'run' && speed > 0.5;
-    const freq = running ? 1.5 + speed * 0.055 : 0;
+    const freq = running ? this.gait.cadence[0] + speed * this.gait.cadence[1] : 0;
     this.stride = freq;
     this.phase += dt * TAU * freq;
     const f = this.phase;
@@ -588,13 +571,14 @@ export class Player {
     // weights ease in and out (second order, no overshoot) rather than
     // snapping toward their targets
     const W = this.wS;
-    this.w.run = Math.max(0, W.run.step(tRun, 4.2, 0.9, dt));
-    this.w.jump = Math.max(0, W.jump.step(tJump, 5, 0.85, dt));
-    this.w.slide = Math.max(0, W.slide.step(tSlide, 5.5, 0.85, dt));
+    const B = this.feel.blend || [4.2, 5, 5.5];
+    this.w.run = Math.max(0, W.run.step(tRun, B[0], 0.9, dt));
+    this.w.jump = Math.max(0, W.jump.step(tJump, B[1], 0.85, dt));
+    this.w.slide = Math.max(0, W.slide.step(tSlide, B[2], 0.85, dt));
     this.w.idle = Math.max(0, W.idle.step(tIdle, 1.1, 1, dt));
 
     this.poseRun(this.pRun, f, sp);
-    this.poseJump(this.pJump);
+    this.poseJump(this.pJump, t);
     this.poseSlide(this.pSlide, t);
     this.poseIdle(this.pIdle, t);
 
@@ -606,31 +590,13 @@ export class Player {
 
     // landing: fold, squash, arms drop
     const land = this.springs.land.step(this.landT * this.landT, 5.5, 0.32, dt);
-    Pz[C.hipY] -= 0.1 * land;
-    Pz[C.knL] += 0.5 * land;
-    Pz[C.knR] += 0.5 * land;
-    Pz[C.thLx] += 0.25 * land;
-    Pz[C.thRx] += 0.25 * land;
-    Pz[C.anL] += 0.25 * land;
-    Pz[C.anR] += 0.25 * land;
-    Pz[C.spLean] += 0.22 * land;
-    Pz[C.elL] -= 0.4 * land;
-    Pz[C.elR] -= 0.4 * land;
-    Pz[C.shLz] += 0.25 * land;
-    Pz[C.shRz] += 0.25 * land;
-    Pz[C.sq] -= 0.07 * land;
+    this.landOverlay(Pz, land);
     // take-off stretch
     if (this.jumpT < 0.25) Pz[C.sq] += 0.06 * Math.sin((this.jumpT / 0.25) * Math.PI);
 
     // lane changes: lean in, look where you're going, fling the outside arm
     const lc = this.springs.lane.step(clamp(this.vx / 9, -1, 1), 3.2, 0.55, dt);
-    Pz[C.hdYaw] -= 0.4 * lc;
-    Pz[C.spSide] -= 0.12 * lc;
-    Pz[C.chTwist] -= 0.12 * lc;
-    Pz[C.shLz] += 0.55 * Math.max(0, lc);
-    Pz[C.shRz] += 0.55 * Math.max(0, -lc);
-    Pz[C.elL] -= 0.4 * Math.max(0, lc);
-    Pz[C.elR] -= 0.4 * Math.max(0, -lc);
+    this.laneOverlay(Pz, lc, dt);
 
     // stumble overlay: pitch forward, arms windmill
     let roll = 0;
@@ -653,13 +619,14 @@ export class Player {
     let cw = 0;
     if (this.crashed) cw = Math.min(1, this.crashT / 0.45);
     else if (this.reviveT > 0) cw = Math.min(1, this.reviveT / 0.9);
+    this.crashW = cw;
     if (cw > 0) {
       const e = cw * cw * (3 - 2 * cw);
       const fl = this.crashed ? Math.exp(-this.crashT * 3) : 0;
       c.set(Pz);
       c[C.bodyPitch] = 1.42;
       c[C.bodyZ] = 0.55;
-      c[C.hipY] = HIP_Y;
+      c[C.hipY] = this.HIP_Y;
       c[C.hipPitch] = 0;
       c[C.spLean] = -0.1;
       c[C.chLean] = 0;
@@ -690,7 +657,7 @@ export class Player {
     // an impulse, so a sudden lane change or a landing hits exactly as hard at
     // any frame rate — and then rings out; the outputs saturate softly.)
     // (The stride's own bounce kicks harder than the root's jumps and lane
-    // changes, so every footfall shows without a jump folding him in half.)
+    // changes, so every footfall shows without a jump folding them in half.)
     this.pelvisDV(dt, Pz);
     const dv = this.pelvisD, dp = this.pelvisDP;
     const D = this.dyn;
@@ -747,17 +714,48 @@ export class Player {
     Pz[C.wrRz] += 0.6 * (S.abR.step(Pz[C.shRz], 3, 0.45, dt) - Pz[C.shRz]);
 
     this.applyPose(Pz, roll);
+    this.afterPose(dt, cw);
 
     // lean into lane changes
-    const lean = clamp(-this.vx * 0.035, -0.4, 0.4);
+    const L = this.feel.lean, T = this.feel.turn;
+    const lean = clamp(-this.vx * L[0], -L[1], L[1]);
     this.root.rotation.z = D.rootRoll.step(this.crashed ? 0 : lean, 2.4, 0.45, dt);
-    this.root.rotation.y = D.rootYaw.step(this.crashed ? 0 : clamp(-this.vx * 0.025, -0.35, 0.35), 2.8, 0.5, dt);
+    this.root.rotation.y = D.rootYaw.step(this.crashed ? 0 : clamp(-this.vx * T[0], -T[1], T[1]), 2.8, 0.5, dt);
 
     this.secondary(dt, sp);
 
     // invulnerability blink
     this.root.visible = this.invulnT > 0 && !this.crashed ? Math.floor(this.invulnT * 12) % 2 === 0 : true;
   }
+
+  landOverlay(Pz, land) {
+    Pz[C.hipY] -= 0.1 * land;
+    Pz[C.knL] += 0.5 * land;
+    Pz[C.knR] += 0.5 * land;
+    Pz[C.thLx] += 0.25 * land;
+    Pz[C.thRx] += 0.25 * land;
+    Pz[C.anL] += 0.25 * land;
+    Pz[C.anR] += 0.25 * land;
+    Pz[C.spLean] += 0.22 * land;
+    Pz[C.elL] -= 0.4 * land;
+    Pz[C.elR] -= 0.4 * land;
+    Pz[C.shLz] += 0.25 * land;
+    Pz[C.shRz] += 0.25 * land;
+    Pz[C.sq] -= 0.07 * land;
+  }
+
+  laneOverlay(Pz, lc) {
+    Pz[C.hdYaw] -= 0.4 * lc;
+    Pz[C.spSide] -= 0.12 * lc;
+    Pz[C.chTwist] -= 0.12 * lc;
+    Pz[C.shLz] += 0.55 * Math.max(0, lc);
+    Pz[C.shRz] += 0.55 * Math.max(0, -lc);
+    Pz[C.elL] -= 0.4 * Math.max(0, lc);
+    Pz[C.elR] -= 0.4 * Math.max(0, -lc);
+  }
+
+  // After the pose is on the bones, before the secondary motion reads them.
+  afterPose() {}
 
   // The pelvis's change of velocity this frame in the runner's frame (x
   // right, y up, z back), split into the root's own motion (pelvisD) and the
@@ -792,24 +790,25 @@ export class Player {
   }
 
   poseRun(r, f, sp) {
+    const G = this.gait;
     const s = Math.sin(f);
     // slow wander so no two strides are quite the same
     const wander = 0.5 * Math.sin(f * 0.31 + 1.3) + 0.5 * Math.sin(f * 0.19);
-    const armAmp = (0.88 + 0.22 * sp) * (1 + 0.08 * wander);
+    const armAmp = (G.arm.amp[0] + G.arm.amp[1] * sp) * (1 + 0.08 * wander);
     // the pelvis bounces like a ball: a quick dip into each contact, a
     // rounded float through the flight; and it carries the weight across
     // onto each planted foot
     const bob = 0.4 * (0.5 - 0.5 * Math.cos(2 * f)) + 0.6 * Math.pow(Math.abs(Math.sin(f)), 0.8);
-    r[C.hipY] = STRIDE.hipY + STRIDE.bob * (0.9 + 0.2 * sp) * bob;
+    r[C.hipY] = G.stride.hipY + G.stride.bob * (0.9 + 0.2 * sp) * bob;
     r[C.hipX] = 0.02 * Math.sin(f - 1.4);
-    r[C.hipYaw] = -0.2 * Math.sin(f - 0.5);
-    r[C.hipRoll] = 0.07 * Math.cos(f + 0.3);
+    r[C.hipYaw] = -G.hipYaw * Math.sin(f - 0.5);
+    r[C.hipRoll] = G.hipRoll * Math.cos(f + 0.3);
     r[C.hipPitch] = 0.06;
-    r[C.spLean] = 0.17 + 0.12 * sp + 0.035 * Math.cos(2 * f - 1.0);
-    r[C.spTwist] = 0.17 * s;
+    r[C.spLean] = G.lean[0] + G.lean[1] * sp + 0.035 * Math.cos(2 * f - 1.0);
+    r[C.spTwist] = G.spTwist * s;
     r[C.spSide] = -0.6 * r[C.hipRoll];
     r[C.chLean] = 0.05;
-    r[C.chTwist] = 0.13 * s;
+    r[C.chTwist] = G.chTwist * s;
     r[C.chSide] = -0.2 * r[C.hipRoll];
     r[C.hdPitch] = r[C.hipPitch] + r[C.spLean] + r[C.chLean] - 0.22;
     r[C.hdYaw] = -0.7 * (r[C.hipYaw] + r[C.spTwist] + r[C.chTwist]);
@@ -818,10 +817,10 @@ export class Player {
       const ch = ARM_CH[side];
       const sh = ch[0], sy = ch[1], sz = ch[2], el = ch[3], cl = ch[4], wr = ch[5], wz = ch[6];
       const q = f + side * Math.PI + Math.PI; // arm follows the opposite leg
-      r[sh] = cyc(ARM.swing, q) * armAmp + 0.06;
-      r[sz] = cyc(ARM.abd, q) + 0.04;
+      r[sh] = cyc(G.arm.swing, q) * armAmp + 0.06;
+      r[sz] = cyc(G.arm.abd, q) + 0.04;
       r[sy] = 0.1 * Math.sin(q);
-      r[el] = cyc(ARM.elbow, q - 0.25);
+      r[el] = cyc(G.arm.elbow, q - 0.25);
       r[cl] = 0;
       r[wr] = 0.18;
       r[wz] = 0.05;
@@ -842,6 +841,7 @@ export class Player {
   // Idle feet: planted a little apart, the free foot's heel lifting as the
   // weight leaves it.
   plantIdle(r, ws) {
+    const { ANKLE_H, TOE_D, TOE_F } = this;
     _eul.set(-r[C.hipPitch], r[C.hipYaw], r[C.hipRoll]);
     _hips.compose(_v3.set(r[C.hipX], r[C.hipY], 0), _qh.setFromEuler(_eul), _one);
     _hipsInv.copy(_hips).invert();
@@ -857,13 +857,15 @@ export class Player {
     }
   }
 
-  // Place both feet for run phase f (see STRIDE) and solve the legs.
+  // Place both feet for run phase f (see GAIT) and solve the legs.
   runLegs(r, f, sp) {
+    const { ANKLE_H, TOE_D, TOE_F } = this;
+    const ST = this.gait.stride, SW = this.gait.swing;
     const v = Math.max(this.speed, 0);
     const freq = this.stride;
-    const duty = freq > 0 ? clamp((STRIDE.reach * freq) / Math.max(v, 1e-3), STRIDE.minContact * freq, STRIDE.maxDuty) : STRIDE.maxDuty;
-    const span = freq > 0 ? Math.min(STRIDE.reach, (v * duty) / freq) : 0;
-    const zTD = STRIDE.ballZ - span / 2;
+    const duty = freq > 0 ? clamp((ST.reach * freq) / Math.max(v, 1e-3), ST.minContact * freq, ST.maxDuty) : ST.maxDuty;
+    const span = freq > 0 ? Math.min(ST.reach, (v * duty) / freq) : 0;
+    const zTD = ST.ballZ - span / 2;
     const ballH = ANKLE_H - TOE_D;
     // this pose's hips, to bring the targets into hip space
     _eul.set(-r[C.hipPitch], r[C.hipYaw], r[C.hipRoll]);
@@ -879,26 +881,27 @@ export class Player {
       let ax, ay, az, pitch, toe;
       if (u < duty) {
         const c = u / duty;
-        const lift = STRIDE.heelLift * Math.pow(smooth(0.3, 1, c), 1.3);
+        const lift = ST.heelLift * Math.pow(smooth(0.3, 1, c), 1.3);
         const bz = zTD + span * c;
         // the ankle swings up over the planted ball as the heel lifts
         ay = ballH + TOE_D * Math.cos(lift) + TOE_F * Math.sin(lift);
         az = bz + TOE_F * Math.cos(lift) - TOE_D * Math.sin(lift);
-        ax = sx * STRIDE.trackX;
+        ax = sx * ST.trackX;
         pitch = -lift;
         toe = lift;
         this.solveLeg(r, side, sx, ax, ay, az, pitch, hipTilt, null);
       } else {
         const c = (u - duty) / (1 - duty);
-        const lift = STRIDE.heelLift;
+        const lift = ST.heelLift;
         const toY = ballH + TOE_D * Math.cos(lift) + TOE_F * Math.sin(lift);
         const toZ = zTD + span + TOE_F * Math.cos(lift) - TOE_D * Math.sin(lift);
-        const n = SWING.length;
+        const n = SW.length;
+        const _st = this.swingT, _sz = this.swingZ, _sy = this.swingY;
         _st[0] = 0;
         _sz[0] = toZ;
         _sy[0] = toY;
         for (let k = 0; k < n; k++) {
-          const K = SWING[k];
+          const K = SW[k];
           _st[k + 1] = K[0];
           _sz[k + 1] = K[1] + K[3] * sp;
           _sy[k + 1] = K[2] + K[4] * sp;
@@ -910,7 +913,7 @@ export class Player {
         // steeply, pawing back toward the ground's own motion
         az = hermite(_st, _sz, 0.6, 1.2, c);
         ay = hermite(_st, _sy, 1.2, -1.4, c);
-        ax = sx * (STRIDE.trackX + (STRIDE.swingX - STRIDE.trackX) * Math.sin(Math.PI * c));
+        ax = sx * (ST.trackX + (ST.swingX - ST.trackX) * Math.sin(Math.PI * c));
         // the foot trails off the toe, hangs from the shin, then levels out,
         // toe up, to meet the ground
         toe = lift * (1 - smooth(0, 0.3, c));
@@ -924,12 +927,14 @@ export class Player {
   // splay puts the knee's plane through the target; the knee bends forward.
   // c = null: planted, the foot held at pitch; else the swing's progress.
   solveLeg(r, side, sx, ax, ay, az, pitch, hipTilt, c) {
+    const { HIP_JOINT, HIP_Y, THIGH, SHIN } = this;
+    const ST = this.gait.stride;
     const d = _v.set(ax, ay, az).applyMatrix4(_hipsInv);
     d.x -= sx * HIP_JOINT.x;
     d.y -= HIP_JOINT.y - HIP_Y;
     // turn the leg against the pelvis's swing (plus a touch of toe-out), then
     // solve in the leg's own frame
-    const yaw = -r[C.hipYaw] - sx * STRIDE.toeOut;
+    const yaw = -r[C.hipYaw] - sx * ST.toeOut;
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
     d.set(d.x * cy - d.z * sy, d.y, d.x * sy + d.z * cy);
     const reach = THIGH + SHIN;
@@ -947,7 +952,7 @@ export class Player {
     let pt = pitch;
     if (c !== null) {
       const hang = shin - 0.3;
-      pt = -STRIDE.heelLift + (hang + STRIDE.heelLift) * smooth(0, 0.3, c);
+      pt = -ST.heelLift + (hang + ST.heelLift) * smooth(0, 0.3, c);
       pt += (0.16 * (1 - smooth(0.9, 1, c)) - pt) * smooth(0.6, 0.94, c);
     }
     if (side === 0) {
@@ -965,103 +970,6 @@ export class Player {
     }
   }
 
-  // Leap on the way up (lead leg alternates), reaching for the ground on the
-  // way down with arms out like wings.
-  poseJump(j) {
-    const fall = smooth(0, 1, -this.vy / V0 + 0.35);
-    const m = (a, b) => a + (b - a) * fall;
-    j[C.hipY] = HIP_Y;
-    j[C.hipX] = 0;
-    j[C.hipYaw] = m(-0.15, 0);
-    j[C.hipRoll] = 0;
-    j[C.hipPitch] = m(0.02, 0.06);
-    j[C.spLean] = m(0.1, 0.16);
-    j[C.spTwist] = m(0.16, 0);
-    j[C.spSide] = 0;
-    j[C.chLean] = m(-0.1, 0.02);
-    j[C.chTwist] = m(0.1, 0);
-    j[C.chSide] = 0;
-    j[C.hdPitch] = m(0.12, 0.1);
-    j[C.hdYaw] = m(-0.08, 0);
-    j[C.hdRoll] = 0;
-    j[C.thLx] = m(1.2, 0.78);
-    j[C.knL] = m(1.45, 0.8);
-    j[C.anL] = m(0.3, 0.25);
-    j[C.toL] = 0;
-    j[C.thRx] = m(-0.45, 0.4);
-    j[C.knR] = m(1.15, 1.05);
-    j[C.anR] = m(-0.6, 0.12);
-    j[C.toR] = m(0.35, 0);
-    j[C.thLz] = m(0.05, 0.1);
-    j[C.thRz] = m(0.05, 0.12);
-    j[C.shLx] = m(-0.55, 0.35);
-    j[C.shLz] = m(0.6, 0.85);
-    j[C.shLy] = 0;
-    j[C.elL] = m(0.55, 0.45);
-    j[C.shRx] = m(1.55, 0.25);
-    j[C.shRz] = m(0.28, 0.9);
-    j[C.shRy] = 0;
-    j[C.elR] = m(0.75, 0.5);
-    j[C.clL] = m(0, 0.1);
-    j[C.clR] = m(0.12, 0.1);
-    j[C.wrL] = 0.15;
-    j[C.wrR] = 0.15;
-    j[C.wrLz] = 0;
-    j[C.wrRz] = 0;
-    j[C.bodyPitch] = 0;
-    j[C.bodyZ] = 0;
-    j[C.bodyRoll] = 0;
-    j[C.sq] = 1;
-    if (this.jumpSide < 0) mirror(j);
-  }
-
-  // Feet-first slide, leaning back, one hand trailing on the floor.
-  poseSlide(s, t) {
-    s[C.hipY] = 0.3;
-    s[C.hipX] = 0;
-    s[C.hipYaw] = 0.14;
-    s[C.hipRoll] = 0.08;
-    s[C.hipPitch] = -0.2;
-    s[C.spLean] = -0.72 + Math.sin(t * 9) * 0.02;
-    s[C.spTwist] = -0.12;
-    s[C.spSide] = -0.06;
-    s[C.chLean] = -0.12;
-    s[C.chTwist] = -0.06;
-    s[C.chSide] = 0;
-    s[C.hdPitch] = -0.85;
-    s[C.hdYaw] = -0.05;
-    s[C.hdRoll] = 0;
-    s[C.thLx] = 1.3;
-    s[C.knL] = 0.12;
-    s[C.anL] = 0.45;
-    s[C.toL] = 0;
-    s[C.thRx] = 0.85;
-    s[C.knR] = 1.75;
-    s[C.anR] = 0.1;
-    s[C.toR] = 0;
-    s[C.thLz] = 0.06;
-    s[C.thRz] = 0.38;
-    s[C.shLx] = -0.7;
-    s[C.shLz] = 0.62;
-    s[C.shLy] = 0;
-    s[C.elL] = 0.15;
-    s[C.shRx] = 1.0;
-    s[C.shRz] = 0.75;
-    s[C.shRy] = 0;
-    s[C.elR] = 0.8;
-    s[C.clL] = 0;
-    s[C.clR] = 0.12;
-    s[C.wrL] = -0.4;
-    s[C.wrR] = 0.2;
-    s[C.wrLz] = 0;
-    s[C.wrRz] = 0;
-    s[C.bodyPitch] = 0;
-    s[C.bodyZ] = 0;
-    s[C.bodyRoll] = 0;
-    s[C.sq] = 1;
-    if (this.slideSide < 0) mirror(s);
-  }
-
   // Title screen: breathing, settling onto one leg and then the other (the
   // weight eases across and rests a while; the free hip drops, its knee
   // softens and its heel peels up), looking around. The feet stay planted.
@@ -1069,7 +977,7 @@ export class Player {
     const br = Math.sin(t * 2.0);
     const raw = Math.sin(t * 0.42 + 0.6 * Math.sin(t * 0.17));
     const ws = Math.tanh(2.6 * raw) / Math.tanh(2.6); // -1 on the left leg .. 1 on the right
-    id[C.hipY] = HIP_Y - 0.016 + br * 0.004 - Math.abs(ws) * 0.008;
+    id[C.hipY] = this.HIP_Y - 0.016 + br * 0.004 - Math.abs(ws) * 0.008;
     id[C.hipX] = ws * 0.045;
     id[C.hipYaw] = 0.06 * Math.sin(t * 0.37) - 0.04 * ws;
     id[C.hipRoll] = ws * 0.075;
@@ -1103,13 +1011,14 @@ export class Player {
     id[C.bodyZ] = 0;
     id[C.bodyRoll] = 0;
     id[C.sq] = 1;
+    return ws;
   }
 
   applyPose(Pz, roll) {
     const b = this.b;
     const sq = Pz[C.sq];
     b.body.rotation.set(Pz[C.bodyPitch], 0, roll + Pz[C.bodyRoll]);
-    b.body.position.z = Pz[C.bodyZ];
+    b.body.position.set(0, 0, Pz[C.bodyZ]);
     const xs = 1 / Math.sqrt(Math.max(0.5, sq));
     b.body.scale.set(xs, sq, xs);
     b.hips.position.set(Pz[C.hipX], Pz[C.hipY], 0);
@@ -1136,7 +1045,7 @@ export class Player {
     b.toeR.rotation.x = Pz[C.toR];
   }
 
-  // --- secondary motion: curls, pouch, cape ---------------------------------------
+  // --- secondary motion -------------------------------------------------------------
   secondary(dt, sp) {
     if (dt <= 0) return;
     // Bone transforms in root space (the renderer recomputes true world
@@ -1145,7 +1054,7 @@ export class Player {
     this.body.updateWorldMatrix(false, true);
 
     // Motion of the root through the world -> inertial acceleration, and the
-    // air streaming past (plus a gusty breeze so he's never quite still).
+    // air streaming past (plus a gusty breeze so they're never quite still).
     const t = this.time;
     // (the acceleration is taken from a smoothed velocity, so a sudden change
     // — a take-off, the start of a lane change — reaches the cloth as a short
@@ -1158,8 +1067,8 @@ export class Player {
     this.invQ.copy(this.root.quaternion).invert();
     this.gravity.set(0, -9.8, 0).applyQuaternion(this.invQ);
     // A soft breeze: slow swells from a wandering direction, now and then a
-    // gust. It is what moves him when he stands still, and it keeps working
-    // on the cloth on top of the headwind while he runs.
+    // gust. It is what moves them when they stand still, and it keeps working
+    // on the cloth on top of the headwind while they run.
     const swell = 0.5 + 0.5 * Math.sin(t * 0.23 + 2 * Math.sin(t * 0.11));
     const gust = Math.pow(0.5 + 0.5 * Math.sin(t * 0.57 + 1.7 * Math.sin(t * 0.19)), 4);
     const dir = 1.1 * Math.sin(t * 0.07 + 0.5) + 0.5 * Math.sin(t * 0.21 + 1);
@@ -1168,16 +1077,17 @@ export class Player {
     this.air.set(-vel.x + this.breeze.x, -vel.y + this.breeze.y, -vel.z + this.breeze.z).applyQuaternion(this.invQ);
     this.accLocal.copy(this.frameAcc).applyQuaternion(this.invQ);
     const airSpeed = this.air.length();
-    const spd = clamp(airSpeed / 24, 0, 1.2);
     const steps = Math.min(8, Math.max(1, Math.ceil(dt / (1 / 120))));
 
     this.hairSim(dt, airSpeed);
-    this.pouchStep(dt, steps, sp);
-    this.capeSim(dt);
+    this.simulate(dt, steps, sp, airSpeed);
     this.simReady = true;
   }
 
-  // Curls: each clump swings toward the push of the air streaming back over
+  // a character's own secondary motion (cape, pouch, backpack...)
+  simulate() {}
+
+  // Locks of hair: each swings toward the push of the air streaming back over
   // the head and away from the head's own acceleration — bouncing on every
   // footfall, floating up through a jump.
   hairSim(dt, airSpeed) {
@@ -1197,187 +1107,25 @@ export class Player {
     b.head.matrixWorld.decompose(_v3, _q, _v2);
     _q.invert();
     const wind = 0.05 + 0.3 * clamp(airSpeed / 25, 0, 1);
-    const B = this.breeze;
+    const Bz = this.breeze;
     const push = _v
-      .set(-this.headAcc.x * 0.0045 + B.x * 0.02, -this.headAcc.y * 0.0055, wind - this.headAcc.z * 0.0035 + B.z * 0.01)
+      .set(-this.headAcc.x * 0.0045 + Bz.x * 0.02, -this.headAcc.y * 0.0055, wind - this.headAcc.z * 0.0035 + Bz.z * 0.01)
       .applyQuaternion(_q);
     for (let i = 0; i < this.hairBones.length; i++) {
-      const d = this.hairBones[i].dir;
+      const H = this.hairBones[i];
+      const d = H.dir;
       const s = this.hair[i];
-      const f = 3.1 + i * 0.22;
-      const rx = s.x.step(d.y * push.z - d.z * push.y, f, 0.18, dt);
-      const ry = s.y.step(d.z * push.x - d.x * push.z, f, 0.18, dt);
-      const rz = s.z.step(d.x * push.y - d.y * push.x, f, 0.18, dt);
-      b[this.hairBones[i].name].rotation.set(clamp(rx, -0.45, 0.45), clamp(ry, -0.45, 0.45), clamp(rz, -0.45, 0.45));
+      const f = H.f + i * 0.22;
+      const k = H.k, lim = H.lim;
+      const rx = s.x.step((d.y * push.z - d.z * push.y) * k, f, H.z, dt);
+      const ry = s.y.step((d.z * push.x - d.x * push.z) * k, f, H.z, dt);
+      const rz = s.z.step((d.x * push.y - d.y * push.x) * k, f, H.z, dt);
+      b[H.name].rotation.set(clamp(rx, -lim, lim), clamp(ry, -lim, lim), clamp(rz, -lim, lim));
     }
   }
 
-  // Hip pouch: a pendulum hung from the belt, kept outside the hips, its flap
-  // jolting open.
-  pouchStep(dt, steps, sp) {
-    const b = this.b;
-    const t = this.time;
-    const h = dt / steps;
-    const ps = this.pouchSim;
-    const pivot = this.anchor.copy(ps.local).applyMatrix4(b.hips.matrixWorld);
-    if (!this.simReady) {
-      ps.p.set(pivot.x - 0.01, pivot.y - ps.len, pivot.z);
-      ps.q.copy(ps.p);
-    }
-    this.hipsInv.copy(b.hips.matrixWorld).invert();
-    const vyPrev = ps.vy;
-    for (let st = 0; st < steps; st++) {
-      const vx = (ps.p.x - ps.q.x) / h, vy = (ps.p.y - ps.q.y) / h, vz = (ps.p.z - ps.q.z) / h;
-      const ax = this.gravity.x + 0.09 * (this.air.x - vx) - this.accLocal.x;
-      const ay = this.gravity.y + 0.09 * (this.air.y - vy) - this.accLocal.y * 0.6;
-      const az = this.gravity.z + 0.09 * (this.air.z - vz) - this.accLocal.z;
-      ps.q.copy(ps.p);
-      ps.p.x += vx * h * 0.985 + ax * h * h;
-      ps.p.y += vy * h * 0.985 + ay * h * h;
-      ps.p.z += vz * h * 0.985 + az * h * h;
-      _v.subVectors(ps.p, pivot);
-      ps.p.copy(pivot).addScaledVector(_v, ps.len / (_v.length() || 1e-6));
-      _v2.copy(ps.p).applyMatrix4(this.hipsInv);
-      const e = Math.hypot(_v2.x / 0.215, _v2.z / 0.18);
-      if (e < 1 && _v2.y < 0.15) {
-        _v2.x /= e;
-        _v2.z /= e;
-        ps.p.copy(_v2.applyMatrix4(b.hips.matrixWorld));
-      }
-    }
-    ps.vy = (ps.p.y - ps.q.y) / h;
-    const pouch = b.pouch;
-    pouch.position.copy(pivot);
-    _v.subVectors(ps.p, pivot).normalize();
-    _q.setFromUnitVectors(DOWN, _v);
-    _v2.set(0, 0, 1).transformDirection(b.hips.matrixWorld);
-    _q2.setFromAxisAngle(UP, Math.atan2(_v2.x, _v2.z));
-    pouch.quaternion.copy(_q).multiply(_q2);
-    const jolt = (ps.vy - vyPrev) / dt;
-    this.lid.v += Math.abs(clamp(jolt, -80, 80)) * 0.0012;
-    const lid = this.lid.step(0, 5, 0.25, dt);
-    b.pouchLid.rotation.z = -clamp(Math.abs(lid) + 0.12 * sp * Math.max(0, Math.sin(t * 17)) * this.w.run, 0, 0.8);
-    pouch.updateMatrix();
-    pouch.matrixWorld.copy(pouch.matrix);
-    b.pouchLid.updateMatrix();
-    b.pouchLid.matrixWorld.multiplyMatrices(pouch.matrixWorld, b.pouchLid.matrix);
-  }
-
-  // The cape. Simulation space has world axes and its origin at the runner:
-  // turning and leaning swing the cape instead of carrying it. The air is the
-  // runner's own speed (the cape streams back further as it grows) plus the
-  // breeze; the gusts that roll down it strengthen and quicken with speed.
-  capeSim(dt) {
-    const cl = this.cloth;
-    const Q = this.root.quaternion;
-    const t = this.time;
-    const W = this.speed;
-    const { cols, rows } = CAPE;
-    // where the chest carries every particle (the collar seam exactly; the
-    // rest is leashed to it), in simulation space
-    const Mc = this.chestM.copy(this.capeM('chest'));
-    const rest = this.capeRest;
-    for (let k = 0; k < cols * rows; k++) {
-      _v.fromArray(rest, k * 3).applyMatrix4(Mc).applyQuaternion(Q).toArray(cl.skin, k * 3);
-    }
-    cl.pinB.set(cl.skin.subarray(0, cols * 3));
-    setColliders(cl, this.capeDefs, this.capeM, Q);
-    // forces: gravity, a share of the runner's own acceleration (the game's
-    // gravity is ~3x real, so only part of a jump's reaches the cloth: it
-    // lifts and floats rather than flags), and the air
-    const f = this.wind;
-    // (Wool with some weight: most of gravity's pull, and never less than
-    // half of it however a jump falls — the cape rises behind on the way
-    // down, but it still hangs.)
-    f.gx = -this.frameAcc.x * 0.22;
-    f.gy = Math.min(-5, -8 - this.frameAcc.y * 0.14);
-    f.gz = -this.frameAcc.z * 0.3;
-    // The headwind the cape feels grows slower than the run speed: it streams
-    // back further as the pace rises; gusts roll down it in broad, irregular
-    // waves, and each free edge plays on its own. Standing still, the breeze
-    // is all there is: it gets a stronger hand.
-    const B = this.breeze;
-    const still = 1 + 1.4 * (1 - Math.min(1, W / 6));
-    f.ax = clamp(-this.vx * 0.32, -4.5, 4.5) + B.x * (1.2 + 0.03 * W) * still;
-    f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.35, -3.5, 2.5) + B.y * still;
-    f.az = (W > 0 ? 1.05 * W + 1 : 0) + B.z * still;
-    f.gust = 0.6 * still + 0.18 * W;
-    f.gustSpeed = 1.2 + 0.32 * W;
-    f.gustLen = 0.75 + 0.012 * W;
-    f.curl = 0.8 * still + 0.18 * W;
-    f.kn = 0.5;
-    f.kt = 0.1;
-    f.damp = 0.5;
-    // (the ground under him, but never above his feet: brushing past the
-    // top of something he isn't standing on must not lift the cloth)
-    f.floor = Math.min(this.groundY || 0, this.y) - this.y + CAPE.margin;
-    f.groundV = W;
-    f.lift = 0.1;
-    f.t = t;
-    // Carry the cloth along with most of the body's own bob and sway: the
-    // stride bounces the shoulders at several g, which real wool would partly
-    // soak up — the rest rolls on down the cape as a ripple.
-    _v.setFromMatrixPosition(this.b.chest.matrixWorld).applyQuaternion(Q);
-    if (this.simReady) cl.shift((_v.x - this.chestPrev.x) * 0.65, (_v.y - this.chestPrev.y) * 0.65, (_v.z - this.chestPrev.z) * 0.65);
-    this.chestPrev.copy(_v);
-    if (!this.simReady) {
-      // start from the rest drape, carried by the body, and let it settle
-      cl.place((v) => v.applyMatrix4(Mc).applyQuaternion(Q));
-      cl.pinA.set(cl.pinB);
-      cl.skinPrev.set(cl.skin);
-      f.t = t - 0.75;
-      for (let i = 0; i < 45; i++) {
-        f.t += 1 / 60;
-        cl.step(1 / 60, f);
-      }
-    } else {
-      cl.step(dt, f);
-    }
-    this.writeCape();
-  }
-
-  // Hand the particles to the shader, in the runner's own space, with how
-  // deeply the cloth curves at each (1/m, toward its outside; across plus a
-  // share along, softened over the neighbours so only real folds and waves
-  // count).
-  writeCape() {
-    const { cols, rows } = CAPE;
-    const cl = this.cloth;
-    const D = this.capeData;
-    const K = this.capeFold;
-    const P = cl.p, Nn = cl.nrm;
-    for (let j = 0; j < rows; j++) {
-      for (let i = 0; i < cols; i++) {
-        const k = j * cols + i;
-        const o = k * 3;
-        let c = 0;
-        if (i > 0 && i < cols - 1) c += curve(P, Nn, o, o - 3, o + 3);
-        if (j > 0 && j < rows - 1) c += 0.6 * curve(P, Nn, o, o - cols * 3, o + cols * 3);
-        K[k] = c;
-      }
-    }
-    for (let pass = 0; pass < 2; pass++) {
-      for (let j = 0; j < rows; j++) {
-        for (let i = 0; i < cols; i++) {
-          const k = j * cols + i;
-          let sum = K[k] * 2, w = 2;
-          if (i > 0) (sum += K[k - 1]), w++;
-          if (i < cols - 1) (sum += K[k + 1]), w++;
-          if (j > 0) (sum += K[k - cols]), w++;
-          if (j < rows - 1) (sum += K[k + cols]), w++;
-          D[k * 4 + 3] = sum / w;
-        }
-      }
-      for (let k = 0; k < cols * rows; k++) K[k] = D[k * 4 + 3];
-    }
-    for (let k = 0; k < cols * rows; k++) {
-      _v.fromArray(P, k * 3).applyQuaternion(this.invQ);
-      D[k * 4] = _v.x;
-      D[k * 4 + 1] = _v.y;
-      D[k * 4 + 2] = _v.z;
-    }
-    this.capeTex.needsUpdate = true;
-  }
+  // z: where the runner is along the scene's z; dist: how far they have run
+  // (the track coordinate behind the floating origin).
   place(z) {
     this.root.position.set(this.x, this.y, z);
     const h = Math.max(0, this.y - (this.groundY || 0));
@@ -1386,4 +1134,12 @@ export class Player {
     this.shadow.scale.set(0.95 * s * (this.sliding ? 1.3 : 1), 1, 1.25 * s * (this.sliding ? 1.6 : 1));
     this.shadow.material.uniforms.uAlpha.value = 0.38 * s;
   }
+
+  // What the game adds to its scenes for this runner.
+  get objects() {
+    return [this.root, this.shadow];
+  }
+
+  // A little flourish when they're picked on the title screen.
+  greet() {}
 }

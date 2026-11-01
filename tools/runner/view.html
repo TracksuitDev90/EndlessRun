@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Runner viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #f6efe4; overflow: hidden; }
+      canvas { display: block; }
+      #label { position: fixed; left: 8px; top: 6px; font: 12px ui-monospace, monospace; color: #6b5a4a; }
+    </style>
+  </head>
+  <body>
+    <div id="label"></div>
+    <script type="module">
+      // A turnaround of a runner like their reference sheet: front, their
+      // left side, back, their right side - posed (?pose=idle|run|jump|slide|bind)
+      // at ?t=<seconds> into it. Serve the repository root and open
+      // tools/runner/view.html?runner=explorer
+      import * as THREE from '../../vendor/three/three.module.min.js';
+      import { shared } from '../../src/render/shaders.js';
+      import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
+      import { loadRunner } from '../../src/game/runner-asset.js';
+      import { characterById } from '../../src/game/characters.js';
+      import { WORLD_DEFS } from '../../src/world/index.js';
+
+      const q = new URLSearchParams(location.search);
+      const char = characterById(q.get('runner') || 'explorer');
+      const pose = q.get('pose') || 'idle';
+      const T = Number(q.get('t') || 1.2);
+      const views = (q.get('views') || 'front,left,back,right').split(',');
+      const zoom = Number(q.get('zoom') || 1);
+      const focusY = Number(q.get('y') || 0.82);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.autoClear = false;
+      document.body.appendChild(renderer.domElement);
+      shared.uMarks.value = makeMarksTexture();
+      shared.uNoise.value = makeNoiseTexture();
+      shared.uResolution.value.set(innerWidth, innerHeight);
+      const asset = await loadRunner('../../' + char.asset);
+      const env = WORLD_DEFS[0].env;
+      const runner = char.make(env, asset);
+      runner.reset();
+      runner.mode = pose === 'idle' || pose === 'bind' ? 'idle' : 'run';
+      const scene = new THREE.Scene();
+      scene.add(runner.root);
+      const cam = new THREE.PerspectiveCamera(22 / zoom, innerWidth / views.length / innerHeight, 0.1, 50);
+      const dt = 1 / 60;
+      // pose: step the runner there
+      if (pose !== 'bind') {
+        if (pose === 'jump') {
+          for (let i = 0; i < 60; i++) runner.update(dt, 14, () => 0);
+          if (q.get('trick')) runner.deck = [q.get('trick')];
+          runner.action('up');
+          const n = Math.round(Number(q.get('jt') || 0.3) / dt);
+          for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
+        } else if (pose === 'slide') {
+          for (let i = 0; i < 60; i++) runner.update(dt, 14, () => 0);
+          runner.action('down');
+          const n = Math.round(Number(q.get('jt') || 0.3) / dt);
+          for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
+        } else {
+          const n = Math.round(T / dt);
+          for (let i = 0; i < n; i++) runner.update(dt, pose === 'run' ? 14 : 0, () => 0);
+        }
+      }
+      runner.place(0, 0);
+      runner.shadow.visible = false;
+      // the ground, and a mark every 10 cm up a pole beside them
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(3, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
+      ground.position.y = -0.001;
+      scene.add(ground);
+      for (let k = 0; k <= 20; k++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.03), new THREE.MeshBasicMaterial({ color: k % 5 ? 0xb8a890 : 0x8a7a64 }));
+        m.position.set(-0.6, k * 0.1, 0.6);
+        scene.add(m);
+      }
+      // views: [name, yaw of the camera round the runner]
+      const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2, three: -0.6, backThree: Math.PI - 0.6 };
+      const w = innerWidth / views.length;
+      renderer.setClearColor(0xf6efe4, 1);
+      renderer.clear();
+      views.forEach((v, i) => {
+        const a = yaws[v] ?? 0;
+        const d = 7.2;
+        cam.position.set(Math.sin(a) * d, focusY + Number(q.get('up') || 0.1), -Math.cos(a) * d);
+        cam.lookAt(0, focusY, 0);
+        shared.uCamPos.value.copy(cam.position);
+        renderer.setViewport(i * w, 0, w, innerHeight);
+        renderer.setScissor(i * w, 0, w, innerHeight);
+        renderer.setScissorTest(true);
+        renderer.render(scene, cam);
+      });
+      document.getElementById('label').textContent = `${char.id} · ${pose}`;
+      window.__ready = true;
+    </script>
+  </body>
+</html>

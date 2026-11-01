@@ -1,27 +1,25 @@
-// The runner's sculpted mesh, skeleton and rig constants, generated offline by
-// tools/runner/build.py into assets/runner/ and loaded once at boot.
+// A runner's sculpted mesh, skeleton and rig constants, generated offline by
+// tools/runner/build.py (the wayfarer) and tools/runner/explorer.py (the
+// explorer) into assets/<runner>/, and loaded once at boot.
 
-let asset = null;
+const cache = new Map();
 
-export async function loadRunner(base = 'assets/runner/') {
+export async function loadRunner(base) {
+  if (cache.has(base)) return cache.get(base);
   const [meta, bin] = await Promise.all([
     fetch(base + 'runner.json').then((r) => r.json()),
     fetch(base + 'runner.bin').then((r) => r.arrayBuffer()),
   ]);
-  asset = { meta, bin };
-  return asset;
-}
-
-export function runner() {
-  if (!asset) throw new Error('runner asset not loaded');
+  const asset = { base, meta, bin };
+  cache.set(base, asset);
   return asset;
 }
 
 // Vertex arrays of the sculpted surfaces: positions, unit normals, garment
 // detail coordinates, material ids, skin indices and weights, outline normals
 // (the normal scaled by each garment's ink weight) and triangle indices.
-export function runnerArrays() {
-  const { meta, bin } = runner();
+export function runnerArrays(asset) {
+  const { meta, bin } = asset;
   const L = meta.layout;
   const n = meta.vertices;
   const view = (Type, k) => new Type(bin, L[k].offset, L[k].length);

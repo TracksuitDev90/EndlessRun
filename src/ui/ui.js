@@ -58,6 +58,8 @@ export class UI {
       ['btn-continue', 'continue'],
       ['btn-again', 'again'],
       ['btn-sound-2', 'sound'],
+      ['btn-title', 'title'],
+      ['btn-title-2', 'title'],
     ]) {
       const el = $(id);
       if (!el) continue;
@@ -71,6 +73,59 @@ export class UI {
 
   on(name, fn) {
     this.handlers[name] = fn;
+  }
+
+  // The title screen's cards, one per runner (see game/characters.js): each
+  // their cut-out art standing up out of a card in their colours. Tapping
+  // one picks them (it doesn't start the run).
+  setRunners(list, selected) {
+    const root = $('pick');
+    root.textContent = '';
+    this.cards = {};
+    for (const c of list) {
+      const b = document.createElement('button');
+      b.className = 'pick-card';
+      b.type = 'button';
+      b.dataset.id = c.id;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', `${c.name}, ${c.title}`);
+      b.style.setProperty('--c1', c.tint[0]);
+      b.style.setProperty('--c2', c.tint[1]);
+      b.innerHTML =
+        `<span class="pick-bg"></span>` +
+        `<img class="pick-fig" src="${c.card}" alt="" draggable="false" />` +
+        `<span class="pick-plate"><span class="pick-name"></span><span class="pick-title"></span></span>` +
+        `<span class="pick-blurb"></span><span class="pick-seal" aria-hidden="true">✓</span>`;
+      b.querySelector('.pick-name').textContent = c.name;
+      b.querySelector('.pick-title').textContent = c.title;
+      b.querySelector('.pick-blurb').textContent = c.blurb;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.handlers.pick?.(c.id);
+      });
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());
+      root.appendChild(b);
+      this.cards[c.id] = b;
+    }
+    this.runnerOrder = list.map((c) => c.id);
+    this.showRunner(selected, false);
+  }
+
+  showRunner(id, hop = true) {
+    for (const [k, b] of Object.entries(this.cards || {})) {
+      b.setAttribute('aria-checked', String(k === id));
+      b.tabIndex = k === id ? 0 : -1;
+      if (k === id && hop) replay(b, 'hop');
+    }
+    this.runnerShown = id;
+  }
+
+  // The runner beside the one shown (dir -1 / +1), for the arrow keys and
+  // sideways swipes on the title screen.
+  runnerBeside(dir) {
+    const o = this.runnerOrder || [];
+    const i = o.indexOf(this.runnerShown);
+    return o[(i + dir + o.length) % o.length];
   }
 
   loaded() {

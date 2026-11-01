@@ -32,13 +32,14 @@
           <p class="tagline">a run through worlds within worlds</p>
           <p id="title-best" class="title-best" hidden>best <b id="title-best-num">0</b></p>
         </div>
+        <div id="pick" class="pick" role="radiogroup" aria-label="Choose who runs"></div>
         <div class="title-bottom">
           <div class="howto">
             <div class="howto-item"><span class="glyph">↑</span><span>jump</span></div>
             <div class="howto-item"><span class="glyph">↓</span><span>slide</span></div>
             <div class="howto-item"><span class="glyph">← →</span><span>dodge</span></div>
           </div>
-          <div class="begin"><span class="touch-only">tap or swipe to begin</span><span class="mouse-only">click, swipe or press a key to begin</span></div>
+          <div class="begin"><span class="touch-only">tap to begin</span><span class="mouse-only">click or press space to begin</span></div>
           <button id="btn-sound-2" class="pill sound-toggle" aria-label="Toggle sound"><span class="ic-sound"></span><span id="sound-label">Sound on</span></button>
         </div>
       </div>
@@ -74,6 +75,7 @@
           <p class="sub">score <b id="pause-score">0</b> · gems <b id="pause-gems">0</b></p>
           <button id="btn-resume" class="btn primary">Resume</button>
           <button id="btn-restart" class="btn">Start over</button>
+          <button id="btn-title" class="btn quiet">Choose runner</button>
         </div>
       </div>
 
@@ -89,6 +91,7 @@
           <p class="sub">Dust off and keep going?</p>
           <button id="btn-continue" class="btn primary">Continue <small id="continue-count">1 left</small></button>
           <button id="btn-again" class="btn">Run again</button>
+          <button id="btn-title-2" class="btn quiet">Choose runner</button>
         </div>
       </div>
 
