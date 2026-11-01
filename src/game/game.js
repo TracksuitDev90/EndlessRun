@@ -604,6 +604,8 @@ export class Game {
       this.gems.update(this.dist, this.runTime);
     }
 
+    // (over water nothing kicks up dust)
+    this.player.wet = this.obstacles.wetAt(this.player.x, this.dist);
     this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
     if (this.state === 'running') this.collide();
     if (this.state === 'running') this.collectGems();

@@ -1,7 +1,7 @@
 # EndlessRun
 
-An endless runner through worlds within worlds. Pick who runs — Rowan, a young
-wayfarer in a puffer jacket and an orange hooded cape, or Wren, a nimble
+An endless runner through worlds within worlds. Pick who runs — Rowan, a tall,
+heavy-striding wayfarer in a puffer jacket and an orange hooded cape, or Wren, a nimble
 explorer with a shock of vermilion hair and a backpack that won't stay shut —
 and run into the screen through a storybook world that never stops changing:
 scenery unfolds out of the ground like a pop-up book as you approach, and every
@@ -661,8 +661,10 @@ Append to the URL:
   desktop (see [The runners](#the-runners)). The explorer is the same four
   draw calls (her body, ~25k triangles, and her hair: a 15×12 cloth), costs
   about half as much to simulate, and adds two draw calls for each thing
-  flying out of her backpack while it's in the air (at most six), and one
-  for the dust while a slide has any in the air. The cloth solver's phases are
+  flying out of her backpack while it's in the air (at most six). Each
+  adds one more for dust while there's any in the air (his boots' puffs, her
+  slides'): forty at most, thrown into preallocated slots, so it makes no
+  garbage. The cloth solver's phases are
   small methods called with integers only: as one big function of nested
   loops V8 kept cycling it in and out of optimisation, running it mostly
   unoptimised and boxing every float it touched (~50 KB of garbage a frame,
@@ -741,11 +743,13 @@ card and how to make them live in `characters.js`).
 | | Rowan, the wayfarer | Wren, the explorer |
 |---|---|---|
 | Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook |
-| Simulated | the cape (19×19 cloth) | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides |
+| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun |
+| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean |
-| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked front flip or a corkscrew twist |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring |
+| Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after |
 | Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust |
-| Run | a sure, bounding stride | a quicker, lighter, narrower one, more lean, less bounce |
+| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce |
 
 ### Choosing who runs
 
@@ -766,7 +770,7 @@ cards; on a wide one the cards stand to the right. The pick is remembered
 
 ### The explorer
 
-![Wren's tucked front flip from the chase camera, her baseball slide kicking up dust, and Hell: everything drained to grey but her hair](docs/explorer-moves.jpg)
+![Wren's tucked back flip from the chase camera, her baseball slide kicking up dust, and Hell: everything drained to grey but her hair](docs/explorer-moves.jpg)
 
 `tools/runner/explorer.py` sculpts her to her reference sheet the same way
 `build.py` sculpts him (it borrows its primitives, meshing, skinning and
@@ -821,10 +825,22 @@ pops up faster, gravity eases off within 3.2 m/s of the top so she hangs
 there, then she drops (the arc is solved piecewise and exactly, the same at any
 frame rate) — and in the air she does a trick, dealt from a shuffled deck so
 the same one never comes twice running: a split leap (one leg reaching out
-straight in front, the other stretched behind, arms flung up), a tucked front
-flip about her hips, or a corkscrew twist about her own axis, legs together,
-arms pulled in. A spin cut short — a fast-fall, landing early — whips round
-to finish quickly rather than snapping back.
+straight in front, the other stretched behind, arms flung up), a tucked back
+flip about her hips, a corkscrew twist about her own axis, legs together,
+arms pulled in, or a front handspring. A spin cut short — a fast-fall,
+landing early — whips round to finish quickly rather than snapping back.
+
+The handspring turns her forward, head first, over the top of the arc. She
+dives, arms sweeping up past her ears and the back leg kicking up behind,
+and goes over in a split; at the top she springs off the air as if it were
+a floor — her elbows fold deep, flaring out, and her body sinks toward her
+hands, then they snap straight and she pops up off them — her back arches
+as her legs whip down under her, and she comes round upright with her arms
+high in a V, legs reaching for the road. Its shape is keyed on how far round
+she has turned rather than on time, so it stays in step with the turn even
+when a fast-fall hurries it, and the turn itself runs like a body's would:
+slowing through the stretched-out handstand, quickening as she folds to snap
+down.
 
 Her slide is a baseball slide: down on her hip, the lead leg out straight with
 its heel on the road and the toe up, the other folded under its knee, leaning
@@ -844,8 +860,10 @@ none otherwise.
 
 She
 runs at a quicker cadence on a narrower track with more lean and less bounce,
-her free arm swinging lightly and the one with the sketchbook held closer;
-she lands in a quick soft crouch with her arms out.
+her free arm swinging lightly and the one with the sketchbook held closer.
+She lands on springs: a quick soft crouch with her arms out, then straight
+back up out of it onto her toes — a little stretch, chin up, arms flicking up
+and out — then a smaller dip and a smaller bounce as it rings out.
 
 Her simulation costs about half his per frame (the hair grid is smaller than
 the cape's); her mesh is about 25k triangles to his 23k.
@@ -853,7 +871,7 @@ the cape's); her mesh is about 25k triangles to his 23k.
 To change either runner, edit their script and regenerate (about 15 and 35
 seconds), then look at them turned round like their reference sheet in
 `tools/runner/view.html?runner=explorer` (also `&pose=idle|run|jump|slide|bind`,
-`&t=` seconds into it, `&trick=leap|flip|twist`, `&jt=` seconds into the jump
+`&t=` seconds into it, `&trick=leap|flip|twist|handspring`, `&jt=` seconds into the jump
 or slide, `&side=1|-1` the slide's lead leg, `&views=front,left,back,right,three`,
 `&zoom=`, `&y=`):
 
@@ -898,9 +916,30 @@ shader draws those lines crisply at any distance. Shading is one broad, crisp
 shadow shape per surface in a warm shadow tone, a restrained hair highlight
 and a thin dark contour tinted by the material under it.
 
+**Drawn out tall.** Sculpted, he stands about 1.57 m; the build then draws
+him out into a tall bruiser of about 1.73 m — his legs a quarter longer, his
+torso (and the arms hanging beside it) a sixth longer — while his boots and
+head keep their sculpted size, so his head is small for his frame. It's a
+smooth remap of height alone (`STRETCH` in `build.py`): every garment's field
+is read back through it, so the surfaces stretch without losing a line of the
+sculpt (the quilting, socks and hems all follow), and the skeleton and every
+rig constant the game reads are carried through it too — the cape's drape is
+laid out by the sculpt's heights and stretched the same way (`rig.stretch`).
+His stride is drawn out to match: longer and slower, sinking deeper into each
+contact and bouncing higher off it, wider-footed, the hips rolling and the
+shoulders driving round against them, arms pumping big. Every time a boot
+drives off the road it kicks up a puff of dust behind it — two, more often
+than not, bigger as the pace builds — thrown with a share of his speed so it
+blooms at his heel before the still air stops it and he runs on out of it
+(none over water). He lands with a stomp: down deep into his knees, feet
+splaying, his body folding over them and his head nodding, the impact
+throwing his arms down and back and squashing him, then driving back up out
+of it once; a ring of dust bursts out low from his boots, and the camera dips
+with the thud.
+
 The build writes `assets/runner/runner.json` (skeleton, rig constants, parts)
 and `runner.bin` (vertex data), loaded once at boot. To change the character,
-edit `build.py` and regenerate (about ten seconds):
+edit `build.py` and regenerate (about fifteen seconds):
 
 ```sh
 pip install numpy scipy scikit-image fast-simplification
@@ -914,15 +953,27 @@ designed path (heel kicks up under the hips, the knee drives through, the foot
 reaches and paws back down), and a two-bone solve turns that into thigh and
 knee angles — the knee always bends forward, the pelvis sinks into each
 contact, the thighs turn against the pelvis's swing so a planted foot never
-twists, and the arms swing against the legs with bent elbows. A 0.6 m leg can
-only stay planted for ~0.58 m of ground, which at the game's 12–28 m/s is a few
+twists, and the arms swing against the legs with bent elbows. The thigh's
+splay out to the side is solved exactly while the leg reaches or stands, so a
+planted foot never skids; as the knee folds up in the swing the ankle comes
+to sit right behind the hip, where no splay can move it sideways, and an
+exact solve there flung the thigh out ~64° and back, side to side, for a frame
+or two every stride (the legs' occasional "spasm") — so the lever it's solved
+with is held at 0.8 of the leg, and the tucked foot gives up a centimetre or
+two sideways instead. A leg can only stay planted for about its own length of
+ground (his 0.68 m legs ~0.67 m), which at the game's 12–28 m/s is a few
 hundredths of a second: at the starting pace contact has no slip at all; at
 higher speeds contact is held for a minimum of ~2.4 frames so the planted pose
 reaches the screen, and the leftover slip is straight back along the run inside
 those frames (no sinking, floating or sideways skid). Jump and slide are
 keyed poses; idle is keyed too but stands on planted feet (IK), easing its
 weight from one leg to the other. Poses blend with second-order springs, so
-every transition eases in and out.
+every transition eases in and out — and nothing jumps while a pose still
+shows: a jump or slide taken straight off the last one eases out of it over
+a sixth of a second instead of snapping to the new lead leg or trick, the
+jump poses (shaped by the climb and fall) hold their landing shape as they
+fade out instead of snapping back to their take-off, and a fast-fall's
+plunge eases into them over a few frames.
 
 **Weight and follow-through.** On top of the pose, the torso, head and arms
 ride on the pelvis like loose springs, kicked by the pelvis's change of
@@ -931,7 +982,12 @@ changes, jumps, landings and changes of pace (as impulses, so a sudden move
 hits equally hard at any frame rate). Every footfall ripples up the spine and
 drops the arms a touch; a lane change whips the shoulders across and lets them
 swing back through; a take-off folds the body, the flight lets it float open
-with the arms rising, and a landing folds it again before it springs up. Arms,
+with the arms rising, and a landing folds it again before it springs up. The
+landing's own bounce is each runner's (`FEEL.land`): the impulse response of
+a damped spring, solved exactly from the moment of touchdown and scaled by
+how hard they came down (a fast-fall slams in harder) — how quick it is and
+how long it rings on is their personality (his heavy and settled, hers quick
+and springy), and their poses shape the dip and the rebound. Arms,
 elbows, spine and head also trail their own posed motion on springs, so they
 lag and overshoot at every reversal, and the lean into a lane change settles
 with a soft overshoot. With each stride the chest turns against the hips and
@@ -1010,7 +1066,7 @@ src/game/                     game loop, player (the runners' shared core:
                               outfit (his palette, cape, pouch, poses), explorer
                               (her palette, hair, backpack, moves), spill
                               (what flies out of it) and dust (what her slides
-                              kick up), kit (body geometry, sheet
+                              and his boots kick up), kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset
                               loader, camera, course (world order),
                               chunk streaming, obstacle director, gem director

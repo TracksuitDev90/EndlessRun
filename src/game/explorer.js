@@ -3,7 +3,7 @@ import { makeCharacterMaterials } from '../render/shaders.js';
 import { clamp, smooth, Spring } from './rig.js';
 import { Cloth } from './cloth.js';
 import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
-import { Player, C, mirror } from './player.js';
+import { Player, C, mirror, hermite } from './player.js';
 import { CONFIG } from '../config.js';
 import { Spill } from './spill.js';
 import { Dust } from './dust.js';
@@ -181,6 +181,9 @@ const FEEL = {
   lean: [0.045, 0.5],
   turn: [0.03, 0.42],
   blend: [5, 6, 7],
+  // she lands on springs: a quick bounce that rings on - down, up onto her
+  // toes, down a little, up a little
+  land: { freq: 5.2, zeta: 0.2, thud: 0 },
 };
 // The jump's arc: gravity eases off to HANG of itself while she's within
 // APEX m/s of the top. G and V0 are solved so the apex and airtime match the
@@ -199,8 +202,68 @@ function solveArc(H, T) {
 }
 
 // Her tricks in the air, dealt so the same one never comes twice running:
-// a split leap, a tucked front flip, a corkscrew twist.
-const TRICKS = ['leap', 'flip', 'leap', 'twist', 'flip', 'twist'];
+// a split leap, a tucked flip (back over), a corkscrew twist, and a front
+// handspring (forward over).
+const TRICKS = ['leap', 'flip', 'handspring', 'leap', 'twist', 'flip', 'handspring', 'twist'];
+
+// The front handspring, keyed on how far round she has turned (0 upright at
+// take-off, 0.5 upside down, 1 upright again). She dives - arms sweeping up
+// past her ears, the back leg kicking up behind - turns over in a split,
+// and at the top of the arc springs off the air as if it were a floor: her
+// elbows fold deep and her body sinks toward her hands, then they snap
+// straight and she pops up off them; her back arches as her legs whip down
+// under her, and she comes round upright with her arms high in a V, legs
+// reaching for the road. (L: the leg she pushes off; R: the one that kicks
+// over first. Lateral channels are per-side magnitudes, as everywhere.)
+const HS_T = [0, 0.16, 0.36, 0.43, 0.5, 0.55, 0.62, 0.76, 0.9, 1];
+const HS = {
+  hipPitch: [0.04, 0.05, 0, -0.02, -0.04, -0.05, -0.06, -0.02, 0.04, 0.06],
+  spLean: [0.15, 0.32, 0, -0.06, -0.12, -0.16, -0.3, -0.36, -0.05, 0.12],
+  chLean: [0.05, 0.12, -0.05, -0.1, -0.14, -0.16, -0.22, -0.2, -0.05, 0.02],
+  hdPitch: [0.1, -0.2, -0.4, -0.45, -0.5, -0.48, -0.35, -0.45, -0.05, 0.1],
+  thLx: [0.85, 0.4, 0.55, 0.4, 0.22, 0.12, -0.12, 0.3, 0.5, 0.5],
+  knL: [1.0, 0.55, 0.12, 0.08, 0.05, 0.05, 0.03, 0.18, 0.4, 0.6],
+  anL: [0.2, -0.3, -0.55, -0.6, -0.6, -0.6, -0.6, -0.3, 0.05, 0.15],
+  thRx: [-0.45, -0.95, -0.8, -0.5, -0.25, -0.18, -0.12, 0.3, 0.42, 0.42],
+  knR: [0.5, 0.1, 0.05, 0.05, 0.05, 0.04, 0.03, 0.2, 0.5, 0.7],
+  anR: [-0.4, -0.55, -0.6, -0.6, -0.6, -0.6, -0.6, -0.3, 0.05, 0.15],
+  thLz: [0.04, 0.06, 0.08, 0.06, 0.04, 0.03, 0.02, 0.04, 0.08, 0.08],
+  thRz: [0.04, 0.06, 0.08, 0.06, 0.04, 0.03, 0.02, 0.04, 0.08, 0.08],
+  // the arms: overhead along her ears, then folding deep at the handstand,
+  // elbows flaring out (the upper arms drop forward as the elbows bend, so
+  // the forearms stay planted under her), then snapping straight to push
+  shLx: [1.9, 2.85, 2.95, 2.4, 1.75, 1.8, 3.05, 2.9, 2.7, 2.35],
+  shRx: [1.8, 2.8, 2.9, 2.35, 1.7, 1.75, 3.0, 2.85, 2.65, 2.3],
+  elL: [0.6, 0.15, 0.3, 1.1, 1.85, 1.7, 0.0, 0.12, 0.2, 0.3],
+  elR: [0.7, 0.2, 0.35, 1.15, 1.9, 1.75, 0.05, 0.15, 0.25, 0.35],
+  shLz: [0.25, 0.12, 0.2, 0.4, 0.55, 0.5, 0.15, 0.25, 0.45, 0.6],
+  shRz: [0.25, 0.12, 0.2, 0.4, 0.55, 0.5, 0.15, 0.25, 0.45, 0.6],
+  clL: [0.1, 0.18, 0.15, 0.1, 0.05, 0.05, 0.28, 0.18, 0.15, 0.12],
+  clR: [0.1, 0.18, 0.15, 0.1, 0.05, 0.05, 0.28, 0.18, 0.15, 0.12],
+  clLy: [0.1, 0.15, 0.1, 0.05, 0, 0, 0.15, 0.1, 0.05, 0],
+  clRy: [0.1, 0.15, 0.1, 0.05, 0, 0, 0.15, 0.1, 0.05, 0],
+  wrL: [0.1, -0.5, -0.7, -0.85, -0.95, -0.9, -0.5, -0.2, 0, 0.1],
+  wrR: [0.1, -0.5, -0.7, -0.85, -0.95, -0.9, -0.5, -0.2, 0, 0.1],
+};
+// (her body sinks toward her hands as her arms fold, and pops off them: m)
+const HS_LIFT = [0, 0, 0, -0.06, -0.13, -0.12, 0.09, 0.04, 0, 0];
+const HS_KEYS = Object.entries(HS).map(([k, v]) => [C[k], Float64Array.from(v)]);
+const HS_TS = Float64Array.from(HS_T);
+// How the turn runs: easing out of the dive, slowing through the handstand
+// (stretched out, she turns slower), quickening as her legs whip down (folded
+// up, faster) and easing into the landing.
+const HS_EASE = (() => {
+  const n = 160;
+  const a = new Float64Array(n + 1);
+  const v = (u) => Math.pow(Math.sin(Math.PI * u), 1.3) * (1 - 0.62 * Math.exp(-(((u - 0.5) / 0.1) ** 2))) * (1 + 0.3 * Math.exp(-(((u - 0.72) / 0.1) ** 2)));
+  for (let i = 1; i <= n; i++) a[i] = a[i - 1] + (v((i - 1) / n) + v(i / n)) / 2;
+  for (let i = 1; i <= n; i++) a[i] /= a[n];
+  return (u) => {
+    const x = clamp(u, 0, 1) * n;
+    const i = Math.min(n - 1, Math.floor(x));
+    return a[i] + (a[i + 1] - a[i]) * (x - i);
+  };
+})();
 
 export class Explorer extends Player {
   constructor(envDef, asset) {
@@ -317,9 +380,10 @@ export class Explorer extends Player {
     this.lidS.reset();
     this.lidKick = 0;
     this.spins = {
-      pitch: { value: 0, from: 0, to: 0, t: 0, delay: 0, dur: 1, pivot: 0.78, pivotTo: 0.78 },
-      yaw: { value: 0, from: 0, to: 0, t: 0, delay: 0, dur: 1, pivot: 0, pivotTo: 0 },
+      pitch: { value: 0, from: 0, to: 0, start: 0, t: 0, delay: 0, dur: 1, pivot: 0.78, pivotTo: 0.78, ease: null },
+      yaw: { value: 0, from: 0, to: 0, start: 0, t: 0, delay: 0, dur: 1, pivot: 0, pivotTo: 0, ease: null },
     };
+    this.hsLift = 0;
     this.deck = this.deck || [];
     this.trick = this.trick || '';
     this.dodgeT = 9;
@@ -395,13 +459,16 @@ export class Explorer extends Player {
   }
 
   // --- moves -------------------------------------------------------------------
-  // A spin of the whole body (pitch: a flip, about pivot m up; yaw: a twist
-  // about her own axis): eased from one angle to the next over dur seconds
-  // after a delay; cut short, it whips round to finish quickly.
-  spinTo(axis, turns, delay, dur, pivot) {
+  // A spin of the whole body (pitch: a flip, about pivot m up - positive turns
+  // go over backward, negative forward; yaw: a twist about her own axis):
+  // eased from one angle to the next over dur seconds after a delay (by
+  // ease(u), or smoothly); cut short, it whips round to finish quickly.
+  spinTo(axis, turns, delay, dur, pivot, ease = null) {
     const S = this.spins[axis];
     const TAU = Math.PI * 2;
     S.from = S.value;
+    S.start = S.value;
+    S.ease = ease;
     // (always at least half a turn still to go: a spin taken up again
     // part-way round carries on instead of snapping back)
     S.to = Math.ceil((S.value + Math.PI) / TAU) * TAU + (Math.abs(turns) - 1) * TAU;
@@ -419,6 +486,14 @@ export class Explorer extends Player {
     S.t = 0;
     S.delay = 0;
     S.dur = dur;
+    S.ease = null;
+  }
+
+  // How far round the current pitch spin she has turned, 0..1.
+  get turned() {
+    const P = this.spins.pitch;
+    const span = P.to - P.start;
+    return span ? clamp((P.value - P.start) / span, 0, 1) : 1;
   }
 
   jump() {
@@ -436,6 +511,7 @@ export class Explorer extends Player {
     this.trick = this.deck.pop();
     const T = this.feel.jump.time;
     if (this.trick === 'flip') this.spinTo('pitch', 1, 0.07, T * 0.68, 0.78);
+    else if (this.trick === 'handspring') this.spinTo('pitch', -1, 0.03, T * 0.8, 0.82, HS_EASE);
     else this.hurry('pitch', 0.18); // (a flip still going round: finish it on the way up)
     if (this.trick === 'twist') this.spinTo('yaw', this.jumpSide, 0.05, T * 0.72);
     this.onJump();
@@ -478,16 +554,34 @@ export class Explorer extends Player {
 
   // --- poses -------------------------------------------------------------------
   poseJump(j, t) {
+    this.hsLift = 0;
     if (this.trick === 'flip') return this.poseTuck(j, 0.8);
     if (this.trick === 'twist') return this.poseTwist(j);
+    if (this.trick === 'handspring') return this.poseHandspring(j);
     return this.poseLeap(j);
+  }
+
+  // The front handspring (see HS): the body's shape follows how far round
+  // she has turned, so it stays in step with the turn even when a fast-fall
+  // hurries it.
+  poseHandspring(j) {
+    const u = this.turned;
+    j.fill(0);
+    j[C.hipY] = this.HIP_Y;
+    j[C.sq] = 1;
+    for (const [i, v] of HS_KEYS) j[i] = hermite(HS_TS, v, 0, 0, u);
+    // (the snap straight must not overshoot into a hyperextended elbow)
+    j[C.elL] = Math.max(0, j[C.elL]);
+    j[C.elR] = Math.max(0, j[C.elR]);
+    this.hsLift = hermite(HS_TS, HS_LIFT, 0, 0, u);
+    if (this.jumpSide < 0) mirror(j);
   }
 
   // A split leap: the lead leg reaching out straight in front, the other
   // stretched out behind, arms flung up and out, chest lifted - folding back
   // together to land.
   poseLeap(j) {
-    const fall = clamp(-this.vy / this.V0 + 0.3, 0, 1);
+    const fall = clamp(-this.vyPose / this.V0 + 0.3, 0, 1);
     const fs = fall * fall * (3 - 2 * fall);
     const m = (a, b) => a + (b - a) * fs;
     j[C.hipY] = this.HIP_Y;
@@ -589,7 +683,7 @@ export class Explorer extends Player {
   // A corkscrew: drawn up straight and narrow - legs together, toes
   // pointed, arms pulled in to her chest - opening out again to land.
   poseTwist(j) {
-    const fall = clamp(-this.vy / this.V0 + 0.15, 0, 1);
+    const fall = clamp(-this.vyPose / this.V0 + 0.15, 0, 1);
     const fs = fall * fall * (3 - 2 * fall);
     const m = (a, b) => a + (b - a) * fs;
     j[C.hipY] = this.HIP_Y;
@@ -643,7 +737,10 @@ export class Explorer extends Player {
   // onto her feet. (Posed leading with the left leg; mirrored for the right,
   // all but the arms: the book stays up.)
   poseSlide(s, t) {
-    const u = 1 - clamp(this.slideT / CONFIG.slide.time, 0, 1);
+    // (how far through the slide she is; cut short by a jump it holds where
+    // it was while the slide fades out, instead of leaping to its end)
+    if (this.slideT > 0) this.slideU = 1 - clamp(this.slideT / CONFIG.slide.time, 0, 1);
+    const u = this.slideU ?? 1;
     const pop = smooth(0.68, 1, u);
     const rattle = (Math.sin(t * 47) * 0.6 + Math.sin(t * 29 + 1.3) * 0.4) * (1 - pop);
     s[C.hipY] = 0.19 + 0.006 * rattle + 0.24 * pop;
@@ -717,21 +814,29 @@ export class Explorer extends Player {
     r[C.wrR] = -0.1;
   }
 
-  // Lighter landings: a quick soft crouch, arms out to balance.
+  // She lands on springs: a quick soft crouch, arms out to balance, and
+  // she bounces straight back up out of it - up onto her toes, a little
+  // stretch, chin up, arms flicking up and out (the book arm less) - then a
+  // smaller dip and a smaller bounce as it rings out (see FEEL.land).
   landOverlay(Pz, land) {
-    Pz[C.hipY] -= 0.07 * land;
-    Pz[C.knL] += 0.38 * land;
-    Pz[C.knR] += 0.38 * land;
-    Pz[C.thLx] += 0.2 * land;
-    Pz[C.thRx] += 0.2 * land;
-    Pz[C.anL] += 0.2 * land;
-    Pz[C.anR] += 0.2 * land;
-    Pz[C.spLean] += 0.18 * land;
-    Pz[C.shLz] += 0.45 * land;
-    Pz[C.shRz] += 0.45 * land;
-    Pz[C.elL] -= 0.3 * land;
-    Pz[C.elR] -= 0.3 * land;
-    Pz[C.sq] -= 0.04 * land;
+    const d = Math.max(0, land), p = Math.max(0, -land);
+    Pz[C.hipY] += -0.075 * d + 0.075 * p;
+    Pz[C.knL] += 0.4 * d - 0.15 * p;
+    Pz[C.knR] += 0.4 * d - 0.15 * p;
+    Pz[C.thLx] += 0.2 * d;
+    Pz[C.thRx] += 0.2 * d;
+    Pz[C.anL] += 0.2 * d - 0.45 * p;
+    Pz[C.anR] += 0.2 * d - 0.45 * p;
+    Pz[C.spLean] += 0.17 * d - 0.08 * p;
+    Pz[C.chLean] -= 0.16 * p;
+    Pz[C.hdPitch] -= 0.18 * p;
+    Pz[C.shLz] += 0.45 * d + 0.7 * p;
+    Pz[C.shRz] += 0.45 * d + 0.5 * p;
+    Pz[C.shLx] += 0.6 * p;
+    Pz[C.shRx] += 0.3 * p;
+    Pz[C.elL] -= 0.3 * d + 0.35 * p;
+    Pz[C.elR] -= 0.3 * d;
+    Pz[C.sq] += -0.045 * d + 0.08 * p;
   }
 
   // A side-skip: a hop off the outside foot, leaning hard into it, arms
@@ -763,15 +868,17 @@ export class Explorer extends Player {
       if (S.value === S.to) continue;
       S.t += dt;
       const u = clamp((S.t - S.delay) / S.dur, 0, 1);
-      const e = u * u * (3 - 2 * u);
+      const e = S.ease ? S.ease(u) : u * u * (3 - 2 * u);
       S.value = u >= 1 ? S.to : S.from + (S.to - S.from) * e;
     }
     // (a crash takes over: let the spins go)
     const live = 1 - cw;
     const pitch = (P.value % (Math.PI * 2)) * live;
     const yaw = (Y.value % (Math.PI * 2)) * live;
-    if (pitch === 0 && yaw === 0) return;
     const b = this.body;
+    // the handspring's spring off her hands
+    b.position.y += this.hsLift * this.w.jump * live;
+    if (pitch === 0 && yaw === 0) return;
     _e.set(pitch, yaw, 0, 'YXZ');
     _q.setFromEuler(_e);
     b.quaternion.premultiply(_q);
@@ -799,7 +906,7 @@ export class Explorer extends Player {
   dustStep(dt) {
     const P = this.dustPlan;
     if (!P) return;
-    if (!this.sliding || this.crashed || !this.grounded) {
+    if (!this.sliding || this.crashed || !this.grounded || this.wet) {
       this.dustPlan = null;
       return;
     }

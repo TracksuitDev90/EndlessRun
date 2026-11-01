@@ -115,6 +115,10 @@ export const FEEL = {
   lean: [0.035, 0.4], // roll per m/s of sideways speed, limit
   turn: [0.025, 0.35], // yaw per m/s, limit
   jump: CONFIG.jump,
+  // the bounce of a landing (see landCurve): how quick it is (Hz) and how
+  // soon it settles (damping, 0..1: low rings on in little bounces), and how
+  // far the camera dips with it (m)
+  land: { freq: 4.2, zeta: 0.35, thud: 0 },
 };
 
 const wrapAngle = (a) => a - TAU * Math.floor((a + Math.PI) / TAU);
@@ -136,7 +140,7 @@ export function cyc(keys, p) {
 
 // Cubic Hermite through (t, value) keys with Catmull-Rom tangents (given end
 // tangents), for the non-uniform swing path.
-function hermite(ts, vs, m0, m1, t) {
+export function hermite(ts, vs, m0, m1, t) {
   let i = 0;
   while (i < ts.length - 2 && t > ts[i + 1]) i++;
   const t0 = ts[i], t1 = ts[i + 1];
@@ -201,10 +205,13 @@ export class Player {
     this.pSlide = new Float32Array(N);
     this.pIdle = new Float32Array(N);
     this.pCrash = new Float32Array(N);
+    // the jump / slide pose as it was when the next one began (see blendIn)
+    this.pJumpFrom = new Float32Array(N);
+    this.pSlideFrom = new Float32Array(N);
     this.w = { run: 0, jump: 0, slide: 0, idle: 1 };
     this.stride = 0;
     this.springs = {};
-    for (const k of ['hdPitch', 'hdYaw', 'hdRoll', 'spLean', 'chTwist', 'spSide', 'chSide', 'shLx', 'shRx', 'shLz', 'shRz', 'elL', 'elR', 'swL', 'swR', 'abL', 'abR', 'lane', 'land']) {
+    for (const k of ['hdPitch', 'hdYaw', 'hdRoll', 'spLean', 'chTwist', 'spSide', 'chSide', 'shLx', 'shRx', 'shLz', 'shRz', 'elL', 'elR', 'swL', 'swR', 'abL', 'abR', 'lane']) {
       this.springs[k] = new Spring();
     }
     // the body riding on the pelvis (see animate): torso fold and sway, a
@@ -363,10 +370,16 @@ export class Player {
     this.crashed = false;
     this.crashT = 0;
     this.reviveT = 0;
-    this.landT = 0;
+    this.landClock = 9;
+    this.landHit = 0;
+    this.camDip = 0;
     this.jumpT = 9;
     this.jumpSide = 1;
     this.slideSide = 1;
+    this.jumpX = 1;
+    this.slideX = 1;
+    this.vyPose = 0;
+    this.vyOff = 0;
     this.phase = 0;
     this.time = 0;
     this.speed = 0;
@@ -412,7 +425,10 @@ export class Player {
       if (this.grounded) {
         this.startSlide();
       } else {
+        // (the pose follows the plunge over a few frames: see vyPose)
+        const was = this.vy;
         this.vy = Math.min(this.vy, -CONFIG.fastFall);
+        this.vyOff += was - this.vy;
         this.slideQueued = true;
         this.jumpBuffer = 0;
         this.onFastFall();
@@ -425,8 +441,33 @@ export class Player {
   onFastFall() {}
   onLand() {}
 
+  // A landing's bounce over time since touchdown, for a landing of strength 1
+  // (a plain jump's): it drops straight into the dip (about +1 at the
+  // bottom), comes back up past where it started (negative: the rebound) and
+  // rings out - the impulse response of a damped spring, solved exactly, so
+  // it is the same at any frame rate.
+  landCurve(t) {
+    const L = this.feel.land;
+    const z = L.zeta, r = Math.sqrt(1 - z * z);
+    const w = TAU * L.freq, wd = w * r;
+    if (t * z * w > 7) return 0;
+    const peak = r * Math.exp((-z / r) * Math.atan(r / z));
+    // (the first few hundredths of a second ease in: a body meets the ground
+    // over a frame or two, it doesn't teleport into its crouch)
+    return ((Math.exp(-z * w * t) * Math.sin(wd * t)) / peak) * (1 - Math.exp(-t / 0.025));
+  }
+
   jump() {
+    // a jump taken straight off a landing (or out of a slide) starts while
+    // the last one's pose still shows: ease out of it (see blendIn) rather
+    // than snapping to the new lead leg or trick in a single frame
+    if (this.w.jump > 0.04) {
+      this.pJumpFrom.set(this.pJump);
+      this.jumpX = 0;
+    }
     this.vy = this.V0;
+    this.vyPose = this.V0;
+    this.vyOff = 0;
     this.grounded = false;
     this.slideT = 0;
     this.slideQueued = false;
@@ -436,8 +477,23 @@ export class Player {
   }
 
   startSlide() {
-    if (this.slideT <= 0) this.slideSide = -this.slideSide;
+    if (this.slideT <= 0) {
+      this.slideSide = -this.slideSide;
+      if (this.w.slide > 0.04) {
+        this.pSlideFrom.set(this.pSlide);
+        this.slideX = 0;
+      }
+    }
     this.slideT = CONFIG.slide.time;
+  }
+
+  // Ease a freshly started pose in from the one it interrupted, over ~0.16 s.
+  blendIn(p, from, x, dt) {
+    if (x >= 1) return 1;
+    x = Math.min(1, x + dt / 0.16);
+    const e = x * x * (3 - 2 * x);
+    for (let i = 0; i < N; i++) p[i] = from[i] + (p[i] - from[i]) * e;
+    return x;
   }
 
   bounceBack() {
@@ -463,6 +519,7 @@ export class Player {
     this.crashT = 0;
     this.slideT = 0;
     this.vy = Math.max(this.vy, 2.5);
+    this.vyOff = this.vyPose - this.vy;
     this.grounded = false;
   }
 
@@ -516,10 +573,12 @@ export class Player {
       // land only when arriving from above; running into a ledge is a hit, not a mantle
       if (this.y <= ground && this.vy <= 0 && prevY >= ground - 0.3) {
         this.y = ground;
+        // (how hard: a plain jump lands at 1, a fast-fall slams in harder)
+        this.landHit = clamp(-this.vy / this.V0, 0.35, 1.7);
+        this.landClock = 0;
         this.vy = 0;
         this.grounded = true;
-        this.landT = 1;
-        this.onLand();
+        this.onLand(this.landHit);
         if (this.crashed) {
           // stay down
         } else if (this.jumpBuffer > 0) {
@@ -533,6 +592,7 @@ export class Player {
       // walked off the top of something
       this.grounded = false;
       this.vy = 0;
+      this.vyOff = this.vyPose;
     } else if (ground - this.y < 0.3) {
       this.y = ground;
     }
@@ -541,11 +601,20 @@ export class Player {
       this.vy = 0;
       this.grounded = true;
     }
+    // The airborne poses are shaped by the climb and fall (vyPose): it rides
+    // on vy, but a fast-fall's sudden plunge eases in over a few frames, and
+    // on the ground it holds where it landed - so the jump pose fades out in
+    // its landing shape instead of snapping back to its take-off for the
+    // frames it still shows.
+    if (!this.grounded) {
+      this.vyOff *= Math.exp(-dt * 9);
+      this.vyPose = this.vy + this.vyOff;
+    }
     if (this.slideT > 0) this.slideT -= dt;
     if (this.stumbleT > 0) this.stumbleT -= dt;
     if (this.invulnT > 0) this.invulnT -= dt;
     if (this.reviveT > 0) this.reviveT -= dt;
-    if (this.landT > 0) this.landT = Math.max(0, this.landT - dt * 4.2);
+    this.landClock += dt;
     this.jumpT += dt;
     if (this.crashed) this.crashT += dt;
 
@@ -581,6 +650,8 @@ export class Player {
     this.poseJump(this.pJump, t);
     this.poseSlide(this.pSlide, t);
     this.poseIdle(this.pIdle, t);
+    this.jumpX = this.blendIn(this.pJump, this.pJumpFrom, this.jumpX, dt);
+    this.slideX = this.blendIn(this.pSlide, this.pSlideFrom, this.slideX, dt);
 
     const total = this.w.run + this.w.jump + this.w.slide + this.w.idle || 1;
     const Pz = this.pose;
@@ -589,8 +660,12 @@ export class Player {
     }
 
     // landing: fold, squash, arms drop
-    const land = this.springs.land.step(this.landT * this.landT, 5.5, 0.32, dt);
+    const land = this.crashed ? 0 : this.landHit * this.landCurve(this.landClock);
     this.landOverlay(Pz, land);
+    this.camDip = this.feel.land.thud * land;
+    // (however the bounce bends them, knees never bend backward)
+    Pz[C.knL] = Math.max(0, Pz[C.knL]);
+    Pz[C.knR] = Math.max(0, Pz[C.knR]);
     // take-off stretch
     if (this.jumpT < 0.25) Pz[C.sq] += 0.06 * Math.sin((this.jumpT / 0.25) * Math.PI);
 
@@ -728,20 +803,23 @@ export class Player {
     this.root.visible = this.invulnT > 0 && !this.crashed ? Math.floor(this.invulnT * 12) % 2 === 0 : true;
   }
 
+  // Landing: fold into the dip (land > 0), squashing; rise out of it on the
+  // rebound (land < 0). A character shapes their own.
   landOverlay(Pz, land) {
-    Pz[C.hipY] -= 0.1 * land;
-    Pz[C.knL] += 0.5 * land;
-    Pz[C.knR] += 0.5 * land;
-    Pz[C.thLx] += 0.25 * land;
-    Pz[C.thRx] += 0.25 * land;
-    Pz[C.anL] += 0.25 * land;
-    Pz[C.anR] += 0.25 * land;
-    Pz[C.spLean] += 0.22 * land;
-    Pz[C.elL] -= 0.4 * land;
-    Pz[C.elR] -= 0.4 * land;
-    Pz[C.shLz] += 0.25 * land;
-    Pz[C.shRz] += 0.25 * land;
-    Pz[C.sq] -= 0.07 * land;
+    const d = Math.max(0, land), p = Math.max(0, -land);
+    Pz[C.hipY] += -0.1 * d + 0.02 * p;
+    Pz[C.knL] += 0.5 * d;
+    Pz[C.knR] += 0.5 * d;
+    Pz[C.thLx] += 0.25 * d;
+    Pz[C.thRx] += 0.25 * d;
+    Pz[C.anL] += 0.25 * d;
+    Pz[C.anR] += 0.25 * d;
+    Pz[C.spLean] += 0.22 * d;
+    Pz[C.elL] -= 0.4 * d;
+    Pz[C.elR] -= 0.4 * d;
+    Pz[C.shLz] += 0.25 * d;
+    Pz[C.shRz] += 0.25 * d;
+    Pz[C.sq] += -0.07 * d + 0.03 * p;
   }
 
   laneOverlay(Pz, lc) {
@@ -865,6 +943,7 @@ export class Player {
     const freq = this.stride;
     const duty = freq > 0 ? clamp((ST.reach * freq) / Math.max(v, 1e-3), ST.minContact * freq, ST.maxDuty) : ST.maxDuty;
     const span = freq > 0 ? Math.min(ST.reach, (v * duty) / freq) : 0;
+    this.duty = duty; // (the share of the stride a foot is down: see footfalls)
     const zTD = ST.ballZ - span / 2;
     const ballH = ANKLE_H - TOE_D;
     // this pose's hips, to bring the targets into hip space
@@ -945,7 +1024,15 @@ export class Player {
     const ly = -THIGH - SHIN * Math.cos(kn);
     const lz = SHIN * Math.sin(kn);
     const ll = Math.hypot(ly, lz);
-    const tz = Math.asin(clamp(-d.x / (Math.hypot(d.y, d.z, d.x) * (ly / ll)), -0.9, 0.9));
+    // The splay swings the ankle sideways by sin(splay) * ly, its drop along
+    // the thigh. As the knee folds up in the swing the ankle comes to sit
+    // right behind the hip (ly passes through 0), where no splay can move it
+    // sideways: solved exactly there, the thigh flicked out ~64 degrees and
+    // back, flipping side to side for a frame or two every stride. So below
+    // 0.8 of the leg's length that lever is held at 0.8: exact while the leg
+    // reaches or stands (the planted foot never skids), and as the knee folds
+    // the tucked foot gives up a centimetre or two sideways instead.
+    const tz = Math.asin(clamp(-d.x / (Math.hypot(d.y, d.z, d.x) * Math.min(ly / ll, -0.8)), -0.9, 0.9));
     const tx = Math.atan2(d.z, d.y) - Math.atan2(lz / ll, (Math.cos(tz) * ly) / ll);
     const thx = wrapAngle(tx);
     const shin = hipTilt + thx - kn;
@@ -1086,6 +1173,23 @@ export class Player {
 
   // a character's own secondary motion (cape, pouch, backpack...)
   simulate() {}
+
+  // Which feet pushed off the road since the last call (bit 1 left, 2
+  // right), from the stride's phase rather than the pose, so a toe-off is
+  // never missed however short the contact or long the frame.
+  footfalls() {
+    const duty = this.duty ?? 0.2;
+    const k = this.toeOffK || (this.toeOffK = [NaN, NaN]);
+    let out = 0;
+    for (let side = 0; side < 2; side++) {
+      const n = Math.floor((this.phase + side * Math.PI - Math.PI - Math.PI * duty) / TAU);
+      if (n > k[side] && this.mode === 'run' && this.stride > 0) out |= 1 << side;
+      // (a contact share growing as the pace drops can tick the count back
+      // one: keep the higher, so no push-off counts twice)
+      if (n > k[side] || !(n >= k[side] - 1)) k[side] = n;
+    }
+    return out;
+  }
 
   // Locks of hair: each swings toward the push of the air streaming back over
   // the head and away from the head's own acceleration — bouncing on every

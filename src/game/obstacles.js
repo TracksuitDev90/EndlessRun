@@ -386,6 +386,17 @@ export class ObstacleField {
     return h;
   }
 
+  // Whether the runner's feet are over water (a wade obstacle): no dust there.
+  wetAt(x, dist) {
+    for (const o of this.records) {
+      if (!o.wade) continue;
+      if (dist < o.d - 0.1 || dist > o.d + o.len + 0.1) continue;
+      if (Math.abs(x - o.x) > o.hw) continue;
+      return true;
+    }
+    return false;
+  }
+
   nextHint(dist, range) {
     for (const g of this.groups) {
       if (g.hint && !g.hinted && g.d > dist && g.d - dist < range) return g;
