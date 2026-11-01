@@ -7,7 +7,8 @@ import { makeDustMaterial } from '../render/shaders.js';
 // thrown from the runner's own space and left behind in the world (track
 // coordinates: x, y and how far along the run), so a slide leaves a trail of
 // them streaming back past the camera. One draw call, and none at all while
-// the air is clear.
+// the air is clear. (The same points can be water instead: drops flung up
+// and spray, splashing through the surf in the Gallery's sands.)
 
 const MAX = 40;
 
@@ -24,25 +25,27 @@ export class Dust {
     this.points.frustumCulled = false;
     this.points.renderOrder = 4;
     this.points.visible = false;
-    this.p = Array.from({ length: MAX }, () => ({ live: false, grit: 0, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.3, grow: 1, alpha: 1, seed: 0 }));
+    this.p = Array.from({ length: MAX }, () => ({ live: false, kind: 0, falls: false, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.3, grow: 1, alpha: 1, seed: 0 }));
     // (what's been thrown since the last update, in preallocated slots: no
     // garbage however much dust flies)
-    this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, grit: false, alpha: -1, life: 1, grow: 1 }));
+    this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, kind: 0, alpha: -1, life: 1, grow: 1 }));
     this.queued = 0;
     this.next = 0;
   }
 
-  // A puff (grit: false) or a speck of grit at p, moving at v, both in the
-  // runner's space; size in metres as it starts. Optionally, for a puff:
-  // alpha (how thick it is; < 0 the default), and scales on how long it
-  // lasts (life) and how far it blooms (grow).
+  // A puff (grit: false) or a speck of grit (true) at p, moving at v, both
+  // in the runner's space; size in metres as it starts. grit 2 is a drop of
+  // water instead (flung up and falling like grit), 3 a burst of spray (a
+  // puff of it). Optionally, for a puff: alpha (how thick it is; < 0 the
+  // default), and scales on how long it lasts (life) and how far it blooms
+  // (grow).
   emit(p, v, size, grit = false, alpha = -1, life = 1, grow = 1) {
     if (this.queued >= MAX) return;
     const q = this.queue[this.queued++];
     q.p.copy(p);
     q.v.copy(v);
     q.size = size;
-    q.grit = grit;
+    q.kind = grit === true ? 1 : grit === false ? 0 : grit;
     q.alpha = alpha;
     q.life = life;
     q.grow = grow;
@@ -56,7 +59,8 @@ export class Dust {
       const w = q.p.applyQuaternion(root.quaternion).add(root.position);
       const v = q.v.applyQuaternion(root.quaternion);
       it.live = true;
-      it.grit = q.grit ? 1 : 0;
+      it.kind = q.kind;
+      it.falls = q.kind === 1 || q.kind === 2;
       it.x = w.x;
       it.y = w.y;
       it.d = dist - (w.z - z);
@@ -66,17 +70,17 @@ export class Dust {
       it.age = 0;
       it.seed = Math.random();
       it.size = q.size * (0.8 + 0.4 * it.seed);
-      it.life = (q.grit ? 0.45 + 0.3 * it.seed : 0.55 + 0.45 * it.seed) * q.life;
-      it.grow = q.grit ? 1 : 1 + (1.6 + 1.2 * it.seed) * q.grow;
-      it.alpha = q.grit ? 1 : q.alpha >= 0 ? q.alpha : 0.75 + 0.2 * it.seed;
+      it.life = (it.falls ? 0.45 + 0.3 * it.seed : 0.55 + 0.45 * it.seed) * q.life;
+      it.grow = it.falls ? 1 : 1 + (1.6 + 1.2 * it.seed) * q.grow;
+      it.alpha = it.falls ? 1 : q.alpha >= 0 ? q.alpha : 0.75 + 0.2 * it.seed;
     }
     this.queued = 0;
     let n = 0;
     for (const it of this.p) {
       if (!it.live) continue;
       it.age += dt;
-      if (it.grit) {
-        // grit: flung up, falls back under gravity, gone when it lands
+      if (it.falls) {
+        // grit (or a drop): flung up, falls back under gravity, gone when it lands
         it.vy -= 16 * dt;
         const k = Math.exp(-1.2 * dt);
         it.vx *= k;
@@ -102,9 +106,9 @@ export class Dust {
       this.pos[n * 3 + 1] = it.y;
       this.pos[n * 3 + 2] = z - (it.d - dist);
       const e = 1 - (1 - u) * (1 - u);
-      this.dust[n * 4] = it.grit ? it.size : it.size * (1 + (it.grow - 1) * e);
-      this.dust[n * 4 + 1] = it.grit ? it.alpha * (1 - u * u) : it.alpha * Math.min(1, u * 8) * (1 - u) * (1 - u * 0.4);
-      this.dust[n * 4 + 2] = it.grit;
+      this.dust[n * 4] = it.falls ? it.size : it.size * (1 + (it.grow - 1) * e);
+      this.dust[n * 4 + 1] = it.falls ? it.alpha * (1 - u * u) : it.alpha * Math.min(1, u * 8) * (1 - u) * (1 - u * 0.4);
+      this.dust[n * 4 + 2] = it.kind;
       this.dust[n * 4 + 3] = it.seed;
       n++;
     }
