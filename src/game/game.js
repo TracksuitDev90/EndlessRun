@@ -513,6 +513,9 @@ export class Game {
 
     this.prevDist = this.dist;
     this.dist += this.speed * dt;
+    // the ground's patterns blur along the run by the shutter's share of this
+    // frame's travel (see runLine in shaders.js)
+    shared.uMotion.value = this.speed * dt * CONFIG.motionBlur;
 
     if (this.dist - this.origin > CONFIG.rebaseStep) {
       this.origin += CONFIG.rebaseStep;
@@ -545,8 +548,8 @@ export class Game {
 
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);
     // the world is kept true out to where the runner will be in a few seconds
-    const [rs, r0, r1] = CONFIG.dream.read;
-    const read = Math.min(r1, Math.max(r0, CONFIG.camera.back + Math.max(this.speed, CONFIG.speed.start) * rs));
+    const R = CONFIG.dream.read;
+    const read = Math.min(R[2], Math.max(R[1], CONFIG.camera.back + Math.max(this.speed, CONFIG.speed.start) * R[0]));
     shared.uBend.value.set(CONFIG.bend, sway, read, CONFIG.bendStart);
     this.particles.update(this.dist);
     this.particles2.update(this.dist);
@@ -554,6 +557,10 @@ export class Game {
 
     this.current.flush(this.origin);
     if (this.next) this.next.flush(this.origin);
+    const camDist = this.camDist();
+    const twisting = shared.uDream.value.x !== 0;
+    this.current.cull(camDist, twisting);
+    if (this.next) this.next.cull(camDist, twisting);
 
     // tutorial hints
     if (st === 'running' && !this.tutorialDone) {
@@ -588,7 +595,12 @@ export class Game {
     this.cam.resize(w, h);
   }
 
-  // Compile every shader up front so the first doorway never hitches.
+  // Compile every shader up front so the first doorway never hitches; while
+  // the GPU compiles, index every world's geometry (see weld in geo.js); then
+  // draw everything once, out of sight under the loading screen, so every
+  // buffer and texture is on the GPU and every program has been used before
+  // the run begins (otherwise each world uploads its geometry the first time
+  // its doorway comes into view).
   async precompile() {
     const scene = new THREE.Scene();
     const roots = [];
@@ -599,8 +611,23 @@ export class Game {
     }
     scene.add(this.player.root, this.player.shadow, this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
     try {
-      if (this.renderer.compileAsync) await this.renderer.compileAsync(scene, this.cam.camera);
-      else this.renderer.compile(scene, this.cam.camera);
+      const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
+      let t = performance.now();
+      for (const w of this.worlds) {
+        for (const _ of w.weldAll()) {
+          if (performance.now() - t > 12) {
+            await new Promise((r) => setTimeout(r, 0));
+            t = performance.now();
+          }
+        }
+      }
+      await compiling;
+      const r = this.renderer;
+      r.setScissorTest(true);
+      r.setScissor(0, 0, 1, 1);
+      r.render(scene, this.cam.camera);
+      r.setScissorTest(false);
+      r.clear(true, true, true);
     } finally {
       for (const w of this.worlds) w.setAllVisibleForCompile(false);
       for (const [root, parent] of roots) {

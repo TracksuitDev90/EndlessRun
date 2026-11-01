@@ -245,3 +245,72 @@ export function groundStrip(width, length, color, segZ = 8, o = {}) {
   }
   return part(g, color, { outline: 0, ...o });
 }
+
+// Index a non-indexed geometry by merging vertices whose every attribute is
+// bit-for-bit the same (part() un-indexes each primitive to merge it, so a
+// sphere's shared vertices come back as exact copies). The triangles and
+// their order are unchanged, so it draws exactly the same picture — but the
+// GPU can reuse a transformed vertex instead of running the (heavy) vertex
+// shader again for each copy: about a third as many vertices to shade.
+export function weld(geo) {
+  if (geo.index) return geo;
+  const names = Object.keys(geo.attributes);
+  const attrs = names.map((nm) => geo.attributes[nm]);
+  const n = geo.attributes.position.count;
+  if (n < 6 || attrs.some((a) => a.isInterleavedBufferAttribute || !(a.array instanceof Float32Array))) return geo;
+  // every vertex's attributes side by side, as raw bits
+  let S = 0;
+  for (const a of attrs) S += a.itemSize;
+  const key = new Uint32Array(n * S);
+  let off = 0;
+  for (const a of attrs) {
+    const v = new Uint32Array(a.array.buffer, a.array.byteOffset, a.array.length);
+    const s = a.itemSize;
+    for (let i = 0; i < n; i++) for (let j = 0; j < s; j++) key[i * S + off + j] = v[i * s + j];
+    off += s;
+  }
+  // open-addressed hash of the distinct vertices
+  let size = 1;
+  while (size < n * 2) size <<= 1;
+  const mask = size - 1;
+  const slots = new Int32Array(size).fill(-1);
+  const first = new Int32Array(n); // unique vertex -> its first source vertex
+  const remap = new Uint32Array(n);
+  let unique = 0;
+  for (let i = 0; i < n; i++) {
+    const b = i * S;
+    let h = 2166136261;
+    for (let j = 0; j < S; j++) h = Math.imul(h ^ key[b + j], 16777619);
+    let p = (h ^ (h >>> 15)) & mask;
+    for (;;) {
+      const u = slots[p];
+      if (u < 0) {
+        slots[p] = unique;
+        first[unique] = i;
+        remap[i] = unique++;
+        break;
+      }
+      const c = first[u] * S;
+      let j = 0;
+      while (j < S && key[c + j] === key[b + j]) j++;
+      if (j === S) {
+        remap[i] = u;
+        break;
+      }
+      p = (p + 1) & mask;
+    }
+  }
+  if (unique > n * 0.9) return geo; // nothing much to gain
+  const out = new THREE.BufferGeometry();
+  for (const [k, a] of attrs.entries()) {
+    const s = a.itemSize;
+    const arr = new Float32Array(unique * s);
+    for (let u = 0; u < unique; u++) {
+      const src = first[u] * s;
+      for (let j = 0; j < s; j++) arr[u * s + j] = a.array[src + j];
+    }
+    out.setAttribute(names[k], new THREE.BufferAttribute(arr, s, a.normalized));
+  }
+  out.setIndex(new THREE.BufferAttribute(unique < 65536 ? Uint16Array.from(remap) : remap, 1));
+  return out;
+}

@@ -41,6 +41,11 @@ const PAIRS = [
   ['clL', 'clR'], ['clLy', 'clRy'], ['shLx', 'shRx'], ['shLy', 'shRy'], ['shLz', 'shRz'], ['elL', 'elR'], ['wrL', 'wrR'], ['wrLz', 'wrRz'],
   ['thLx', 'thRx'], ['thLz', 'thRz'], ['thLy', 'thRy'], ['knL', 'knR'], ['anL', 'anR'], ['toL', 'toR'],
 ].map(([a, b]) => [C[a], C[b]]);
+// each arm's channels: shoulder swing, twist, spread, elbow, collarbone, wrist, wrist roll
+const ARM_CH = [
+  ['shLx', 'shLy', 'shLz', 'elL', 'clL', 'wrL', 'wrLz'].map((n) => C[n]),
+  ['shRx', 'shRy', 'shRz', 'elR', 'clR', 'wrR', 'wrRz'].map((n) => C[n]),
+];
 const NEGATE = ['hipX', 'hipYaw', 'hipRoll', 'spTwist', 'spSide', 'chTwist', 'chSide', 'hdYaw', 'hdRoll', 'bodyRoll'].map((n) => C[n]);
 
 function mirror(p) {
@@ -169,6 +174,11 @@ function curve(P, N, o, a, b) {
   return (4 * (lx * N[o] + ly * N[o + 1] + lz * N[o + 2])) / Math.max(1e-6, dx * dx + dy * dy + dz * dz);
 }
 const UP = new THREE.Vector3(0, 1, 0);
+
+// A spring kicked by a change of velocity (an impulse, so it hits as hard at
+// any frame rate), and a soft saturation of its output.
+const kick = (spr, c, d, live) => (spr.v += c * d * live);
+const soft = (x, m) => m * Math.tanh(x / m);
 
 export class Player {
   constructor(envDef) {
@@ -326,6 +336,7 @@ export class Player {
       this.cloth.leash[j] = s < 0.3 ? 0.003 + 3 * Math.max(0, s - 0.08) ** 2 : Infinity;
     }
     this.cloth.setColliderCount(this.capeDefs.length);
+    this.capeFold = new Float32Array(cols * rows);
     this.capeM = (bone) => _m.multiplyMatrices(this.b[bone].matrixWorld, this.boneInv[bone]);
     this.wind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.2, draw: 0.7, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.4, floor: 0, lift: 0.1, t: 0 };
 
@@ -484,6 +495,7 @@ export class Player {
     this.invulnT = CONFIG.reviveInvulnerable;
     this.vy = 0;
     this.y = 0;
+    this.vx = 0;
     this.grounded = true;
     this.slideT = 0;
     this.lane = Math.round((this.x - CONFIG.laneX[0]) / 2.4);
@@ -493,11 +505,22 @@ export class Player {
   update(dt, speed, groundAt) {
     this.time += dt;
     this.speed = speed;
-    // lanes
+    // lanes: a critically damped spring toward the lane, solved exactly (the
+    // same path at any frame rate). Velocity is continuous — a dodge eases
+    // in over a couple of frames instead of starting at full speed, and a
+    // quick reversal swings back through rather than snapping round — yet
+    // it clears a lane's obstacle as soon as the old first-order follow did.
     const tx = CONFIG.laneX[this.lane];
-    const nx = this.crashed ? this.x : damp(this.x, tx, CONFIG.laneRate, dt);
-    this.vx = (nx - this.x) / Math.max(dt, 1e-4);
-    this.x = nx;
+    if (this.crashed) {
+      this.vx = 0;
+    } else {
+      const w = CONFIG.laneSpring;
+      const e = Math.exp(-w * dt);
+      const d = this.x - tx;
+      const j = (this.vx + w * d) * dt;
+      this.x = tx + (d + j) * e;
+      this.vx = (this.vx - w * j) * e;
+    }
 
     // vertical
     const ground = groundAt ? groundAt(this.x) : 0;
@@ -505,8 +528,9 @@ export class Player {
     if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
     if (!this.grounded) {
       const prevY = this.y;
+      // (exact for constant gravity: the same arc and airtime at any frame rate)
+      this.y += this.vy * dt - 0.5 * G * dt * dt;
       this.vy -= G * dt;
-      this.y += this.vy * dt;
       // land only when arriving from above; running into a ledge is a hit, not a mantle
       if (this.y <= ground && this.vy <= 0 && prevY >= ground - 0.3) {
         this.y = ground;
@@ -671,17 +695,15 @@ export class Player {
     const dv = this.pelvisD, dp = this.pelvisDP;
     const D = this.dyn;
     const live = 1 - cw;
-    const kick = (spr, c, d) => (spr.v += c * d * live);
-    const soft = (x, m) => m * Math.tanh(x / m);
-    kick(D.flex, 1.2, dv.y);
-    kick(D.flex, 3.6, dp.y);
-    kick(D.flap, -1.0, dv.y);
-    kick(D.flap, -3.2, dp.y);
-    kick(D.sway, 0.12, dv.x);
-    kick(D.sway, 0.5, dp.x);
-    kick(D.fling, 0.17, dv.x);
-    kick(D.fling, 0.6, dp.x);
-    kick(D.surge, 0.05, dv.z);
+    kick(D.flex, 1.2, dv.y, live);
+    kick(D.flex, 3.6, dp.y, live);
+    kick(D.flap, -1.0, dv.y, live);
+    kick(D.flap, -3.2, dp.y, live);
+    kick(D.sway, 0.12, dv.x, live);
+    kick(D.sway, 0.5, dp.x, live);
+    kick(D.fling, 0.17, dv.x, live);
+    kick(D.fling, 0.6, dp.x, live);
+    kick(D.surge, 0.05, dv.z, live);
     const flex = soft(D.flex.step(0, 3.2, 0.32, dt), 0.3);
     const flap = soft(D.flap.step(0, 3, 0.26, dt), 0.35);
     const sway = soft(D.sway.step(0, 1.8, 0.36, dt), 0.22);
@@ -792,11 +814,10 @@ export class Player {
     r[C.hdPitch] = r[C.hipPitch] + r[C.spLean] + r[C.chLean] - 0.22;
     r[C.hdYaw] = -0.7 * (r[C.hipYaw] + r[C.spTwist] + r[C.chTwist]);
     r[C.hdRoll] = -0.6 * (r[C.hipRoll] + r[C.spSide]);
-    for (const [ph, sh, sy, sz, el, cl, wr, wz] of [
-      [f, C.shLx, C.shLy, C.shLz, C.elL, C.clL, C.wrL, C.wrLz],
-      [f + Math.PI, C.shRx, C.shRy, C.shRz, C.elR, C.clR, C.wrR, C.wrRz],
-    ]) {
-      const q = ph + Math.PI; // arm follows the opposite leg
+    for (let side = 0; side < 2; side++) {
+      const ch = ARM_CH[side];
+      const sh = ch[0], sy = ch[1], sz = ch[2], el = ch[3], cl = ch[4], wr = ch[5], wz = ch[6];
+      const q = f + side * Math.PI + Math.PI; // arm follows the opposite leg
       r[sh] = cyc(ARM.swing, q) * armAmp + 0.06;
       r[sz] = cyc(ARM.abd, q) + 0.04;
       r[sy] = 0.1 * Math.sin(q);
@@ -1312,12 +1333,18 @@ export class Player {
     } else {
       cl.step(dt, f);
     }
-    // hand the particles to the shader, in the runner's own space, with how
-    // deeply the cloth curves at each (1/m, toward its outside; across plus a
-    // share along, softened over the neighbours so only real folds and waves
-    // count)
+    this.writeCape();
+  }
+
+  // Hand the particles to the shader, in the runner's own space, with how
+  // deeply the cloth curves at each (1/m, toward its outside; across plus a
+  // share along, softened over the neighbours so only real folds and waves
+  // count).
+  writeCape() {
+    const { cols, rows } = CAPE;
+    const cl = this.cloth;
     const D = this.capeData;
-    const K = this.capeFold || (this.capeFold = new Float32Array(cols * rows));
+    const K = this.capeFold;
     const P = cl.p, Nn = cl.nrm;
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {

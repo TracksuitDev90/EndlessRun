@@ -47,7 +47,10 @@ body {
   outline: none;
 }
 
-/* The ink that creeps in from the edges after a stumble. */
+/* The ink that creeps in from the edges after a stumble. (Plain alpha over
+   the game rather than a multiply blend: with an ink this dark the two look
+   the same, and a blend mode over a WebGL canvas costs phones a whole extra
+   full-screen pass. Its own compositor layer, so fading it repaints nothing.) */
 #ink {
   position: fixed;
   inset: 0;
@@ -55,8 +58,8 @@ body {
   opacity: 0;
   transition: opacity 0.25s ease-out;
   background:
-    radial-gradient(ellipse at center, rgba(20, 10, 6, 0) 48%, rgba(20, 10, 6, 0.55) 74%, rgba(20, 10, 6, 0.92) 100%);
-  mix-blend-mode: multiply;
+    radial-gradient(ellipse at center, rgba(12, 6, 4, 0) 48%, rgba(12, 6, 4, 0.55) 74%, rgba(12, 6, 4, 0.92) 100%);
+  will-change: opacity;
 }
 
 #ui {
@@ -276,6 +279,9 @@ body:not(.touch) .touch-only {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.4s ease;
+  /* the score ticks many times a second: keep its layout and repaints to itself */
+  contain: layout style;
+  will-change: transform;
 }
 #scorebox.show {
   opacity: 1;

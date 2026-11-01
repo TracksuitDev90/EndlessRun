@@ -2,9 +2,11 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { mulberry32 } from '../core/rng.js';
 
 // Hand-drawn foliage scribbles ("u" and "ω" marks) like the reference trees.
-// Drawn once into a tileable canvas; shaders sample its alpha.
-export function makeMarksTexture() {
-  const size = 256;
+// Drawn once into a tileable canvas; shaders sample its alpha. (Drawn at
+// 512: the same scribbles as the original 256 tile, scaled up, so they stay
+// crisp on foliage right in front of the camera.)
+export function makeMarksTexture(size = 512) {
+  const k = size / 256;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
@@ -23,12 +25,12 @@ export function makeMarksTexture() {
       let dy = Math.abs(m.y - y);
       dx = Math.min(dx, size - dx);
       dy = Math.min(dy, size - dy);
-      if (dx * dx + dy * dy < 26 * 26) {
+      if (dx * dx + dy * dy < 26 * 26 * k * k) {
         ok = false;
         break;
       }
     }
-    if (ok) marks.push({ x, y, r: 5 + rnd() * 4, kind: rnd(), w: 2.2 + rnd() * 1.4 });
+    if (ok) marks.push({ x, y, r: (5 + rnd() * 4) * k, kind: rnd(), w: (2.2 + rnd() * 1.4) * k });
   }
   for (const m of marks) {
     for (const ox of [-size, 0, size]) {
@@ -60,8 +62,11 @@ export function makeMarksTexture() {
 }
 
 // R: white noise (paper grain). G: soft tileable value noise (watercolor wash).
-export function makeNoiseTexture() {
-  const size = 128;
+// (256 texels across: the same noise as the original 128 tile, sampled twice
+// as finely, so where it's stretched — clouds, smoke, lava — it stays smooth
+// instead of showing the bilinear facets between texels. The grain is read
+// one texel per pixel, as before; see GRAIN in shaders.js.)
+export function makeNoiseTexture(size = 256) {
   const data = new Uint8Array(size * size * 4);
   const rnd = mulberry32(4242);
   const grid = (n) => {

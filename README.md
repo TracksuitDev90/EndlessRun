@@ -490,22 +490,33 @@ Append to the URL:
 
 | Flag | Effect |
 |---|---|
-| `?debug` | FPS, draw calls, triangles, pixel ratio, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
+| `?debug` | FPS (and the display's refresh rate and stride), how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU and its class, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
 | `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
+| `?fps=30` | lock the frame rate (an even 30 on any display; resolution still adapts) |
 | `?manual` | no render loop; drive frames with `__step(frames, dt)` from the console (used for automated tests) |
 
 ## How it holds 60 fps
 
 - **Everything is instanced.** Each prop type (a cypress, a house, a hedge…) is
-  one `InstancedMesh`; a world draws in roughly 30–60 draw calls including ink
+  one `InstancedMesh`; a world draws in roughly 40–80 draw calls including ink
   outlines. Placements live in plain records and are only re-uploaded when
   chunks stream in/out — steady-state frames do no buffer work. The game logic
   takes well under a millisecond per frame.
+- **Indexed geometry.** `part()` un-indexes each primitive so props can be
+  merged, which leaves a sphere's shared vertices as exact copies; while the
+  shaders compile at load, every batch's geometry is welded back into an
+  index (only bit-identical vertices merge, so it draws exactly the same
+  picture), and the GPU shades a third to a half as many vertices.
+- **Nothing drawn that can't be seen.** Placements stream in in order of
+  distance, so the far end of a batch is the end of its list: props that rise
+  or lift into view are flattened or sunk out of sight until the camera nears
+  them, and that tail of each batch is left out of the draw. The sky is drawn
+  last, on the far plane, so it only shades the pixels nothing else covered.
 - **Procedural generation is cheap here.** The track streams in 16 m chunks
   just ahead of you and recycles them behind, so only ~15 chunks exist at once
   no matter how far you run. A floating origin keeps float precision perfect
@@ -520,26 +531,57 @@ Append to the URL:
   rides on spring follow-through, the cape is a 19×19 cloth simulation whose
   surface the GPU rebuilds from a 19×19 texture of particle positions (the
   only thing uploaded per frame), and the curls and hip pouch are springs;
-  animation and simulation together take about 1 ms on a desktop (see
-  [The runner](#the-runner)).
+  animation and simulation together take about half a millisecond on a
+  desktop (see [The runner](#the-runner)). The cloth solver's phases are
+  small methods called with integers only: as one big function of nested
+  loops V8 kept cycling it in and out of optimisation, running it mostly
+  unoptimised and boxing every float it touched (~50 KB of garbage a frame,
+  and the GC pauses that come with it); now it allocates nothing.
 - **Cheap, painterly shading.** Hand-written toon shader with a per-world
   lighting model: terminator softness and wrap (harsh vs soft worlds), rim /
   back light, low-lying mist, leaf dapple, an analytic wall shadow, colour
   grade and a tinted vignette — no shadow maps, no post-processing passes.
   Light shafts and lamp cones are soft additive volumes; cast shadows are
   decals. Ink lines use the inverted-hull trick.
-- **No hitches.** All shaders are compiled during the loading screen; no
-  allocations in the hot loop.
-- **Gems are cheap too.** All of a world's stones share one instanced batch
-  — every kind is in the one geometry, and each instance folds away all but
-  its own in the vertex shader — plus its ink, its halos and ground pools one
-  batch each, and the pick-up motes a single point cloud whose bursts live in
-  uniforms: five draw calls in all, however many kinds of stone a world has.
+- **No hitches.** All shaders are compiled during the loading screen, and
+  then everything is drawn once under it, so every world's buffers and
+  textures are on the GPU and every program has been used before the run
+  starts (otherwise each world uploads its geometry the first time its
+  doorway comes into view); no allocations in the hot loop.
+- **Gems are cheap too.** All of a world's stones share one geometry —
+  every kind is in it, its triangles marked with their kind — and each kind
+  present draws its own range of it, instanced; plus its ink, its halos and
+  ground pools one batch each, and the pick-up motes a single point cloud
+  whose bursts live in uniforms: a few draw calls in all, however many kinds
+  of stone a world has.
   Each kind's surface is a handful of numbers in a uniform array. Spinning, bobbing, rippling and being sucked into the
   runner happen in the vertex shader; taking a gem rewrites one small batch once. Planning
   and pick-up cost a few microseconds a frame.
-- **Adaptive resolution.** Renders at up to 2× device pixels and steps down in
-  0.25 increments if the frame rate dips below ~52 fps.
+- **Frame pacing** (`src/core/pacer.js`). The display's refresh period is
+  measured (from refreshes in which nothing was drawn, so slow frames can't
+  pass themselves off as a slow screen), the game renders every *stride*
+  refreshes — every one on a 60 or 90 Hz screen, every other on 120 Hz (an
+  even 60 rather than an uneven ~100) — and each frame advances the
+  simulation by exactly the whole refreshes it will be on screen. Motion lands
+  on vsync with no timestamp jitter, and a late frame advances by one more
+  refresh with no catch-up surge after it. Jumps and lane changes are
+  integrated exactly, so they follow the same path at any frame rate.
+- **Adaptive quality** (`src/core/quality.js`). Starts from a guess at the
+  GPU's class (and what worked last time on the device), renders at up to 2×
+  device pixels, and over ~1.5 s windows steps the resolution down in 0.25
+  increments when frames come late (two at once when most do). If even the
+  lowest resolution can't hold the rate, or the script itself is the
+  bottleneck, it drops to an even half rate (30 fps on a 60 Hz screen) and
+  buys a notch of sharpness back with the time; after a long run of perfect
+  frames it tries a notch sharper, never one that has failed. Resizes happen
+  at most once a frame and only when the size really changed; a paused game
+  stops drawing.
+- **No strobing at speed.** At 28 m/s the road moves further in a frame than
+  its cobbles or slates are deep, and a crisp line across the road seems to
+  strobe or crawl backwards; the ground's lines across the run are smeared
+  over half the frame's travel (as a camera's shutter would) and the forest's
+  grass softens, so they read as speed instead. `CONFIG.motionBlur` sets the
+  shutter (0 turns it off).
 
 The doorway effect renders in two passes while a door is in view: the doorway
 shape writes a stencil mask and the *next* world draws only inside it; then the

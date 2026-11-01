@@ -7,10 +7,12 @@ import { loadRunner } from './game/runner-asset.js';
 import { Input } from './core/input.js';
 import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
+import { FramePacer } from './core/pacer.js';
+import { Quality, gpuClass } from './core/quality.js';
 
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
 // ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
-// 0 = off), ?seed=<n>, ?dpr=<n>, ?god
+// 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
@@ -21,6 +23,7 @@ function parseParams() {
     dream: num('dream'),
     seed: num('seed'),
     dpr: num('dpr'),
+    fps: num('fps'),
     god: q.has('god'),
     manual: q.has('manual'),
   };
@@ -45,56 +48,65 @@ async function boot() {
     throw e;
   }
   renderer.autoClear = false;
+  // (checking every program's compile log is a blocking round trip to the GPU
+  // process on Android; only worth it when debugging)
+  renderer.debug.checkShaderErrors = params.debug;
   renderer.setClearColor(0x000000, 1);
   renderer.info.autoReset = false;
 
   shared.uMarks.value = makeMarksTexture();
   shared.uNoise.value = makeNoiseTexture();
+  // Sharper textures at grazing angles (the road and ground into the
+  // distance) where the GPU has room for it.
+  const gpu = gpuClass(renderer);
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
+  const tier = mobile ? gpu.tier : 'high';
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  shared.uMarks.value.anisotropy = Math.min(maxAniso, tier === 'high' ? 8 : 4);
+  shared.uNoise.value.anisotropy = Math.min(maxAniso, tier === 'high' ? 4 : tier === 'mid' ? 2 : 1);
 
   await loadRunner();
   const audio = new Ambient();
   const game = new Game({ renderer, ui, audio, params });
   window.__game = game;
 
-  // --- adaptive resolution: hold 60fps by trading pixel density ---------------
-  const deviceDpr = Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio);
-  let dpr = params.dpr ? Math.min(params.dpr, 3) : deviceDpr;
-  const quality = { frames: 0, time: 0, cooldown: 2, raised: false };
+  // --- frame pacing and adaptive quality (see core/pacer.js, core/quality.js) ---
+  // Hold a steady frame rate — 60 where the device can, an even 30 where it
+  // can't — trading pixel density first.
+  const pacer = new FramePacer();
+  if (params.fps) pacer.forced = params.fps;
+  const quality = new Quality(pacer, {
+    deviceDpr: Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio),
+    minDpr: CONFIG.minPixelRatio,
+    mobile,
+    gpu: gpu.tier,
+    fixedDpr: params.dpr ? Math.min(params.dpr, 3) : 0,
+    fixedFps: !!params.fps,
+  });
 
+  // Resizing reallocates the canvas (and its multisampled buffers), so it is
+  // only done when the size really changed, at most once a frame — a phone's
+  // address bar sliding away fires a burst of resize events.
+  let sizeKey = '';
+  let resizePending = true;
   function resize() {
+    resizePending = false;
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const dpr = quality.dpr;
+    const key = `${w}x${h}@${dpr}`;
+    if (key === sizeKey) return;
+    sizeKey = key;
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     shared.uPixelRatio.value = dpr;
     shared.uResolution.value.set(Math.max(1, w * dpr), Math.max(1, h * dpr));
     game.resize(w, h);
   }
-  window.addEventListener('resize', resize);
-  window.visualViewport?.addEventListener('resize', resize);
+  const requestResize = () => (resizePending = true);
+  window.addEventListener('resize', requestResize);
+  window.visualViewport?.addEventListener('resize', requestResize);
   resize();
-
-  function sampleQuality(dt) {
-    if (params.dpr) return;
-    quality.cooldown -= dt;
-    quality.frames++;
-    quality.time += dt;
-    if (quality.frames < 90) return;
-    const avg = quality.time / quality.frames;
-    quality.frames = 0;
-    quality.time = 0;
-    if (quality.cooldown > 0) return;
-    if (avg > 1 / 52 && dpr > CONFIG.minPixelRatio) {
-      dpr = Math.max(CONFIG.minPixelRatio, Math.round((dpr - 0.25) * 4) / 4);
-      quality.cooldown = 3;
-      resize();
-    } else if (avg < 1 / 75 && dpr < deviceDpr && !quality.raised) {
-      dpr = Math.min(deviceDpr, dpr + 0.25);
-      quality.raised = true;
-      quality.cooldown = 3;
-      resize();
-    }
-  }
 
   // --- controls ---------------------------------------------------------------
   const togglePause = () => (game.state === 'paused' ? game.resume() : game.pause());
@@ -147,6 +159,9 @@ async function boot() {
       game.pause();
       audio.suspend();
     }
+    // the first frame back is not a late one
+    pacer.reset();
+    quality.hold(1);
   });
 
   if (params.debug) {
@@ -157,48 +172,86 @@ async function boot() {
   }
 
   // --- warm up --------------------------------------------------------------
+  // (the display's refresh rate is measured meanwhile, while nothing is drawn)
+  let calibrating = true;
+  let calibrated = 0;
+  const calib = (now) => {
+    pacer.calibrate(now);
+    calibrated++;
+    if (calibrating) requestAnimationFrame(calib);
+  };
+  requestAnimationFrame(calib);
   await game.precompile();
+  const until = performance.now() + 400;
+  while (calibrated < 14 && performance.now() < until) await new Promise((r) => requestAnimationFrame(r));
+  calibrating = false;
+  pacer.fit();
   game.update(1 / 60);
   game.render();
   ui.loaded();
   ui.showTitle(true);
 
   // --- main loop ----------------------------------------------------------------
-  let last = performance.now();
-  let smoothDt = 1 / 60;
-  let fpsAcc = 0;
-  let fpsFrames = 0;
-  let fps = 60;
+  // (a paused game draws nothing: the last frame stays on screen, and the
+  // GPU rests — on a phone that also keeps it from heating up and throttling)
+  const stats = params.debug ? makeStats() : null;
+  let drawnPaused = false;
   function frame(now) {
     requestAnimationFrame(frame);
-    let raw = (now - last) / 1000;
-    last = now;
-    if (!(raw > 0)) return;
-    if (raw > 0.1) raw = 0.1;
-    // Light smoothing removes rAF timestamp jitter without lagging real hitches.
-    smoothDt = Math.abs(raw - smoothDt) < smoothDt * 0.5 ? smoothDt + (raw - smoothDt) * 0.25 : raw;
-
-    game.update(smoothDt);
+    const dt = pacer.tick(now);
+    if (dt === 0) return;
+    if (game.state === 'paused') {
+      if (drawnPaused && !resizePending) {
+        pacer.idle();
+        quality.hold(0.5);
+        return;
+      }
+      drawnPaused = true;
+    } else {
+      drawnPaused = false;
+    }
+    if (resizePending) resize();
+    const t0 = performance.now();
+    game.update(dt);
     renderer.info.reset();
     game.render();
-    sampleQuality(raw);
+    const js = performance.now() - t0;
+    if (quality.sample(dt, pacer.missed, js)) resize();
+    if (stats) stats(now, dt, js);
+  }
 
-    if (params.debug) {
-      fpsAcc += raw;
-      fpsFrames++;
-      if (fpsAcc > 0.5) {
-        fps = fpsFrames / fpsAcc;
-        fpsAcc = 0;
-        fpsFrames = 0;
-        const i = renderer.info.render;
-        ui.stats(
-          `${fps.toFixed(0)} fps  dpr ${dpr}\n` +
-          `calls ${i.calls}  tris ${(i.triangles / 1000).toFixed(0)}k\n` +
+  // ?debug: frame rate, how many frames came late, frame-time spread, the
+  // quality the governor settled on, draw calls and triangles.
+  function makeStats() {
+    const times = new Float32Array(120);
+    const sorted = new Float32Array(120);
+    let n = 0, late = 0, jsSum = 0, acc = 0, frames = 0, lastNow = 0;
+    return (now, dt, js) => {
+      const iv = lastNow ? now - lastNow : dt * 1000;
+      lastNow = now;
+      times[n++ % times.length] = iv;
+      if (pacer.missed > 0) late++;
+      jsSum += js;
+      acc += dt;
+      frames++;
+      if (acc < 0.5) return;
+      const m = Math.min(n, times.length);
+      sorted.set(times.subarray(0, m));
+      const s = sorted.subarray(0, m).sort();
+      const i = renderer.info.render;
+      ui.stats(
+        `${(frames / acc).toFixed(0)} fps (${pacer.hz.toFixed(0)} Hz /${pacer.stride})  dpr ${quality.dpr}\n` +
+          `frame p50 ${s[m >> 1].toFixed(1)}  p95 ${s[Math.floor(m * 0.95)].toFixed(1)} ms  late ${((100 * late) / frames).toFixed(0)}%\n` +
+          `js ${(jsSum / frames).toFixed(1)} ms  calls ${i.calls}  tris ${(i.triangles / 1000).toFixed(0)}k\n` +
+          `${gpu.name.slice(0, 32)} (${gpu.tier})\n` +
           `${game.current.id}  ${game.dist.toFixed(0)} m  ${game.speed.toFixed(1)} m/s\n` +
           `${game.state}${game.god ? '  GOD' : ''}`
-        );
-      }
-    }
+      );
+      acc = 0;
+      frames = 0;
+      late = 0;
+      jsSum = 0;
+    };
   }
   if (params.manual) {
     // Deterministic stepping for automated tests: __step(frames, dt)
