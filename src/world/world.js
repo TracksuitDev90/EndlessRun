@@ -271,8 +271,12 @@ class WorldBuilder {
   }
 
   // Ground shadow decal (multiply). o.hard: crisp rectangle instead of a blob.
+  // o.plane: { w, d, x, y, z } bakes its size and offset into the decal (for
+  // one put alongside an obstacle with `with`); o.cross: it glides with
+  // something swimming across the run (see CROSS).
   shadow(name, o = {}) {
-    const g = part(P.plane(1, 1), '#ffffff', { rx: -Math.PI / 2, outline: 0 });
+    const pl = o.plane;
+    const g = pl ? part(P.plane(pl.w, pl.d), '#ffffff', { rx: -Math.PI / 2, x: pl.x || 0, y: pl.y ?? 0.04, z: pl.z || 0, outline: 0 }) : part(P.plane(1, 1), '#ffffff', { rx: -Math.PI / 2, outline: 0 });
     const mat = makeShadowMaterial(this.u, o);
     const b = new Batch(name, g, mat, null, o.cap ?? 256);
     if (o.order) b.renderOrder = o.order;
@@ -318,7 +322,7 @@ class WorldBuilder {
       })
     ).scale(size, size, size);
     const o = { spin: spec.motion, look: spec.look };
-    const mat = makeGemMaterial(this.u, { ...o, kinds: kinds.map((k) => k.texture || {}) });
+    const mat = makeGemMaterial(this.u, { ...o, polish: spec.polish, kinds: kinds.map((k) => k.texture || {}) });
     this.world.addBatch('gems', new KindBatch('gems', geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), 220));
     for (const [name, gain, pool] of [['gemGlow', spec.glow, false], ['gemPool', spec.pool, true]]) {
       const g = part(quadGeo(), '#ffffff', { outline: 0 });

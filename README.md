@@ -31,6 +31,7 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck: an ivory walk inlaid with brass clock-ticks between colonnades of ivory arches, oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
+| IX | **The Kelp Deep** — the last world, under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
 
 The first lap always nests inward in that order; after that the order shuffles
 (never the same world twice in a row). Each doorway is painted the colour of
@@ -164,6 +165,82 @@ is the same upside down, so it's back exactly where it began; the glass is
 see-through, so you can watch it. The ones in your way turn over within their
 own footprint.
 
+### Under the sea
+
+The Kelp Deep is under water, and the water is a look, not a drag: the runner
+runs as fast as anywhere.
+
+**The splash.** Coming in through its doorway, the screen is splashed with
+water. The instant the camera comes through, a wall of water hits the lens —
+the picture swims behind it, white water flashing across, flung out in
+streaks from where it hit — then the sheet slides off down the screen, faster
+and faster, its front a rounded, bright, wavering lip, the picture soft and
+tinted beneath it; and behind it, left on the glass, drops big and small hang
+a moment and then streak away down the screen, stretching as they speed up,
+each one a little lens (the world upside down in it, a glint on top, a dark
+edge) with a wet trail beaded with tiny drops behind it. A second and a half
+in all, and a rush of water with a deep whump and bubbles burbling after
+(`src/game/splash.js`). It's drawn over the finished frame — the frame is
+copied into a texture and one full-screen pass refracts it through the water
+— only while a splash is running, so it costs nothing the rest of the time
+(and the adaptive resolution ignores it). Into the Kelp Deep the splash is the
+doorway's burst; only the swell races ahead, like a wave. Any world can ask
+for it with `env.splash: true`.
+
+**The water.** Overhead, the sky is the underside of the surface: a ceiling
+of light rippling far above, brightest round the sun, shafts of light
+fanning down from it (and long soft shafts slanting through the water, light
+pooling where they land); everything that faces up — the sand, the coral, the
+whale's back, the runner — is played over by a net of caustics, thin bright
+lines wavering and drifting, brightest where they cross (`env.sea`). The
+water darkens and cools down the screen, teal and green at the top sinking
+through to deep blue at the bottom (`env.deep`, worked out in the colour
+grade from where each pixel is on the screen). Marine snow drifts, and
+bubbles rise through it (`particles.ring` draws motes as bubbles). The kelp
+sways in the current, a wave running up it from its holdfast; the seagrass
+and the anemones' tentacles wave (toon option `current`).
+
+**The runner in the water** (`src/game/bubbles.js`). Bubbles stream off
+them as they run and come in little breaths from their mouth; each footfall
+puffs up sand and a few bubbles; a jump leaves a burst at their feet and a
+trail behind, a landing a ring of sand and bubbles, a slide a churn of both,
+a lane change a little swirl on the side they leave, and a stumble a cloud;
+diving in through the doorway, a burst. They're thrown from the runner and
+left in the water: carried along in their wake a moment, then slowed and
+rising, wobbling and swelling, until they fall behind. And all the while the
+water swirls round them: tiny bubbles and streaks spiralling round their
+legs, arms and body and peeling off behind them, worked out on the GPU from
+the runner's position alone. The sand is the explorer's dust, lit by the
+road it comes off.
+
+**Its creatures.** A school of fish is one instance: every fish its own
+vertices, each carrying where it swims in the school and its own beat, and
+the vertex shader sends it along a snaking stream (shrinking away at the ends
+of the loop, so its wrapping round never shows) or round a milling ball,
+turned the way it's heading with its tail beating — a whole school in one
+draw call (toon option `school`; the same shape rising up a column makes the
+bubbles from vents in the reef). The jellyfish's bell squeezes and relaxes, a
+quick beat and a slow ease back, its rim pulling in hardest, while its
+ruffled arms and long tentacles trail and ripple a beat behind, and it lifts
+on every beat (toon option `jelly`). Mantas and turtles beat their wings and
+flippers, and now and then a whale swims by far off, its tail beating.
+
+**The whale.** The marquee obstacle: a humpback crossing the path, the one
+you dive under. It's built tail to snout across the road — long pale-bellied
+flippers out past the road on its head's side, its flukes out past it on the
+other, knobbly tubercles on its head, pleats down its throat (toon option
+`pleats`), dark above and pale beneath — with its belly held level on the
+duck line right across all three lanes and its back below the camera's eye.
+It swims in from one side as you come and is right over the road the moment
+you reach it, however fast you run: it glides sideways a fixed share of
+every metre between you (toon option `cross`, driven by the runner's position
+in the vertex shader), so it's never early or late; its shadow glides across
+the sand with it. Only its tail half beats up and down, and only out past
+the road, so the gap beneath it never changes, and it sings as it comes — a
+long low moan a few seconds before it reaches the road (an obstacle's `call`).
+
+![The Kelp Deep: kelp, coral and light shafts over the sand; a whale gliding across the path; the splash coming in — the sheet sliding off with its bright lip, then drops streaking down the lens; and the twilight reef on the second visit, a jellyfish glowing](docs/ocean.jpg)
+
 ### Coming back around
 
 Every time you return to a world it has changed — the changes layer up, and
@@ -180,6 +257,7 @@ rolls in slow waves:
 | Sky Road | flocks of birds | a ringed planet in a pink sky | whales swimming through the clouds |
 | Hell | an ember storm: more fire on the wind, the plain alight | the eclipse swells, its ring of fire burning hotter, ash falling thick | the colours begin to drift |
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
+| Kelp Deep | the twilight reef: blue dusk, the light from above fading, jellyfish glowing everywhere, plankton lit up in the water | the deep at midnight: almost no light from above, the anemones, jellyfish and plankton glowing | the colours begin to drift |
 
 ![The Hall of Doors on four visits](docs/laps.jpg)
 
@@ -269,6 +347,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Sky Road | **Aquamarine** turquoise | the complement of all that amber — a splinter of clear sky | a long leaning double-terminated aquamarine shard · a squat sky diamond · turquoise, sky blue in a web of dark matrix · fluorite, pale sea-green octahedra zoned in rings | a fan of three splinters |
 | Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
+| Kelp Deep | **Conch pearl** coral pink | coral pink against all that teal and green | conch pearl, the sea's own gem, porcelain pink and polished smooth, whole and baroque · red coral, polished branches · fire opal, flecked with gold · spessartine, an orange dodecahedron · rhodochrosite, banded rose and pink (the polished stones keep their pink under the teal water: `gem.polish`) | a great conch pearl in a scallop shell |
 
 The natural stones are made the way real ones are bounded: cleaved out of a
 block by flat planes — the faces of a crystal's habit (a sapphire barrel is a
@@ -480,7 +559,13 @@ duck line (slide), and grandfather clocks, great hourglasses and clock weights
 pendulums — is decoration kept off the walk; the obstacles stay where they
 stand (an hourglass in your way turns over within its own footprint, its
 pendulum bobs only sway along the run, rising as they swing), so a jump or a
-slide is never mistimed by something moving.
+slide is never mistimed by something moving. In the Kelp Deep: a dome of brain
+coral, a giant clam gaping on the sand or a sunken treasure chest, gold
+glowing through its sprung lid (jump; a ridge of reef across the whole path),
+an arch of rock crusted with coral, a fringe of it along its face (slide), a
+thicket of kelp, a tower of rock crowded with coral and a great violet sea
+fan (go around) — and the whale crossing the path (slide; see
+[Under the sea](#under-the-sea)).
 
 ### Washing and bark
 
@@ -531,7 +616,7 @@ Append to the URL:
 | Flag | Effect |
 |---|---|
 | `?debug` | FPS, how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
-| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`) |
+| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`, `ocean`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
@@ -602,6 +687,17 @@ Append to the URL:
   Each kind's surface is a handful of numbers in a uniform array. Spinning, bobbing, rippling and being sucked into the
   runner happen in the vertex shader; taking a gem rewrites one small batch once. Planning
   and pick-up cost a few microseconds a frame.
+- **Under the sea, cheaply.** The Kelp Deep draws about as much as the
+  Cypress Lane or the Deepwood. Its scenery kelp is flat leaves shaded down
+  their midribs and drawn without ink (a fifth of the triangles of rounded
+  ones); each school of fish, bait ball and column of bubbles is one
+  instance whose fish all swim in the vertex shader; the whale's crossing,
+  the kelp's sway and the jellyfish's pulse are all vertex-shader work. The
+  caustics are three lookups into the shared noise texture (every other world
+  skips them on a uniform). The runner's bubbles are a hundred points written
+  by the CPU and its swirl a fixed buffer worked out on the GPU (one draw
+  call each, none out of the water). The splash's extra full-screen pass runs
+  only for its second and a half.
 - **Frame timing** (`src/core/pacer.js`). Every animation frame the browser
   gives is drawn, at whatever rate it runs (60, 90, 120 Hz; Safari keeps
   pages near 60 on ProMotion screens unless told otherwise, near 30 in Low
@@ -919,7 +1015,9 @@ src/game/                     game loop, player (the runners' shared core:
                               loader, camera, course (world order),
                               chunk streaming, obstacle director, gem director
                               (gems.js: the ghost route and pick-up), portal, dream
-                              (depth recipes and the shared warp uniforms)
+                              (depth recipes and the shared warp uniforms), bubbles
+                              (the runner's bubbles, swirl and sand under the sea)
+                              and splash (the screen splashed coming into it)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/view.html        a runner turned round like their reference sheet
@@ -972,6 +1070,28 @@ lays a ceiling of smoke with dry lightning in it over the sky, and
 `env.particles2` adds a second layer of motes (Hell's falling ash under its
 rising embers). `gateExtras` entries can be `[name, x, y, dz]` to stand
 something on the gate (the Gallery's clock hands).
+Under the sea: `env.sea: { surface, rays, caustics, scale }` puts the
+rippling underside of the surface overhead, shafts fanning down from it and
+caustics on everything facing up (scale per metre, a multiple of 1/256);
+`env.deep: { amount, from, to, tint }` darkens the picture toward `tint` down
+the screen (0 the top, 1 the bottom); `env.splash` splashes the screen with
+water coming in; `env.bubbles` puts the runner in the water (their bubbles,
+swirl and sand); `particles.ring: 1` draws a layer of motes as bubbles; and
+ground pattern 9 is the ocean floor (pass the chunk distance as `p0`). Toon
+options: `current: [lean across, rate, wave per metre up, lean along]` sways
+a prop in the current, more the higher it reaches (build it in segments);
+`school: [speed, loop length, snaking, shape]` swims a school (each fish's
+vertices carry `fish`: where it swims in the school and its beat; shape 0 a
+stream along +x, 1 a ball milling round y, 2 a column rising up y);
+`jelly: [beats per second, squeeze, ripple, lift]` pulses a jellyfish (its
+`role` 0 the bell, 1 what trails); `cross: [glide per metre, beat rate,
+beat at the flukes, far rise]` swims something across the run, built tail
+(−x) to head (+x), so it's right over the road as the runner reaches it (its
+`p0` past pi turns it about; `b.shadow(…, { cross, plane })` gives it a
+shadow that glides with it); and `pleats: true` draws a whale's throat
+pleats on parts marked 0.6 (uv.x along the body, uv.y round it). `b.beam`
+takes `wobble` to sway a shaft of light. An obstacle spec with `call:
+'whale'` sings a few seconds before the runner reaches it.
 
 `gem` is the world's collectible: a `name`, a `color` (the HUD's little gem),
 its `stones` — each `{ name, weight, tints, parts(), texture }`, `weight`
@@ -990,7 +1110,8 @@ matrix), `bands` with `bandFreq`, `wander` and `rings` (`'round'` or
 `'nested'`) in a `second` colour, `opaque`, `rough`, `metal`, `glints` and
 `scale`. Then `motion` (`[turn, bob rate, bob height, nod]`), `look`
 (`[self-lit, glints, facet hue spread, fire]`) and `glow` / `pool` (halo and
-ground-light strength). Pick a colour nothing else in the world is. For stones
+ground-light strength); `polish` (0..1) lets polished stones (`metal()`) keep
+their own colour in any light, a pearl's lustre rather than a mirror's. Pick a colour nothing else in the world is. For stones
 too dark (or pale) to glow in their own colour, `light` gives the halo, the
 light on the road and the motes they leave a colour of their own.
 

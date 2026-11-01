@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { CONFIG } from '../config.js';
-import { shared, copyEnvUniforms, lerpEnvUniforms, DRAIN_NONE, DRAIN_ALL } from '../render/shaders.js';
+import { shared, makeEnvUniforms, copyEnvUniforms, lerpEnvUniforms, DRAIN_NONE, DRAIN_ALL } from '../render/shaders.js';
 import { Particles } from '../render/particles.js';
 import { World } from '../world/world.js';
 import { WORLD_DEFS } from '../world/index.js';
@@ -14,6 +14,8 @@ import { CHARACTERS, characterById } from './characters.js';
 import { ChaseCamera } from './camera.js';
 import { Portal } from './portal.js';
 import { Dream } from './dream.js';
+import { WaterFx } from './bubbles.js';
+import { Splash } from './splash.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -54,10 +56,16 @@ export class Game {
     this.particles2 = new Particles(320, 7);
     this.sparkles = new Sparkles();
     this.dream = new Dream();
+    // under the sea: the bubbles, swirl and sand round the runner, lit as
+    // the runner is (see bubbles.js)
+    this.waterU = makeEnvUniforms(WORLD_DEFS[0].env);
+    this.water = new WaterFx(this.waterU);
+    // coming into a world with env.splash, the screen is splashed with water
+    this.splash = new Splash();
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
-    this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
+    this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
@@ -109,6 +117,8 @@ export class Game {
     this.passedBest = false;
     this.ui.setGems(0);
     this.sparkles.reset();
+    this.water.reset();
+    this.splash.stop();
 
     this.course.ensure(0, CONFIG.speed.start);
     this.depth = this.course.segAt(0).ordinal;
@@ -400,6 +410,28 @@ export class Game {
     this.player.u.uDrain.value.set(1, y, -1, live);
   }
 
+  // --- under the sea -------------------------------------------------------------
+  // In a world with env.bubbles the water shows on the runner: from the
+  // moment they pass through its doorway until they pass out of it.
+  updateWater(dt) {
+    const wet = this.course.segAt(this.dist).world.def.env.bubbles || 0;
+    if (wet === 0 && this.water.amount === 0) return;
+    copyEnvUniforms(this.waterU, this.player.u);
+    this.water.update(dt, this, wet);
+  }
+
+  // Obstacles that announce themselves (spec.call: the whale's song, a few
+  // seconds before it crosses the road).
+  callAhead() {
+    if (this.state !== 'running') return;
+    const ahead = Math.max(this.speed, CONFIG.speed.start) * 3.2;
+    for (const g of this.obstacles.groups) {
+      if (g.called || !g.spec?.call || g.d < this.dist || g.d - this.dist > ahead) continue;
+      g.called = true;
+      this.audio.call(g.spec.call);
+    }
+  }
+
   // --- time coming unstuck ------------------------------------------------------
   // A world whose env asks for it (env.wonk: [at the start, by the end], the
   // Gallery of Hours) has its clock hands spin wonkier and wonkier the
@@ -481,6 +513,10 @@ export class Game {
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
     this.dream.doorway(this.current.def, this.current.env, !!old.def.env.drain);
     this.audio.door();
+    if (this.current.def.env.splash) {
+      this.splash.start();
+      this.audio.splash();
+    }
     this.door = null;
   }
 
@@ -511,6 +547,8 @@ export class Game {
     this.startDrain(this.current, 'settle');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
+    this.water.reset();
+    this.splash.stop();
   }
 
   skipToNextDoor(before = 150) {
@@ -523,6 +561,7 @@ export class Game {
     if (this.state === 'paused') return;
     this.time += dt;
     shared.uTime.value = this.time;
+    this.splash.update(dt);
     const st = this.state;
 
     if (st === 'running') {
@@ -572,6 +611,8 @@ export class Game {
 
     const pz = -(this.dist - this.origin);
     this.player.place(pz, this.dist);
+    this.updateWater(dt);
+    this.callAhead();
     shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);
     this.dream.update(dt);
     this.updateDrain(dt);
@@ -625,6 +666,7 @@ export class Game {
       r.clearDepth();
     }
     r.render(this.sceneMain, camera);
+    this.splash.render(r);
   }
 
   resize(w, h) {
@@ -649,7 +691,9 @@ export class Game {
       scene.add(...r.objects);
       r.forCompile?.(true);
     }
-    scene.add(this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh);
+    scene.add(this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh, ...this.water.objects);
+    this.water.forCompile(true);
+    scene.add(this.splash.mesh);
     try {
       const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
       let t = performance.now();
@@ -670,6 +714,8 @@ export class Game {
       r.clear(true, true, true);
     } finally {
       for (const w of this.worlds) w.setAllVisibleForCompile(false);
+      this.water.forCompile(false);
+      this.splash.scene.add(this.splash.mesh);
       for (const [root, parent] of roots) {
         root.removeFromParent();
         if (parent) parent.add(root);
@@ -678,7 +724,7 @@ export class Game {
         r.forCompile?.(false);
         for (const o of r.objects) o.removeFromParent();
       }
-      this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points);
+      this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
       this.scenePortal.add(this.portal.stencilMesh);
     }
   }

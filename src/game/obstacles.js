@@ -315,6 +315,7 @@ export class ObstacleField {
   // d, o) places one; info carries the lane x, the distance and the world's
   // visit (how many times it has come round before).
   putSpec(world, group, spec, x, d, o) {
+    group.spec = spec;
     world.put(group, spec.name, x, 0, d, o);
     if (spec.with) for (const name of spec.with) world.put(group, name, x, 0, d, o);
     if (spec.extras) {

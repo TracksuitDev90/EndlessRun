@@ -41,6 +41,7 @@ export class Particles {
     u.uColor.value.copy(colorOf(a)).lerp(colorOf(b), t);
     u.uSize.value = a.size + (b.size - a.size) * t;
     u.uOpacity.value = a.opacity + (b.opacity - a.opacity) * t;
+    u.uRing.value = (a.ring || 0) + ((b.ring || 0) - (a.ring || 0)) * t;
     u.uDrift.value.set(
       a.drift[0] + (b.drift[0] - a.drift[0]) * t,
       a.drift[1] + (b.drift[1] - a.drift[1]) * t,

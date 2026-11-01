@@ -164,6 +164,109 @@ export class Ambient {
     [81, 86, 88, 93].forEach((m, i) => this.chime(hz(m), t + i * 0.07, 0.05));
   }
 
+  // White noise, made once (the splash's rush of water).
+  noise() {
+    if (this.noiseBuf) return this.noiseBuf;
+    const ctx = this.ctx;
+    const len = Math.floor(ctx.sampleRate * 1.2);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return (this.noiseBuf = buf);
+  }
+
+  // Into the water: a rush of noise falling from a hiss to a roar, a deep
+  // whump under it, and bubbles burbling up after.
+  splash() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise();
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 0.9;
+    band.frequency.setValueAtTime(3200, t);
+    band.frequency.exponentialRampToValueAtTime(380, t + 0.7);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.32, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+    src.connect(band).connect(g).connect(this.bus);
+    src.start(t);
+    src.stop(t + 1.1);
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.35);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.28, t + 0.02);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    o.connect(og).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.5);
+    for (let i = 0; i < 9; i++) {
+      const bt = t + 0.15 + Math.random() * 0.9;
+      const f = 280 + Math.random() * 420;
+      const b = ctx.createOscillator();
+      b.type = 'sine';
+      b.frequency.setValueAtTime(f, bt);
+      b.frequency.exponentialRampToValueAtTime(f * 2.4, bt + 0.07);
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.0001, bt);
+      bg.gain.exponentialRampToValueAtTime(0.05, bt + 0.01);
+      bg.gain.exponentialRampToValueAtTime(0.0001, bt + 0.08);
+      b.connect(bg).connect(this.bus);
+      b.start(bt);
+      b.stop(bt + 0.1);
+    }
+    setTimeout(() => {
+      g.disconnect();
+      og.disconnect();
+    }, 1500);
+  }
+
+  // Something calling ahead of its obstacle (spec.call): 'whale', a humpback's
+  // long low moan rising and falling, wavering, a fainter voice a fifth over it.
+  call(kind) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running' || kind !== 'whale') return;
+    const t = ctx.currentTime;
+    const dur = 2.6;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.5);
+    g.gain.setValueAtTime(0.12, t + dur - 0.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g).connect(this.bus);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 5.2;
+    const lfoAmt = ctx.createGain();
+    lfoAmt.gain.value = 7;
+    lfo.connect(lfoAmt);
+    const f0 = 150 + Math.random() * 40;
+    for (const [mul, amp] of [[1, 1], [1.5, 0.35]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f0 * mul, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.9 * mul, t + dur * 0.4);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.75 * mul, t + dur);
+      lfoAmt.connect(o.frequency);
+      const a = ctx.createGain();
+      a.gain.value = amp;
+      o.connect(a).connect(lp);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+    lfo.start(t);
+    lfo.stop(t + dur + 0.05);
+    setTimeout(() => g.disconnect(), (dur + 0.6) * 1000);
+  }
+
   // A short glassy ting: a sine with two inharmonic partials, quick to fade.
   ting(f, t, vol) {
     const ctx = this.ctx;
