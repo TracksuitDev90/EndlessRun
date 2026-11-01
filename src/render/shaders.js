@@ -929,14 +929,8 @@ void main() {
     base = mix(base, vec3(0.62, 0.59, 0.56) * (0.85 + 0.3 * c3), ashTop);
     vein *= (1.0 - ashTop) * uCrust.x;
   #else
-    // (most parts carry no marks: skip the texture there — its derivatives
-    // taken outside the branch, where they are always defined)
-    vec2 muv = vUv * uMarkRepeat;
-    vec2 mdx = dFdx(muv), mdy = dFdy(muv);
-    if (vFx.x > 0.0) {
-      float m = textureGrad(uMarks, muv, mdx, mdy).a * vFx.x;
-      base = mix(base, base * 0.64, m);
-    }
+    float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+    base = mix(base, base * 0.64, m);
   #endif
 
   vec3 V = v / dist;

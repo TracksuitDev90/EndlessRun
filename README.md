@@ -490,14 +490,14 @@ Append to the URL:
 
 | Flag | Effect |
 |---|---|
-| `?debug` | FPS (and the display's refresh rate and stride), how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU and its class, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
+| `?debug` | FPS, how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
 | `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
-| `?fps=30` | lock the frame rate (an even 30 on any display; resolution still adapts) |
+| `?fps=30` | cap the frame rate (resolution still adapts) |
 | `?manual` | no render loop; drive frames with `__step(frames, dt)` from the console (used for automated tests) |
 
 ## How it holds 60 fps
@@ -557,25 +557,24 @@ Append to the URL:
   Each kind's surface is a handful of numbers in a uniform array. Spinning, bobbing, rippling and being sucked into the
   runner happen in the vertex shader; taking a gem rewrites one small batch once. Planning
   and pick-up cost a few microseconds a frame.
-- **Frame pacing** (`src/core/pacer.js`). The display's refresh period is
-  measured (from refreshes in which nothing was drawn, so slow frames can't
-  pass themselves off as a slow screen), the game renders every *stride*
-  refreshes — every one on a 60 or 90 Hz screen, every other on 120 Hz (an
-  even 60 rather than an uneven ~100) — and each frame advances the
-  simulation by exactly the whole refreshes it will be on screen. Motion lands
-  on vsync with no timestamp jitter, and a late frame advances by one more
-  refresh with no catch-up surge after it. Jumps and lane changes are
-  integrated exactly, so they follow the same path at any frame rate.
-- **Adaptive quality** (`src/core/quality.js`). Starts from a guess at the
-  GPU's class (and what worked last time on the device), renders at up to 2×
-  device pixels, and over ~1.5 s windows steps the resolution down in 0.25
-  increments when frames come late (two at once when most do). If even the
-  lowest resolution can't hold the rate, or the script itself is the
-  bottleneck, it drops to an even half rate (30 fps on a 60 Hz screen) and
-  buys a notch of sharpness back with the time; after a long run of perfect
-  frames it tries a notch sharper, never one that has failed. Resizes happen
-  at most once a frame and only when the size really changed; a paused game
-  stops drawing.
+- **Frame timing** (`src/core/pacer.js`). Every animation frame the browser
+  gives is drawn, at whatever rate it runs (60, 90, 120 Hz; Safari keeps
+  pages near 60 on ProMotion screens unless told otherwise, near 30 in Low
+  Power Mode). A frame on the usual cadence advances the simulation by
+  exactly the usual interval (the median of recent ones), so rAF's timestamp
+  jitter never reaches the motion; a late frame advances by the time that
+  really passed, once, with no running average dragging behind it (which
+  ran the game fast for a quarter of a second after every dropped frame).
+  Jumps and lane changes are integrated exactly, so they follow the same
+  path at any frame rate.
+- **Adaptive resolution** (`src/core/quality.js`). Renders at up to 2× device
+  pixels; averaged over ~1.5 s, frames slower than ~50 fps step it down a
+  notch (0.25), and on a fast screen with room to spare it steps up once.
+  If stepping down doesn't make frames any quicker (the browser holding the
+  rate down, or a bottleneck that isn't pixels) the resolution is put back.
+  It never changes the frame rate. What it settles on is remembered on the
+  device; the next session starts a notch above it. Resizes happen at most
+  once a frame and only when the size really changed.
 - **No strobing at speed.** At 28 m/s the road moves further in a frame than
   its cobbles or slates are deep, and a crisp line across the road seems to
   strobe or crawl backwards; the ground's lines across the run are smeared
