@@ -566,19 +566,21 @@ export default {
   env: {
     drain: true,
     sky: ['#020102', '#6a1a0a', '#060202'],
-    // no sun: a total eclipse hangs over the road ahead, a black hole of a
-    // thing ringed in fire, the sky bent round it (see FS_SKY)
-    sun: { dir: [0, 0.2, -1], glow: '#c8300c', disc: '#000000', size: 0.075 },
+    // no sun: a total eclipse hangs over the road ahead, a black disc in a
+    // ring of fire (see FS_SKY)
+    sun: { dir: [0, 0.2, -1], glow: '#8a2008', disc: '#000000', size: 0.045 },
     eclipse: [1, 1, 1],
     stars: 0,
     // a ceiling of smoke with dry lightning in it
     skyFx: { rays: 0.1, clouds: 0, smoke: 1 },
     // lit from ahead and below by the burning horizon: hard shadows, hot rims
-    light: { dir: [0.12, 0.3, -1], shadow: [0.3, 0.22, 0.24], hi: [1.15, 0.95, 0.8], soft: 0.035, wrap: 0.1, hiAmt: 0.35, lift: 0.35 },
+    light: { dir: [0.12, 0.3, -1], shadow: [0.24, 0.18, 0.2], hi: [1.1, 0.9, 0.75], soft: 0.035, wrap: 0.1, hiAmt: 0.3, lift: 0.25 },
     rim: [1.0, 0.45, 0.15, 0.5],
     // low smoke over the ash, swallowing the road ahead
     mist: { color: '#1e0806', amount: 0.72, top: 1.8, fade: 3.5, near: 14, far: 80 },
-    grade: { sat: 1.1, contrast: 1.18, vignette: 0.85, exposure: 0.98, tint: '#000000' },
+    // dim, and darker still toward the edges of the screen, closing in on the
+    // road (a lightning flash throws its light right out into them)
+    grade: { sat: 1.1, contrast: 1.2, vignette: 1, edge: [0.12, 0.82], exposure: 0.78, tint: '#000000' },
     ink: '#0a0606',
     fog: [34, 175],
     ground: [C.ashA, C.ashB, C.cinder],
@@ -600,13 +602,13 @@ export default {
         particles: { color: '#ffa040', size: 3.2, drift: [0.6, 1.5, 0], opacity: 1 },
       },
     },
-    // the eclipse swells: the black sun hangs bigger and lower, bending the
-    // sky harder round it, its corona streaming further
+    // the eclipse swells: the black sun hangs bigger and lower, its ring of
+    // fire burning hotter and its corona streaming further
     {
       env: {
         sky: ['#010001', '#5a1210', '#0a0204'],
-        sun: { dir: [0, 0.17, -1], glow: '#ff3a20', disc: '#000000', size: 0.1 },
-        eclipse: [1, 1.3, 1.3],
+        sun: { dir: [0, 0.17, -1], glow: '#a82814', disc: '#000000', size: 0.06 },
+        eclipse: [1, 1.2, 1.3],
         skyFx: { rays: 0.9, smoke: 0.8 },
         rim: [1.0, 0.3, 0.15, 0.55],
         particles2: { color: '#e6e2de', size: 2.0, drift: [0.2, -0.4, 0], opacity: 0.9 },

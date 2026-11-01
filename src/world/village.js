@@ -5,7 +5,8 @@ import {
 import { shaftParts, giantFlowerParts } from './whimsy.js';
 import { crystal, stone, barrel, nugget, blade, lumps, rough } from './gems.js';
 import {
-  orangeCratesGeo, raspberryBedGeo, fruitBasketsGeo, grapefruitCartGeo, appleCartGeo, fruitStandGeo, busTimetableGeo,
+  orangeCratesGeo, raspberryBedGeo, fruitBasketsGeo, melonCrateGeo, berryFlatsGeo,
+  grapefruitCartGeo, appleCartGeo, peachCartGeo, fruitStandGeo, exoticStandGeo, busTimetableGeo,
   shopfrontParts, marketStallGeo, busShelterGeo, benchGeo, postboxGeo, bikeGeo, gardenFenceGeo,
 } from './lane-art.js';
 import { groundStrip } from '../render/geo.js';
@@ -334,7 +335,8 @@ export default {
     // the neighbourhood: shops, a market stall, the bus stop, street furniture
     b.toon('shopGrocer', shopGeo('grocer', 31), { cap: 24, anim: 'pop', marks: [1, 1] });
     b.toon('shopBakery', shopGeo('bakery', 37), { cap: 24, anim: 'pop', marks: [1, 1] });
-    b.toon('stall', marketStallGeo(), { cap: 16, anim: 'pop', marks: [2, 2] });
+    b.toon('stall', marketStallGeo(0), { cap: 16, anim: 'pop', marks: [2, 2] });
+    b.toon('stallB', marketStallGeo(1), { cap: 16, anim: 'pop', marks: [2, 2] });
     b.toon('shelter', busShelterGeo(), { cap: 8, anim: 'pop', marks: [2, 2] });
     b.toon('bench', benchGeo(), { cap: 24, anim: 'pop' });
     b.toon('postbox', postboxGeo(), { cap: 16, anim: 'pop' });
@@ -364,11 +366,15 @@ export default {
     b.toon('crates', orangeCratesGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
     b.toon('raspberries', raspberryBedGeo(), { cap: 16, anim: 'popEarly', marks: [2.4, 2] });
     b.toon('baskets', fruitBasketsGeo(), { cap: 16, anim: 'popEarly', marks: [3, 3] });
+    b.toon('melons', melonCrateGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
+    b.toon('berries', berryFlatsGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
     b.toon('timetable', busTimetableGeo(), { cap: 24, anim: 'popEarly', marks: [2, 2] });
     b.toon('pergola', pergolaGeo(), { cap: 10, anim: 'popEarly', marks: [2.2, 1.6] });
     b.toon('grapefruitCart', grapefruitCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
     b.toon('appleCart', appleCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('peachCart', peachCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
     b.toon('fruitStand', fruitStandGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('exoticStand', exoticStandGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
     b.toon('topiary', topiaryGeo(), { cap: 16, anim: 'popEarly', marks: [3, 2.6] });
 
     // threshold
@@ -380,12 +386,17 @@ export default {
   // the bus stop's timetable hung over a lane to slide under, and fruit carts,
   // a fruit stand and potted cypresses to go round.
   obstacles: {
-    L: [{ name: 'hedge', len: 0.9 }, { name: 'crates', len: 0.9 }, { name: 'raspberries', len: 0.8 }, { name: 'baskets', len: 0.85 }],
+    L: [
+      { name: 'hedge', len: 0.9 }, { name: 'crates', len: 0.9 }, { name: 'raspberries', len: 0.8 }, { name: 'baskets', len: 0.85 },
+      { name: 'melons', len: 0.9 }, { name: 'berries', len: 0.85 },
+    ],
     H: [{ name: 'timetable', len: 0.35 }],
     W: [
       { name: 'grapefruitCart', len: 3.0 },
       { name: 'appleCart', len: 2.2 },
+      { name: 'peachCart', len: 2.2 },
       { name: 'fruitStand', len: 1.4, tints: ['#ffffff', '#bff0d0', '#ffd0c8', '#d8e8ff'] },
+      { name: 'exoticStand', len: 1.4, tints: ['#ffffff', '#ffd0c8', '#d8e8ff', '#fff0b0'] },
       { name: 'topiary', len: 1.5 },
     ],
     LW: { name: 'hedgeWide', len: 0.9 },
@@ -421,7 +432,7 @@ export default {
         ctx.put('shelter', s * 7.05, 0, 6.1, { ry: -s * Math.PI / 2 });
         ctx.put('shadow', s * 7.0, 0.03, 6.1, { sx: 2.4, sz: 4 });
       } else if (stallAt > 0) {
-        ctx.put('stall', s * 7.35, 0, stallAt, { ry: -s * 0.55 });
+        ctx.put(rng.chance(0.5) ? 'stall' : 'stallB', s * 7.35, 0, stallAt, { ry: -s * 0.55 });
         ctx.put('shadow', s * 7.35, 0.03, stallAt, { sx: 2.6, sz: 2.6 });
       }
       const furnAt = rng.int(0, 3);

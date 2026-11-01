@@ -253,18 +253,56 @@ function chimneyPotsGeo() {
   return merge(parts).translate(0, 0, -0.35);
 }
 
+// the washing line's height, and the breeze in the washing: [how far a hem
+// sways, how fast, the line's height, how far the washing hangs below it]
+const LINE = 2.35;
+const BREEZE = [0.13, 1.25, LINE, LINE - CONFIG.duckLine];
+
+// Mark a finished part as washing (uv: its own beat in x, 1 in y) for the
+// breeze in the shader (toon option `cloth`), or as something that stays put.
+function hung(g, beat) {
+  const uv = g.attributes.uv.array;
+  for (let i = 0; i < uv.length; i += 2) {
+    uv[i] = beat;
+    uv[i + 1] = beat < 0 ? 0 : 1;
+  }
+  return g;
+}
+const still = (g) => hung(g, -1);
+
+// Drape a garment pegged at x = cx between top and bottom: soft folds running
+// down it, deeper toward the hem; its top sagging between the pegs and its
+// corners drooping beyond them; the hem a little uneven (only ever lifted, so
+// it never hangs below the duck line) and flaring out a touch.
+function drape(g, { cx, top, bottom, w, seed }) {
+  const pos = g.attributes.position.array;
+  for (let i = 0; i < pos.length; i += 3) {
+    const u = (pos[i] - cx) / (w / 2);
+    const k = Math.min(1, Math.max(0, (top - pos[i + 1]) / (top - bottom)));
+    const near = (1 - k) * (1 - k);
+    pos[i + 2] += 0.032 * Math.sin(u * Math.PI * 1.6 + seed * 6.28) * (0.3 + 0.7 * k);
+    pos[i + 1] -= 0.05 * Math.max(0, 1 - (u / 0.6) ** 2) * near * near + 0.05 * Math.max(0, Math.abs(u) - 0.6) * near;
+    pos[i + 1] += 0.025 * (0.5 + 0.5 * Math.sin(u * 4.7 + seed * 11)) * k ** 6;
+    pos[i] += (pos[i] - cx) * 0.07 * k * k;
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
 function laundryGeo(half, count, seed) {
   // Washing line between two poles. Every garment hangs to the duck line so the
   // laundry reads as one band to slide under, with the slates showing beneath.
+  // The washing is soft cloth: draped in folds, and stirring in the breeze
+  // (see `cloth` in build).
   const rnd = seeded(seed);
   const D = CONFIG.duckLine;
-  const line = 2.35;
+  const line = LINE;
   const parts = [];
   for (const s of [-1, 1]) {
-    parts.push(part(P.box(0.12, line + 0.3, 0.12), C.pole, { x: s * half, y: (line + 0.3) / 2 }));
-    parts.push(part(P.box(0.4, 0.08, 0.08), C.pole, { x: s * (half - 0.12), y: line + 0.15 }));
+    parts.push(still(part(P.box(0.12, line + 0.3, 0.12), C.pole, { x: s * half, y: (line + 0.3) / 2 })));
+    parts.push(still(part(P.box(0.4, 0.08, 0.08), C.pole, { x: s * (half - 0.12), y: line + 0.15 })));
   }
-  parts.push(part(P.box(half * 2, 0.03, 0.03), '#e8e2d0', { y: line, outline: 0 }));
+  parts.push(still(part(P.box(half * 2, 0.03, 0.03), '#e8e2d0', { y: line, outline: 0 })));
   const span = half * 2 - 0.4;
   const slot = span / count;
   for (let i = 0; i < count; i++) {
@@ -272,29 +310,31 @@ function laundryGeo(half, count, seed) {
     const col = CLOTHES[Math.floor(rnd() * CLOTHES.length)];
     const kind = rnd();
     const w = Math.min(0.8, slot * 0.92);
-    const bottom = D + rnd() * 0.05;
+    const bottom = D + 0.02 + rnd() * 0.05;
     const top = line - 0.04;
+    const beat = rnd();
+    const fold = { cx: x, top, bottom, w, seed: rnd() };
+    const cloth = (geo, c, o) => parts.push(hung(drape(part(geo, c, o), fold), beat));
     if (kind < 0.4) {
       // long nightshirt with sleeves
-      parts.push(part(P.box(w * 0.72, top - 0.08 - bottom, 0.05), col, { x, y: (top - 0.08 + bottom) / 2 }));
-      parts.push(part(P.box(w, 0.22, 0.05), col, { x, y: top - 0.12 }));
+      cloth(P.box(w * 0.72, top - 0.08 - bottom, 0.04, 5, 7), col, { x, y: (top - 0.08 + bottom) / 2 });
+      cloth(P.box(w, 0.22, 0.05, 7, 2), col, { x, y: top - 0.12 });
     } else if (kind < 0.8) {
       // sheet, with a darker hem stripe
-      parts.push(part(P.box(w, top - bottom, 0.04), col, { x, y: (top + bottom) / 2 }));
-      parts.push(part(P.box(w + 0.01, 0.07, 0.05), scaleColor(col, 0.78), { x, y: bottom + 0.09, outline: 0 }));
+      cloth(P.box(w, top - bottom, 0.035, 7, 8), col, { x, y: (top + bottom) / 2 });
+      cloth(P.box(w + 0.01, 0.07, 0.045, 7, 1), scaleColor(col, 0.78), { x, y: bottom + 0.09, outline: 0 });
     } else {
       // long johns
       const lw = w * 0.36;
-      parts.push(part(P.box(w * 0.8, 0.26, 0.05), col, { x, y: top - 0.13 }));
-      parts.push(part(P.box(lw, top - 0.2 - bottom, 0.05), col, { x: x - w * 0.2, y: (top - 0.2 + bottom) / 2 }));
-      parts.push(part(P.box(lw, top - 0.2 - bottom, 0.05), col, { x: x + w * 0.2, y: (top - 0.2 + bottom) / 2 }));
+      cloth(P.box(w * 0.8, 0.26, 0.05, 6, 2), col, { x, y: top - 0.13 });
+      cloth(P.box(lw, top - 0.2 - bottom, 0.045, 2, 6), col, { x: x - w * 0.2, y: (top - 0.2 + bottom) / 2 });
+      cloth(P.box(lw, top - 0.2 - bottom, 0.045, 2, 6), col, { x: x + w * 0.2, y: (top - 0.2 + bottom) / 2 });
     }
-    parts.push(part(P.box(0.05, 0.1, 0.07), '#c8a070', { x: x - w * 0.3, y: line - 0.02, outline: 0 }));
-    parts.push(part(P.box(0.05, 0.1, 0.07), '#c8a070', { x: x + w * 0.3, y: line - 0.02, outline: 0 }));
+    parts.push(still(part(P.box(0.05, 0.1, 0.07), '#c8a070', { x: x - w * 0.3, y: line - 0.02, outline: 0 })));
+    parts.push(still(part(P.box(0.05, 0.1, 0.07), '#c8a070', { x: x + w * 0.3, y: line - 0.02, outline: 0 })));
   }
   return merge(parts).translate(0, 0, -0.1);
 }
-
 function parapetWallGeo() {
   const parts = [
     part(P.box(7.8, 0.72, 0.6), C.brick, { y: 0.36 }),
@@ -438,8 +478,8 @@ export default {
 
     b.toon('skylight', skylightGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('chimneyPots', chimneyPotsGeo(), { cap: 24, anim: 'popEarly' });
-    b.toon('laundry', laundryGeo(0.98, 2, 4), { cap: 24, anim: 'popEarly' });
-    b.toon('laundryWide', laundryGeo(3.95, 9, 8), { cap: 10, anim: 'popEarly' });
+    b.toon('laundry', laundryGeo(0.98, 2, 4), { cap: 24, anim: 'popEarly', cloth: BREEZE });
+    b.toon('laundryWide', laundryGeo(3.95, 9, 8), { cap: 10, anim: 'popEarly', cloth: BREEZE });
     b.toon('parapetWall', parapetWallGeo(), { cap: 10, anim: 'popEarly' });
     b.toon('chimneyStack', chimneyStackGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('waterTank', waterTankGeo(), { cap: 24, anim: 'popEarly' });
