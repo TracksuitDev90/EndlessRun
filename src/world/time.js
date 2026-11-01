@@ -1,7 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, cloudParts, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
 import { crystal, metal, crystalPoint, nugget, octahedron, blade, FACE } from './gems.js';
-import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
 // VIII · The Gallery of Hours — a gallery of clocks open to the sky: a walk
@@ -23,6 +22,18 @@ import { CONFIG } from '../config.js';
 // starts again. Pocket watches dangle out of the sky, hourglasses drift and
 // turn over among the clouds, armillary spheres turn on pedestals in the
 // bays, and little cogs drift by high over the walk.
+//
+// And the sands of time are running out over it all: the walk is sand. It
+// drifts in off both sides, banked high against the balustrades and
+// spilling in across the walk in tongues — far in here, hardly at all
+// there — and every few arches a thread of sand falls from the cornice and
+// heaps up a pile against the balustrade, until it runs out and the pile
+// slumps out across the floor (the drifts and piles are shaped in the vertex
+// shader, see sandHeight; the sand itself is ground pattern 10). Wind ripples
+// creep across it, wisps of sand blow over it, and the runner leaves
+// footprints in it (game/sands.js). When the doorway out leads into the sea,
+// the sea laps in through it: waves of white foam roll up the beach in front
+// of it and draw back, wetting the sand.
 //
 // All the turning and swinging is decoration, and kept off the walk: the
 // obstacles stay where they stand (their pendulum bobs only sway along the
@@ -50,6 +61,7 @@ const C = {
   glass: '#dfeaf2',
   sand: '#d49a48',
   sandHi: '#e6b664',
+  sandFall: '#ecc888',
   sky: '#dfe9f6',
 };
 
@@ -416,6 +428,60 @@ function weightGeo() {
   return merge(parts).translate(0, 0, -0.65);
 }
 
+// --- the sands -------------------------------------------------------------------------
+// The floor: one strip across the walk and out under the balustrades, fine
+// where the drifts and piles heap up (|x| > 3) and coarse down the flat
+// middle, where only the pattern changes; uv in metres (x across, y along
+// the run) like groundStrip's.
+function sandStrip() {
+  const xs = [];
+  for (let i = 0; i <= 16; i++) xs.push(-7 + i * 0.25);
+  for (let x = -2; x <= 2; x++) xs.push(x);
+  for (let i = 0; i <= 16; i++) xs.push(3 + i * 0.25);
+  const rows = 32;
+  const L = CONFIG.chunkLength;
+  const pos = [];
+  const nrm = [];
+  const uv = [];
+  for (let j = 0; j <= rows; j++) {
+    const d = (L * j) / rows;
+    for (const x of xs) {
+      pos.push(x, 0, -d);
+      nrm.push(0, 1, 0);
+      uv.push(x, d);
+    }
+  }
+  const idx = [];
+  const W = xs.length;
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < W - 1; i++) {
+      const a = j * W + i;
+      const b = a + W;
+      idx.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setIndex(idx);
+  return part(g, '#ffffff', { outline: 0 });
+}
+
+// A thread of sand falling from the cornice onto its pile (see THREAD in the
+// shaders): the stream, 0..1 up y (role 0), and the grains bouncing off the
+// pile where it lands (role 1).
+function threadGeo() {
+  const parts = [role(part(P.cyl(1, 1, 1, 6, 12, true), C.sandFall, { y: 0.5, emit: 0.25, outline: 0 }), 0)];
+  const rnd = seeded(5);
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + rnd();
+    const r = 0.1 + rnd() * 0.14;
+    parts.push(role(part(P.ico(0.025 + rnd() * 0.02), C.sandFall, { x: Math.cos(a) * r, y: 0.04 + rnd() * 0.22, z: Math.sin(a) * r, emit: 0.25, outline: 0 }), 1));
+  }
+  return merge(parts);
+}
+
 function gateGeo(opening, depth) {
   const parts = [...gateFrameParts(opening, { thick: 1.4, depth, color: C.ivory })];
   const top = gateTop(opening);
@@ -453,7 +519,19 @@ export default {
     grade: { sat: 1.0, contrast: 1.04, vignette: 0.22, exposure: 1.02, tint: '#5a4a6a' },
     ink: '#4a3420',
     fog: [55, 210],
-    ground: ['#efe4cc', '#e2d4b6', '#b8a27a'],
+    ground: ['#f5e9cd', '#e9d5ad', '#bfa578'],
+    // the sands (see the sand ground): [how high the drifts bank against
+    // the balustrades (m), how high a pile heaps up (m), how long one takes
+    // to build and slump (s), the share of the arches sand falls from]; and
+    // the sea where it laps up the beach before a doorway into it [shallow,
+    // deep, foam], how far up it reaches (m), how long a wave takes to roll
+    // in and draw back (s), and how far from the doorway the runner is as it
+    // starts to pour in and when it's in full (m)
+    sands: {
+      dunes: [0.75, 1.25, 9, 0.65],
+      sea: ['#8fdcd6', '#45b2c4', '#fbfdfa'],
+      surf: { reach: 26, period: [2.6, 3.6], from: 80, to: 46 },
+    },
     shadowDecal: [0.78, 0.74, 0.8],
     cast: [-0.25, 0.4],
     glowGain: 0.6,
@@ -471,6 +549,7 @@ export default {
         rim: [1.0, 0.75, 0.45, 0.35],
         mist: { color: '#ffd8a8' },
         cast: [0.7, 0.8],
+        sands: { sea: ['#86d0c4', '#3f98a8', '#fff4e2'] },
         particles: { color: '#ffd890', size: 2.3, drift: [0.1, 0.2, 0], opacity: 0.9 },
       },
     },
@@ -486,7 +565,8 @@ export default {
         rim: [0.6, 0.75, 1.0, 0.4],
         mist: { color: '#3a4a8a', amount: 0.5 },
         grade: { exposure: 0.92, vignette: 0.4, tint: '#0a0a2a' },
-        ground: ['#c8c4d4', '#b4b0c4', '#7a7690'],
+        ground: ['#cbc3c8', '#b5abb6', '#7a7088'],
+        sands: { sea: ['#3d7f9a', '#1b4a6e', '#d4e2f2'] },
         particles: { color: '#dfe8ff', size: 2.4, drift: [0.04, 0.1, 0], opacity: 1 },
       },
     },
@@ -507,7 +587,8 @@ export default {
     const WATCH = { anim: 'liftFar', wobble: [0, 0.6, 0.4, 0] };
     const HG = (z, period) => [period, HG_WAIST, z, HG_WAIST - HG_FLOOR];
 
-    b.ground('ground', groundStrip(14, 16, '#ffffff', 8), 8);
+    b.ground('ground', sandStrip(), 10, { dunes: true });
+    b.toon('sandThread', threadGeo(), { cap: 64, ink: 0, thread: [11.3, 0.07] });
     b.toon('bay', bayGeo(), { cap: 72, anim: 'rise', ink: 0.05 });
     b.toon('bracket', merge([part(P.box(0.9, 0.9, 1.6), C.ivoryLo, { y: 0.45 }), part(P.cyl(0.6, 0.7, 0.3, 12), C.brass, { y: 1.0 })]), { cap: 24, anim: 'pop', ink: 0.04 });
     b.toon('wallClock', merge(dialParts({ r: 2.6, depth: 0.4 })), { cap: 24, anim: 'pop', ink: 0.05 });
@@ -574,6 +655,9 @@ export default {
     const put = (name, x, y, z, o) => ctx.put(name, x, y, z, o);
     for (const s of [-1, 1]) {
       const ry = s < 0 ? 0 : Math.PI;
+      // under the arch at the chunk's seam, perhaps a thread of sand falling
+      // onto a pile (the shaders decide which, and when: see pileCycle)
+      ctx.put('sandThread', s * 5.85, 0, 0, { p0: ctx.d0 % 4096, p1: s });
       // the colonnade: a bay every 8 m (each arch reaching back to the next column)
       for (const z of [4, 12]) ctx.put('bay', s * WALL_X, 0, z, { ry });
       // in the bays: a grandfather clock, a great pendulum swinging along the

@@ -30,7 +30,7 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | V | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
-| VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck: an ivory walk inlaid with brass clock-ticks between colonnades of ivory arches, oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
+| VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump (see [The sands of time](#the-sands-of-time)), your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 | IX | **The Kelp Deep** — the last world, under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
 
 The first lap always nests inward in that order; after that the order shuffles
@@ -164,6 +164,62 @@ whole glass turns over on its waist and starts again. Everything but the sand
 is the same upside down, so it's back exactly where it began; the glass is
 see-through, so you can watch it. The ones in your way turn over within their
 own footprint.
+
+### The sands of time
+
+The Gallery's walk is sand, and it won't keep still.
+
+**Drifts and piles.** Sand has drifted in off both sides, banked high
+against the balustrades (half burying them, and the grandfather clocks
+standing in the bays) and spilling in across the walk in tongues of loose,
+paler sand with a soft lip at their edge — far into the lanes in some
+places, hardly past the drift in others. Every so many arches a thread of
+sand falls from the cornice and heaps up a pile against the balustrade;
+when it runs out (its tail falling after it), the pile gives way all at
+once and slumps out across the floor toward the walk, then settles into the
+drift while the next one grows. Grains trickle down the drifts' faces, and
+pour when a pile slumps; wind ripples creep across the packed sand, the
+drift's crest creeps slowly along the walk, and wisps of fine sand blow
+across it in gusts. The lanes themselves are never raised, so obstacles,
+gems and shadows stand exactly where they always do.
+
+**Footprints.** The runner leaves footprints: the wayfarer a hiking boot's
+lugs, the explorer a trainer's wavy tread (drawn a third over life size, so
+they read from the camera), each pressed in where the foot was planted, the
+ball and toes dug in deepest, a rim of sand squeezed up round it, its walls
+lit and shaded by the world's light. A landing presses both feet in at once,
+deeper; a slide ploughs a furrow with the sand heaped up at its end.
+
+**The surf.** When the doorway out leads under the sea, the sea pours in
+through it as its doors swing open and laps up the beach in front of it
+(modelled on a hand-animated shoreline): wave after wave rolls up the sand —
+fast, slowing as it runs out of push — and draws back, each reaching its
+own way up the beach, its front rolling along in lobes. A band of white foam
+leads it, opening behind into lace — rounded holes of teal water, each with
+a shadowed crescent on the side toward the light where the foam stands
+proud of it — that thins and breaks up toward the open water. It leaves the
+sand darker where it has been, glistening as the backwash bares it, washes
+footprints away, and flattens the drifts in front of the doorway. Run
+through it and you splash: drops and spray at every footfall, the water
+churned white round your legs and a wake trailing behind you.
+
+How it's done: the floor is one strip per chunk, fine where the sand heaps
+up and coarse down the flat middle, shaped in the vertex shader from track
+coordinates (`sandHeight`: the drift's foot, its crest and the piles are
+noise and hashes of where along the walk you are, so they need no CPU work
+and run on seamlessly from chunk to chunk), its normal from the slope; the
+threads are one instanced batch that works out from the same hashes whether
+there's a pile under its arch and when it's pouring. The sand's pattern,
+the footprints and the surf are ground pattern 10. The footprints are a
+ring of twelve in uniforms, written by `src/game/sands.js` from the
+stride's phase and the runner's toe bones; the waves are worked out there
+too (so the runner knows when they're in the water) and handed over as a
+handful of numbers — the front, how far this wave reached, the wet line,
+how far the foam has been carried — while the foam's cells are worked out
+per pixel (and not at all out in open water). The splashes are the
+runner's own dust points, flavoured as water.
+
+![The Gallery's sands: drifts banked against the balustrades and a footprint behind the runner; a thread of sand falling from the cornice onto a pile heaped against the balustrade; the sea lapping up the beach through the open doorway into the Kelp Deep; and wading through its foam](docs/sands.jpg)
 
 ### Under the sea
 
@@ -700,6 +756,14 @@ Append to the URL:
   by the CPU and its swirl a fixed buffer worked out on the GPU (one draw
   call each, none out of the water). The splash's extra full-screen pass runs
   only for its second and a half.
+- **Sand that moves, for one draw call.** The Gallery's drifts and piles are
+  heaped in the vertex shader of its floor strip (2.4k triangles a chunk, fine
+  only where the sand heaps up: about 50k more on screen than the flat ivory
+  floor had), and its threads of sand are one more draw call; nothing about
+  them is worked out on the CPU. The footprints are twelve slots of a uniform
+  array, and the ground only loops over them in the few metres round the
+  runner; the surf's cells of foam are worked out per pixel only where there
+  is lace, and only while a doorway into the sea is near.
 - **Frame timing** (`src/core/pacer.js`). Every animation frame the browser
   gives is drawn, at whatever rate it runs (60, 90, 120 Hz; Safari keeps
   pages near 60 on ProMotion screens unless told otherwise, near 30 in Low
@@ -1073,7 +1137,10 @@ src/game/                     game loop, player (the runners' shared core:
                               (gems.js: the ghost route and pick-up), portal, dream
                               (depth recipes and the shared warp uniforms), bubbles
                               (the runner's bubbles, swirl and sand under the sea)
-                              and splash (the screen splashed coming into it)
+                              and splash (the screen splashed coming into it);
+                              sands (the footprints in the Gallery's sand and
+                              the surf lapping up it before a doorway into the
+                              sea)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/view.html        a runner turned round like their reference sheet
@@ -1098,9 +1165,22 @@ An obstacle spec can also bring companion batches drawn with another material
 (`with: ['creekWideWater']`), lower its collision top (`top`), skip its contact
 shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
 true })` gives a surface the running-water shader, and ground pattern 6 is the
-forest's long grass, 7 Hell's ash (fissures glowing beyond the road) and 8 the
-Gallery's ivory slabs with their brass clock-tick bezel (for all three, pass the
-chunk distance as `p0` so they run on seamlessly). `b.toon(…, { lava: true })`
+forest's long grass, 7 Hell's ash (fissures glowing beyond the road), 8 ivory
+slabs with a brass clock-tick bezel (the Gallery's floor before the sand came
+in) and 10 the Gallery's sands (for all of them, pass the chunk distance as
+`p0` so they run on seamlessly). Pattern 10 goes with `b.ground(…, 10, {
+dunes: true })` on a strip laid out like the Gallery's `sandStrip()` (the
+vertex shader heaps it into drifts and piles), and reads the world's
+`env.sands`: `dunes: [drift height at the balustrade, pile height, a pile's
+cycle in seconds, the share of arches sand falls from]`, `sea: [shallow,
+deep, foam]` for the surf, and `surf: { reach, period: [min, max], from, to
+}` — how far up the beach it laps, how long a wave takes, and how far from
+the doorway the runner is as the sea starts to pour in and once it's in
+full. The surf comes only when the doorway out leads into a world with
+`env.sea`; `game/sands.js` drives it and the footprints. `b.toon(…, {
+thread: [height, radius] })` makes a batch of threads of sand falling onto
+the piles (put one under each chunk-seam arch, `p0` the chunk distance and
+`p1` the side; the shader decides which pour, and when). `b.toon(…, { lava: true })`
 gives a surface the molten-rock material (it lights itself and keeps its colour
 through a drain), and `b.toon(…, { turn: [spinZ, swingX, swingRate, spinY] })`
 turns a prop in the vertex shader — gears and clock hands spinning about their

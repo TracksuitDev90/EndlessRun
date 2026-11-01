@@ -16,6 +16,7 @@ import { Portal } from './portal.js';
 import { Dream } from './dream.js';
 import { WaterFx } from './bubbles.js';
 import { Splash } from './splash.js';
+import { Sands } from './sands.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -62,6 +63,9 @@ export class Game {
     this.water = new WaterFx(this.waterU);
     // coming into a world with env.splash, the screen is splashed with water
     this.splash = new Splash();
+    // a world with env.sands: the runner's footprints in it, and the surf
+    // before a doorway into the sea (see sands.js)
+    this.sands = new Sands();
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
@@ -119,6 +123,7 @@ export class Game {
     this.sparkles.reset();
     this.water.reset();
     this.splash.stop();
+    this.sands.reset(seed);
 
     this.course.ensure(0, CONFIG.speed.start);
     this.depth = this.course.segAt(0).ordinal;
@@ -549,6 +554,7 @@ export class Game {
     this.setParticles(this.current.env, this.current.env, 0);
     this.water.reset();
     this.splash.stop();
+    this.sands.reset(this.seed ^ Math.floor(d));
   }
 
   skipToNextDoor(before = 150) {
@@ -604,8 +610,10 @@ export class Game {
       this.gems.update(this.dist, this.runTime);
     }
 
-    // (over water nothing kicks up dust)
-    this.player.wet = this.obstacles.wetAt(this.player.x, this.dist);
+    // (over water nothing kicks up dust; the surf lapping up the sand before
+    // a doorway into the sea counts)
+    this.sands.surf(dt, this);
+    this.player.wet = this.obstacles.wetAt(this.player.x, this.dist) || this.sands.wetAt(this.player.x, this.dist);
     this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
     if (this.state === 'running') this.collide();
     if (this.state === 'running') this.collectGems();
@@ -613,6 +621,7 @@ export class Game {
 
     const pz = -(this.dist - this.origin);
     this.player.place(pz, this.dist);
+    this.sands.update(dt, this);
     this.updateWater(dt);
     this.callAhead();
     shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);

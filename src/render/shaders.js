@@ -4,6 +4,9 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 // flat illustration, not physically based lighting.
 THREE.ColorManagement.enabled = false;
 
+// How many footprints the sand keeps at once (see game/sands.js).
+export const PRINTS = 12;
+
 // Uniforms shared by every material in the game (same JS objects, so one write
 // updates all programs).
 export const shared = {
@@ -264,7 +267,105 @@ vec3 skyColor(vec3 dir) {
 // wobble, ink-outline extrusion and the curved-world bend.
 // uAnim.x mode: 0 static, 1 pop-up hinge, 2 rise (per-vertex), 3 swing
 // ---------------------------------------------------------------------------
-const VS_OBJECT = COMMON + /* glsl */ `
+// The Gallery's sands (env.sands; ground pattern 10, toon options dunes and
+// thread). Track coordinates: p.x across the walk, p.y along the run (the
+// chunk distance, mod 4096 — every period here divides it, so nothing jumps
+// where it wraps). Needs uNoise and uShore declared first:
+//   uShore: x where the doorway out stands (track m, mod 4096), y how much the
+//   beach before it is washed flat (0..1), z the sea lapping up it (0..1),
+//   w how far up the beach the sea can reach (m).
+const SANDS_COMMON = /* glsl */ `
+float sandN(vec2 q) { return texture2D(uNoise, q).g; }
+// how far out from the middle of the walk the drift banked against this
+// side's balustrade starts to rise: well into the walk here, hardly at all
+// there
+float driftFoot(float d, float side) {
+  float n = sandN(vec2(d * 0.015625 + side * 0.31, 0.17 + side * 0.23));
+  float n2 = sandN(vec2(d * 0.0625 + side * 0.53, 0.61));
+  return mix(5.6, 3.5, smoothstep(0.3, 0.7, n)) - (n2 - 0.5) * 1.2;
+}
+// how far before the doorway out a point is (m; < 0 past it)
+float doorAhead(float d) {
+  return mod(uShore.x - d + 2048.0, 4096.0) - 2048.0;
+}
+`;
+const SANDS_VS = /* glsl */ `
+#if defined(DUNES) || defined(THREAD)
+uniform sampler2D uNoise;
+uniform vec4 uShore;
+// x the drift's height against the balustrade, y a pile's height, z a
+// pile's cycle (s), w the share of the arches sand falls from
+uniform vec4 uDunes;
+` + SANDS_COMMON + /* glsl */ `
+// where a pile and its thread stand, out from the middle of the walk
+#define PILE_X 5.85
+// the share of a pile's cycle it builds for (the rest it slumps)
+#define BUILD 0.8
+// the sea washes the beach in front of a doorway into it flat
+float sandWash(float d) {
+  return uShore.y * (1.0 - smoothstep(uShore.w + 2.0, uShore.w + 14.0, doorAhead(d)));
+}
+// The pile under the arch at cell (its chunk distance) on this side, if
+// there is one (returns 0 if not): its height and radius, and where it is
+// in its cycle (f: 0..1) of T seconds.
+float pileCycle(float cell, float side, out float H, out float R0, out float f, out float T) {
+  float h0 = hash13(vec3(cell, side + 2.0, 1.37));
+  float h1 = hash13(vec3(cell, side + 2.0, 7.13));
+  float h2 = hash13(vec3(cell, side + 2.0, 4.91));
+  T = uDunes.z * (0.75 + 0.5 * h1);
+  f = fract(uTime / T + h2);
+  H = uDunes.y * (0.65 + 0.55 * h2);
+  R0 = 1.3 + 0.5 * h1;
+  return step(h0, uDunes.w);
+}
+// a heap's profile, 1 at its peak to 0 at its foot: a cone of sand, its
+// top rounded and its foot easing out
+float heap(float u) {
+  float c = clamp(1.0 - u, 0.0, 1.0);
+  return 0.5 * c + 0.5 * c * c * (3.0 - 2.0 * c);
+}
+// A pile heaped against the balustrade under every so many arches (at the
+// chunk seams), fed by a thread of sand falling from the cornice: it builds
+// up while the sand runs, and when the sand stops it slumps out across the
+// floor toward the walk; that apron settles into the drift as the next one
+// grows. slip: how much sand is running down it here (0..1).
+float pileHeight(vec2 p, float side, out float slip) {
+  slip = 0.0;
+  float cell = floor(p.y * 0.0625 + 0.5) * 16.0;
+  float H, R0, f, T;
+  if (pileCycle(mod(cell, 4096.0), side, H, R0, f, T) < 0.5) return 0.0;
+  float g = min(f / BUILD, 1.0);
+  float c = clamp((f - BUILD) / (1.0 - BUILD), 0.0, 1.0);
+  // (it gives way all at once, then settles)
+  float k = 1.0 - (1.0 - c) * (1.0 - c) * (1.0 - c);
+  float dy = p.y - cell;
+  float rc = R0 * (0.4 + 0.6 * sqrt(g)) * (1.0 + 0.9 * k);
+  float r = length(vec2(p.x - side * (PILE_X - 0.7 * k), dy));
+  float cone = H * pow(g, 0.6) * (1.0 - k) * heap(r / rc);
+  float ra = length(vec2(p.x - side * (PILE_X - 0.7), dy));
+  float apron = H * 0.22 * max(k, 1.0 - smoothstep(0.0, 0.7, g)) * heap(ra / (R0 * 2.1));
+  float on = 1.0 - smoothstep(rc, rc * 1.15, r);
+  slip = max(4.0 * k * (1.0 - k) * on, 0.45 * step(f, BUILD) * on * smoothstep(0.0, 0.1, g));
+  return cone + apron;
+}
+// The sand's height at p: the drift banked against the balustrade, its crest
+// rising and falling along the walk and creeping slowly on, and the piles;
+// nothing in the lanes, and nothing on the beach the sea has washed flat.
+float sandHeight(vec2 p, out float slip) {
+  slip = 0.0;
+  float ax = abs(p.x);
+  if (ax < 3.2) return 0.0;
+  float side = p.x < 0.0 ? -1.0 : 1.0;
+  float foot = driftFoot(p.y, side);
+  float crest = sandN(vec2(p.y * 0.03125 + side * 0.71 - uTime * 0.004, 0.43));
+  float drift = uDunes.x * (0.5 + 0.7 * crest) * pow(smoothstep(foot, 6.3, ax), 1.7);
+  float pile = pileHeight(p, side, slip);
+  return (drift + pile) * smoothstep(3.2, 3.9, ax) * (1.0 - sandWash(p.y));
+}
+#endif
+`;
+
+const VS_OBJECT = COMMON + SANDS_VS + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uWobble;
 uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
@@ -294,8 +395,19 @@ attribute vec4 aInst;
 // clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
 uniform float uWonk;
 #endif
-#if defined(SAND) || defined(WONKY) || defined(JELLY)
+#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD)
 attribute float role;
+#endif
+#ifdef DUNES
+// x how much sand is running down here, y how deep it lies
+varying vec2 vSand;
+#endif
+#ifdef THREAD
+// A thread of sand falling from the cornice onto a pile (see pileHeight;
+// p0 the chunk distance of the arch it falls under, p1 which side): x the
+// height it falls from, y its radius. role 0 the stream (built 0..1 up y),
+// 1 the grains bouncing where it lands.
+uniform vec4 uThread;
 #endif
 #ifdef CURRENT
 // Swaying in the current (kelp, seagrass, anemones): a wave runs up the prop
@@ -632,6 +744,48 @@ void main() {
     }
   #endif
 
+  #ifdef DUNES
+    {
+      // the sands (see sandHeight): the strip is laid flat, uv in metres
+      // (y along the run, from p0); its normal from the slope of the sand
+      float slip, s1, s2;
+      vec2 sp = vec2(lp.x, uv.y + phase);
+      float h = sandHeight(sp, slip);
+      float hx = sandHeight(sp + vec2(0.15, 0.0), s1);
+      float hd = sandHeight(sp + vec2(0.0, 0.15), s2);
+      lp.y += h;
+      ln = normalize(vec3((h - hx) / 0.15, 1.0, (hd - h) / 0.15));
+      vSand = vec2(slip, h);
+    }
+  #endif
+  #ifdef THREAD
+    {
+      // its head falls from the cornice when the sand starts to run, and
+      // when it stops, its tail falls after it; nothing where there's no
+      // pile, or on the beach the sea has washed flat
+      float H, R0, f, T, slip;
+      float has = pileCycle(phase, sgn, H, R0, f, T) * (1.0 - step(0.3, sandWash(phase)));
+      float land = sandHeight(vec2(sgn * PILE_X, phase), slip);
+      float ts = f * T;
+      float te = (f - BUILD) * T;
+      float bot = max(land, uThread.x - 4.9 * ts * ts);
+      float top = te > 0.0 ? uThread.x - 4.9 * te * te : uThread.x;
+      float on = has * step(bot + 0.05, top);
+      if (role < 0.5) {
+        float y = mix(bot, top, lp.y);
+        // a thin, grainy stream, wavering a little as it falls
+        float grain = 0.7 + 0.3 * sin(uTime * 41.0 + y * 37.0 + phase);
+        lp.xz *= uThread.y * on * grain;
+        lp.x += sin(uTime * 2.3 + y * 0.7 + phase) * 0.025 * on;
+        lp.y = y;
+      } else {
+        // where it lands, grains bouncing off the top of the pile
+        float hit = on * step(bot, land + 0.01);
+        lp *= hit * (0.75 + 0.35 * sin(uTime * 23.0 + phase * 3.0));
+        lp.y += land;
+      }
+    }
+  #endif
   vec3 wp = (M * vec4(lp, 1.0)).xyz;
   vec3 wn = normalize(mat3(M) * ln);
   #ifdef OUTLINE
@@ -828,6 +982,250 @@ float caustic(vec3 p, vec3 n, float dist) {
 }
 `;
 
+// Ground pattern 10, the Gallery's sands (inside FS_TOON's GROUND block,
+// after hash12): packed sand and the loose sand spilled in off the drifts,
+// the runner's footprints, and the surf lapping up the beach before a
+// doorway into the sea (see game/sands.js for what drives them).
+const SANDS_FS = /* glsl */ `
+#if GROUND == 10
+#define PRINTS ${PRINTS}
+uniform vec4 uShore;
+` + SANDS_COMMON + /* glsl */ `
+// the swash: x its front (m before the doorway), y how far this wave
+// reached, z the wet line, w 1 while it draws back
+uniform vec4 uSurf;
+// x how far its foam has been carried (m), yzw the phases of its front's lobes
+uniform vec4 uSurf2;
+// x how much lace the wave carries (0..1), y how far its lobes reach (m),
+// z where the runner is across the walk, w how much they're wading
+uniform vec4 uSurf3;
+uniform vec3 uSeaShallow;
+uniform vec3 uSeaDeep;
+uniform vec3 uSeaFoam;
+// each footprint: x, d (track m, mod 4096), heading (rad, toward +x), kind
+// (0 a boot, 1 a trainer, 2 a slide's furrow); and its length (a furrow's),
+// width (a furrow's), depth (m), and 1 or -1 (a right or a left foot)
+uniform vec4 uPrintA[PRINTS];
+uniform vec4 uPrintB[PRINTS];
+// x the runner (track m), y how far back the prints go (m), z how many
+uniform vec4 uPrintZone;
+#ifdef DUNES
+varying vec2 vSand;
+#else
+const vec2 vSand = vec2(0.0);
+#endif
+// the relief the pattern gives the sand (added to its normal), and how much
+// wet sand bared by the backwash glistens
+vec3 gBump = vec3(0.0);
+float gSheen = 0.0;
+float wrapD(float a) {
+  return mod(a + 2048.0, 4096.0) - 2048.0;
+}
+// A footprint, q in its own frame (m: y toward the toe, x to the outside of
+// the foot): how deep it presses the sand (1 at the deepest; the rim of sand
+// squeezed up round it below 0). kind 0 a hiking boot's lugs, 1 a trainer's
+// wavy tread, a size smaller (both drawn a third over life size, so they
+// read from the camera); fine: how far the tread is lost to distance.
+float footprint(vec2 q, float kind, float fine) {
+  q /= mix(1.32, 1.18, kind);
+  float fore = (length((q - vec2(0.008, 0.062)) / vec2(0.056, 0.088)) - 1.0) * 0.056;
+  float heel = (length((q - vec2(0.0, -0.092)) / vec2(0.045, 0.056)) - 1.0) * 0.045;
+  float k = 0.035;
+  float hh = clamp(0.5 + 0.5 * (heel - fore) / k, 0.0, 1.0);
+  float sdf = mix(heel, fore, hh) - k * hh * (1.0 - hh);
+  float inner = smoothstep(0.003, -0.008, sdf);
+  // a runner's print: the ball and toes dug in deepest, the heel barely
+  float dig = mix(0.4, 1.0, smoothstep(-0.12, 0.04, q.y));
+  float lug = kind < 0.5 ? fract(q.y * 26.0 + abs(q.x) * 12.0) : fract(q.y * 32.0 + sin(q.x * 75.0) * 0.3);
+  float tread = mix(smoothstep(0.3, 0.45, lug) * (1.0 - smoothstep(0.75, 0.9, lug)), 0.5, fine);
+  float rim = smoothstep(0.032, 0.006, sdf) * smoothstep(-0.004, 0.006, sdf);
+  return inner * dig * (0.82 + 0.18 * tread) - rim * 0.32;
+}
+// A slide's furrow, its end at the origin running back len metres, w wide,
+// the sand it shoved along heaped up at its end.
+float furrow(vec2 q, float len, float w) {
+  float d = length(vec2(q.x, q.y - clamp(q.y, -len, 0.0))) - w * 0.5;
+  float trough = smoothstep(0.02, -w * 0.45, d);
+  float rim = smoothstep(0.09, 0.0, d) * smoothstep(-0.03, 0.02, d);
+  float push = exp(-pow((q.y - 0.07) / 0.07, 2.0)) * smoothstep(w * 0.6, 0.0, abs(q.x));
+  return trough - 0.35 * rim - 0.5 * push;
+}
+float printShape(vec2 q, vec4 A, vec4 B, float fine) {
+  return A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
+}
+// The runner's footprints round p: how deep they press the sand here (m);
+// the slope they give it is added to grad (dh/dx, dh/dd).
+float printsAt(vec2 p, float fine, inout vec2 grad) {
+  float dz = wrapD(p.y - uPrintZone.x);
+  if (uPrintZone.z < 0.5 || dz > 0.8 || dz < -uPrintZone.y) return 0.0;
+  float deep = 0.0;
+  for (int i = 0; i < PRINTS; i++) {
+    if (float(i) >= uPrintZone.z) break;
+    vec4 A = uPrintA[i];
+    vec4 B = uPrintB[i];
+    vec2 hd = vec2(sin(A.z), cos(A.z));
+    vec2 rt = vec2(hd.y, -hd.x);
+    vec2 dp = vec2(p.x - A.x, wrapD(p.y - A.y));
+    float along = dot(dp, hd);
+    float across = dot(dp, rt);
+    float back = A.w > 1.5 ? B.x : 0.0;
+    if (abs(across) > 0.4 || along > 0.38 || along < -back - 0.38) continue;
+    vec2 q = vec2(across * B.w, along);
+    float e = 0.012;
+    float h0 = printShape(q, A, B, fine);
+    float hx = printShape(q + vec2(e, 0.0), A, B, fine);
+    float hy = printShape(q + vec2(0.0, e), A, B, fine);
+    vec2 g = -vec2((hx - h0) * B.w, hy - h0) / e * B.z * 1.5;
+    grad += g.x * rt + g.y * hd;
+    deep = max(deep, h0 * B.z);
+  }
+  return deep;
+}
+// the swash's front rolls along in lobes (as in game/sands.js)
+float surfLobes(float x) {
+  return uSurf3.y * (0.7 * sin(0.42 * x + uSurf2.y) + 0.45 * sin(1.07 * x + uSurf2.z) + 0.2 * sin(2.3 * x + uSurf2.w));
+}
+// Cells of foam: x how far from the nearest cell's heart, y how far from
+// the nearest wall between two cells. Their hearts wander, so the lace keeps
+// reshaping as it slides.
+vec2 foamCells(vec2 q) {
+  vec2 c = floor(q);
+  vec2 f = fract(q);
+  float d1 = 9.0;
+  float d2 = 9.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 o = vec2(float(i), float(j));
+      vec2 h = vec2(hash12(c + o + 3.1), hash12(c + o + 11.7));
+      vec2 pt = o + 0.5 + 0.4 * sin(6.2831 * h + uTime * (0.7 + 0.6 * h.yx));
+      float d = length(pt - f);
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+      } else if (d < d2) {
+        d2 = d;
+      }
+    }
+  }
+  return vec2(d1, d2 - d1);
+}
+vec3 sandGround(vec2 p, float dist, float far) {
+  float ax = abs(p.x);
+  float side = p.x < 0.0 ? -1.0 : 1.0;
+  // how much ground a pixel covers here (m), for what must fade with distance
+  float fw = fwidth(p.x) + fwidth(p.y);
+  // fine pale sand in broad soft patches
+  float n1 = sandN(p * 0.0625);
+  float n2 = sandN(p * 0.25 + 0.31);
+  vec3 c = mix(uGroundB, uGroundA, smoothstep(0.2, 0.75, n1 * 0.65 + n2 * 0.35));
+  // ripples the wind has drawn in it (their crests run along the walk, so
+  // they never strobe), creeping slowly sideways: each a long gentle rise
+  // to its crest and a short steep face in its own shade
+  float rx = p.x * 1.4 + (n1 - 0.5) * 3.0 + sin(p.y * 0.19635) * 0.5 + (n2 - 0.5) * 0.8 + uTime * 0.025;
+  float rk = (1.0 - far * 0.8) * (1.0 - smoothstep(0.25, 0.6, fwidth(rx)));
+  float rf = fract(rx);
+  float lee = smoothstep(0.78, 0.93, rf) * (1.0 - smoothstep(0.95, 1.0, rf));
+  c *= 1.0 + (0.035 * rf - 0.08 * lee) * rk;
+  // loose sand spilled in off the drift on each side: tongues of it reaching
+  // into the walk, far in here, hardly at all there, paler than the packed
+  // sand, with a soft lip facing the walk, lit or shaded as it faces the
+  // light
+  float t1 = sandN(vec2(p.y * 0.125 + side * 0.37, 0.77 + side * 0.11));
+  float t2 = sandN(vec2(p.y * 0.375 + side * 0.19, 0.29));
+  float reach = max(0.6, driftFoot(p.y, side) - 0.3 - smoothstep(0.35, 0.75, t1) * 2.3 - (t2 - 0.5) * 0.9);
+  float lt = clamp((ax - reach) / 0.35, 0.0, 1.0);
+  float loose = lt * lt * (3.0 - 2.0 * lt);
+  float lip = 4.0 * lt * (1.0 - lt) * (1.0 - far);
+  c = mix(c, c * vec3(1.04, 1.03, 1.0) + vec3(0.012, 0.01, 0.004), loose);
+  c *= 1.0 + lip * (0.025 - 0.11 * side * uLightDir.x);
+  vec2 grad = vec2(0.0);
+  // grains trickling down the drifts and the piles, running when one slumps
+  float slope = 1.0 - normalize(vNormal).y;
+  float run = sandN(vec2(p.y * 1.5 + side * 0.4, ax * 0.3 + uTime * 0.09));
+  float trickle = max(smoothstep(0.55, 0.72, run) * smoothstep(0.04, 0.25, slope), vSand.x * smoothstep(0.42, 0.62, run));
+  c *= 1.0 + 0.08 * trickle * (1.0 - far);
+  // the deeper it lies, the looser and paler
+  c *= 1.0 + 0.03 * smoothstep(0.2, 0.8, vSand.y);
+  // wisps of fine sand blowing across the walk, coming and going in gusts
+  float gust = smoothstep(0.42, 0.7, sandN(vec2(p.x * 0.025 - uTime * 0.04, p.y * 0.03125 + uTime * 0.015)));
+  float wisp = smoothstep(0.56, 0.74, sandN(vec2(p.x * 0.1 - uTime * 0.38, p.y * 0.625)));
+  c = mix(c, c * 1.06 + vec3(0.04, 0.036, 0.026), wisp * gust * 0.9 * (1.0 - far));
+  // the odd dark grain
+  vec2 gq = p * 4.0;
+  vec2 gc = floor(gq);
+  vec2 go = fract(gq) - (vec2(hash12(gc + 1.7), hash12(gc + 5.3)) * 0.6 + 0.2);
+  float gr = 0.07 + 0.05 * hash12(gc + 9.1);
+  float speck = (1.0 - smoothstep(gr - 0.04, gr + 0.04, length(go))) * step(0.94, hash12(gc + 23.0)) * (1.0 - smoothstep(0.02, 0.06, fw));
+  c = mix(c, c * vec3(0.55, 0.52, 0.5), speck * 0.75);
+  // the runner's footprints, darker and cooler where they're pressed in
+  float deep = printsAt(p, smoothstep(0.004, 0.015, fw), grad);
+  c = mix(c, c * uShadowTint * 0.92, clamp(deep * 24.0, 0.0, 0.85));
+
+  // The sea, lapping up the beach before a doorway into it: a front of
+  // white foam rolling up the sand and drawing back, lace trailing behind it
+  // over the water, the sand it has wet darker, glistening as it's bared
+  if (uShore.z > 0.0) {
+    float s = doorAhead(p.y);
+    float lob = surfLobes(p.x);
+    float u = uSurf.x + lob - s;
+    float wet = smoothstep(0.8, -1.5, s - (uSurf.z + lob * 0.8)) * uShore.z;
+    c *= mix(vec3(1.0), vec3(0.8, 0.75, 0.69), wet);
+    gSheen = uSurf.w * step(u, 0.0) * (1.0 - smoothstep(0.0, max(uSurf.y - uSurf.x, 0.5) * 0.9 + 0.3, -u));
+    if (u > -0.6) {
+      // a thin film running ahead of the foam
+      c = mix(c, c * 0.9 + vec3(0.06, 0.08, 0.09), smoothstep(-0.55, 0.0, u) * 0.5);
+      // the foam: cells of it carried with the water — solid at the front,
+      // opening into lace behind, the lace thinning and breaking up further
+      // back — and the strand on the light's side shading the water in each
+      // hole
+      vec2 q = vec2(p.x, s - uSurf2.x) * 1.35;
+      q += (vec2(sandN(q * 0.11 + 0.3), sandN(q * 0.11 + 0.71)) - 0.5) * 0.9;
+      float aa = fw * 1.6 + 0.02;
+      float L = 1.4 + 3.6 * uSurf3.x;
+      float w = mix(0.95, 0.08, smoothstep(0.05, L * 0.8, u));
+      // (each hole a rounded pebble: the cell, shrunk from its walls, its
+      // corners trimmed round)
+      float r = 0.64 - 0.3 * w;
+      float brk = smoothstep(0.3, 0.6, sandN(q * 0.07 + vec2(0.13, 0.0)));
+      float keep = mix(1.0, brk, smoothstep(L * 0.35, L, u)) * (1.0 - smoothstep(L, L * 1.9, u));
+      vec2 cl = vec2(0.4, 0.0);
+      float foam = 0.0;
+      float lee = 0.0;
+      // (out in open water, with no lace left, the cells aren't worked out)
+      if (keep > 0.0) {
+        cl = foamCells(q);
+        foam = (1.0 - smoothstep(w - aa, w + aa, cl.y) * (1.0 - smoothstep(r - aa, r + aa, cl.x))) * keep;
+        foam *= smoothstep(-0.02, 0.04 + aa * 0.5, u + 0.16 * (0.45 - cl.x));
+        vec2 toLight = normalize(vec2(uLightDir.x, uLightDir.z) + 1e-4) * 0.16;
+        vec2 cs = foamCells(q + toLight);
+        lee = (1.0 - smoothstep(w - aa, w + aa, cs.y) * (1.0 - smoothstep(r - aa, r + aa, cs.x))) * keep * (1.0 - foam);
+      }
+      // the water: pale and thin at the front, deepening toward the doorway
+      vec3 water = mix(uSeaShallow, uSeaDeep, smoothstep(0.5, 12.0, u)) * (1.0 - 0.2 * lee);
+      float sheet = smoothstep(0.0, 0.6, u);
+      c = mix(c, water, sheet);
+      // (far off, the lace blurs to a pale wash)
+      foam = mix(foam, keep * clamp(w * 1.3, 0.0, 1.0) * smoothstep(0.0, 0.3, u), smoothstep(0.25, 0.9, aa));
+      // round the runner's legs as they wade, the water churned white, and a
+      // wake trailing off behind them
+      if (uSurf3.w > 0.0) {
+        vec2 rq = vec2(p.x - uSurf3.z, wrapD(p.y - uPrintZone.x));
+        float churn = smoothstep(0.55, 0.2, length(rq * vec2(1.0, 0.7)) + (cl.x - 0.4) * 0.3);
+        float aft = max(-rq.y, 0.0);
+        float vee = abs(abs(rq.x) - (0.22 + aft * 0.3));
+        float wake = (1.0 - smoothstep(0.03, 0.08 + aft * 0.03, vee)) * step(rq.y, 0.1) * (1.0 - smoothstep(0.8, 5.0, aft));
+        foam = max(foam, clamp(churn + wake * 0.85, 0.0, 1.0) * uSurf3.w * sheet);
+      }
+      c = mix(c, uSeaFoam, foam);
+      grad *= 1.0 - sheet;
+    }
+  }
+  gBump = vec3(-grad.x, 0.0, grad.y);
+  return mix(c, mix(uGroundA, uGroundB, 0.4), far * 0.5);
+}
+#endif
+`;
+
 const FS_TOON = FS_HEAD + /* glsl */ `
 uniform vec3 uLightDir;
 uniform vec3 uShadowTint;
@@ -956,6 +1354,7 @@ float edgeMaskRun(vec2 f, vec2 size, float w) {
   if (uMotion <= aa) return min(along, smoothstep(w - aa, w + aa, e.y));
   return min(along, 1.0 - runLine(e.y, w, aa));
 }
+` + SANDS_FS + /* glsl */ `
 vec3 groundColor(vec2 p, float dist) {
   float far = smoothstep(25.0, 140.0, dist);
   vec3 avg = mix(uGroundA, uGroundB, 0.5);
@@ -1193,6 +1592,8 @@ vec3 groundColor(vec2 p, float dist) {
     vec3 starC = fh > 0.982 ? vec3(0.62, 0.36, 0.86) : vec3(1.0, 0.5, 0.32);
     c = mix(c, starC * (0.8 + 0.4 * clamp(1.0 - fr / 0.26, 0.0, 1.0)), star);
     return mix(c, mix(uGroundA, uGroundC, bed * 0.8 + 0.1), far * 0.5);
+  #elif GROUND == 10
+    return sandGround(p, dist, far);
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -1216,6 +1617,15 @@ void main() {
   float dist = length(v);
   #ifdef GROUND
     vec3 base = groundColor(vUv, dist) * vColor;
+    #if GROUND == 10
+      // the sand's own relief (footprints, the lip of the loose sand), and a
+      // soft form shading so its drifts and piles read in any light: lighter
+      // turned toward the light than the flat floor is, shaded turned away
+      n = normalize(n + gBump);
+      float sl = dot(n, uLightDir) - uLightDir.y;
+      base *= mix(0.86, 1.06, smoothstep(-0.35, 0.2, sl));
+      base = mix(base, base * uShadowTint, 0.6 * smoothstep(-0.12, -0.38, sl));
+    #endif
   #else
     vec3 base = vColor;
   #endif
@@ -1318,6 +1728,12 @@ void main() {
   shade *= 1.0 + caustic(vPos, n, dist) * (1.0 - vFx.y);
   vec3 col = mix(base * shade, base, max(vFx.y, gEmit));
   gKeep = max(gKeep, vFx.y);
+  #ifdef GROUND
+    #if GROUND == 10
+      // wet sand just bared by the backwash shines with the sky
+      if (gSheen > 0.0) col = mix(col, skyColor(reflect(V, vec3(0.0, 1.0, 0.0))) * 1.1 + 0.05, gSheen * 0.28);
+    #endif
+  #endif
 
   #ifdef CRUST
     if (glass > 0.0) {
@@ -2508,7 +2924,7 @@ void main() {
 // ---------------------------------------------------------------------------
 const VS_DUST = COMMON + /* glsl */ `
 uniform vec2 uResolution;
-attribute vec4 aDust; // x size (m), y opacity, z 1 for grit, w seed
+attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray), w seed
 varying vec4 vDust;
 varying vec3 vWorld;
 varying vec3 vPos;
@@ -2533,7 +2949,9 @@ varying vec4 vDust;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
   float r = length(c);
-  float grit = vDust.z;
+  // (drops of water are drawn like grit, spray like a puff)
+  float grit = step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z));
+  float wet = step(1.5, vDust.z);
   float a = atan(c.y, c.x);
   // (the lumps stay inside the sprite, or its square would cut them off)
   float lump = (0.028 * sin(a * 5.0 + vDust.w * 6.3) + 0.016 * sin(a * 9.0 - vDust.w * 4.1)) * (1.0 - grit);
@@ -2545,7 +2963,9 @@ void main() {
   float lit = smoothstep(0.2, -0.25, c.y + 0.06 * sin(a * 3.0 + vDust.w));
   vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
   vec3 col = dust * mix(sh, vec3(1.0), 0.35 + 0.65 * lit);
-  col = mix(col, dust * 0.42, grit);
+  col = mix(col, dust * 0.42, grit * (1.0 - wet));
+  // water: white, a glassy teal shade beneath
+  col = mix(col, mix(vec3(0.62, 0.84, 0.86), vec3(1.0), 0.4 + 0.6 * lit), wet);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
@@ -3086,6 +3506,7 @@ const setColor = (c, v) => (Array.isArray(v) ? c.setRGB(v[0], v[1], v[2]) : c.se
 export function makeEnvUniforms(env) {
   const v3 = () => ({ value: new THREE.Vector3() });
   const v4 = () => ({ value: new THREE.Vector4() });
+  const v40 = () => ({ value: new THREE.Vector4(0, 0, 0, 0) });
   const c = () => ({ value: new THREE.Color() });
   const u = {
     uSkyTop: c(), uSkyHorizon: c(), uSkyBottom: c(),
@@ -3098,10 +3519,19 @@ export function makeEnvUniforms(env) {
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
     uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(), uVigShape: v4(),
     uSea: v4(), uDeep: v4(), uDeepTint: c(),
+    // The Gallery's sands (env.sands, see the sand ground): its dunes, and
+    // what game/sands.js writes each frame — the surf before a doorway into
+    // the sea, and the runner's footprints
+    uDunes: v4(), uShore: v40(), uSurf: v40(), uSurf2: v40(), uSurf3: v40(),
+    uSeaShallow: c(), uSeaDeep: c(), uSeaFoam: c(),
+    uPrintA: { value: Array.from({ length: PRINTS }, () => new THREE.Vector4()) },
+    uPrintB: { value: Array.from({ length: PRINTS }, () => new THREE.Vector4()) },
+    uPrintZone: v40(),
   };
   writeEnvUniforms(u, env);
   return u;
 }
+
 
 export function writeEnvUniforms(u, env) {
   const L = env.light;
@@ -3159,6 +3589,16 @@ export function writeEnvUniforms(u, env) {
   const deep = env.deep || {};
   u.uDeep.value.set(deep.amount || 0, deep.from ?? 0.3, deep.to ?? 1, 0);
   setColor(u.uDeepTint.value, deep.tint || '#ffffff');
+  // the sands: [drift height at the wall, pile height, a pile's cycle (s),
+  // share of the arches sand falls from]; the sea's colours where it laps
+  // up the beach
+  const sands = env.sands || {};
+  const dn = sands.dunes || [0, 0, 1, 0];
+  u.uDunes.value.set(dn[0], dn[1], dn[2], dn[3]);
+  const sw = sands.sea || ['#8fd9d4', '#4cb3c4', '#ffffff'];
+  setColor(u.uSeaShallow.value, sw[0]);
+  setColor(u.uSeaDeep.value, sw[1]);
+  setColor(u.uSeaFoam.value, sw[2]);
   // a draining world starts in full colour: game.js saps it when you come
   // through its doorway
   u.uDrain.value.set(env.drain ? 1 : 0, DRAIN_NONE, 0, 0);
@@ -3272,6 +3712,14 @@ export function makeToonMaterial(env, o = {}) {
     uniforms.uCross = { value: new THREE.Vector4(...o.cross) };
   }
   if (o.pleats) defines.PLEATS = '';
+  // the sands (env.sands): a ground strip heaped into drifts and piles, and
+  // the threads of sand falling onto the piles ([height they fall from,
+  // radius])
+  if (o.dunes) defines.DUNES = '';
+  if (o.thread) {
+    defines.THREAD = '';
+    uniforms.uThread = { value: new THREE.Vector4(o.thread[0], o.thread[1], 0, 0) };
+  }
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
