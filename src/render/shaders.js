@@ -27,6 +27,10 @@ export const shared = {
   uBloomCol: { value: [new THREE.Color(), new THREE.Color(), new THREE.Color()] },
   // the runner's chest: a collected gem flies into it (see VS_GEM)
   uGemAt: { value: new THREE.Vector3() },
+  // how far the road moves under the runner while a frame is shown, times the
+  // shutter (CONFIG.motionBlur): the ground's patterns blur along the run by
+  // this much (see runBlur)
+  uMotion: { value: 0 },
 };
 
 const COMMON = /* glsl */ `
@@ -89,6 +93,8 @@ float hash13(vec3 p) {
 `;
 
 const SKY_FN = /* glsl */ `
+// the paper grain: one texel of the noise texture's white noise per pixel
+#define GRAIN (1.0 / 256.0)
 uniform vec3 uSkyTop;
 uniform vec3 uSkyHorizon;
 uniform vec3 uSkyBottom;
@@ -636,10 +642,30 @@ float tri(vec3 p, vec3 an) {
 uniform vec3 uGroundA;
 uniform vec3 uGroundB;
 uniform vec3 uGroundC;
+uniform float uMotion;
 float edgeMask(vec2 f, vec2 size, float w) {
   vec2 e = min(f, 1.0 - f) * size;
   float aa = max(fwidth(vUv.y), fwidth(vUv.x)) * 0.8;
   return smoothstep(w - aa, w + aa, min(e.x, e.y));
+}
+// A line of half-width w across the road, d metres away (along the run),
+// filtered over a pixel (aa) and over the frame's travel: at speed the road
+// moves further in a frame than its tiles are deep (28 m/s against 32 cm
+// cobbles is a row and a half a frame), and a crisp line seems to strobe or
+// crawl backwards. Smeared over the travel, as a camera's shutter would, it
+// widens and fades instead. Returns the line's coverage.
+float runLine(float d, float w, float aa) {
+  float b = max(aa, uMotion);
+  return (1.0 - smoothstep(w - b, w + b, d)) * min(1.0, (2.0 * w + aa) / (2.0 * w + b));
+}
+// edgeMask for tiles laid across the run, their joins across it blurred by
+// the run (identical to edgeMask standing still)
+float edgeMaskRun(vec2 f, vec2 size, float w) {
+  vec2 e = min(f, 1.0 - f) * size;
+  float aa = max(fwidth(vUv.y), fwidth(vUv.x)) * 0.8;
+  float along = smoothstep(w - aa, w + aa, e.x);
+  if (uMotion <= aa) return min(along, smoothstep(w - aa, w + aa, e.y));
+  return min(along, 1.0 - runLine(e.y, w, aa));
 }
 vec3 groundColor(vec2 p, float dist) {
   float far = smoothstep(25.0, 140.0, dist);
@@ -652,7 +678,7 @@ vec3 groundColor(vec2 p, float dist) {
     vec2 cell = floor(q);
     float h = hash12(cell + 17.0);
     vec3 c = mix(uGroundA, uGroundB, h);
-    c = mix(mix(uGroundC, c, 0.35), c, mix(edgeMask(fract(q), cs, 0.026), 1.0, far * 0.8));
+    c = mix(mix(uGroundC, c, 0.35), c, mix(edgeMaskRun(fract(q), cs, 0.026), 1.0, far * 0.8));
     c = mix(c, avg, far * 0.5);
     float border = smoothstep(3.95, 4.05, abs(p.x));
     return mix(c, uGroundC * 1.12, border);
@@ -664,7 +690,7 @@ vec3 groundColor(vec2 p, float dist) {
     vec2 cell = floor(q);
     float h = hash12(cell + 3.0);
     vec3 c = mix(uGroundA, uGroundB, h);
-    c = mix(uGroundC, c, mix(edgeMask(fract(q), cs, 0.03), 1.0, far * 0.8));
+    c = mix(uGroundC, c, mix(edgeMaskRun(fract(q), cs, 0.03), 1.0, far * 0.8));
     float lane = 1.0 - smoothstep(0.05, 0.09, abs(abs(p.x) - 1.2));
     c = mix(c, uGroundC, lane * 0.55 * (1.0 - far));
     float border = smoothstep(4.0, 4.1, abs(p.x));
@@ -695,6 +721,10 @@ vec3 groundColor(vec2 p, float dist) {
     // p.y runs on from chunk to chunk (see the vertex shader), so every period
     // here divides the 4096 m it wraps at.
     float soften = smoothstep(0.25, 0.9, fwidth(p.x) * 9.0);
+    // (and at speed, as each blade passes under the camera faster than a
+    // frame can follow, they smear into the grass's own tone; standing
+    // still this is no change)
+    soften = max(soften, smoothstep(0.2, 0.6, uMotion / 0.42));
     vec3 c = mix(uGroundA, uGroundB, 0.3);
     for (int k = 0; k < 2; k++) {
       float fk = float(k);
@@ -818,7 +848,7 @@ vec3 groundColor(vec2 p, float dist) {
     float major = 1.0 - step(0.13, abs(fract(p.y / 2.0) - 0.5));
     float tickW = mix(0.022, 0.045, major);
     float tickIn = mix(4.08, 3.9, major);
-    float tick = (1.0 - smoothstep(tickW - aa, tickW + aa, tq)) * step(tickIn, ax) * step(ax, 4.36);
+    float tick = (uMotion <= aa ? 1.0 - smoothstep(tickW - aa, tickW + aa, tq) : runLine(tq, tickW, aa)) * step(tickIn, ax) * step(ax, 4.36);
     float rimA = 1.0 - smoothstep(0.018, 0.018 + aa + fwidth(ax), abs(ax - 3.82));
     float rimB = 1.0 - smoothstep(0.03, 0.03 + aa + fwidth(ax), abs(ax - 4.42));
     float metal = max(max(tick, rimA), rimB) * (1.0 - far * 0.7);
@@ -1016,7 +1046,7 @@ void main() {
     col += uRim.rgb * (0.45 + 0.55 * base) * rim * (1.0 - max(vFx.y, gEmit));
   #endif
 
-  float g = texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5;
+  float g = texture2D(uNoise, gl_FragCoord.xy * GRAIN).r - 0.5;
   float wash = texture2D(uNoise, vPos.xz * (1.0 / 64.0)).g - 0.5;
   col *= 1.0 + g * 0.05 + wash * 0.09;
 
@@ -1388,7 +1418,7 @@ void main() {
   float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
   float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y));
   col += uRim.rgb * base * rim * 0.45 * (1.0 - unlit);
-  col *= 1.0 + (texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5) * 0.035;
+  col *= 1.0 + (texture2D(uNoise, gl_FragCoord.xy * GRAIN).r - 0.5) * 0.035;
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), 1.0);
 }
@@ -1751,7 +1781,7 @@ void main() {
     float az = atan(d.x, -d.z);
     c = hueRot(c, sw * 1.3 * sin(az * 3.0 + d.y * 9.0 + uTime * 0.35));
   }
-  c += (texture2D(uNoise, gl_FragCoord.xy * (1.0 / 128.0)).r - 0.5) * 0.02;
+  c += (texture2D(uNoise, gl_FragCoord.xy * GRAIN).r - 0.5) * 0.02;
   gl_FragColor = vec4(grade(c, uTrip), 1.0);
 }
 `;

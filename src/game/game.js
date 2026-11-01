@@ -513,6 +513,9 @@ export class Game {
 
     this.prevDist = this.dist;
     this.dist += this.speed * dt;
+    // the ground's patterns blur along the run by the shutter's share of this
+    // frame's travel (see runLine in shaders.js)
+    shared.uMotion.value = this.speed * dt * CONFIG.motionBlur;
 
     if (this.dist - this.origin > CONFIG.rebaseStep) {
       this.origin += CONFIG.rebaseStep;

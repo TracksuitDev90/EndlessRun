@@ -162,4 +162,8 @@ export const CONFIG = {
   // Rendering
   maxPixelRatio: 2,
   minPixelRatio: 1,
+  // The ground's patterns are blurred along the run by this share of how far
+  // the road moves in a frame (a camera's shutter: 0.5 = half the frame), so
+  // tiles and grass don't strobe at speed; 0 turns it off.
+  motionBlur: 0.5,
 };

@@ -47,11 +47,11 @@ export function gpuClass(renderer) {
 }
 
 export class Quality {
-  // o: { deviceDpr, mobile, gpu: 'low' | 'mid' | 'high', fixedDpr, fixedFps }
+  // o: { deviceDpr, minDpr, mobile, gpu: 'low' | 'mid' | 'high', fixedDpr, fixedFps }
   constructor(pacer, o) {
     this.pacer = pacer;
     this.maxDpr = o.deviceDpr;
-    this.minDpr = Math.min(1, o.deviceDpr);
+    this.minDpr = Math.min(o.minDpr ?? 1, o.deviceDpr);
     this.fixedDpr = !!o.fixedDpr;
     this.fixedFps = !!o.fixedFps;
     this.failed = new Set();

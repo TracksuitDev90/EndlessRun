@@ -83,16 +83,23 @@ export class FramePacer {
     this.clean[this.cleanI] = dt;
     this.cleanI = (this.cleanI + 1) % HIST;
     if (this.cleanN < HIST) this.cleanN++;
-    if (++this.sinceFit >= 8 && this.cleanN >= 8) {
-      this.sinceFit = 0;
-      const n = this.cleanN;
-      const s = this.sorted;
-      for (let i = 0; i < n; i++) s[i] = this.clean[i];
-      const v = s.subarray(0, n).sort();
-      // (a low percentile: an idle refresh can still run long when the page
-      // is busy, never short)
-      this.period = v[Math.floor(n * 0.3)];
-    }
+    if (++this.sinceFit >= 8) this.fit();
+  }
+
+  // The period from the clean intervals: the middle of those clustered at the
+  // shortest (an idle refresh can still run two or three long when the page
+  // is busy, never short; the median of the cluster averages out timestamp
+  // jitter, which some browsers round to a millisecond).
+  fit() {
+    this.sinceFit = 0;
+    const n = this.cleanN;
+    if (n < 6) return;
+    const s = this.sorted;
+    for (let i = 0; i < n; i++) s[i] = this.clean[i];
+    const v = s.subarray(0, n).sort();
+    let m = 1;
+    while (m < n && v[m] < v[0] * 1.35) m++;
+    this.period = m & 1 ? v[m >> 1] : (v[(m >> 1) - 1] + v[m >> 1]) / 2;
   }
 
   // Call once per requestAnimationFrame with its timestamp (ms). Returns the

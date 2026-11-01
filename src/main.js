@@ -56,6 +56,14 @@ async function boot() {
 
   shared.uMarks.value = makeMarksTexture();
   shared.uNoise.value = makeNoiseTexture();
+  // Sharper textures at grazing angles (the road and ground into the
+  // distance) where the GPU has room for it.
+  const gpu = gpuClass(renderer);
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
+  const tier = mobile ? gpu.tier : 'high';
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  shared.uMarks.value.anisotropy = Math.min(maxAniso, tier === 'high' ? 8 : 4);
+  shared.uNoise.value.anisotropy = Math.min(maxAniso, tier === 'high' ? 4 : tier === 'mid' ? 2 : 1);
 
   await loadRunner();
   const audio = new Ambient();
@@ -67,10 +75,9 @@ async function boot() {
   // can't — trading pixel density first.
   const pacer = new FramePacer();
   if (params.fps) pacer.forced = params.fps;
-  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
-  const gpu = gpuClass(renderer);
   const quality = new Quality(pacer, {
     deviceDpr: Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio),
+    minDpr: CONFIG.minPixelRatio,
     mobile,
     gpu: gpu.tier,
     fixedDpr: params.dpr ? Math.min(params.dpr, 3) : 0,
@@ -178,6 +185,7 @@ async function boot() {
   const until = performance.now() + 400;
   while (calibrated < 14 && performance.now() < until) await new Promise((r) => requestAnimationFrame(r));
   calibrating = false;
+  pacer.fit();
   game.update(1 / 60);
   game.render();
   ui.loaded();
