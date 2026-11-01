@@ -56,32 +56,22 @@ async function boot() {
 
   shared.uMarks.value = makeMarksTexture();
   shared.uNoise.value = makeNoiseTexture();
-  // Sharper textures at grazing angles (the road and ground into the
-  // distance) where the GPU has room for it.
-  const gpu = gpuClass(renderer);
-  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
-  const tier = mobile ? gpu.tier : 'high';
-  const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  shared.uMarks.value.anisotropy = Math.min(maxAniso, tier === 'high' ? 8 : 4);
-  shared.uNoise.value.anisotropy = Math.min(maxAniso, tier === 'high' ? 4 : tier === 'mid' ? 2 : 1);
+  const gpu = gpuClass(renderer); // (named in the ?debug overlay)
 
   await loadRunner();
   const audio = new Ambient();
   const game = new Game({ renderer, ui, audio, params });
   window.__game = game;
 
-  // --- frame pacing and adaptive quality (see core/pacer.js, core/quality.js) ---
-  // Hold a steady frame rate — 60 where the device can, an even 30 where it
-  // can't — trading pixel density first.
+  // --- frame timing and adaptive resolution (see core/pacer.js, core/quality.js) ---
+  // Every animation frame the browser gives us is drawn; the resolution
+  // adapts to hold the rate.
   const pacer = new FramePacer();
-  if (params.fps) pacer.forced = params.fps;
-  const quality = new Quality(pacer, {
+  if (params.fps) pacer.cap = params.fps;
+  const quality = new Quality({
     deviceDpr: Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio),
     minDpr: CONFIG.minPixelRatio,
-    mobile,
-    gpu: gpu.tier,
     fixedDpr: params.dpr ? Math.min(params.dpr, 3) : 0,
-    fixedFps: !!params.fps,
   });
 
   // Resizing reallocates the canvas (and its multisampled buffers), so it is
@@ -172,67 +162,40 @@ async function boot() {
   }
 
   // --- warm up --------------------------------------------------------------
-  // (the display's refresh rate is measured meanwhile, while nothing is drawn)
-  let calibrating = true;
-  let calibrated = 0;
-  const calib = (now) => {
-    pacer.calibrate(now);
-    calibrated++;
-    if (calibrating) requestAnimationFrame(calib);
-  };
-  requestAnimationFrame(calib);
   await game.precompile();
-  const until = performance.now() + 400;
-  while (calibrated < 14 && performance.now() < until) await new Promise((r) => requestAnimationFrame(r));
-  calibrating = false;
-  pacer.fit();
   game.update(1 / 60);
   game.render();
   ui.loaded();
   ui.showTitle(true);
 
   // --- main loop ----------------------------------------------------------------
-  // (a paused game draws nothing: the last frame stays on screen, and the
-  // GPU rests — on a phone that also keeps it from heating up and throttling)
   const stats = params.debug ? makeStats() : null;
-  let drawnPaused = false;
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = pacer.tick(now);
     if (dt === 0) return;
-    if (game.state === 'paused') {
-      if (drawnPaused && !resizePending) {
-        pacer.idle();
-        quality.hold(0.5);
-        return;
-      }
-      drawnPaused = true;
-    } else {
-      drawnPaused = false;
-    }
     if (resizePending) resize();
     const t0 = performance.now();
+    game.frameStep = pacer.nominal;
     game.update(dt);
     renderer.info.reset();
     game.render();
     const js = performance.now() - t0;
-    if (quality.sample(dt, pacer.missed, js)) resize();
-    if (stats) stats(now, dt, js);
+    if (quality.sample(pacer.raw)) resize();
+    if (stats) stats(dt, js);
   }
 
   // ?debug: frame rate, how many frames came late, frame-time spread, the
-  // quality the governor settled on, draw calls and triangles.
+  // resolution, draw calls and triangles, the GPU.
   function makeStats() {
     const times = new Float32Array(120);
     const sorted = new Float32Array(120);
-    let n = 0, late = 0, jsSum = 0, acc = 0, frames = 0, lastNow = 0;
-    return (now, dt, js) => {
-      const iv = lastNow ? now - lastNow : dt * 1000;
-      lastNow = now;
-      times[n++ % times.length] = iv;
-      if (pacer.missed > 0) late++;
+    let n = 0, late = 0, jsSum = 0, acc = 0, frames = 0;
+    return (dt, js) => {
+      times[n++ % times.length] = pacer.raw * 1000;
+      if (pacer.late) late++;
       jsSum += js;
-      acc += dt;
+      acc += pacer.raw;
       frames++;
       if (acc < 0.5) return;
       const m = Math.min(n, times.length);
@@ -240,10 +203,10 @@ async function boot() {
       const s = sorted.subarray(0, m).sort();
       const i = renderer.info.render;
       ui.stats(
-        `${(frames / acc).toFixed(0)} fps (${pacer.hz.toFixed(0)} Hz /${pacer.stride})  dpr ${quality.dpr}\n` +
+        `${(frames / acc).toFixed(0)} fps  dpr ${quality.dpr}\n` +
           `frame p50 ${s[m >> 1].toFixed(1)}  p95 ${s[Math.floor(m * 0.95)].toFixed(1)} ms  late ${((100 * late) / frames).toFixed(0)}%\n` +
           `js ${(jsSum / frames).toFixed(1)} ms  calls ${i.calls}  tris ${(i.triangles / 1000).toFixed(0)}k\n` +
-          `${gpu.name.slice(0, 32)} (${gpu.tier})\n` +
+          `${gpu.name.slice(0, 32)}\n` +
           `${game.current.id}  ${game.dist.toFixed(0)} m  ${game.speed.toFixed(1)} m/s\n` +
           `${game.state}${game.god ? '  GOD' : ''}`
       );

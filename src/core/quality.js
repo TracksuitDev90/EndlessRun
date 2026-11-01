@@ -1,24 +1,25 @@
-// Adaptive quality: keep the frame rate steady by trading pixel density, and
-// — only if that isn't enough — frame rate, so a phone that can't hold 60
-// gets an even 30 at a sharp resolution rather than a juddering 40-something.
-//
-// The signal is frames that came late (missed a display refresh) and how
-// long the game's own JavaScript took. Over ~1.5 s windows:
-//   - more than a few late frames: step down. If the script alone is eating
-//     most of the frame, resolution won't help, so drop the frame rate;
-//     otherwise lower the resolution a notch, and drop the frame rate only
-//     at the bottom of the range;
-//   - a long run of perfect frames: try a notch sharper (never one that has
-//     already failed this session), and — once — the higher frame rate again.
-// Changes are spaced out (a resolution change reallocates the canvas), the
-// first guess comes from the GPU's name and from what worked last time
-// (remembered on the device), so most sessions start right and never change.
+// Adaptive resolution: hold the frame rate by trading pixel density. Frames
+// are averaged over ~1.5 s windows (the real time between them, whatever rate
+// the browser runs at):
+//   - slower than ~50 fps on average: a notch (0.25 of device pixels) lower,
+//     two notches if slower than ~28 fps;
+//   - faster than ~75 fps on average (a 120 Hz screen with room to spare):
+//     a notch higher, once a session.
+// If stepping down doesn't make frames any quicker — after a second notch,
+// since one may not be enough to make the display's next refresh — the
+// browser itself is holding the rate down (Low Power Mode caps Safari near
+// 30) or the bottleneck isn't pixels: the resolution is put back, and not
+// lowered again for half a minute (the second time, not again that session).
+// Changes are spaced out — a resolution change reallocates the canvas — and
+// it never touches the frame rate itself. What it settles on is remembered on
+// the device, and the next session starts a notch above it, so a phone that
+// needs a lower resolution gets it straight away, and one that was only
+// briefly hot or busy finds its way back up.
 
-const KEY = 'er.quality.v1';
+const KEY = 'er.quality.v2';
 const STEP = 0.25;
 
-// A rough first guess at a mobile GPU's class from its name (the governor
-// corrects it either way within a few seconds).
+// The GPU's name and a rough class, for the ?debug overlay.
 export function gpuClass(renderer) {
   let name = '';
   try {
@@ -47,167 +48,101 @@ export function gpuClass(renderer) {
 }
 
 export class Quality {
-  // o: { deviceDpr, minDpr, mobile, gpu: 'low' | 'mid' | 'high', fixedDpr, fixedFps }
-  constructor(pacer, o) {
-    this.pacer = pacer;
+  // o: { deviceDpr, minDpr, fixedDpr }
+  constructor(o) {
     this.maxDpr = o.deviceDpr;
     this.minDpr = Math.min(o.minDpr ?? 1, o.deviceDpr);
-    this.fixedDpr = !!o.fixedDpr;
-    this.fixedFps = !!o.fixedFps;
-    this.failed = new Set();
-    this.triedFaster = false;
-    this.cool = 2.5; // seconds before the first decision (compiles, first uploads)
-    this.calm = 0; // perfect windows in a row
-    this.saveIn = 12;
-    this.resetWindow();
-
-    let dpr = o.deviceDpr;
-    let extra = 0; // strides beyond the display's own
-    if (!o.fixedDpr && o.mobile) {
-      dpr = Math.min(o.deviceDpr, o.gpu === 'high' ? 2 : o.gpu === 'low' ? 1 : 1.5);
-    }
-    const saved = this.load();
-    if (saved) {
-      if (!o.fixedDpr) dpr = Math.min(o.deviceDpr, Math.max(this.minDpr, saved.dpr));
-      extra = saved.extra;
-    }
-    if (o.fixedDpr) dpr = o.fixedDpr;
-    this.dpr = snap(dpr);
-    this.extra = this.fixedFps ? 0 : Math.max(0, Math.min(2, extra | 0));
-    this.applyStride();
-  }
-
-  applyStride() {
-    this.pacer.stride = this.pacer.minStride + this.extra;
-  }
-
-  // The display rate may change under us (phones switch 60 <-> 90/120 Hz).
-  get fps() {
-    return this.pacer.fps;
-  }
-
-  resetWindow() {
+    this.fixed = !!o.fixedDpr;
+    this.raised = false;
+    this.cool = 2; // seconds before the first decision
+    this.stable = 0;
     this.frames = 0;
-    this.late = 0;
-    this.js = 0;
+    this.time = 0;
+    this.clock = 0;
+    this.blockedUntil = 0; // no stepping down before this (seconds of clock)
+    this.blocks = 0;
+    this.check = null; // { from, avg, tries }: a step down, to see whether it helped
+    let dpr = o.fixedDpr || o.deviceDpr;
+    const saved = this.fixed ? null : this.load();
+    if (saved !== null) dpr = Math.min(this.maxDpr, Math.max(this.minDpr, saved + STEP));
+    this.dpr = snap(dpr);
+    // (a notch above what was saved: saved again once it has held)
+    this.saved = saved === null || saved === this.dpr;
+  }
+
+  // Leave out a stretch that isn't the game's own doing (a hidden tab).
+  hold(seconds = 1) {
+    this.cool = Math.max(this.cool, seconds);
+    this.frames = 0;
     this.time = 0;
   }
 
-  // Leave out what isn't the game's own doing (a hidden tab, a pause) and
-  // give a heavy moment (a doorway, a restart) time to settle.
-  hold(seconds = 1.5) {
-    this.cool = Math.max(this.cool, seconds);
-    this.resetWindow();
-  }
-
-  // Once per rendered frame: the step it advanced by, the refreshes it came
-  // late by and the milliseconds of script it took. Returns true when the
-  // resolution changed (the caller resizes).
-  sample(dt, missed, jsMs) {
-    this.applyStride();
+  // Once per frame with the real time since the last one (seconds). Returns
+  // true when the resolution changed (the caller resizes).
+  sample(raw) {
+    if (this.fixed || !(raw > 0) || raw > 0.25) return false;
+    this.clock += raw;
     if (this.cool > 0) {
-      this.cool -= dt;
-      if (this.cool <= 0) this.resetWindow();
+      this.cool -= raw;
       return false;
     }
     this.frames++;
-    this.time += dt;
-    if (missed > 0) this.late++;
-    this.js += jsMs;
-    this.saveIn -= dt;
-    if (this.saveIn <= 0) {
-      this.saveIn = 1e9;
-      this.save();
+    this.time += raw;
+    if (this.frames < 90 && this.time < 1.5) return false;
+    const avg = this.time / this.frames;
+    this.frames = 0;
+    this.time = 0;
+    const check = this.check;
+    this.check = null;
+    if (check && avg > check.avg * 0.92) {
+      if (check.tries < 2 && this.dpr > this.minDpr) {
+        // no quicker yet: one more notch
+        this.check = { from: check.from, avg: check.avg, tries: check.tries + 1 };
+        return this.set(Math.max(this.minDpr, this.dpr - STEP));
+      }
+      // stepping down bought nothing: put the resolution back
+      this.blockedUntil = ++this.blocks > 1 ? Infinity : this.clock + 30;
+      return this.set(check.from);
     }
-    // (most frames late: no need to wait out the whole window)
-    const severe = this.frames >= 20 && this.late > this.frames * 0.5;
-    if (this.time < 1.5 && !severe) return false;
-    const frames = this.frames;
-    const lateRate = this.late / frames;
-    const budget = 1000 / this.fps;
-    const jsShare = this.js / frames / budget;
-    this.resetWindow();
-    if (lateRate > 0.08) return this.down(jsShare, lateRate > 0.6 ? 2 : 1);
-    if (this.late === 0 && jsShare < 0.45) {
-      this.calm++;
-      if (this.calm >= 4) return this.up();
-    } else {
-      this.calm = 0;
+    let next = this.dpr;
+    if (avg > 1 / 50 && this.clock >= this.blockedUntil) {
+      next = Math.max(this.minDpr, this.dpr - STEP * (avg > 1 / 28 ? 2 : 1));
+      if (snap(next) !== this.dpr) this.check = { from: this.dpr, avg, tries: 1 };
+    } else if (avg < 1 / 75 && !this.raised && this.dpr < this.maxDpr) {
+      next = Math.min(this.maxDpr, this.dpr + STEP);
+      this.raised = true;
     }
-    return false;
-  }
-
-  key(extra, dpr) {
-    return `${extra}:${dpr.toFixed(2)}`;
-  }
-
-  canSlow() {
-    return !this.fixedFps && this.pacer.fps / (this.pacer.stride + 1) * this.pacer.stride >= 26 && this.extra < 2;
-  }
-
-  down(jsShare, notches) {
-    this.calm = 0;
-    this.failed.add(this.key(this.extra, this.dpr));
-    if (jsShare > 0.65 && this.canSlow()) return this.slower();
-    if (!this.fixedDpr && this.dpr - STEP >= this.minDpr - 1e-6) {
-      this.dpr = snap(Math.max(this.minDpr, this.dpr - STEP * notches));
-      this.changed(1.5);
-      return true;
-    }
-    if (this.canSlow()) return this.slower();
-    return false;
-  }
-
-  // Half (or two-thirds) the frame rate; the extra time per frame buys back
-  // a notch of sharpness.
-  slower() {
-    this.extra++;
-    this.applyStride();
-    this.changed(2);
-    if (!this.fixedDpr && this.dpr + STEP <= this.maxDpr + 1e-6 && !this.failed.has(this.key(this.extra, this.dpr + STEP))) {
-      this.dpr = snap(this.dpr + STEP);
-      return true;
-    }
-    return false;
-  }
-
-  up() {
-    this.calm = 0;
-    // once a session, try the faster frame rate back
-    if (this.extra > 0 && !this.triedFaster && !this.failed.has(this.key(this.extra - 1, this.dpr))) {
-      this.triedFaster = true;
-      this.extra--;
-      this.applyStride();
-      this.changed(2);
+    next = snap(next);
+    if (next === this.dpr) {
+      this.stable += 1.5;
+      if (!this.saved && this.stable > 15) this.save();
       return false;
     }
-    const next = snap(this.dpr + STEP);
-    if (this.fixedDpr || next > this.maxDpr + 1e-6 || this.failed.has(this.key(this.extra, next))) return false;
-    this.dpr = next;
-    this.changed(2.5);
-    return true;
+    return this.set(next);
   }
 
-  changed(cool) {
-    this.cool = cool;
-    this.resetWindow();
-    this.saveIn = 10;
+  set(dpr) {
+    this.dpr = snap(dpr);
+    this.cool = 3;
+    this.stable = 0;
+    this.saved = false;
+    return true;
   }
 
   load() {
     try {
-      const v = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (v && typeof v.dpr === 'number' && typeof v.extra === 'number') return v;
+      const v = Number(localStorage.getItem(KEY));
+      return v > 0 ? v : null;
     } catch {
-      /* storage unavailable */
+      return null;
     }
-    return null;
   }
 
   save() {
-    if (this.fixedDpr || this.fixedFps) return;
+    this.saved = true;
     try {
-      localStorage.setItem(KEY, JSON.stringify({ dpr: this.dpr, extra: this.extra }));
+      localStorage.setItem(KEY, String(this.dpr));
+      localStorage.removeItem('er.quality.v1'); // the last version's (it could also lower the frame rate)
     } catch {
       /* storage unavailable (private mode) */
     }

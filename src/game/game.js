@@ -55,6 +55,7 @@ export class Game {
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
+    this.frameStep = 1 / 60; // the usual frame interval (set by the main loop)
     this.god = !!params.god;
     this.tutorialDone = readFlag('er.tutorialDone');
     this.best = readNumber('er.best');
@@ -513,9 +514,10 @@ export class Game {
 
     this.prevDist = this.dist;
     this.dist += this.speed * dt;
-    // the ground's patterns blur along the run by the shutter's share of this
-    // frame's travel (see runLine in shaders.js)
-    shared.uMotion.value = this.speed * dt * CONFIG.motionBlur;
+    // the ground's patterns blur along the run by the shutter's share of a
+    // frame's travel (see runLine in shaders.js) — a usual frame's, not this
+    // one's: a late frame mustn't flash the road blurrier for an instant
+    shared.uMotion.value = this.speed * Math.min(this.frameStep, 1 / 50) * CONFIG.motionBlur;
 
     if (this.dist - this.origin > CONFIG.rebaseStep) {
       this.origin += CONFIG.rebaseStep;
