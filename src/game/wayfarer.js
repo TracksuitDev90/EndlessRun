@@ -5,6 +5,7 @@ import { Cloth } from './cloth.js';
 import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
 import { COL, CAPE, capeBind, capeColliders } from './outfit.js';
 import { Player, C, mirror } from './player.js';
+import { Dust } from './dust.js';
 
 // The wayfarer: a young wayfarer in a hooded cape (outfit.js), steady and
 // sure-footed. On top of the shared runner (player.js):
@@ -14,18 +15,55 @@ import { Player, C, mirror } from './player.js';
 //     shifting breeze and lagging every lane change, take-off and landing;
 //   - curls bounce on springs; the hip pouch is a pendulum, its flap lifting;
 //   - he leaps with the lead leg alternating, arms out like wings coming down,
-//     and slides feet first, leaning back, a hand trailing on the floor.
+//     and slides feet first, leaning back, a hand trailing on the floor;
+//   - he runs heavy: every push-off kicks a puff of dust off the road behind
+//     his boot (dust.js), and he lands with a stomp.
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
+const _d = new THREE.Vector3();
+const _dv = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
 
+// How he runs: a tall bruiser's stride - long legs (see build.py's stretch)
+// covering more road with each step at a slower, heavier cadence; sinking a
+// little deeper into every contact and bouncing higher off it; wider-footed,
+// the hips rolling and the shoulders driving round against them, arms
+// pumping big. (The swing path is the default's drawn out to his legs.)
+const GAIT = {
+  cadence: [1.38, 0.05],
+  stride: { reach: 0.67, hipY: 0.774, bob: 0.046, trackX: 0.084, swingX: 0.112, toeOut: 0.07, heelLift: 0.72, ballZ: -0.025 },
+  swing: [
+    [0.16, 0.42, 0.32, 0.035, 0.035],
+    [0.4, 0.23, 0.49, 0.0, 0.09],
+    [0.65, -0.17, 0.4, -0.045, 0.035],
+    [0.84, -0.32, 0.26, -0.023, 0.0],
+  ],
+  arm: {
+    swing: [0.16, 0.5, 0.6, 0.38, -0.1, -0.46, -0.56, -0.34],
+    abd: [0.48, 0.42, 0.41, 0.45, 0.49, 0.53, 0.54, 0.52],
+    elbow: [1.4, 1.7, 1.82, 1.62, 1.28, 1.05, 1.0, 1.15],
+    amp: [1.0, 0.24],
+  },
+  lean: [0.2, 0.12],
+  hipYaw: 0.22,
+  hipRoll: 0.09,
+  spTwist: 0.2,
+  chTwist: 0.16,
+};
+
+// How he lands: a stomp - a slow, heavy bounce that sinks deep and pushes
+// back up once, and the camera feels the thud.
+const FEEL = {
+  land: { freq: 3.3, zeta: 0.42, thud: 0.05 },
+};
+
 export class Wayfarer extends Player {
   constructor(envDef, asset) {
-    super(envDef, asset, {});
+    super(envDef, asset, { gait: GAIT, feel: FEEL });
   }
 
   buildLook() {
@@ -47,6 +85,26 @@ export class Wayfarer extends Player {
     this.capeInkMat = mats.capeInk;
     this.buildBody();
     this.buildCape();
+    this.dust = new Dust(this.u);
+  }
+
+  get objects() {
+    return [this.root, this.shadow, this.dust.points];
+  }
+
+  forCompile(on) {
+    this.dust.forCompile(on);
+  }
+
+  update(dt, speed, groundAt) {
+    this.lastDt = dt;
+    super.update(dt, speed, groundAt);
+  }
+
+  place(z, dist = 0) {
+    super.place(z);
+    this.dust.update(this.lastDt, this.root, z, dist);
+    this.lastDt = 0;
   }
 
   // The cape: its rest drape settles onto the body as bound, then the render
@@ -104,13 +162,65 @@ export class Wayfarer extends Player {
     ps.vy = 0;
     this.lid.reset();
     this.gustT = 0;
+    this.lastDt = 0;
+    this.toeOffK = null;
+    this.dust?.clear();
     this.cloth.collidersMoved = false;
+  }
+
+  // The stomp: he drops deep into his knees, feet splaying, his body folding
+  // over them and his head nodding, the impact throwing his arms down and
+  // back and squashing him; then drives back up out of it - chest lifting,
+  // arms pumping through, a touch of stretch - and runs on.
+  landOverlay(Pz, land) {
+    const d = Math.max(0, land), p = Math.max(0, -land);
+    Pz[C.hipY] += -0.14 * d + 0.03 * p;
+    Pz[C.knL] += 0.72 * d;
+    Pz[C.knR] += 0.72 * d;
+    Pz[C.thLx] += 0.36 * d;
+    Pz[C.thRx] += 0.36 * d;
+    Pz[C.anL] += 0.33 * d;
+    Pz[C.anR] += 0.33 * d;
+    Pz[C.thLz] += 0.1 * d;
+    Pz[C.thRz] += 0.1 * d;
+    Pz[C.spLean] += 0.34 * d - 0.12 * p;
+    Pz[C.chLean] += 0.1 * d - 0.08 * p;
+    Pz[C.hdPitch] += 0.14 * d - 0.1 * p;
+    Pz[C.shLx] += -0.4 * d + 0.35 * p;
+    Pz[C.shRx] += -0.4 * d + 0.35 * p;
+    Pz[C.shLz] += 0.34 * d;
+    Pz[C.shRz] += 0.34 * d;
+    Pz[C.elL] += 0.2 * d;
+    Pz[C.elR] += 0.2 * d;
+    Pz[C.clL] += 0.08 * d;
+    Pz[C.clR] += 0.08 * d;
+    Pz[C.sq] += -0.1 * d + 0.04 * p;
+  }
+
+  // ...and the dust it throws up: a ring of puffs bursting out low from
+  // both boots, more and bigger the harder he comes down.
+  onLand(hit) {
+    if (this.crashed || this.wet || this.mode !== 'run' || hit < 0.5) return;
+    const r = Math.random;
+    const run = _dv.set(this.vx, 0, -this.speed).applyQuaternion(this.invQ);
+    const n = Math.round(5 + 2 * Math.min(1.5, hit));
+    for (let k = 0; k < n; k++) {
+      const side = k % 2 ? 1 : -1;
+      const a = (k / n) * Math.PI * 2 + r() * 0.6;
+      // (from the boots, which are where the hips are, and on the ground)
+      _d.set(side * 0.12 + Math.sin(a) * 0.08, 0.06, 0.02 + Math.cos(a) * 0.1);
+      _v.copy(run).multiplyScalar(0.45 + 0.15 * r());
+      _v.x += Math.sin(a) * (1.4 + 1.2 * r()) * hit;
+      _v.y += 0.3 + 0.5 * r();
+      _v.z += Math.cos(a) * (1.0 + 1.0 * r()) * hit + 0.4;
+      this.dust.emit(_d, _v, 0.24 + 0.1 * r() + 0.06 * hit, false, 0.78 + 0.15 * r(), 0.9, 0.9);
+    }
   }
 
   // Leap on the way up (lead leg alternates), reaching for the ground on the
   // way down with arms out like wings.
   poseJump(j) {
-    const fall = clamp(-this.vy / this.V0 + 0.35, 0, 1);
+    const fall = clamp(-this.vyPose / this.V0 + 0.35, 0, 1);
     const fs = fall * fall * (3 - 2 * fall);
     const m = (a, b) => a + (b - a) * fs;
     j[C.hipY] = this.HIP_Y;
@@ -209,6 +319,37 @@ export class Wayfarer extends Player {
   simulate(dt, steps, sp) {
     this.pouchStep(dt, steps, sp);
     this.capeSim(dt);
+    this.footDust(sp);
+  }
+
+  // Each time a boot drives off the road it kicks up a puff of dust behind
+  // it (two, more often than not, and bigger as the pace builds). They're
+  // left behind in the world (still air stops them), so a trail of them
+  // streams back from his heels.
+  footDust(sp) {
+    const feet = this.footfalls();
+    if (!feet || !this.grounded || this.wet || this.sliding || this.crashed || this.w.run < 0.6 || this.speed < 4) return;
+    const r = Math.random;
+    // (thrown with a share of his own speed - his wake drags the dust along
+    // a moment, so it blooms at his heels before the still air stops it and
+    // he runs on out of it - plus a kick back, up and out from the boot)
+    const run = _dv.set(this.vx, 0, -this.speed).applyQuaternion(this.invQ);
+    for (let side = 0; side < 2; side++) {
+      if (!(feet & (1 << side))) continue;
+      const sx = side ? 1 : -1;
+      const ball = _d.setFromMatrixPosition(this.b[side ? 'toeR' : 'toeL'].matrixWorld);
+      ball.y = 0.06;
+      ball.z += 0.04;
+      const n = r() < 0.55 + 0.45 * sp ? 2 : 1;
+      for (let k = 0; k < n; k++) {
+        _v.copy(run).multiplyScalar(0.5 + 0.15 * r());
+        _v.x += sx * (0.2 + 0.7 * r());
+        _v.y += 0.45 + 0.6 * r();
+        _v.z += 0.3 + 0.8 * r();
+        _v2.set(ball.x + sx * 0.05 * k, ball.y, ball.z + 0.07 * k);
+        this.dust.emit(_v2, _v, 0.22 + 0.08 * r() + 0.08 * sp, false, 0.76 + 0.16 * r(), 0.8, 0.8);
+      }
+    }
   }
 
   // Hip pouch: a pendulum hung from the belt, kept outside the hips, its flap

@@ -85,6 +85,12 @@ export class ChaseCamera {
     px += Math.sin(time * 61) * 0.22 * s;
     py += Math.sin(time * 47 + 1.3) * 0.18 * s;
 
+    // a heavy landing's thud (the runner's own bounce, a few cm: see
+    // FEEL.land.thud); it dips the camera, not shakes it
+    const thud = (player.camDip || 0) * (1 - i);
+    py -= thud;
+    ly -= thud * 0.6;
+
     this.camera.position.set(px, py, pz);
     this.look.set(lx, ly, lz);
     this.camera.lookAt(this.look);

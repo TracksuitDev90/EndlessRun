@@ -68,6 +68,24 @@ export const CAPE = {
 
 const smooth01 = (t) => t * t * (3 - 2 * t);
 
+// A height on the sculpt, as it stands on him: build.py draws the figure out
+// tall after sculpting it (rig.stretch: [sculpt y, stretched y] pairs), so
+// the drape's heights - the shoulders' line, the hem at the upper calf - are
+// given as sculpted and carried through the same stretch.
+function tall(rig, y) {
+  const T = rig.stretch;
+  if (!T) return y;
+  if (y <= T[0][0]) return y + T[0][1] - T[0][0];
+  for (let i = 1; i < T.length; i++) {
+    if (y <= T[i][0]) {
+      const f = (y - T[i - 1][0]) / (T[i][0] - T[i - 1][0]);
+      return T[i - 1][1] + (T[i][1] - T[i - 1][1]) * f;
+    }
+  }
+  const L = T[T.length - 1];
+  return y + L[1] - L[0];
+}
+
 // The line the cloth leaves the body along, as an ellipse round the shoulders
 // (half-width, depth behind and in front of the body's middle).
 const HULL = { w: 0.265, back: 0.15, front: 0.13, z: 0.012 };
@@ -108,7 +126,7 @@ export function capeBind(rig, colliders) {
     // where it leaves the body: the shoulder's edge at the sides, the upper
     // back behind, the front of the shoulder at the front edges
     const s2 = Math.sin(thH) ** 2;
-    hull(thH, 1, 1.14 + 0.05 * s2, S);
+    hull(thH, 1, tall(rig, 1.14 + 0.05 * s2), S);
     K.set(S.x * 0.92 + N.x * 0.08, N.y - 0.004 - 0.02 * (1 - s2), S.z * 0.92 + N.z * 0.08);
     // dense polyline of the column: over the shoulder (a quadratic curve,
     // leaving the collar level and arriving at the edge heading down)...
@@ -120,7 +138,7 @@ export function capeBind(rig, colliders) {
     // ...then hanging: the sides swing in behind the arms as they fall (the
     // cloth gathers into folds rather than spreading over them), standing
     // out a little toward the hem
-    const hem = CAPE.hemBack + CAPE.hemRise * c * c;
+    const hem = tall(rig, CAPE.hemBack + CAPE.hemRise * c * c);
     const drop = S.y - hem + 0.25;
     for (let k = 1; k <= 60; k++) {
       const f = k / 60;

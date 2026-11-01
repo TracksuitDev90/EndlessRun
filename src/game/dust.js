@@ -1,7 +1,8 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeDustMaterial } from '../render/shaders.js';
 
-// Dust kicked up off the road: puffs that bloom out, drift and thin away, and
+// Dust kicked up off the road - by Wren's slides, and by Rowan's boots as he
+// pounds along and lands: puffs that bloom out, drift and thin away, and
 // specks of grit flung up that fall back. Like the backpack's spill they're
 // thrown from the runner's own space and left behind in the world (track
 // coordinates: x, y and how far along the run), so a slide leaves a trail of
@@ -24,18 +25,32 @@ export class Dust {
     this.points.renderOrder = 4;
     this.points.visible = false;
     this.p = Array.from({ length: MAX }, () => ({ live: false, grit: 0, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.3, grow: 1, alpha: 1, seed: 0 }));
-    this.queue = [];
+    // (what's been thrown since the last update, in preallocated slots: no
+    // garbage however much dust flies)
+    this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, grit: false, alpha: -1, life: 1, grow: 1 }));
+    this.queued = 0;
     this.next = 0;
   }
 
   // A puff (grit: false) or a speck of grit at p, moving at v, both in the
-  // runner's space; size in metres as it starts.
-  emit(p, v, size, grit = false) {
-    if (this.queue.length < MAX) this.queue.push({ p: p.clone(), v: v.clone(), size, grit });
+  // runner's space; size in metres as it starts. Optionally, for a puff:
+  // alpha (how thick it is; < 0 the default), and scales on how long it
+  // lasts (life) and how far it blooms (grow).
+  emit(p, v, size, grit = false, alpha = -1, life = 1, grow = 1) {
+    if (this.queued >= MAX) return;
+    const q = this.queue[this.queued++];
+    q.p.copy(p);
+    q.v.copy(v);
+    q.size = size;
+    q.grit = grit;
+    q.alpha = alpha;
+    q.life = life;
+    q.grow = grow;
   }
 
   update(dt, root, z, dist) {
-    for (const q of this.queue) {
+    for (let i = 0; i < this.queued; i++) {
+      const q = this.queue[i];
       const it = this.p[this.next];
       this.next = (this.next + 1) % MAX;
       const w = q.p.applyQuaternion(root.quaternion).add(root.position);
@@ -51,11 +66,11 @@ export class Dust {
       it.age = 0;
       it.seed = Math.random();
       it.size = q.size * (0.8 + 0.4 * it.seed);
-      it.life = q.grit ? 0.45 + 0.3 * it.seed : 0.55 + 0.45 * it.seed;
-      it.grow = q.grit ? 1 : 2.6 + 1.2 * it.seed;
-      it.alpha = q.grit ? 1 : 0.75 + 0.2 * it.seed;
+      it.life = (q.grit ? 0.45 + 0.3 * it.seed : 0.55 + 0.45 * it.seed) * q.life;
+      it.grow = q.grit ? 1 : 1 + (1.6 + 1.2 * it.seed) * q.grow;
+      it.alpha = q.grit ? 1 : q.alpha >= 0 ? q.alpha : 0.75 + 0.2 * it.seed;
     }
-    this.queue.length = 0;
+    this.queued = 0;
     let n = 0;
     for (const it of this.p) {
       if (!it.live) continue;
@@ -103,7 +118,7 @@ export class Dust {
   }
 
   clear() {
-    this.queue.length = 0;
+    this.queued = 0;
     for (const it of this.p) it.live = false;
     this.points.geometry.setDrawRange(0, 0);
     this.points.visible = false;

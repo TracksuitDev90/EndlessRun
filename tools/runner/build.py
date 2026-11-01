@@ -230,6 +230,117 @@ def from_head(q):
 HEAD_Y = float(from_head(V(0, 1.295, 0))[1])
 SIDES = [(-1, 'L'), (1, 'R')]
 
+# --------------------------------------------------------------------------------
+# the stretch: a tall bruiser. Everything above is sculpted to the reference's
+# proportions (about 1.57 m); the figure is then drawn out tall - his legs a
+# quarter longer, his torso (and the arms that hang beside it) a sixth
+# longer - while his boots and his head keep their sculpted size, so he
+# stands about 1.73 m with a smaller head for his frame. It is a smooth
+# remap of height alone (bind space y -> W(y)): every garment's field is read
+# through its inverse, so the surfaces stretch without losing a line of the
+# sculpt; the skeleton and every rig constant the game reads are carried
+# through it too. Widths are untouched.
+# --------------------------------------------------------------------------------
+
+STRETCH = dict(
+    legs=1.24,  # how much longer the legs grow...
+    torso=1.15,  # ...and the torso and arms
+    boots=0.27,  # nothing below the tops of the boots stretches...
+    bootsRamp=0.06,  # ...easing in over this much
+    hips=0.67,  # where the legs' stretch hands over to the torso's
+    hipsRamp=0.1,
+    neck=1.17,  # nothing above the base of the neck stretches (the head
+    neckRamp=0.08,  # rides up on it unchanged)
+)
+
+
+def _stretch_rate(y):
+    S = STRETCH
+    on = smooth(S['boots'], S['boots'] + S['bootsRamp'], y) * (1 - smooth(S['neck'], S['neck'] + S['neckRamp'], y))
+    k = S['legs'] + (S['torso'] - S['legs']) * smooth(S['hips'] - S['hipsRamp'] / 2, S['hips'] + S['hipsRamp'] / 2, y)
+    return 1 + (k - 1) * on
+
+
+_SY = np.linspace(-0.2, 2.4, 5201)
+_SR = _stretch_rate(_SY)
+_SW = _SY[0] + np.concatenate([[0.0], np.cumsum(0.5 * (_SR[1:] + _SR[:-1]) * np.diff(_SY))])
+
+
+def stretch_y(y):
+    return np.interp(y, _SY, _SW)
+
+
+def unstretch_y(y):
+    return np.interp(y, _SW, _SY)
+
+
+def stretch_p(p):
+    q = np.array(p, dtype=np.float64, copy=True)
+    q[..., 1] = stretch_y(q[..., 1])
+    return q
+
+
+def unstretch_p(p):
+    q = np.array(p, dtype=np.float64, copy=True)
+    q[..., 1] = unstretch_y(q[..., 1])
+    return q
+
+
+def sy(y):
+    """A sculpt height, stretched (a plain float)."""
+    return float(stretch_y(y))
+
+
+def stretched(g):
+    """Draw a garment out tall: its field, the volumes that own it, its detail
+    coordinates and materials are all read where the point came from."""
+    f, owners, det, mats = g.field, g.owners, g.details, g.mats
+    g.field = lambda p: f(unstretch_p(p))
+    g.owners = [((lambda p, o=o: o(unstretch_p(p))), (lambda p, w=w: w(unstretch_p(p)))) for o, w in owners]
+    if det:
+        g.details = lambda p, n, own: det(unstretch_p(p), n, own)
+    if mats:
+        g.mats = lambda p, n, own: mats(unstretch_p(p), n, own)
+    g.lo, g.hi = g.lo.copy(), g.hi.copy()
+    g.lo[1], g.hi[1] = sy(g.lo[1]), sy(g.hi[1])
+    return g
+
+
+def stretch_rig():
+    """Carry the skeleton through the stretch: every joint moves to its
+    stretched height; the arms, hanging slantwise through the stretched
+    torso, come out longer and a little steeper."""
+    old = {b['name']: b['world'][:3, 3].copy() for b in BONES}
+    new = {n: stretch_p(w) for n, w in old.items()}
+    for b in BONES:
+        n, par = b['name'], b['parent']
+        if n.startswith('arm'):
+            s = -1 if n.endswith('L') else 1
+            S, E = new[n], new['fore' + n[3:]]
+            b['q'] = quat_axis((0, 0, 1), s * math.atan2(abs(E[0] - S[0]), S[1] - E[1]))
+        if par is None:
+            b['p'] = [float(x) for x in new[n]]
+        elif par.startswith('arm') or par.startswith('fore'):
+            b['p'] = [0.0, -float(np.linalg.norm(new[n] - new[par])), 0.0]
+        else:
+            b['p'] = [float(x) for x in new[n] - new[par]]
+    return new
+
+
+def stretch_colliders(cs):
+    out = []
+    for c in cs:
+        c = dict(c)
+        if c['kind'] == 'ell':
+            k = float(_stretch_rate(c['c'][1]))
+            c['c'] = [round(float(x), 5) for x in stretch_p(c['c'])]
+            c['r'] = [c['r'][0], round(c['r'][1] * k, 5), c['r'][2]]
+        else:
+            c['a'] = [round(float(x), 5) for x in stretch_p(c['a'])]
+            c['b'] = [round(float(x), 5) for x in stretch_p(c['b'])]
+        out.append(c)
+    return out
+
 # The cape is simulated in the game (src/game/outfit.js); all that is sculpted
 # of it here is what sits still at the neck: a soft gathered roll round the
 # base of the neck that the cloth hangs from (closed at the throat by a little
@@ -1018,14 +1129,25 @@ def export(garments, out_dir, mat_ids, rig, label='runner', script='build.py'):
 
 def build():
     build_rig()
-    garments = [g_head(), g_hair(), g_tee(), g_jacket(), g_shorts(), g_legs(), g_boots(), g_hands(), g_hood(), g_pouch()]
+    J = stretch_rig()
+    garments = [stretched(g) for g in (g_head(), g_hair(), g_tee(), g_jacket(), g_shorts(), g_legs(), g_boots(), g_hands(), g_hood(), g_pouch())]
+    knee, ankle = HIP_JOINT[1] - THIGH, HIP_JOINT[1] - THIGH - SHIN
+    r5 = lambda x: round(float(x), 5)
+    collar = dict(COLLAR, c=[r5(x) for x in stretch_p(COLLAR['c'])])
+    hood = dict(HOOD, top=r5(sy(HOOD['top'])), mid=r5(sy(HOOD['mid'])), tip=r5(sy(HOOD['tip'])))
     rig = dict(
-        hipY=HIP_Y, hipJoint=list(HIP_JOINT), thigh=THIGH, shin=SHIN, toe=list(TOE), chestY=CHEST_Y, headY=HEAD_Y,
-        shoulder=list(SHOULDER), upperArm=UPPER_ARM, forearm=FOREARM, armRest=ARM_REST,
-        collar=COLLAR, hood=HOOD, cloth=cloth_colliders(), pouch=list(POUCH), pouchLid=list(POUCH_LID),
+        hipY=r5(sy(HIP_Y)), hipJoint=[HIP_JOINT[0], r5(sy(HIP_JOINT[1]))], thigh=r5(sy(HIP_JOINT[1]) - sy(knee)), shin=r5(sy(knee) - sy(ankle)),
+        toe=list(TOE), chestY=r5(sy(CHEST_Y)), headY=r5(sy(HEAD_Y)),
+        shoulder=[SHOULDER[0], r5(sy(SHOULDER[1]))], upperArm=r5(np.linalg.norm(J['foreL'] - J['armL'])), forearm=r5(np.linalg.norm(J['handL'] - J['foreL'])),
+        armRest=r5(math.atan2(abs(J['foreR'][0] - J['armR'][0]), J['armR'][1] - J['foreR'][1])),
+        collar=collar, hood=hood, cloth=stretch_colliders(cloth_colliders()), pouch=[r5(x) for x in J['pouch']], pouchLid=[r5(x) for x in J['pouchLid'] - J['pouch']],
         hair=[dict(name=k, dir=list(v / np.linalg.norm(v))) for k, v in HAIR_BONES.items()],
-        sockY=SOCK_Y, shortsHem=SHORTS_HEM, bootX=BOOT_X, bootCollar=list(BOOT_COLLAR), soleH=SOLE_H, torsoSeams=list(TORSO_SEAMS), sleeveSeams=list(SLEEVE_SEAMS), cuffU=CUFF_U,
+        sockY=r5(sy(SOCK_Y)), shortsHem=r5(sy(SHORTS_HEM)), bootX=BOOT_X, bootCollar=list(BOOT_COLLAR), soleH=SOLE_H, torsoSeams=list(TORSO_SEAMS), sleeveSeams=list(SLEEVE_SEAMS), cuffU=CUFF_U,
+        # sculpt height -> stretched height, for what the game lays out by
+        # the sculpt's heights (the cape's drape: outfit.js)
+        stretch=[[r5(y), r5(sy(y))] for y in np.arange(0, 2.0001, 0.02)],
     )
+    print(f'  stretched: hip joint {HIP_JOINT[1]} -> {rig["hipJoint"][1]} m, thigh {THIGH} -> {rig["thigh"]}, shin {SHIN} -> {rig["shin"]}, shoulder {SHOULDER[1]} -> {rig["shoulder"][1]}')
     export(garments, OUT, MAT, rig)
 
 
