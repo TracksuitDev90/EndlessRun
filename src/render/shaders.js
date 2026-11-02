@@ -2111,26 +2111,27 @@ vec3 foxStretch(vec3 r, float tail) {
   return mix(vec3(1.0, 1.0, 0.22), vec3(1.0, 0.25, 1.0), leg);
 }
 // One eye, drawn on the side of the face (q: the rest position, mirrored onto
-// the right side): an almond slanting up toward the ear under a heavy dark
-// rim, the inner corner running down the muzzle in the fox's dark tear line;
-// an amber iris with a slit pupil and a catch-light. It shuts (uFace.x) under
-// a lid of fur, or squeezes shut in a happy arc (uFace.y).
+// the right side): big and round, only a little almond, tipped up toward the
+// ear under a dark rim, the inner corner running down the muzzle in the
+// fox's dark tear line; an amber iris round a big dark pupil, with two
+// catch-lights. It shuts (uFace.x) under a lid of fur, or squeezes shut in a
+// happy arc (uFace.y).
 vec3 foxEye(vec3 c, vec3 q, inout float unlit) {
-  vec3 E = vec3(0.0345, 0.612, -0.488);
+  vec3 E = vec3(0.0352, 0.613, -0.487);
   vec3 ne = normalize(vec3(0.52, 0.2, -1.0));
-  vec3 ea = normalize(vec3(0.7, 0.42, 0.58));
+  vec3 ea = normalize(vec3(0.7, 0.26, 0.58));
   ea = normalize(ea - ne * dot(ea, ne));
   vec3 ev = normalize(cross(ne, ea));
   if (ev.y < 0.0) ev = -ev;
   vec3 o = q - E;
   if (dot(o, ne) < -0.02) return c;
   vec2 e = vec2(dot(o, ea), dot(o, ev));
-  float hl = 0.0145, hh = 0.0078;
+  float hl = 0.0168, hh = 0.0128;
   float x = clamp(e.x / hl, -1.0, 1.0);
-  float prof = pow(max(1.0 - x * x, 0.0), 0.75);
-  // the almond (signed, m): the top a little fuller than the bottom
-  float top = hh * prof * 1.08;
-  float bot = -hh * prof * 0.86;
+  float prof = pow(max(1.0 - x * x, 0.0), 0.56);
+  // the eye (signed, m): the top a little fuller than the bottom
+  float top = hh * prof * 1.04;
+  float bot = -hh * prof * 0.92;
   float dA = max(max(e.y - top, bot - e.y), abs(e.x) - hl);
   float open = clamp(uFace.x, 0.0, 1.0) * (1.0 - uFace.y);
   // the lid comes down from the top
@@ -2145,19 +2146,20 @@ vec3 foxEye(vec3 c, vec3 q, inout float unlit) {
   float along = dot(t0, td);
   float across = t0.x * td.y - t0.y * td.x - 0.02 * along * along / 0.016;
   float tear = band(across, 0.0014 * (1.0 - 0.55 * smoothstep(0.0, 0.017, along))) * step(0.0, along) * (1.0 - smoothstep(0.012, 0.018, along));
-  float flick = band(e.y - top * 0.3 - (e.x - hl * 0.8) * 0.5, 0.0011) * step(hl * 0.8, e.x) * step(e.x, hl * 1.3);
+  float flick = band(e.y - top * 0.25 - (e.x - hl * 0.8) * 0.45, 0.0011) * step(hl * 0.82, e.x) * step(e.x, hl * 1.22);
   c = mix(c, ink, max(max(rim, tear * 0.85), flick));
   // the eye itself
   float eye = fill(dS);
-  vec2 look = uFace.zw * vec2(0.0035, 0.0018);
-  vec2 ic = e - look - vec2(-0.0006, 0.0006);
+  vec2 look = uFace.zw * vec2(0.0035, 0.0022);
+  vec2 ic = e - look - vec2(-0.0004, 0.0002);
   float ir = length(ic);
-  vec3 iris = mix(uPal[F_IRIS], uPal[F_IRIS_IN], smoothstep(0.0072, 0.002, ir));
-  iris = mix(iris, ink, smoothstep(0.0058, 0.0074, ir) * 0.6);
-  // a slit pupil, a little rounded
-  float pup = fill(length(ic / vec2(0.32, 1.0)) - 0.0046);
+  vec3 iris = mix(uPal[F_IRIS], uPal[F_IRIS_IN], smoothstep(0.0098, 0.003, ir));
+  iris = mix(iris, ink, smoothstep(0.0088, 0.0108, ir) * 0.55);
+  // a big pupil, a tall oval (a fox's slit, opened wide)
+  float pup = fill(length(ic / vec2(0.74, 1.0)) - 0.0066);
   iris = mix(iris, ink, pup);
-  float glint = fill(length(e - look - vec2(0.0024, 0.0028)) - 0.0016);
+  // two catch-lights: a big one up toward the ear, a little one below
+  float glint = max(fill(length(e - look - vec2(0.0034, 0.0042)) - 0.0026), fill(length(e - look - vec2(-0.0032, -0.0036)) - 0.0012) * 0.9);
   iris = mix(iris, vec3(1.0), glint);
   c = mix(c, iris, eye);
   unlit = max(unlit, eye * (0.35 + 0.65 * glint));
@@ -2165,7 +2167,7 @@ vec3 foxEye(vec3 c, vec3 q, inout float unlit) {
   float lidLine = band(e.y - lid, 0.0011) * step(abs(e.x), hl * prof + 0.001) * step(dA, 0.0) * (1.0 - step(0.98, open));
   c = mix(c, ink, lidLine);
   // happy: shut tight in an arc, bowed up
-  float arc = band(e.y - (hh * 0.35) * (1.0 - x * x) + 0.0015, 0.0013) * step(abs(e.x), hl * 0.95);
+  float arc = band(e.y - (hh * 0.3) * (1.0 - x * x) + 0.0015, 0.0014) * step(abs(e.x), hl * 0.95);
   c = mix(c, ink, arc * smoothstep(0.3, 0.7, uFace.y));
   return c;
 }
@@ -2205,11 +2207,11 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   if (m == 1 && r.z < -0.42 && r.y > 0.53) {
     vec3 q = vec3(abs(r.x), r.y, r.z);
     c = foxEye(c, q, unlit);
-    // the nose: black and damp, a glint on top
-    vec3 N = vec3(0.0, 0.575, -0.583);
-    float nd = length((r - N) * vec3(1.0, 1.2, 1.15)) - 0.0148;
+    // the nose: a black button, damp, a glint on top
+    vec3 N = vec3(0.0, 0.577, -0.566);
+    float nd = length((r - N) * vec3(1.0, 1.2, 1.15)) - 0.0172;
     c = mix(c, uPal[F_NOSE], fill(nd));
-    float ng = fill(length((r - N - vec3(0.0, 0.0085, -0.004)) * vec3(0.8, 2.0, 1.0)) - 0.0036);
+    float ng = fill(length((r - N - vec3(0.0, 0.0098, -0.0045)) * vec3(0.8, 2.0, 1.0)) - 0.0042);
     c = mix(c, vec3(0.85), ng * 0.6);
     unlit = max(unlit, ng * 0.6);
   }

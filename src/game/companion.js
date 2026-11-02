@@ -17,12 +17,15 @@ import { clamp } from './rig.js';
 //     out between your legs;
 //   - ride: springs up onto your shoulder and rides there a while, ears
 //     streaming, before leaping off ahead;
-//   - weave: zigzags across the road in front of you;
-//   - pounce: the mousing leap - up, over and down nose first;
-//   - twirl: a leap with a spin, for joy (and whenever you take a whole run
-//     of gems);
+//   - pounce: the mousing leap - up in an arch and down nose first (a
+//     treat: rare);
+//   - whirl: pulls up in a lane of her own and chases her tail round once,
+//     for the joy of it (rarer still; sometimes when you take a whole run of
+//     gems);
 //   - fetch: spots a gem in a lane you're not in, races over to it, springs
 //     up and snaps it out of the air, and tosses it back to you.
+// However she goes, she goes like a fox: nose first along the road, crossing
+// it on a slant (never crabwise, never broadside to you) and leaning into it.
 // Under all of it she's careful: she reads the obstacles ahead and leaps the
 // low ones, ducks under the bars (she fits), swerves round the walls, and
 // keeps out from under your feet. When you stumble she flattens her ears and
@@ -90,8 +93,12 @@ export class Companion {
     this.yaw = Math.PI - 0.5;
     this.yawV = 0;
     this.spin = 0;
-    this.spinV = 0;
-    this.goal = { x: this.x, dz: this.dz, w: 6, wz: 2.5, low: 0 };
+    this.whirl = null;
+    this.whirledAt = -99;
+    this.pouncedAt = -99;
+    this.hurdle = null;
+    this.curl = 0;
+    this.goal = { x: this.x, dz: this.dz, w: 6, wz: 2.5, low: 0, urgent: false };
     this.air = null;
     this.windup = null;
     this.beat = null;
@@ -138,6 +145,7 @@ export class Companion {
 
   crashed() {
     if (this.ride) this.dismount();
+    this.stopWhirl();
     this.endBeat();
     this.fetching = null;
     this.mood.earsBack = 1.4;
@@ -150,14 +158,11 @@ export class Companion {
     this.cheer(1.4);
   }
 
-  // A whole run of gems taken: she's delighted.
+  // A whole run of gems taken: she's delighted (and once in a while it's
+  // too much for her, and she has to chase her tail about it).
   wholeRun() {
     this.cheer(1.2);
-    const t = this.game.time;
-    if (t - (this.twirled || -99) > 9 && Math.random() < 0.6 && !this.beat && !this.fetching && !this.ride && this.grounded && this.canLeap(0.8)) {
-      this.twirled = t;
-      this.startBeat('twirl');
-    }
+    if (Math.random() < 0.25 && !this.beat && !this.fetching && !this.ride && this.canWhirl()) this.startBeat('whirl');
   }
 
   cheer(t) {
@@ -174,6 +179,7 @@ export class Companion {
     const g = this.game;
     const st = g.state;
     const p = g.player;
+    this.goal.urgent = false;
     if (st === 'title') this.title(dt);
     else if (this.ride) this.riding(dt);
     else {
@@ -235,6 +241,7 @@ export class Companion {
         ctx.mode = 'ride';
       }
       ctx.crouch = 0;
+      ctx.fall = 0;
       ctx.speed = g.speed;
       _vel.set(g.player.vx, 0, -g.speed);
       ctx.vel.copy(_vel);
@@ -248,8 +255,12 @@ export class Companion {
     _q.setFromEuler(_e);
     b.place(_p, _q, 0, 1);
     ctx.speed = Math.hypot(vf, this.vx * 0.5);
+    // (whirling, her feet patter round quick and short whatever her pace)
+    if (this.whirl) ctx.speed = Math.max(ctx.speed, 6);
     ctx.vel.set(this.vx, this.vy, -vf);
     ctx.lat = this.vx;
+    ctx.curl = this.curl;
+    ctx.fall = this.grounded ? 0 : this.C.gravity;
     if (!this.grounded) {
       ctx.mode = 'air';
       ctx.airT = this.air.t;
@@ -376,13 +387,13 @@ export class Companion {
   chooseBeat() {
     const g = this.game;
     const p = g.player;
-    const open = this.openRoad(p.x, 2.4);
+    // (the showy ones - the mousing pounce, chasing her tail - are treats:
+    // rare, and never twice running)
     const opts = [
-      ['scout', 1.6],
+      ['scout', 1.8],
       ['trail', 2],
-      ['weave', open ? 1.6 : 0],
-      ['pounce', this.canLeap(1.0) ? 1.6 : 0],
-      ['twirl', this.canLeap(0.8) ? 0.8 : 0],
+      ['pounce', this.canLeap(1.0) && g.time - this.pouncedAt > this.C.pounceEvery ? 0.5 : 0],
+      ['whirl', this.canWhirl() ? 0.25 : 0],
       ['under', this.openRoad(p.x, 2.2) && p.grounded && !p.sliding && g.speed > 8 ? 2.4 : 0],
       ['ride', this.openRoad(p.x, 3.2) && p.grounded && !p.sliding && !g.stumbleWindow ? 2.6 : 0],
     ];
@@ -407,13 +418,13 @@ export class Companion {
     this.stage = 0;
     const p = this.game.player;
     const lane = Math.round((p.x - LANES[0]) / 2.4);
-    this.beatLane = pick([0, 1, 2].filter((l) => l !== lane));
-    if (name === 'pounce') this.jump(this.C.pounce, 'pounce');
-    if (name === 'twirl') {
-      this.jump(this.C.twirl, 'twirl');
-      this.spinV = (Math.random() < 0.5 ? -1 : 1) * Math.PI * 2;
-      this.cheer(1);
+    const others = [0, 1, 2].filter((l) => l !== lane);
+    this.beatLane = name === 'whirl' ? this.playLane(others) : pick(others);
+    if (name === 'pounce') {
+      this.pouncedAt = this.game.time;
+      this.jump(this.C.pounce, 'pounce');
     }
+    if (name === 'whirl') this.whirledAt = this.game.time;
   }
 
   endBeat() {
@@ -460,14 +471,27 @@ export class Companion {
         if (t > 5) this.endBeat();
         break;
       }
-      case 'weave': {
-        // zigzag across the road in front of you
-        const n = Math.floor(t / 0.62);
-        G.x = n % 2 ? LANES[0] + 0.3 : LANES[2] - 0.3;
-        G.dz = 4.2;
-        G.w = 9;
-        G.wz = 2;
-        if (t > 3.1 || !this.openRoad(p.x, 1.4)) this.endBeat();
+      case 'whirl': {
+        // out ahead into a lane of her own, where she pulls up and chases
+        // her tail round once, then bounds off after you
+        G.x = LANES[this.beatLane];
+        G.w = 4;
+        if (this.stage === 0) {
+          G.dz = clamp(5.6 + g.speed * 0.14, 6.5, 8.6);
+          G.wz = 2;
+          const set = this.dz > G.dz - 1.2 && Math.abs(this.x - G.x) < 0.3 && Math.abs(this.vx) < 1.2;
+          if (set && this.grounded && !this.windup && this.openRoad(this.x, 1.6) && this.laneOf(p.x) !== this.beatLane) {
+            this.stage = 1;
+            this.startWhirl(this.x >= p.x ? -1 : 1);
+          } else if (t > 4.5) this.endBeat();
+        } else if (this.stage === 1) {
+          G.dz = this.dz;
+          if (!this.whirl) this.stage = 2;
+        } else {
+          G.dz = 2.5;
+          G.wz = 3.5;
+          if (this.dz > 0.6 || t > 7) this.endBeat();
+        }
         break;
       }
       case 'under': {
@@ -513,8 +537,7 @@ export class Companion {
         if (t > 4.5) this.endBeat();
         break;
       }
-      case 'pounce':
-      case 'twirl': {
+      case 'pounce': {
         G.dz = Math.max(1.5, this.dz);
         if (this.grounded && !this.windup && t > 0.3) this.endBeat();
         break;
@@ -773,7 +796,10 @@ export class Companion {
       }
       if (best !== gl || tight < need) {
         G.x = LANES[best] + clamp(G.x - LANES[best], -0.3, 0.3);
-        if (Math.abs(G.x - this.x) > 0.3) G.w = Math.max(G.w, 18);
+        if (Math.abs(G.x - this.x) > 0.3) {
+          G.w = Math.max(G.w, 18);
+          G.urgent = true;
+        }
       }
       if (this.fetching && Math.abs(this.fetching.gem.x - G.x) > 1) this.fetching = null;
     }
@@ -781,7 +807,11 @@ export class Companion {
     // time a leap over it: she holds her line until it's by
     if (tight >= need && this.grounded && Math.abs(G.x - this.x) > 0.05) {
       const near = df + vf * 0.65 + 1.5;
-      if (this.threat(G.x, df - 0.6, near, 'LH') && !this.threat(this.x, df - 0.6, near, 'LH')) G.x = this.x;
+      if (this.threat(G.x, df - 0.6, near, 'LH') && !this.threat(this.x, df - 0.6, near, 'LH')) {
+        // (and pulls up hard: no drifting on into it)
+        G.x = this.x;
+        G.urgent = true;
+      }
     }
     // a hurdle (or water) ahead in her lane: leap it, the top of the leap
     // over its middle
@@ -792,7 +822,12 @@ export class Companion {
         // so she's over its top by the time she reaches it)
         // (she winds up first: the spring comes that beat later)
         const G = this.C.gravity;
-        const kind = Math.random() < 0.25 && o.y1 < 0.8 ? 'pounce' : 'leap';
+        // (now and then, over something low, the mousing pounce - a treat)
+        if (this.hurdle !== o) {
+          this.hurdle = o;
+          this.hurdleKind = Math.random() < 0.12 && o.y1 < 0.8 && g.time - this.pouncedAt > this.C.pounceEvery ? 'pounce' : 'leap';
+        }
+        const kind = this.hurdleKind;
         const wind = this.C.windup[kind];
         let H = Math.max(this.C.leap, o.y1 + 0.42);
         const tr = (o.d - df - 0.5) / vf - wind;
@@ -806,7 +841,11 @@ export class Companion {
         const T = (2 * v0) / this.C.gravity;
         const mid = o.d + o.len / 2;
         const at = mid - df - vf * (T * 0.5 + wind) + 0.25;
-        if (at <= 0.05 && !this.threat(this.x, df, df + vf * (T + wind) + 1, 'H')) this.jump(H, late ? 'leap' : kind, late && tr < 0.02);
+        if (at <= 0.05 && !this.threat(this.x, df, df + vf * (T + wind) + 1, 'H')) {
+          const k = late ? 'leap' : kind;
+          if (k === 'pounce') this.pouncedAt = g.time;
+          this.jump(H, k, late && tr < 0.02);
+        }
       }
     }
     // out from under the runner's feet (unless she means to be there)
@@ -828,6 +867,7 @@ export class Companion {
   // she's caught late).
   jump(H, kind, now = false) {
     if (!this.grounded || this.windup) return;
+    this.stopWhirl();
     this.sitting = false;
     const dur = now ? 0 : this.C.windup[kind] ?? 0.1;
     if (dur <= 0) this.launch(H, kind);
@@ -842,6 +882,10 @@ export class Companion {
   launch(H, kind) {
     const G = this.C.gravity;
     this.windup = null;
+    // (she springs along her line: no more speed across than she can shed
+    // in the air before she's over it)
+    const a = this.C.lateral.accAir, d = this.goal.x - this.x;
+    this.vx = clamp(this.vx, d < 0 ? -this.stopV(-d, a) - 0.3 : -1.2, d > 0 ? this.stopV(d, a) + 0.3 : 1.2);
     this.vy = Math.sqrt(2 * G * H);
     this.grounded = false;
     this.air = { t: 0, T: (2 * this.vy) / G, kind };
@@ -858,40 +902,122 @@ export class Companion {
       this.vy = 0;
       this.grounded = true;
       this.body.land(hit);
-      this.spin = 0;
-      this.spinV = 0;
     }
   }
 
   move(dt) {
     const g = this.game;
     const G = this.goal;
-    // across: quick, quicker still to dodge; a little less control in the air
-    const w = this.grounded ? G.w : G.w * 0.6;
-    follow(this.x, this.vx, G.x, w, dt, _f);
-    this.x = _f[0];
-    this.vx = clamp(_f[1], -11, 11);
-    // along: she can outrun you, and drop back
+    // along: she can outrun you, and drop back (and pulls up hard to play)
     const S = this.C.surge;
-    follow(this.dz, this.vdz, G.dz, G.wz, dt, _f);
-    this.dz = _f[0];
-    this.vdz = clamp(_f[1], S[0], S[1]);
+    if (this.whirl && this.whirl.brake) {
+      // (not right to a stop: you'd run past her, and off the screen she'd
+      // go - she lets you gain on her, and plays out in front of you)
+      const want = -Math.min(g.speed * 0.55, 6.5);
+      this.vdz += clamp(want - this.vdz, -26 * dt, 26 * dt);
+      this.dz += this.vdz * dt;
+    } else {
+      follow(this.dz, this.vdz, G.dz, G.wz, dt, _f);
+      this.dz = _f[0];
+      this.vdz = clamp(_f[1], S[0], S[1]);
+    }
     // (while you run she never runs backwards over the ground; when you're
     // down she turns and trots back to you)
     if (g.state === 'running' && g.speed + this.vdz < 0) this.vdz = -g.speed;
-    this.windupStep(dt);
-    if (!this.grounded) {
-      this.fall(dt);
-      if (this.spinV) this.spin = this.spinV * clamp(this.air.t / this.air.T, 0, 1);
+    // across: a fox runs where she's facing, so she crosses the road on a
+    // slant, never crabwise - how fast she can go across is a share of how
+    // fast she's covering the ground (a steeper slant only to dodge), and
+    // she leans into it and out of it rather than jolting sideways. In the
+    // air she's carried across by her spring, steering only a little.
+    const vf = Math.abs(g.speed + this.vdz);
+    const L = this.C.lateral;
+    const urgent = G.urgent;
+    const a = this.grounded ? (urgent ? L.accDodge : L.acc) : L.accAir;
+    follow(this.x, this.vx, G.x, this.grounded ? G.w : G.w * 0.6, dt, _f);
+    let want = _f[1];
+    if (this.grounded) {
+      const cap = (urgent ? L.dodge : L.slant) * vf + L.base;
+      want = clamp(want, -cap, cap);
     }
-    if (!this.sitting) this.yawFromMotion(dt);
+    // (and never faster at her line than she can pull up from by the time
+    // she's on it: no sailing past it)
+    want = clamp(want, -this.stopV(this.x - G.x, a), this.stopV(G.x - this.x, a));
+    this.vx += clamp(want - this.vx, -a * dt, a * dt);
+    this.x += this.vx * dt;
+    this.windupStep(dt);
+    if (!this.grounded) this.fall(dt);
+    if (this.whirl) this.whirlStep(dt);
+    else if (!this.sitting) this.yawFromMotion(dt);
   }
 
+  // --- chasing her tail -----------------------------------------------------------------
+  // The rarest thing she does, and only for the joy of it: she pulls up
+  // short, and whirls once round on her own feet after her brush - her back
+  // curled into a C, her head round to her tail, the tail flung out round
+  // her - then she's off after you. Seldom (CONFIG.companion.whirl.every
+  // seconds apart at the least), and only with a clear lane of her own to
+  // do it in, well ahead of you.
+  canWhirl() {
+    const g = this.game;
+    const p = g.player;
+    if (g.time - this.whirledAt < this.C.whirl.every || !this.grounded || this.windup || this.ride) return false;
+    const lane = this.laneOf(p.x);
+    return [0, 1, 2].some((l) => l !== lane && this.openRoad(LANES[l], 3.2));
+  }
+
+  // The clear lane (not yours) nearest her, to play in.
+  playLane(lanes) {
+    const open = lanes.filter((l) => this.openRoad(LANES[l], 3.2));
+    const from = open.length ? open : lanes;
+    return from.reduce((a, b) => (Math.abs(LANES[b] - this.x) < Math.abs(LANES[a] - this.x) ? b : a));
+  }
+
+  // dir: which way round (+1 turning to her left, -1 to her right).
+  startWhirl(dir) {
+    this.whirl = { t: 0, dir, dur: this.C.whirl.dur, brake: true };
+    this.whirledAt = this.game.time;
+    this.cheer(this.C.whirl.dur + 1);
+  }
+
+  whirlStep(dt) {
+    const W = this.whirl;
+    W.t += dt;
+    // a beat to pull up and gather, then once round, quick in the middle
+    const lead = 0.14;
+    const k = clamp((W.t - lead) / W.dur, 0, 1);
+    const e = k * k * k * (k * (k * 6 - 15) + 10);
+    this.spin = W.dir * Math.PI * 2 * e;
+    // her back curls round toward her tail as she goes, and straightens out
+    const c = clamp(W.t / (lead + 0.12), 0, 1) * (1 - clamp((k - 0.78) / 0.22, 0, 1));
+    this.curl = W.dir * c * c * (3 - 2 * c);
+    W.brake = k < 0.85;
+    if (k >= 1) this.stopWhirl();
+  }
+
+  // Done (or cut short - she has a hurdle to see to): whatever's left of the
+  // turn she makes up as she runs on.
+  stopWhirl() {
+    if (!this.whirl) return;
+    this.yaw += this.spin;
+    this.yaw -= Math.PI * 2 * Math.round(this.yaw / (Math.PI * 2));
+    this.spin = 0;
+    this.curl = 0;
+    this.whirl = null;
+  }
+
+  // The fastest she can be crossing toward a line d away (d > 0 when it's
+  // on that side) and still pull up on it, braking at a.
+  stopV(d, a) {
+    return d > 0 ? Math.sqrt(2 * a * 0.85 * d) : 1e9;
+  }
+
+  // Facing where she's going: along the road, angled across it only as far
+  // as she's actually crossing it.
   yawFromMotion(dt) {
     const vf = this.game.speed + this.vdz;
     if (Math.hypot(vf, this.vx) < 0.4) return;
-    const want = Math.atan2(-this.vx, vf);
-    this.turnTo(vf > 0 ? want * 0.85 : want, vf > 0 ? 9 : 5, dt);
+    if (vf > 0) this.turnTo(Math.atan2(-this.vx, Math.max(vf, 3)) * 0.9, 8, dt);
+    else this.turnTo(Math.atan2(-this.vx, vf), 5, dt);
   }
 
   turnTo(want, k, dt) {
