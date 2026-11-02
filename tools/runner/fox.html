@@ -12,22 +12,33 @@
   <body>
     <div id="label"></div>
     <script type="module">
-      // Sorrel turned round like a reference sheet - her left side, the
-      // front, the back, three-quarters - posed (?pose=sit|stand|run|leap|
-      // pounce|hop|ride) at ?t=<seconds> into it (for run: ?v=<m/s>; for the
-      // air poses ?p=<0..1> through the flight). Serve the repository root
-      // and open tools/runner/fox.html?pose=run
+      // Sorrel turned round like a reference sheet, or a film strip of her
+      // moving. Serve the repository root and open tools/runner/fox.html.
+      //   ?pose=stand|sit|ride|run|leap|pounce|hop|twirl  what she's doing
+      //   &t=<s>        how long into it (for the jumps: how long she runs
+      //                 first, then winds up and jumps)
+      //   &v=<m/s>      her pace over the ground (run and the jumps)
+      //   &views=left,front,back,right,three,backThree   one view each...
+      //   &strip=<n>&every=<frames>   ...or a film strip: n frames of the
+      //                 first view, every so many frames apart (at 60 a second)
+      //   &from=<s>     where the strip starts (default: just before the jump)
+      //   &zoom=, &y=, &z=, &up=   framing; &shells=0, &ink=0 hide layers
+      // The jumps are driven as the game drives them (a wind-up crouch, a
+      // launch, a flight under her gravity, a landing).
       import * as THREE from '../../vendor/three/three.module.min.js';
       import { shared } from '../../src/render/shaders.js';
       import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
       import { loadRunner } from '../../src/game/runner-asset.js';
       import { Fox } from '../../src/game/fox.js';
       import { WORLD_DEFS } from '../../src/world/index.js';
+      import { CONFIG } from '../../src/config.js';
 
       const q = new URLSearchParams(location.search);
       const pose = q.get('pose') || 'stand';
       const T = Number(q.get('t') || 1.2);
-      const views = (q.get('views') || 'left,front,back,three').split(',');
+      const strip = Number(q.get('strip') || 0);
+      const every = Number(q.get('every') || 3);
+      const views = strip ? Array(strip).fill((q.get('views') || 'left').split(',')[0]) : (q.get('views') || 'left,front,back,three').split(',');
       const zoom = Number(q.get('zoom') || 1);
       const focusY = Number(q.get('y') || 0.36);
       const focusZ = Number(q.get('z') || 0);
@@ -48,44 +59,21 @@
       scene.add(fox.root);
       if (q.get('shells') === '0') fox.furMesh.visible = false;
       if (q.get('ink') === '0') fox.inkMesh.visible = false;
-      const cam = new THREE.PerspectiveCamera(22 / zoom, innerWidth / views.length / innerHeight, 0.1, 50);
-      const dt = 1 / 60;
-      const v = Number(q.get('v') || 14);
-      const at = new THREE.Vector3();
-      const qi = new THREE.Quaternion();
-      // (&ts=a,b,c: a moment for each view, &ps=: a point through the
-      // flight for each)
-      const ts = (q.get('ts') || '').split(',').filter(Boolean).map(Number);
-      const ps = (q.get('ps') || '').split(',').filter(Boolean).map(Number);
-      function poseAt(T, P) {
-        fox.reset();
-        const vel = new THREE.Vector3(0, 0, pose === 'sit' || pose === 'stand' || pose === 'ride' ? 0 : -v);
-        const n = Math.max(1, Math.round(T / dt));
-        for (let i = 0; i < n; i++) {
-          let ctx;
-          if (pose === 'run') ctx = { speed: v, vel, mode: 'run' };
-          else if (pose === 'leap' || pose === 'pounce' || pose === 'hop' || pose === 'twirl') {
-            ctx = { speed: v, vel, mode: i < n - 20 ? 'run' : 'air', airT: P * 0.6, airDur: 0.6, airKind: pose };
-          } else ctx = { speed: 0, vel, mode: pose };
-          fox.place(at, qi);
-          fox.update(dt, ctx);
-        }
-        fox.place(at, qi, 0, 0);
-      }
-      const ground = new THREE.Mesh(new THREE.PlaneGeometry(3, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(4, 4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
       ground.position.y = -0.001;
       scene.add(ground);
-      for (let k = 0; k <= 10; k++) {
+      for (let k = 0; k <= 15; k++) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.03), new THREE.MeshBasicMaterial({ color: k % 5 ? 0xb8a890 : 0x8a7a64 }));
-        m.position.set(-0.5, k * 0.1, 0.5);
+        m.position.set(-0.6, k * 0.1, 0.6);
         scene.add(m);
       }
+      const cam = new THREE.PerspectiveCamera(22 / zoom, innerWidth / views.length / innerHeight, 0.1, 50);
       const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2, three: -0.7, backThree: Math.PI - 0.7, top: 0 };
       const w = innerWidth / views.length;
       renderer.setClearColor(0xf6efe4, 1);
       renderer.clear();
-      views.forEach((name, i) => {
-        if (i === 0 || ts.length || ps.length) poseAt(ts[i] ?? T, ps[i] ?? Number(q.get('p') || 0.4));
+      function render(i) {
+        const name = views[i];
         const a = yaws[name] ?? 0;
         const d = 4.2;
         const up = name === 'top' ? 4 : Number(q.get('up') || 0.35);
@@ -96,8 +84,65 @@
         renderer.setScissor(i * w, 0, w, innerHeight);
         renderer.setScissorTest(true);
         renderer.render(scene, cam);
-      });
-      document.getElementById('label').textContent = `fox · ${pose}`;
+      }
+
+      // --- the simulation ---------------------------------------------------
+      const dt = 1 / 60;
+      const v = Number(q.get('v') || 14);
+      const jump = { leap: CONFIG.companion.leap, pounce: CONFIG.companion.pounce, hop: 0.45, twirl: CONFIG.companion.twirl }[pose];
+      const G = CONFIG.companion.gravity;
+      const wind = CONFIG.companion.windup[pose] || 0;
+      const at = new THREE.Vector3();
+      const qi = new THREE.Quaternion();
+      const vel = new THREE.Vector3();
+      let y = 0, vy = 0, air = null, crouch = null, jumped = false;
+      function step(i) {
+        const moving = pose === 'run' || jump;
+        if (jump && !jumped && i * dt >= T) {
+          crouch = { t: 0 };
+          jumped = true;
+        }
+        if (crouch) {
+          crouch.t += dt;
+          if (crouch.t >= wind) {
+            crouch = null;
+            vy = Math.sqrt(2 * G * jump);
+            air = { t: 0, T: (2 * vy) / G };
+          }
+        }
+        if (air) {
+          y += vy * dt - 0.5 * G * dt * dt;
+          vy -= G * dt;
+          air.t += dt;
+          if (y <= 0 && vy < 0) {
+            y = 0;
+            fox.land(Math.min(1.4, -vy / 8));
+            vy = 0;
+            air = null;
+          }
+        }
+        vel.set(0, air ? vy : 0, moving ? -v : 0);
+        at.set(0, y, 0);
+        const spin = air && pose === 'twirl' ? (air.t / air.T) * Math.PI * 2 : 0;
+        qi.setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
+        fox.place(at, qi, 0, 0);
+        let ctx;
+        if (air) ctx = { speed: v, vel, mode: 'air', airT: air.t, airDur: air.T, airKind: pose };
+        else if (moving) ctx = { speed: v, vel, mode: 'run', crouch: crouch ? crouch.t / wind : 0, crouchKind: pose };
+        else ctx = { speed: 0, vel, mode: pose };
+        fox.update(dt, ctx);
+      }
+      // (&from=<s>: start the strip that far in instead)
+      const start = Math.max(1, Math.round((q.has('from') ? Number(q.get('from')) : jump ? Math.max(0.5, T - 0.05) : T) / dt));
+      let frame = 0;
+      for (; frame < start; frame++) step(frame);
+      if (strip) {
+        for (let i = 0; i < views.length; i++) {
+          render(i);
+          for (let k = 0; k < every; k++) step(frame++);
+        }
+      } else views.forEach((_, i) => render(i));
+      document.getElementById('label').textContent = `fox · ${pose}${strip ? ` · every ${every} frames` : ''}`;
       window.__ready = true;
     </script>
   </body>
