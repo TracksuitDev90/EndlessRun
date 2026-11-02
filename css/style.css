@@ -468,13 +468,15 @@ body:not(.touch) .touch-only {
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: 0.01em;
 }
-/* the depth multiplier: an orange seal stamped on the end of the pill */
+/* the worlds you've come through: a little orange doorway stamped on the end
+   of the pill, the count on its panel */
 .score-mult {
   position: relative;
   margin-left: -14px;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  min-width: 36px;
+  height: 42px;
+  padding: 6px 7px 0;
+  border-radius: 18px 18px 4px 4px;
   display: grid;
   place-items: center;
   background: var(--coat);
@@ -483,6 +485,7 @@ body:not(.touch) .touch-only {
   box-shadow: 2px 3px 0 var(--ink);
   font-weight: 600;
   font-size: 15px;
+  line-height: 1;
   font-variant-numeric: tabular-nums lining-nums;
   transform: rotate(-8deg);
 }
@@ -514,6 +517,24 @@ body:not(.touch) .touch-only {
   width: 22px;
   height: 19px;
   overflow: visible;
+}
+/* a world whose gems are pearls (the Kelp Deep) wears a pearl instead */
+.pearl-ic {
+  display: none;
+  width: 21px;
+  height: 21px;
+  overflow: visible;
+}
+.pearl-body {
+  fill: url(#pearl-body);
+  stroke: var(--ink);
+  stroke-width: 1.8;
+}
+#ui.pearl .gem-ic {
+  display: none;
+}
+#ui.pearl .pearl-ic {
+  display: block;
 }
 .gem-body {
   fill: var(--gem, #2c6cff);
@@ -769,6 +790,69 @@ body:not(.touch) .touch-only {
   font-size: 13px;
   opacity: 0.75;
   margin-left: 6px;
+}
+/* the gem exchange: cash the gems in hand in for points */
+.exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: -4px 0 0;
+}
+.exchange[hidden] {
+  display: none;
+}
+.btn.gem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 10px 12px;
+  font-size: 17px;
+  text-align: left;
+  background: linear-gradient(135deg, var(--paper) 0%, var(--paper) 55%, color-mix(in srgb, var(--gem, #2c6cff) 30%, var(--paper)) 100%);
+}
+.btn.gem .ex-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.btn.gem .ex-ic svg {
+  width: 26px;
+  height: 24px;
+}
+.btn.gem .ex-label {
+  flex: 1;
+  white-space: nowrap;
+}
+.btn.gem .ex-label b {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.btn.gem .ex-pts {
+  padding: 2px 9px 3px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--coat);
+  font-weight: 600;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+.btn.gem:disabled {
+  cursor: default;
+  transform: translate(2px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.exchange.done .ex-label {
+  font-style: italic;
+  opacity: 0.8;
+}
+.btn.gem.cashed .ex-pts {
+  animation: stamp 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.exchange-note {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.7;
 }
 
 #stats {

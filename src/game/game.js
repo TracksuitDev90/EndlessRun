@@ -30,6 +30,18 @@ const CHEST = 0.9; // a collected gem is sucked into the runner's chest, this hi
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const numeral = (n) => NUMERALS[n - 1] || String(n);
 
+// Where a popping lid (spec.lid: a sunken chest) is in its cycle, keeping
+// time exactly as the object shader does (LID): c, seconds into the cycle
+// (it pops at POP_AT), and how hard this one pops (0 it stays shut, 0.4 a
+// burp, 1 flung wide).
+const POP_AT = 0.42;
+export function lidPop(time, p0, every) {
+  const tt = time + p0 * 0.15915 * every;
+  const cyc = Math.floor(tt / every);
+  const h = (cyc * 0.618034 + p0 * 0.3183) % 1;
+  return { c: tt - cyc * every, pop: h < 0.15 ? 0 : h < 0.4 ? 0.4 : 1 };
+}
+
 // Orchestrates one run: streaming, obstacles, the player, doorways between
 // worlds, the camera and the two-pass portal render.
 export class Game {
@@ -122,7 +134,8 @@ export class Game {
     this.crashTimer = 0;
     this.crashShown = false;
     this.score = 0;
-    this.gemCount = 0;
+    this.gemCount = 0; // gems in hand (not yet exchanged)
+    this.gemWorth = 0; // what they're worth at the exchange, before the haul bonus
     this.bestBefore = this.best;
     this.passedBest = false;
     this.ui.setGems(0);
@@ -133,7 +146,7 @@ export class Game {
 
     this.course.ensure(0, CONFIG.speed.start);
     this.depth = this.course.segAt(0).ordinal;
-    this.ui.setScore(0, this.depth);
+    this.ui.setScore(0, this.depth - 1);
     this.dream.reset(this.course.segAt(0).dream);
     this.current = this.course.segAt(0).world;
     this.current.applyVisit(this.course.segAt(0).visit);
@@ -141,7 +154,7 @@ export class Game {
     this.chunks.reset(seed, 0);
     this.obstacles.reset(this.rng, 0, !this.tutorialDone && !this.params.world);
     this.gems.reset(new RNG(seed ^ 0x2c1b3c6d), 0);
-    this.ui.setGemColor(this.current.def.gem?.color);
+    this.ui.setGemColor(this.current.def.gem?.color, this.current.def.gem?.icon);
 
     this.player.reset();
     this.companion?.reset(title);
@@ -176,16 +189,28 @@ export class Game {
   }
 
   restart() {
+    this.finishRun();
     this.ui.hideCrash();
     this.newRun(false);
   }
 
   // Back to the title screen (from the pause or crash card), to pick again.
   toTitle() {
+    this.finishRun();
     this.ui.hideCrash();
     this.ui.showPause(false);
     this.saveBest();
     this.newRun(true);
+  }
+
+  // Leaving the crash card for good: any gems still in hand are exchanged
+  // (nobody loses a haul by not pressing the button), and the score saved.
+  finishRun() {
+    if (this.state !== 'crashed') return;
+    if (this.gemCount > 0) this.score += this.exchangeOffer().bonus;
+    this.gemCount = 0;
+    this.gemWorth = 0;
+    this.saveBest();
   }
 
   // Pick who runs (title screen only): the new runner steps in where the old
@@ -214,7 +239,7 @@ export class Game {
     this.pausedFrom = this.state;
     this.state = 'paused';
     this.saveBest();
-    this.ui.showPause(true, this.score, this.gemCount);
+    this.ui.showPause(true, this.score, this.exchangeOffer());
     this.audio.suspend();
   }
 
@@ -254,7 +279,10 @@ export class Game {
   // --- gems -----------------------------------------------------------------
   // Each gem pays its points × depth with a chime that climbs the scale along
   // its run, and is sucked into the runner with a few motes of its colour;
-  // taking a whole run pays a bonus on top. A gem missed costs nothing.
+  // taking a whole run pays a bonus on top. A gem missed costs nothing. And
+  // every gem banks a worth toward the exchange at the end of the run: more
+  // the more worlds you've come through, and the further into its world it
+  // was found.
   collectGems() {
     const got = this.gems.collect(this.player, this.prevDist, this.dist, this.time);
     for (const g of got) this.creditGem(g);
@@ -269,6 +297,7 @@ export class Game {
     if (tossed) this.gems.take(g, this.time, this.dist, true);
     this.score += (g.crown ? S.crown : S.gem) * this.depth;
     this.gemCount++;
+    this.gemWorth += this.gemWorthAt(g.d, g.crown);
     if (!tossed) this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, g.crown ? 1.25 : 1);
     this.audio.gem(g.index, g.crown);
     if (g.whole) {
@@ -281,13 +310,51 @@ export class Game {
     this.ui.gem(this.gemCount);
   }
 
+  // What a gem found at d is worth at the exchange (see CONFIG.gems.exchange).
+  gemWorthAt(d, crown) {
+    const X = CONFIG.gems.exchange;
+    const seg = this.course.segAt(d);
+    const into = Math.min(1, Math.max(0, (d - seg.start) / Math.max(1, seg.end - seg.start)));
+    return X.base * (1 + X.perWorld * (seg.ordinal - 1)) * (1 + X.into * into) * (crown ? X.crown : 1);
+  }
+
+  // The gems in hand, cashed in: their worth times the haul bonus.
+  exchangeOffer() {
+    const X = CONFIG.gems.exchange;
+    const haul = 1 + X.haul * Math.min(1, this.gemCount / X.big);
+    return { gems: this.gemCount, haul, bonus: Math.round((this.gemWorth * haul) / 5) * 5 };
+  }
+
+  // Exchange the gems in hand for points (the crash card's button): they're
+  // spent, so a Continue picks up with none, and the next crash offers
+  // whatever's been found since.
+  exchangeGems() {
+    if (this.state !== 'crashed' || this.gemCount === 0) return;
+    const offer = this.exchangeOffer();
+    const from = this.score;
+    this.score += offer.bonus;
+    this.gemCount = 0;
+    this.gemWorth = 0;
+    this.saveBest();
+    this.ui.setGems(0);
+    this.ui.exchanged(offer, from, this.score, this.best, this.score > this.bestBefore);
+    this.audio.exchange(offer.gems);
+  }
+
   // --- score ----------------------------------------------------------------
+  // The clear bonus for one obstacle at the current depth: it climbs with
+  // every world you've come through (see CONFIG.score).
+  clearBonus() {
+    const S = CONFIG.score;
+    return Math.round((S.clear * this.depth * (1 + S.grow * (this.depth - 1))) / 5) * 5;
+  }
+
   updateScore(dt) {
     const S = CONFIG.score;
     this.score += this.speed * dt * S.perMeter * this.depth;
     const cleared = this.obstacles.collectCleared(this.dist - CONFIG.player.halfDepth);
     if (cleared > 0) {
-      const bonus = cleared * S.clear * this.depth;
+      const bonus = cleared * this.clearBonus();
       this.score += bonus;
       this.ui.scorePop(bonus);
     }
@@ -296,7 +363,7 @@ export class Game {
       this.ui.newBest();
       this.audio.fanfare();
     }
-    this.ui.setScore(this.score, this.depth);
+    this.ui.setScore(this.score, this.depth - 1);
   }
 
   saveBest() {
@@ -455,6 +522,20 @@ export class Game {
     }
   }
 
+  // A chest's lid popping open is heard (a muffled clunk and a glug of
+  // bubbles, quieter further off) while it's far enough ahead to open.
+  lidPops(dt) {
+    if (this.state !== 'running' || dt <= 0) return;
+    for (const g of this.obstacles.groups) {
+      const lid = g.spec?.lid;
+      if (!lid || g.world !== this.current) continue;
+      const ahead = g.d - this.dist;
+      if (ahead < 12 || ahead > 70) continue;
+      const now = lidPop(this.time, g.p0, lid[0]);
+      if (now.pop > 0 && now.c >= POP_AT && now.c - dt < POP_AT) this.audio.chest(now.pop, ahead);
+    }
+  }
+
   // --- time coming unstuck ------------------------------------------------------
   // A world whose env asks for it (env.wonk: [at the start, by the end], the
   // Gallery of Hours) has its clock hands spin wonkier and wonkier the
@@ -531,7 +612,7 @@ export class Game {
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
     this.announceWorld(this.door.seg);
-    this.ui.setGemColor(this.current.def.gem?.color);
+    this.ui.setGemColor(this.current.def.gem?.color, this.current.def.gem?.icon);
     this.depth = this.door.seg.ordinal;
     this.dream.set(this.door.seg.dream, this.door.seg.dream, 0);
     this.dream.doorway(this.current.def, this.current.env, !!old.def.env.drain);
@@ -566,7 +647,7 @@ export class Game {
     this.chunks.reset(this.seed, d);
     this.obstacles.reset(this.rng, d, false);
     this.gems.reset(new RNG(this.seed ^ 0x2c1b3c6d ^ Math.floor(d)), d);
-    this.ui.setGemColor(this.current.def.gem?.color);
+    this.ui.setGemColor(this.current.def.gem?.color, this.current.def.gem?.icon);
     this.startDrain(this.current, 'settle');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
@@ -599,7 +680,7 @@ export class Game {
       this.crashTimer -= dt;
       if (this.crashTimer <= 0 && !this.crashShown) {
         this.crashShown = true;
-        this.ui.showCrash(this.continuesLeft, this.score, this.best, this.score > this.bestBefore && this.score > 0, this.gemCount);
+        this.ui.showCrash(this.continuesLeft, this.score, this.best, this.score > this.bestBefore && this.score > 0, this.exchangeOffer());
       }
     } else if (st === 'reviving') {
       this.speed = 0;
@@ -643,6 +724,7 @@ export class Game {
     this.sands.update(dt, this);
     this.updateWater(dt);
     this.callAhead();
+    this.lidPops(dt);
     shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);
     this.dream.update(dt);
     this.updateDrain(dt);

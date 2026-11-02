@@ -316,6 +316,8 @@ export class ObstacleField {
   // visit (how many times it has come round before).
   putSpec(world, group, spec, x, d, o) {
     group.spec = spec;
+    // (its phase: a chest's lid keeps its own time by it, see lidPop in game.js)
+    group.p0 = o.p0 ?? 0;
     world.put(group, spec.name, x, 0, d, o);
     if (spec.with) for (const name of spec.with) world.put(group, name, x, 0, d, o);
     if (spec.extras) {

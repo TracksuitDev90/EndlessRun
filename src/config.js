@@ -56,10 +56,12 @@ export const CONFIG = {
   inputBuffer: 0.16, // seconds a jump pressed in mid-air is remembered
 
   // Score: every meter run is worth `perMeter` points times the depth you're
-  // at (×1 in the first world, ×2 through the first doorway, …), and every
-  // obstacle you get past without a hit pays `clear` × depth (full-width rows
-  // count `wide` times).
-  score: { perMeter: 1, clear: 10, wide: 2 },
+  // at (1 in the first world, 2 through the first doorway, …; the badge on
+  // the score counts the worlds you've come through), and every obstacle you
+  // get past without a hit pays a clear bonus that climbs with every world:
+  // `clear` × depth × (1 + `grow` × worlds come through), to the nearest 5 —
+  // 10, 25, 45, 70, 100, 135, 175… (full-width rows count `wide` times).
+  score: { perMeter: 1, clear: 10, grow: 0.25, wide: 2 },
 
   // Gems (see game/gems.js): laid in runs along a "ghost" route through the
   // obstacles ahead. Missing them costs nothing. Times are seconds of running
@@ -88,6 +90,15 @@ export const CONFIG = {
     // points (× depth) for a gem and a crown stone; a run taken whole pays
     // `perfect` × its length on top
     score: { gem: 10, crown: 30, perfect: 5 },
+    // The exchange (on the crash card): every gem banks a worth as it's taken
+    // — `base` × (1 + `perWorld` × the worlds come through before it) × (1 +
+    // `into` × how far through its world it was found), a crown stone `crown`
+    // times that — and the gems in hand are cashed in for that many points,
+    // plus a haul bonus that grows with how many there are, up to +`haul`
+    // (×1.5) at `big` gems — in all, about two fifths again on top of what
+    // the run scored. Gems not exchanged by the time the run is over are
+    // exchanged anyway.
+    exchange: { base: 10, perWorld: 0.5, into: 0.75, crown: 3, haul: 0.5, big: 400 },
   },
 
   // The companion who runs with you (see game/companion.js): who it is

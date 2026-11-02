@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, rgb, gateFrameParts, gateLeafParts, gateTop, moved, rod } from './shapes.js';
-import { crystal, metal, nugget, dodecahedron, lumps, FACE } from './gems.js';
+import { metal } from './gems.js';
 import { shaftParts } from './whimsy.js';
 import { CONFIG } from '../config.js';
 
@@ -729,12 +729,19 @@ function clamGeo() {
 }
 
 // L · A sunken treasure chest: iron-bound, its lid sprung a crack and gold
-// glowing through it, a few coins spilled in the sand, barnacles and weed.
+// glowing through it, a string of pearls caught under the lid and hanging
+// over the front, a few coins spilled in the sand, barnacles and weed. Now
+// and then something inside pushes: the lid rattles, pops open on its hinge
+// and a gush of bubbles pours out of it, gold coins flipping up and falling
+// back in, then it drops shut with a bounce (toon option lid, see the object
+// shader: role 1 the lid, 2 the bubbles, 3 the coins; CHEST_LID says how
+// often and how wide, and where the hinge is).
+const CHEST = { W: 1.5, D: 0.82, H: 0.5, back: 0.5 };
+// [seconds between pops, the hinge's height and depth, how wide it flings open (rad)]
+const CHEST_LID = [4.6, CHEST.H, -CHEST.D / 2 - CHEST.back, 1.2];
 function chestGeo() {
   const parts = [];
-  const W = 1.5;
-  const D = 0.82;
-  const H = 0.5;
+  const { W, D, H, back } = CHEST;
   parts.push(part(P.box(W, H, D), null, { y: H / 2, grad: [C.woodLo, C.wood, 0, H] }));
   // the domed lid, sprung open a little on its hinge at the back
   const lid = [
@@ -742,19 +749,51 @@ function chestGeo() {
     part(P.box(0.07, 0.02, D + 0.02), C.iron, { x: -W * 0.3 }),
   ];
   for (const bx of [-W * 0.32, W * 0.32]) lid.push(part(P.torus(D / 2 + 0.015, 0.03, 4, 12, Math.PI), C.iron, { x: bx, ry: Math.PI / 2 }));
+  // (its underside, for when it's open: old wood lit warm by the gold)
+  lid.push(part(P.box(W - 0.04, 0.02, D - 0.04), '#8a6438', { y: 0.012, emit: 0.35, outline: 0 }));
   moved(lid, { z: D / 2 });
-  moved(lid, { rx: -0.14 });
-  parts.push(...moved(lid, { y: H, z: -D / 2 }));
+  moved(lid, { rx: -0.1 });
+  parts.push(...moved(lid, { y: H, z: -D / 2 }).map((g) => role(g, 1)));
   // the bands and the lock
   for (const bx of [-W * 0.32, W * 0.32]) parts.push(part(P.box(0.08, H + 0.02, D + 0.03), C.iron, { x: bx, y: H / 2, outline: 0.5 }));
   parts.push(part(P.box(0.2, 0.22, 0.05), '#c89a3a', { y: H - 0.08, z: D / 2 + 0.02, outline: 0.5 }));
-  // gold glowing in the crack
-  parts.push(part(P.box(W * 0.9, 0.08, D * 0.7), C.gold, { y: H + 0.04, emit: 1, outline: 0 }));
+  // the treasure, heaped to the brim and glowing: gold, and pearls on it
+  parts.push(part(P.box(W * 0.92, 0.08, D * 0.86), C.gold, { y: H + 0.0, emit: 1, outline: 0 }));
   const rnd = seeded(7);
+  // (mounds of it, their lower halves lost in the chest)
+  for (let i = 0; i < 7; i++) parts.push(part(P.sphere(0.16 + rnd() * 0.08, 8, 5), C.gold, { x: (rnd() - 0.5) * W * 0.8, y: H + 0.02, z: (rnd() - 0.5) * D * 0.55, sy: 0.55, emit: 0.85, outline: 0 }));
+  for (const [x, z, r, c] of [[-0.38, 0.05, 0.075, '#fbf4f0'], [0.12, -0.1, 0.085, '#f6d2e2'], [0.42, 0.12, 0.07, '#2e3a38'], [-0.1, 0.18, 0.06, '#f4c878']]) {
+    parts.push(part(P.sphere(r, 10, 8), c, { x, y: H + 0.1 + r * 0.5, z, emit: 0.25, mark: 1, outline: 0.3 }));
+  }
+  // a string of pearls caught under the lid, hanging over the front
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    const x = -0.18 + t * 0.62;
+    const sag = Math.sin(t * Math.PI) * 0.2;
+    parts.push(part(P.sphere(0.026, 6, 5), '#fbf2f2', { x, y: H + 0.02 - sag, z: D / 2 + 0.035, emit: 0.3, mark: 1, outline: 0 }));
+  }
   for (let i = 0; i < 9; i++) parts.push(part(P.cyl(0.07, 0.07, 0.02, 10), C.gold, { x: (rnd() - 0.5) * 1.6, y: 0.012, z: D / 2 + 0.15 + rnd() * 0.4, rx: (rnd() - 0.5) * 0.4, emit: 0.5, outline: 0.4 }));
   for (let i = 0; i < 14; i++) parts.push(part(P.sphere(0.035 + rnd() * 0.03, 5, 4), C.barnacle, { x: (rnd() - 0.5) * W, y: rnd() * H * 0.9, z: D / 2 + 0.01, outline: 0.3 }));
   parts.push(...moved(seagrassParts({ n: 5, h: 0.6, seed: 3 }), { x: W / 2 + 0.05, z: 0.2 }));
-  return merge(parts).translate(0, 0, -0.5);
+  const body = merge(parts).translate(0, 0, -back);
+  // the bubbles and coins, each built round the origin, carrying where it
+  // starts from (fish.xyz, in the chest's own space) and its own beat (fish.w)
+  const loose = [];
+  const from = (g, x, y, z, w, k) => {
+    const cnt = g.attributes.position.count;
+    const arr = new Float32Array(cnt * 4);
+    for (let i = 0; i < cnt; i++) arr.set([x, y, z, w], i * 4);
+    g.setAttribute('fish', new THREE.BufferAttribute(arr, 4));
+    return role(g, k);
+  };
+  for (let i = 0; i < 26; i++) {
+    const r = 0.035 + rnd() * rnd() * 0.09;
+    loose.push(from(part(P.sphere(r, 8, 6), '#e8fffa', { emit: 0.7, outline: 0 }), (rnd() - 0.5) * W * 0.8, H + 0.08, (rnd() - 0.5) * D * 0.5 - back, (i + rnd()) / 26, 2));
+  }
+  for (let i = 0; i < 5; i++) {
+    loose.push(from(part(P.cyl(0.075, 0.075, 0.018, 12), C.gold, { rx: Math.PI / 2, emit: 0.6, outline: 0.35 }), (i / 4 - 0.5) * W * 0.6, H + 0.06, (rnd() - 0.5) * D * 0.3 - back, rnd(), 3));
+  }
+  return merge([body, ...loose]);
 }
 
 // L (wide) · A ridge of reef right across the path: rock crowded with low
@@ -880,81 +919,170 @@ const OPENING = { halfW: 4.5, rectH: 6.6, arch: true };
 const GATE_DEPTH = 1.8;
 
 // --- gems -------------------------------------------------------------------------
-// Coral-pink stones against all that teal: the conch pearl above all — the
-// sea's own gem, porcelain pink, polished smooth — whole and baroque, with
-// the sea's other warm stones found alongside it: branches of red precious
-// coral, fire opal flecked with gold, spessartine garnet, and rhodochrosite
-// banded rose and pink. The crown: a great conch pearl in a scallop shell.
-const OPAL = { speckle: 0.65, second: '#ffe680', mottle: 0.35, glints: 1.5, scale: 9 };
+// Pearls, every one of them: the sea's own gem, lustrous rather than cut, in
+// all the shades pearls come in — Akoya white with a rosé glow, South Sea
+// gold, freshwater pink with a blue-lavender sheen, Tahitian peacock black
+// shot with green and blue, silver-grey drops, cream baroques and champagne
+// circled pearls — each iridescent with its own orient (the nacre's
+// interference colours sliding over it as it turns: see the pearl branch of
+// the gem shader, a kind's `nacre`). Every pearl's shade is picked from its
+// kind's few close tints, so a run reads as one find but no two match. The
+// crown: a great pearl sitting in an open scallop shell.
+//
+// A pearl is smooth (its normals are), and white in the geometry: the
+// instance colour is its shade.
+const PEARL = (o = {}) => ({ tint: 1, ...o });
+const pearlRound = (r, o = {}) => metal(P.sphere(r, 22, 16), '#ffffff', PEARL(o));
+// A drop: a teardrop turned on a lathe, its point up.
+function pearlDrop(r) {
+  const prof = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    const a = t * Math.PI;
+    // a round belly tapering to a soft point
+    const w = Math.sin(a) * (1 - 0.42 * t) * r;
+    prof.push([Math.max(w, 1e-4), -Math.cos(a) * r * 1.22 + r * 0.12 * t]);
+  }
+  return P.lathe(prof, 22);
+}
+// A sphere pushed out of round by surf(direction) -> point, its normals
+// worked out from the surface itself (so they're smooth everywhere, with no
+// crease along the sphere's seam).
+function blob(surf, ws = 24, hs = 18) {
+  const g = P.sphere(1, ws, hs);
+  const pos = g.attributes.position;
+  const nor = g.attributes.normal;
+  const d = new THREE.Vector3();
+  const t1 = new THREE.Vector3();
+  const t2 = new THREE.Vector3();
+  const p0 = new THREE.Vector3();
+  const p1 = new THREE.Vector3();
+  const p2 = new THREE.Vector3();
+  const at = (v, out) => out.set(...surf(v.x, v.y, v.z));
+  const e = 0.002;
+  for (let i = 0; i < pos.count; i++) {
+    d.set(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize();
+    at(d, p0);
+    t1.set(0, 1, 0).cross(d);
+    if (t1.lengthSq() < 1e-6) t1.set(1, 0, 0);
+    t1.normalize();
+    t2.copy(d).cross(t1);
+    at(t1.multiplyScalar(e).add(d).normalize(), p1);
+    at(t2.multiplyScalar(e).add(d).normalize(), p2);
+    p1.sub(p0);
+    p2.sub(p0);
+    p1.cross(p2).normalize();
+    if (p1.dot(d) < 0) p1.negate();
+    pos.setXYZ(i, p0.x, p0.y, p0.z);
+    nor.setXYZ(i, p1.x, p1.y, p1.z);
+  }
+  return g;
+}
+// A baroque pearl: smooth but lumpy, never quite round.
+function pearlBaroque(r, seed) {
+  const rnd = seeded(seed);
+  const k = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
+  return blob((x, y, z) => {
+    const f = r * (1 + 0.13 * Math.sin(x * 2.3 + k[0]) * Math.cos(z * 2.1 + k[1]) + 0.09 * Math.sin(y * 3.1 + k[2]) + 0.05 * Math.sin((x + y) * 4.7));
+    return [x * f * 1.08, y * f * 0.9, z * f];
+  });
+}
+// A circled pearl: grooved round its waist in rings.
+function pearlCircled(r) {
+  return blob((x, y, z) => {
+    const f = r * (1 - 0.035 * Math.pow(Math.max(0, Math.cos(y * 9.0)), 6) * (1 - y * y));
+    return [x * f, y * r * 0.94, z * f];
+  }, 24, 30);
+}
+// One valve of a scallop: a shallow ribbed plate, its ribs fanning out from
+// the hinge at its back (-z), its rim scalloped by them.
+function shellValve(r) {
+  return blob((x, y, z) => {
+    const a = Math.atan2(x, z + 1.1);
+    const rib = 1 + 0.1 * Math.pow(Math.abs(Math.cos(a * 8)), 0.5) * (1 - Math.abs(y));
+    return [x * r * rib, y * r * 0.2, z * r * 0.92 * rib];
+  }, 32, 12);
+}
+// A pearl sitting in an open scallop: the lower valve its dish, the upper
+// one hinged open behind it, so it reads as a shell from every side.
+function pearlInShell() {
+  const r = 0.35;
+  const lo = part(shellValve(r), null, { y: -0.24, grad: [C.shellLo, C.shell, -0.31, -0.17], outline: 0.6 });
+  const up = shellValve(r * 0.98).translate(0, 0, r * 0.9);
+  const top = part(up, null, { rx: -1.3, y: -0.21, z: -r * 0.86, grad: [C.shellLo, C.shell, -0.21, 0.4], outline: 0.6 });
+  return [lo, top, metal(P.sphere(0.2, 22, 16), '#ffffff', PEARL({ y: -0.03, z: 0.04 }))];
+}
 const GEM = {
-  name: 'conch pearl',
-  color: '#ff8f80',
-  light: '#ffb2a2',
+  name: 'pearl',
+  // (the counter wears a pearl; see ui.js)
+  color: '#f4e4ec',
+  icon: 'pearl',
+  light: '#ffe8f0',
   stones: [
     {
-      name: 'conch pearl',
-      weight: 3,
-      tints: ['#ff9a8a'],
-      parts: () => [metal(P.sphere(0.18, 16, 12), '#ff8a78', { sx: 1.0, sy: 0.84, sz: 0.9 })],
-      texture: {},
+      name: 'Akoya pearl',
+      weight: 2.4,
+      tints: ['#f6f2ec', '#eff1ea', '#f8eff0'],
+      parts: () => [pearlRound(0.22)],
+      texture: { nacre: 0.55, second: '#ffc4dc' },
     },
     {
-      name: 'baroque conch pearl',
-      weight: 1.2,
-      tints: ['#ffa898'],
-      parts: () => lumps({ n: 3, r: 0.14, spread: 0.12, seed: 6 }).map((g) => metal(g, '#ff9484')),
-      texture: {},
+      name: 'golden South Sea pearl',
+      weight: 1.5,
+      tints: ['#fac56e', '#f2b25a', '#fcd38c'],
+      parts: () => [pearlRound(0.23)],
+      texture: { nacre: 0.5, second: '#ffd2b4' },
     },
     {
-      // precious coral: polished red branches
-      name: 'red coral',
-      weight: 1.2,
-      tints: ['#ff5a48'],
-      parts: () => [
-        metal(P.capsule(0.055, 0.32, 3, 8), '#f2503e', { rz: 0.2 }),
-        metal(P.capsule(0.045, 0.18, 3, 8), '#f2503e', { x: 0.1, y: 0.08, rz: -0.7 }),
-        metal(P.capsule(0.04, 0.14, 3, 8), '#f4604a', { x: -0.1, y: 0.04, rz: 0.9 }),
-      ],
-      texture: {},
+      name: 'pink freshwater pearl',
+      weight: 1.5,
+      tints: ['#f6c2da', '#eeb2d4', '#f8d0e4'],
+      // (a button pearl: a little flattened)
+      parts: () => [pearlRound(0.22, { sy: 0.84 })],
+      texture: { nacre: 0.6, second: '#c4d4ff' },
     },
     {
-      name: 'fire opal',
-      weight: 1.2,
-      tints: ['#ff7a3c', '#ff8a4a', '#ff6a34'],
-      parts: () => [crystal(nugget({ r: [0.2, 0.15, 0.17], faces: 22, spread: 0.08, chips: 1, seed: 33 }))],
-      texture: OPAL,
+      name: 'Tahitian pearl',
+      weight: 1.3,
+      tints: ['#26342f', '#2e3836', '#1f2d33'],
+      parts: () => [pearlRound(0.22)],
+      texture: { nacre: 0.95, second: '#3cffc4' },
     },
     {
-      name: 'spessartine',
+      name: 'silver drop pearl',
       weight: 1,
-      tints: ['#ff6a30', '#ff7a3a'],
-      parts: () => [crystal(dodecahedron({ r: 0.17, seed: 5 }), { rx: 0.4, rz: 0.3 })],
-      texture: { rough: 0.06, glints: 1.5 },
+      tints: ['#cac8d6', '#bec4ce', '#d4cedc'],
+      parts: () => [metal(pearlDrop(0.2), '#ffffff', PEARL({ rz: 0.25 }))],
+      texture: { nacre: 0.78, second: '#ffcaf0' },
     },
     {
-      name: 'rhodochrosite',
+      name: 'baroque pearl',
       weight: 1,
-      tints: ['#ff7f9a', '#ff8aa4'],
-      parts: () => [crystal(nugget({ r: [0.2, 0.14, 0.18], faces: 18, spread: 0.1, chips: 2, seed: 61 }))],
-      texture: { bands: 0.6, bandFreq: 16, rings: 'round', second: '#ffe0ea', opaque: 0.55, glints: 0.9 },
+      tints: ['#f4ead4', '#f8eedc', '#eee0c8'],
+      parts: () => [metal(pearlBaroque(0.21, 6), '#ffffff', PEARL({ rz: 0.4 }))],
+      texture: { nacre: 0.62, second: '#bff0ff' },
+    },
+    {
+      name: 'circled champagne pearl',
+      weight: 0.9,
+      tints: ['#e8c460', '#deb652', '#eecc70'],
+      parts: () => [metal(pearlCircled(0.22), '#ffffff', PEARL({ rx: 0.3 }))],
+      texture: { nacre: 0.6, second: '#ffdcef' },
     },
   ],
   crown: {
-    name: 'conch pearl in a scallop shell',
-    tints: ['#ffa898'],
-    parts: () => [
-      ...moved(scallopParts(0.36), { rx: FACE * 0.55, y: -0.2, z: -0.05 }),
-      metal(P.sphere(0.17, 16, 12), '#ff8a78', { y: -0.04, z: 0.08, sx: 1.0, sy: 0.88, sz: 0.92 }),
-    ],
-    texture: {},
+    name: 'pearl in a scallop shell',
+    tints: ['#f8f0f2', '#f4c8dc', '#f2c27a'],
+    parts: () => pearlInShell(),
+    texture: { nacre: 0.85, second: '#ffd0f0' },
   },
   // (bobbing slowly in the water)
   motion: [0.7, 1.0, 0.1, 0.14],
   look: [0.78, 1.15, 0.25, 0.3],
-  // (the pearls and the coral keep their pink under the teal water)
+  // (the shell keeps its own colour under the teal water)
   polish: 0.7,
-  glow: 0.7,
-  pool: 0.26,
+  glow: 0.62,
+  pool: 0.24,
 };
 
 const RAY = [-0.16, 1, 0.24];
@@ -1075,7 +1203,8 @@ export default {
 
     b.toon('brain', brainGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
     b.toon('clam', clamGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
-    b.toon('chest', chestGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    // (now and then it pops open and bubbles pour out)
+    b.toon('chest', chestGeo(), { cap: 24, anim: 'popEarly', ink: 0.04, lid: CHEST_LID });
     b.toon('ridge', ridgeGeo(), { cap: 10, anim: 'popEarly', ink: 0.04 });
     b.toon('arch', archGeo(0.95), { cap: 24, anim: 'popEarly', ink: 0.045 });
     // (the whale swims in from far off rather than unfolding)
@@ -1093,7 +1222,8 @@ export default {
     L: [
       { name: 'brain', len: 1.8, tints: [C.coralO, C.coralY, C.coralP, '#b07ad8'] },
       { name: 'clam', len: 1.1 },
-      { name: 'chest', len: 1.0 },
+      // (its lid pops with a clunk and a glug: see chestPops in game.js)
+      { name: 'chest', len: 1.0, lid: CHEST_LID },
     ],
     H: [{ name: 'arch', len: 0.9 }],
     W: [{ name: 'kelpW', len: 1.2 }, { name: 'tower', len: 1.5 }, { name: 'fanW', len: 0.8 }],
