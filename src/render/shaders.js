@@ -2607,8 +2607,19 @@ void main() {
       // lie of the fur, standing to its own height; the layers thin out
       // toward the tips
       vec3 sc = foxStretch(vRest, step(0.0, vD.z));
-      float tall = foxNoise(vRest * sc * 260.0) * 0.65 + foxNoise(vRest * sc * 90.0 + 5.1) * 0.35;
-      if (tall < 0.3 + vShell * 0.5 || m == 5) discard;
+      vec3 fq = vRest * sc * 260.0;
+      float tall = foxNoise(fq) * 0.65 + foxNoise(vRest * sc * 90.0 + 5.1) * 0.35;
+      // strands under a couple of pixels across would shimmer as she moves:
+      // there the fur thins to a soft solid fringe instead (the inner
+      // layers whole, the outer ones gone)
+      float lod = smoothstep(0.35, 1.1, length(fwidth(fq)));
+      tall = mix(tall, 1.0 - 0.9 * vShell, lod);
+      // each strand's edge antialiased (through the multisampling, as
+      // coverage)
+      float thr = 0.3 + vShell * 0.5;
+      float aa = max(fwidth(tall), 1e-3);
+      float cover = smoothstep(thr - aa, thr + aa, tall);
+      if (cover < 0.5 || m == 5) discard;
     #endif
     // (a fox is a flame in the dark: its coat keeps its colour through a
     // drain, as the cape does)

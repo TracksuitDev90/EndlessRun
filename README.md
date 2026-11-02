@@ -1122,7 +1122,7 @@ needs a skinned mesh whose bones are named like the ones `build.py` writes.
 
 ## The fox
 
-![Sorrel: standing, sitting with her brush swept round, and three moments of her gallop; in the run, sitting by Rowan on the title screen, riding on his shoulder, and the one thing besides the cape still in colour in Hell](docs/fox.jpg)
+![Sorrel: standing, sitting with her brush swept round, and her gallop - flying stretched out, her forefeet down, gathered with her hind legs right under her chest; the mousing pounce - reared up, springing, turning over the top and diving nose first, her tail lagging behind every move; in the run, sitting by Rowan on the title screen, riding on his shoulder, and the one thing besides the cape still in colour in Hell](docs/fox.jpg)
 
 Sorrel is a red fox, and she runs with you whoever you pick. You don't steer
 her — she has a mind of her own (`src/game/companion.js`) — and she's almost
@@ -1146,9 +1146,11 @@ neck, head, jaw and ears, four legs of three joints each, and eight bones down
 the tail. Each vertex carries how far inside the white it lies, how dark it
 runs, how far along the tail it is and how long its fur grows there, and the
 shader does the rest. To change her, edit the script and regenerate (about
-twelve seconds), then look at her in `tools/runner/fox.html` (`?pose=stand|
-sit|run|leap|pounce|hop|ride`, `&ts=` a moment for each view, `&v=` the pace,
-`&views=left,front,back,three`):
+twelve seconds), then look at her in `tools/runner/fox.html` — turned round
+(`?pose=stand|sit|ride|run|leap|pounce|hop|twirl`, `&views=left,front,back,
+three`, `&v=` the pace, `&t=` how long into it) or as a film strip of her
+moving (`&strip=12&every=2`: twelve frames, two frames apart at 60 a second;
+`&from=` where it starts), the jumps driven as the game drives them:
 
 ```sh
 python3 tools/runner/fox.py   # -> assets/fox/
@@ -1172,35 +1174,59 @@ strands toward the tips and combed back by the air streaming past her, so her
 outline is soft and ragged at any distance. Like the cape and Wren's hair,
 she keeps her colour through Hell's drain: a little flame on the ash.
 
-**How she moves** (`src/game/fox.js`). A rotary gallop, her legs placed by IK
-along designed paths: the forefeet land one after the other and vault her
-body over them, her back gathers as the hind legs swing through under her,
-they drive off, and she flies stretched out flat, forelegs reaching and hind
-legs trailing — the spine flexing and stretching through every stride and her
-head held level and steady through all of it. The cannon of each hind leg is
-kept parallel to the thigh, as in every running dog, which makes a three-bone
-leg an exact two-bone solve. She leads with the leg on the inside of a turn,
-banks into it and bends her spine toward it. In the air she stretches out flat
-over a hurdle and gathers to land forefeet first; pounces like a fox after a
-mouse (up steeply, arching over the top and diving down nose first); hops to
-snap at a gem; and now and then leaps with a twirl. On the title screen she
-sits, haunches down and forelegs straight, her brush swept round beside her,
-looking about — up at the runner, out at you — her ears flicking; when you
-pick a runner she hops up to say hello.
+**How she moves** (`src/game/fox.js`), after real foxes and the classic
+drawn gallop cycles. A rotary gallop with a long, loping stride (about two
+and a half strides a second, more of each stride in the air the faster she
+goes): every foot is planted — pinned to the road, carried back at exactly
+the ground's speed — for as long as its leg can reach, and between the
+footfalls her body rides real flight arcs under gravity, dropping into each
+pair of footfalls and driven back up off them, so she has weight rather than
+bobbing on a wave. The forefeet land one after the other and she vaults over
+them; her back gathers into a ball, her hind legs swinging right through
+under her chest; they drive off and she flies stretched out flat, forelegs
+reaching straight ahead and hind legs straight back. The legs are placed by
+IK along designed paths (the cannon of each hind leg kept parallel to the
+thigh, as in every running dog, which makes a three-bone leg an exact
+two-bone solve). Her head is held steady while everything under it works, as
+a running fox's is: whatever the stride's bounce, rocking and gathering do to
+her neck, the head keeps a height and an angle that change only slowly. She
+leads with the leg on the inside of a turn, banks into it and bends her spine
+toward it.
 
-Her tail is simulated: a chain of particles from root to tip in a frame that
-moves with her but doesn't turn with her, so every turn swings it and it lags
-behind her body. Each step it's carried by the air (the headwind streaming it
-back, gusts fluttering down it), by gravity and by her own acceleration (a
-take-off leaves it hanging, a landing drops it, a lane change swings it out
-and back), held toward the shape her mood gives it — level behind her at a
-gallop, pumping gently with her stride; swept round on the ground when she
-sits; up and curling when she pounces; sweeping side to side when she's
-pleased — stiffly at the root and loosely at the tip, and each part of it is
-drawn to move with the part before it, so the stride ripples down it rather
-than whipping it. Under the sea it floats. Her ears are on springs: pricked
-or swivelled about, laid back by the wind and the pace, flattened when she
-slinks, flopping with every jolt.
+Every jump has weight: she winds up first — sinking into her legs, coiled,
+all four feet planted (for the pounce, rearing up on her haunches with her
+forepaws drawn to her chest) — then springs. Over a hurdle she drives off with
+her hind legs stretched out behind, tucks them up under her over the top with
+her forelegs reaching ahead, and comes down forefeet first, nose dipping; the
+pounce is the mousing leap — springing almost straight up, turning over the
+top and diving down nose first, forepaws together, hind legs trailing up. She
+lands forefeet first, the front dipping as they take it, then her weight comes
+down into all four legs, folding them and gathering her back, and she springs
+back up out of it, deeper the harder she came down. On the title screen she
+sits, haunches down and forelegs straight, her brush swept slowly to and fro
+round her paws, looking about — up at the runner, out at you — her ears
+flicking; when you pick a runner she winds up and hops to say hello.
+
+Her tail is simulated, and answers how she moves: a chain of particles from
+root to tip in a frame that moves with her but doesn't turn with her, so
+every turn of her hips swings it and it lags behind. Its shape comes from her
+mood (out behind her a touch above level at a gallop; swept round on the
+ground when she sits; up and curling when she pounces; sweeping side to side
+when she's pleased) bent by the air streaming past her, so at a gallop it
+streams out behind as a real fox's does. On that shape it's a chain of damped
+springs: each part is held to the shape relative to the part before it (not
+to her body), stiffly at the root and softly at the tip, so a swing at the
+root runs down it as a wave; her own acceleration throws it — it hangs below
+her as she springs up, streams up behind her as she falls, whips down on a
+landing, swings out wide as a counterweight in a turn — gravity weighs it and
+the air damps it. On the run its root rides only a little of the pelvis's
+rocking, so it ripples rather than flaps. Under the sea it floats. (The
+headwind used to be a force fighting the chain's length every step, which set
+its tip thrashing; it's in the shape now, and the tip moves a few degrees a
+frame, smoothly.) Her ears are on springs: pricked or swivelled about, laid
+back by the wind and the pace, flattened when she slinks, flopping with every
+jolt. Where her fur's strands would be under a couple of pixels across — and
+shimmer as she moves — they thin into a soft solid fringe instead.
 
 **Her mind.** Most of the time she lopes along a lane or two over, drifting
 ahead and dropping back; every few seconds she gets an idea:
@@ -1236,12 +1262,15 @@ bars (she fits), won't jump where a bar or wall would meet her, won't step
 sideways into a hurdle too close to time a leap, and keeps out from under
 your feet unless she means to be there. When you stumble she lays her ears
 back and looks round; when you go down she turns, trots back and sits by
-you; when you get up she bounces. Everything she does is checked by a test
-that runs the game for minutes at a time with an autopilot runner and
-reports any frame she so much as grazes an obstacle.
+you; when you get up she bounces. `tools/companion/audit.js` checks all of
+it: it plays the game for minutes at a time without drawing it, with an
+autopilot runner, and reports any frame she so much as grazes an obstacle
+(serve the repository, then `node tools/companion/audit.js "?seed=2" 240`;
+it needs Playwright).
 
-Her tunables (how high she leaps, how far ahead and behind she ranges, how
-much faster she runs, how often she gets ideas, how long she rides, how often
+Her tunables (her gravity and how long she winds up for each kind of jump,
+how high she leaps, how far ahead and behind she ranges, how much faster she
+runs, how often she gets ideas, how long she rides, how often
 and how eagerly she fetches) live in `CONFIG.companion`; `?companion=none`
 runs alone. Companions are listed in `src/game/companions.js` — the fox is
 the first — and `companion.js` is written for any of them: a new animal
@@ -1286,7 +1315,9 @@ tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
 tools/runner/view.html        a runner turned round like their reference sheet
-tools/runner/fox.html         the fox turned round, posed
+tools/runner/fox.html         the fox turned round, posed, or as a film strip
+tools/companion/audit.js      plays the game unseen, checking the companion
+                              never touches an obstacle
 tools/characters/             the reference sheets and the cut-out of the
                               title screen's cards -> assets/characters/
 vendor/three/                 three.js r185 (MIT)

@@ -108,6 +108,7 @@ export class Fox {
     this.springs = {};
     for (const k of ['headP', 'headY', 'neckY', 'roll', 'bend', 'earL', 'earR', 'earLo', 'earRo', 'earLs', 'earRs', 'jaw', 'land', 'low', 'wag', 'lift']) this.springs[k] = new Spring();
     this.tail = this.buildTail();
+    this.tailHold = new Spring();
     this.face = new THREE.Vector4(1, 0, 0, 0);
     this.reset();
   }
@@ -261,6 +262,10 @@ export class Fox {
     for (const k in this.wS) this.wS[k].reset(k === 'sit' ? 1 : 0);
     for (const s of Object.values(this.springs)) s.reset();
     this.tail.ready = false;
+    this.headRef = { y: 0, p: 0, ready: false, pReady: false };
+    this.crouch = 0;
+    this.crouchKind = 'leap';
+    this.freq = 2;
     this.root.visible = true;
   }
 
@@ -290,9 +295,13 @@ export class Fox {
     this.snapT += dt;
     // gallop: strides a second rise with the pace; the lead changes to the
     // inside of a turn
+    // (a long, loping stride: she floats between footfalls, more of the
+    // stride in the air the faster she goes)
     const run = this.mode === 'run';
-    const freq = run ? clamp(2.0 + 0.085 * this.speed, 2.2, 4.4) : 0;
-    this.phase = (this.phase + dt * freq) % 1;
+    this.freq = clamp(1.55 + 0.058 * this.speed, 1.9, 3.15);
+    this.phase = (this.phase + dt * (run ? this.freq : 0)) % 1;
+    this.crouch = ctx.crouch || 0;
+    this.crouchKind = ctx.crouchKind || 'leap';
     if (Math.abs(this.lat) > 2.5) this.lead = this.lat > 0 ? 1 : -1;
     this.leadX += (this.lead - this.leadX) * (1 - Math.exp(-dt * 10));
 
@@ -326,13 +335,6 @@ export class Fox {
     this.twitch[i] = 0;
   }
 
-  landCurve(t) {
-    const f = 5, z = 0.4, r = Math.sqrt(1 - z * z);
-    const w = TAU * f, wd = w * r;
-    if (t * z * w > 7) return 0;
-    return Math.exp(-z * w * t) * Math.sin(wd * t) * 1.4 * (1 - Math.exp(-t / 0.02));
-  }
-
   animate(dt, t) {
     const m = this.mode;
     let tg = 0, ts = 0, tsit = 0, ta = 0, tr = 0;
@@ -362,13 +364,48 @@ export class Fox {
     const P = this.pose;
     for (let i = 0; i < N; i++) P[i] = (this.pGallop[i] * w.gallop + this.pStand[i] * w.stand + this.pSit[i] * w.sit + this.pAir[i] * w.air + this.pRide[i] * w.ride) / total;
 
-    // landing: the body drops into her legs and springs back
-    const land = this.landHit * this.landCurve(this.landClock);
-    P[C.y] -= 0.07 * land;
-    P[C.flex] += 0.14 * land;
-    P[C.pitch] -= 0.05 * land;
-    P[C.neckP] -= 0.12 * land;
-    P[C.tailLift] += 0.25 * land;
+    // winding up for a jump: she sinks into her legs, coiled, all four feet
+    // planted under her, eyes on where she's going (for the pounce she rears
+    // up on her haunches, forepaws drawn up to her chest)
+    const cr = this.crouch;
+    if (cr > 0) {
+      const e = cr * cr * (3 - 2 * cr);
+      const pounce = this.crouchKind === 'pounce';
+      P[C.y] -= (pounce ? 0.06 : this.crouchKind === 'hop' ? 0.06 : 0.1) * e;
+      P[C.flex] += (pounce ? 0.05 : 0.22) * e;
+      P[C.pitch] += (pounce ? 0.85 : 0.05) * e;
+      for (let i = 0; i < 4; i++) {
+        const f = FEET[i], toe = this.legs[i].toe;
+        let x = toe.x * (i < 2 ? 0.92 : 1), y = toe.y, z = toe.z + (i < 2 ? -0.03 : -0.05);
+        if (pounce && i < 2) {
+          bodyFoot(_crouchP, FEET[0], toe.x * 0.6, 0.24, -0.3, P[C.pitch]);
+          x = _crouchP[0];
+          y = _crouchP[1];
+          z = _crouchP[2];
+        }
+        P[f[0]] += (x - P[f[0]]) * e;
+        P[f[1]] += (y - P[f[1]]) * e;
+        P[f[2]] += (z - P[f[2]]) * e;
+      }
+      P[C.neckP] += (pounce ? 0.1 : -0.18) * e;
+      P[C.headP] += (pounce ? -0.45 : 0.12) * e;
+      P[C.earBack] -= 0.35 * e;
+      P[C.tailLift] += 0.2 * e;
+    }
+    // landing: forefeet first - the front dips as they take it - then her
+    // weight comes down into all four legs, folding them and gathering her
+    // back, and she springs back up out of it; the harder she came down, the
+    // deeper
+    const lk = this.landHit;
+    if (lk > 0 && this.landClock < 1.5) {
+      const a = impulse(this.landClock, 6.5, 0.5, 0);
+      const c = impulse(this.landClock, 4.2, 0.42, 0.035);
+      P[C.pitch] -= 0.15 * lk * a;
+      P[C.y] -= 0.085 * lk * c;
+      P[C.flex] += 0.26 * lk * c;
+      P[C.neckP] -= 0.28 * lk * c;
+      P[C.tailLift] += 0.25 * lk * a;
+    }
     // slinking: low to the ground, head down and forward, ears flat, tail low
     const lo = this.low;
     if (lo > 0.001) {
@@ -418,92 +455,121 @@ export class Fox {
   }
 
   // The rotary gallop (with a right lead: left fore, right fore, right hind,
-  // left hind; mirrored with a left). u for each leg: 0 at touchdown, its
-  // stance until `duty`, then the swing - the forefoot flicked back and
-  // folded up under the chest, then reaching far out ahead; the hind foot
-  // kicked out behind, swung forward folded, and planted well forward under
-  // the belly. The spine gathers between the fore and hind footfalls and
-  // stretches out in the flight after the hind drive.
+  // left hind; mirrored with a left). Each foot is planted - pinned to the
+  // road, carried back at exactly the ground's speed - for as long as its
+  // leg can reach (never less than about four frames), and the rest of the
+  // stride she flies. Between the footfalls her body rides real flight arcs
+  // (gravity, not a wave): it drops into each pair of footfalls, is driven
+  // back up off them and floats. After the forefeet, her back gathers into a
+  // ball - the hind legs swinging right through under her chest, the
+  // forelegs folded up and back; after the hind drive she flies stretched
+  // out flat, forelegs reaching straight ahead and hind legs straight back.
+  // (u for each leg: 0 at touchdown, planted until its duty, then the swing.)
   poseGallop(P, ph, t) {
-    const v = this.speed;
+    const v = Math.max(this.speed, 0.3);
+    const f = this.freq || 2;
     const sp = clamp((v - 4) / 24, 0, 1);
-    const s = 0.35 + 0.65 * smooth(1, 14, v);
-    const duty = lerp(0.36, 0.2, sp);
+    const s = 0.3 + 0.7 * smooth(0.5, 13, v);
     const lx = this.leadX;
-    // touchdown times: the trailing fore, the leading fore, then the hinds
-    const offs = [0.04 - 0.04 * lx, 0.04 + 0.04 * lx, 0.54 + 0.04 * lx, 0.54 - 0.04 * lx];
+    const reachF = 0.24 + 0.12 * s, reachH = 0.28 + 0.14 * s;
+    const minDown = 0.068 * f;
+    const dF = clamp(Math.max((reachF * f) / v, minDown), 0.1, 0.5);
+    const dH = clamp(Math.max((reachH * f) / v, minDown), 0.1, 0.5);
+    const lag = 0.07;
+    const offs = [lag / 2 - (lag / 2) * lx, lag / 2 + (lag / 2) * lx, 0.5 + lag / 2 + (lag / 2) * lx, 0.5 + lag / 2 - (lag / 2) * lx];
     for (let i = 0; i < 4; i++) {
       const leg = this.legs[i];
       const front = i < 2;
+      const duty = front ? dF : dH;
       const u = (ph - offs[i] + 1) % 1;
       const toe = leg.toe;
+      // the ground covered while it's down (as much as the leg can reach)
+      const span = Math.min(front ? reachF : reachH, (v * duty) / f);
       let z, y, curl;
       if (front) {
-        const zTD = -0.06 - 0.16 * s, zLO = 0.04 + 0.13 * s;
+        const zTD = -0.08 - 0.12 * s - 0.02 * sp, zLO = zTD + span;
         if (u < duty) {
           const c = u / duty;
-          z = lerp(zTD, zLO, c);
+          z = zTD + span * c;
           y = 0;
-          curl = -0.7 * smooth(0.55, 1, c);
+          curl = -0.75 * smooth(0.45, 1, c);
         } else {
           const keys = this.frontSwing || (this.frontSwing = []);
           keys.length = 0;
-          keys.push([0, zLO, 0], [0.14, zLO + 0.08, 0.075], [0.45, 0.02, 0.17], [0.78, zTD - 0.13 * s, 0.11], [0.999, zTD, 0.002]);
+          keys.push([0, zLO, 0], [0.12, zLO + 0.06 * s, 0.06 + 0.05 * s], [0.38, 0.02, 0.13 + 0.07 * s], [0.74, zTD - 0.22 * s, 0.13 + 0.09 * s], [0.92, zTD - 0.06 * s, 0.04], [1, zTD, 0]);
           const c = (u - duty) / (1 - duty);
           pathLine(keys, c, _key);
           z = _key[0];
           y = Math.max(0, _key[1]);
-          curl = -0.7 - 1.0 * smooth(0, 0.25, c) + 1.95 * smooth(0.45, 0.85, c) - 0.25 * smooth(0.85, 1, c);
+          curl = -0.75 - 1.0 * smooth(0, 0.22, c) + 2.15 * smooth(0.42, 0.78, c) - 0.4 * smooth(0.82, 1, c);
         }
       } else {
-        const zTD = -0.05 - 0.13 * s, zLO = 0.06 + 0.2 * s;
+        const zTD = -0.12 - 0.1 * s, zLO = zTD + span;
         if (u < duty) {
           const c = u / duty;
-          z = lerp(zTD, zLO, c);
+          z = zTD + span * c;
           y = 0;
-          curl = 0.5 * smooth(0.5, 1, c);
+          curl = 0.55 * smooth(0.4, 1, c);
         } else {
           const keys = this.hindSwing || (this.hindSwing = []);
           keys.length = 0;
-          keys.push([0, zLO, 0], [0.18, zLO + 0.15 * s, 0.09], [0.55, 0.0, 0.15], [0.82, zTD - 0.08 * s, 0.08], [0.999, zTD, 0.002]);
+          keys.push([0, zLO, 0], [0.16, zLO + 0.16 * s, 0.06 + 0.04 * s], [0.36, zLO + 0.06 * s, 0.1 + 0.03 * s], [0.62, 0.0, 0.14 + 0.03 * s], [0.86, zTD - 0.06 * s, 0.06], [1, zTD, 0]);
           const c = (u - duty) / (1 - duty);
           pathLine(keys, c, _key);
           z = _key[0];
           y = Math.max(0, _key[1]);
-          curl = 0.5 + 0.5 * smooth(0, 0.2, c) - 1.2 * smooth(0.3, 0.7, c) + 0.2 * smooth(0.8, 1, c);
+          curl = 0.55 + 0.45 * smooth(0, 0.2, c) - 1.3 * smooth(0.3, 0.68, c) + 0.3 * smooth(0.8, 1, c);
         }
       }
-      this.setFoot(P, i, toe.x, toe.y + y, toe.z + z);
+      this.setFoot(P, i, toe.x * (front ? 0.92 : 0.95), toe.y + y, toe.z + z);
       P[front ? (i === 0 ? C.pawL : C.pawR) : i === 2 ? C.toeL : C.toeR] = curl;
     }
-    // the body over the legs: the spine gathers (+) in the flight after the
-    // forefeet and stretches out (-) in the flight after the hinds; it rides
-    // highest in each flight, and pitches nose down over the forefeet, up
-    // as the hinds drive
-    const k = 0.25 + 0.75 * smooth(2, 10, v);
-    const fl = Math.cos(TAU * (ph - 0.36));
-    P[C.flex] = (0.12 + 0.12 * sp) * fl * k;
-    P[C.y] = (0.028 * (0.5 + 0.5 * Math.cos(2 * TAU * (ph - 0.38))) - 0.018) * k;
-    P[C.pitch] = -0.075 * Math.cos(TAU * (ph - 0.13)) * k;
-    P[C.z] = 0.02 * Math.sin(TAU * (ph - 0.2)) * k;
-    P[C.roll] = 0.02 * Math.sin(TAU * ph) * lx;
+    // the body's flight: two flights a stride, each a parabola, and a dip
+    // into each pair of footfalls that turns the fall into the next rise
+    const k = 0.2 + 0.8 * smooth(1.5, 10, v);
+    const cw = lag + 0.5 * (dF + dH);
+    P[C.y] = this.bounce(ph, f, cw, 20) * k - 0.015 - 0.02 * sp;
+    // the back gathers (+) in the flight after the forefeet, stretches out
+    // (-) in the flight after the hind drive
+    P[C.flex] = (0.12 + 0.5 * Math.cos(TAU * (ph - 0.36))) * k;
+    // rocking over the forefeet (nose down), then up off the hind drive
+    P[C.pitch] = -0.085 * Math.cos(TAU * (ph - 0.3)) * k;
+    P[C.z] = 0.025 * Math.sin(TAU * (ph - 0.25)) * k;
+    P[C.roll] = 0.025 * Math.sin(TAU * ph) * lx * k;
     P[C.bend] = 0;
-    // the head held level, low and forward, eyes on the road
-    P[C.neckP] = -0.35 - 0.12 * sp;
+    // the head low and forward, eyes on the road (held steady: see steadyHead)
+    P[C.neckP] = -0.3 - 0.14 * sp;
     P[C.neckY] = 0;
-    P[C.headP] = 0.28 + 0.1 * sp - P[C.pitch] - 0.45 * P[C.flex] * 0.6;
+    P[C.headP] = 0.24 + 0.12 * sp;
     P[C.headY] = 0;
     P[C.headR] = 0;
-    // the tail held out level behind, pumping with the stride
-    // (it rides the pelvis, which tucks and tips with the spine; held half
-    // against that, it undulates rather than flapping)
-    P[C.tailLift] = 0.1 + 0.28 * P[C.flex] + 0.05 * sp;
-    P[C.tailEnd] = P[C.tailLift] + 0.12;
+    // the tail held out behind, a touch above level
+    P[C.tailLift] = 0.08 + 0.06 * sp;
+    P[C.tailEnd] = P[C.tailLift] + 0.1;
     P[C.tailSide] = 0;
     P[C.tailWag] = 0;
-    P[C.earBack] = 0.35 + 0.45 * sp;
+    P[C.earBack] = 0.3 + 0.45 * sp;
     P[C.earOut] = 0.05;
-    P[C.jaw] = 0.12 * sp * (0.5 + 0.5 * Math.sin(TAU * ph));
+    P[C.jaw] = 0.1 * sp * (0.5 + 0.5 * Math.sin(TAU * ph));
+  }
+
+  // The body's height through a stride (x: phase): two identical halves,
+  // each a support (both feet of a pair down, cw of a stride all told,
+  // the body decelerating its fall and driven back up: a dip) and then a
+  // flight (a parabola under gravity g). Returns the height about its mean.
+  bounce(x, f, cw, g) {
+    const c = clamp(cw, 0.06, 0.45);
+    const T = (0.5 - c) / f, Tc = c / f;
+    const v0 = (g * T) / 2, A = (2 * v0) / Tc;
+    const apex = (g * T * T) / 8, dip = (v0 * Tc) / 4;
+    const mean = ((2 / 3) * apex * T - (2 / 3) * dip * Tc) / (T + Tc);
+    let u = x - Math.floor(x * 2) / 2;
+    if (u < c) {
+      const tau = u / f;
+      return -v0 * tau + (A * tau * tau) / 2 - mean;
+    }
+    const tau = (u - c) / f;
+    return v0 * tau - (g * tau * tau) / 2 - mean;
   }
 
   // Standing: square on her feet, breathing, the tail low and easy.
@@ -558,39 +624,50 @@ export class Fox {
     P[C.headR] = 0.12 * Math.sin(t * 0.47 + 0.5);
     P[C.tailLift] = -0.55;
     P[C.tailEnd] = -0.05;
-    P[C.tailSide] = 0.95;
+    // (swept slowly to and fro round her paws, its tip flicking now and then)
+    P[C.tailSide] = 0.82 + 0.2 * Math.sin(t * 0.55) + 0.1 * Math.sin(t * 1.3 + 1) + 0.12 * Math.pow(Math.max(0, Math.sin(t * 0.9 + 2)), 8);
     P[C.tailWag] = 0;
     P[C.earBack] = -0.12;
     P[C.earOut] = 0.08;
     P[C.jaw] = 0;
   }
 
-  // In the air (p: 0..1 through the flight). leap: stretched out flat over
-  // a hurdle, forelegs reaching, hinds trailing, then gathering to land
-  // forefeet first. pounce: up steeply nose first, arching over the top and
-  // diving down nose first, forepaws together. hop: a little spring with
-  // the head up (snapping at a gem). twirl: a leap with a spin.
+  // In the air (p: 0..1 through the flight; feet placed in her body's own
+  // frame, turned with it). leap: she drives off with her hind legs
+  // stretched out behind and her forelegs folding up, tucks her hind legs
+  // up under her over the top with her forelegs reaching ahead, and comes
+  // down forefeet first, reaching for the road, nose dipping. pounce (the
+  // mousing leap): reared up, she springs almost straight up with her
+  // forepaws drawn to her chest, arches over the top and dives down nose
+  // first, forepaws together reaching down and hind legs trailing up. hop:
+  // a little spring, head up, snapping at something. twirl: a leap with a
+  // spin.
   poseAir(P, p, kind) {
     const F = this.legs;
-    const pounce = kind === 'pounce' ? 1 : 0;
-    const hop = kind === 'hop' ? 1 : 0;
-    const rise = 1 - smooth(0.0, 0.45, p);
-    const fall = smooth(0.5, 0.95, p);
-    const mid = Math.sin(Math.PI * p);
-    // leap
-    let pitch = 0.32 * rise - 0.28 * fall;
-    let flex = -0.18 * mid + 0.12 * fall;
-    const reachF = -0.2 - 0.12 * mid + 0.08 * fall;
-    const fy = 0.12 + 0.06 * mid - 0.1 * fall;
-    const hz = 0.32 * (1 - fall) + 0.04 * fall;
-    const hy = 0.1 + 0.06 * mid;
+    const pounce = kind === 'pounce', hop = kind === 'hop';
+    let pitch, flex, fz, fy, hz, hy, fx = 0.9;
     if (pounce) {
-      pitch = lerp(0.75, -1.25, smooth(0.15, 0.85, p));
-      flex = 0.22 * mid - 0.1 * fall;
-    }
-    if (hop) {
-      pitch = 0.3 * mid;
-      flex = 0.06;
+      pitch = kf(PITCH_POUNCE, p);
+      flex = kf(FLEX_POUNCE, p);
+      fz = kf([-0.12, -0.16, -0.3, -0.36, -0.36], p);
+      fy = kf([0.24, 0.2, 0.1, 0.08, 0.06], p);
+      hz = kf([0.32, 0.3, 0.3, 0.28, 0.24], p);
+      hy = kf([0.0, 0.04, 0.1, 0.16, 0.14], p);
+      fx = 0.55;
+    } else if (hop) {
+      pitch = 0.3 * Math.sin(Math.PI * p) + 0.05;
+      flex = 0.05;
+      fz = kf([-0.1, -0.12, -0.14, -0.2, -0.24], p);
+      fy = kf([0.14, 0.2, 0.2, 0.12, 0.03], p);
+      hz = kf([0.3, 0.24, 0.16, 0.1, 0.06], p);
+      hy = kf([0.0, 0.06, 0.1, 0.08, 0.02], p);
+    } else {
+      pitch = kf(PITCH_LEAP, p);
+      flex = kf(FLEX_LEAP, p);
+      fz = kf([-0.08, -0.26, -0.36, -0.3, -0.26], p);
+      fy = kf([0.18, 0.16, 0.13, 0.06, 0.0], p);
+      hz = kf([0.36, 0.2, 0.02, 0.06, 0.12], p);
+      hy = kf([0.02, 0.12, 0.17, 0.14, 0.08], p);
     }
     P[C.y] = 0;
     P[C.z] = 0;
@@ -598,31 +675,24 @@ export class Fox {
     P[C.roll] = 0;
     P[C.flex] = flex;
     P[C.bend] = 0;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 4; i++) {
+      const front = i < 2;
       const toe = F[i].toe;
-      const x = toe.x * (pounce ? 0.55 : 0.9);
-      if (pounce) this.setFoot(P, i, x, 0.12 + 0.05 * mid - 0.05 * fall, -0.24 - 0.08 * fall);
-      else if (hop) this.setFoot(P, i, x, 0.1 + 0.05 * mid, -0.17);
-      else this.setFoot(P, i, x, fy, toe.z + reachF + (i === 0 ? 0.02 : -0.02));
+      const side = i % 2 === 0 ? 1 : -1;
+      bodyFoot(P, FEET[i], toe.x * (front ? fx : 0.95), front ? fy : hy, (front ? fz - 0.2 : hz + 0.2) + side * 0.015, pitch);
     }
-    for (let i = 2; i < 4; i++) {
-      const toe = F[i].toe;
-      if (pounce) this.setFoot(P, i, toe.x, 0.13 + 0.05 * mid, toe.z + 0.22 * mid + 0.05);
-      else if (hop) this.setFoot(P, i, toe.x, 0.05 + 0.05 * mid, toe.z + 0.06);
-      else this.setFoot(P, i, toe.x, hy, toe.z + hz + (i === 2 ? 0.02 : -0.02));
-    }
-    P[C.pawL] = P[C.pawR] = pounce ? 0.3 : hop ? -0.9 : -0.3 - 0.9 * rise + 0.6 * fall;
-    P[C.toeL] = P[C.toeR] = pounce ? 0.6 : 0.7 * (1 - fall);
-    P[C.neckP] = pounce ? -0.1 - 0.3 * fall : hop ? 0.25 : -0.3;
+    P[C.pawL] = P[C.pawR] = pounce ? kf([-1.2, -1.0, 0.2, 0.4, 0.3], p) : hop ? -1.0 : kf([-1.3, -0.6, 0.2, 0.4, 0.3], p);
+    P[C.toeL] = P[C.toeR] = pounce ? kf([0.8, 0.5, 0.3, 0.5, 0.6], p) : kf([0.9, 0.4, -0.3, 0.0, 0.2], p);
+    P[C.neckP] = pounce ? kf([0.25, 0.15, -0.15, -0.35, -0.4], p) : hop ? 0.3 : kf([-0.2, -0.3, -0.32, -0.25, -0.15], p);
     P[C.neckY] = 0;
-    P[C.headP] = pounce ? -0.3 * fall : hop ? 0.35 * mid : 0.25 - pitch * 0.6;
+    P[C.headP] = pounce ? kf([-0.5, -0.4, -0.2, -0.15, -0.1], p) : hop ? -0.15 * Math.sin(Math.PI * p) : 0.22 - pitch * 0.5;
     P[C.headY] = 0;
     P[C.headR] = 0;
-    P[C.tailLift] = pounce ? 0.6 + 0.5 * fall : 0.15 + 0.25 * rise;
-    P[C.tailEnd] = P[C.tailLift] + (pounce ? 0.5 : 0.1);
+    P[C.tailLift] = pounce ? kf([-0.4, -0.2, 0.4, 0.8, 0.9], p) : kf([0.25, 0.2, 0.1, 0.05, 0.1], p);
+    P[C.tailEnd] = P[C.tailLift] + (pounce ? 0.4 : 0.1);
     P[C.tailSide] = 0;
     P[C.tailWag] = 0;
-    P[C.earBack] = pounce ? -0.25 : hop ? -0.1 : 0.7;
+    P[C.earBack] = pounce ? -0.3 : hop ? -0.15 : 0.6;
     P[C.earOut] = 0.05;
     P[C.jaw] = 0;
   }
@@ -677,6 +747,7 @@ export class Fox {
     b.jaw.rotation.set(-0.42 * this.springs.jaw.step(clamp(P[C.jaw], 0, 1), 9, 0.7, dt), 0, 0);
     this.root.matrixWorld.identity();
     this.body.updateWorldMatrix(false, true);
+    this.steadyHead(dt);
 
     // the legs
     for (let i = 0; i < 4; i++) this.solveLeg(this.legs[i], P, i);
@@ -685,6 +756,40 @@ export class Fox {
     this.earsSim(P, dt, t);
     // the tail
     this.tailSim(P, dt, t);
+  }
+
+  // Her head stays steady while everything under it works, as a running
+  // fox's does: whatever the stride's bounce, rocking and gathering do to
+  // her neck, the head is held at a height and an angle that change only
+  // slowly (a landing still nods it, the stride a little).
+  steadyHead(dt) {
+    const b = this.b;
+    const w = this.w;
+    const tot = w.gallop + w.stand + w.sit + w.air + w.ride || 1;
+    const landing = this.landHit > 0 ? impulse(this.landClock, 4.2, 0.42, 0.035) * this.landHit : 0;
+    const stab = clamp((w.gallop * 0.85 + w.air * 0.3 + w.ride * 0.5) / tot, 0, 0.9) * (1 - clamp(Math.abs(landing), 0, 0.7));
+    const H = this.headRef;
+    _hp.setFromMatrixPosition(b.head.matrixWorld);
+    _np.setFromMatrixPosition(b.neck.matrixWorld);
+    if (!H.ready || dt <= 0) {
+      H.y = _hp.y;
+      H.ready = true;
+    }
+    H.y += (_hp.y - H.y) * (1 - Math.exp(-dt * 3));
+    const lever = Math.max(0.08, Math.hypot(_hp.z - _np.z, _hp.x - _np.x));
+    b.neck.rotation.x += clamp(((H.y - _hp.y) / lever) * stab, -0.45, 0.45);
+    b.neck.updateWorldMatrix(false, true);
+    // and level: the head's pitch in her own space, held to a slow average
+    b.head.matrixWorld.decompose(_hp, _hq, _s);
+    _np.set(0, 0, -1).applyQuaternion(_hq);
+    const pitch = Math.atan2(_np.y, Math.hypot(_np.x, _np.z));
+    if (!H.pReady || dt <= 0) {
+      H.p = pitch;
+      H.pReady = true;
+    }
+    H.p += (pitch - H.p) * (1 - Math.exp(-dt * 3));
+    b.head.rotation.x -= (pitch - H.p) * stab;
+    b.head.updateWorldMatrix(false, true);
   }
 
   // Aim a bone so its rest offset to the next joint (rest, bind space)
@@ -748,36 +853,48 @@ export class Fox {
     }
   }
 
-  // The tail: a chain of particles (see buildTail). Each step it's carried
-  // by the air (the headwind streaming it back, gusts fluttering it), by
-  // gravity and by her own acceleration (it lags every turn, take-off and
-  // landing), and held toward the shape her mood gives it - stiffly at the
-  // root, loosely at the tip - then kept to its length.
+  // The tail: a chain of particles from root to tip (see buildTail), in a
+  // frame that moves with her but doesn't turn with her - so every turn of
+  // her hips swings it and it lags behind. Its shape comes from her mood
+  // (the pose's tailLift / tailEnd / tailSide / tailWag) bent by the air
+  // streaming past her: at a gallop it streams out behind, level, as a real
+  // fox's does. On top of that shape it's a damped chain: each part is held
+  // to the shape relative to the part before it (not to her body), so a
+  // swing at the root runs down it as a wave; her own acceleration throws
+  // it (it hangs back on a take-off, whips down on a landing, swings out
+  // wide in a turn), gravity weighs it, and the air damps it. The steady
+  // headwind is in the shape rather than a force (as a force it fought the
+  // chain's length every step and set the tip thrashing).
   tailSim(P, dt, t) {
     const T = this.tail;
     const n = T.n;
     const L = this.tailSeg;
     const b = this.b;
-    // the root, and the hips' turn, in world axes (the frame moves with her)
     const rootQ = this.root.quaternion;
     const root = _tr.setFromMatrixPosition(b.tail0.matrixWorld).applyQuaternion(rootQ);
     b.hips.matrixWorld.decompose(_v2, _hipsQ, _s);
     const hipsQ = _hipsQ.premultiply(rootQ);
-    // the shape it's held to: back from the root, lifted there (tailLift)
-    // and toward the tip (tailEnd), swept round to the side (tailSide, at
-    // the tip), and waved. The root rides the pelvis; the rest is held
-    // level with her heading, so a sitting fox's tail lies along the ground
-    // and sweeps round in front of her paws.
     const lift = P[C.tailLift], end = P[C.tailEnd], side = P[C.tailSide], wag = P[C.tailWag];
-    const sp = clamp(this.speed / 20, 0, 1);
+    // the air streaming past her: how hard, and which way
+    const air = _air.copy(this.vel).negate();
+    const as = air.length();
+    if (as > 1e-3) air.divideScalar(as);
+    const stream = smooth(1.5, 17, as) * (this.mode === 'sit' ? 0 : 1);
+    const still = this.tailHold.step(this.mode === 'sit' || this.mode === 'stand' ? 0 : 1, 2, 1, dt);
+    // a slow wag sweeping side to side, its beat running down the tail
+    const wagP = TAU * (1.4 + 0.5 * wag) * t;
     for (let i = 1; i < n; i++) {
       const k = i / (n - 1);
-      const wave = Math.sin(t * 6.5 - k * 3.2) * (0.05 + 0.05 * sp) + Math.sin(t * 9 * (0.6 + wag) - k * 2.4) * 0.5 * wag * k;
       const ax = lift + (end - lift) * Math.pow(k, 0.8);
-      const ay = side * 3.3 * Math.pow(k, 0.85) + wave;
+      const ay = side * 3.3 * Math.pow(k, 0.85) + Math.sin(wagP - k * 1.6) * (0.08 + 0.55 * wag) * (0.4 + 0.6 * k);
       _e.set(-ax, ay, 0, 'YXZ');
-      _q2.copy(hipsQ).slerp(rootQ, smooth(0.1, 0.55, k));
-      T.dir[i].set(0, 0, 1).applyEuler(_e).applyQuaternion(_q2);
+      // (sitting or standing, its root comes out of the rump wherever the
+      // pelvis tips it; on the move she holds it steady, so only a little of
+      // the pelvis's rocking reaches it)
+      _q2.copy(hipsQ).slerp(rootQ, lerp(smooth(0.1, 0.55, k), 0.65 + 0.15 * k, still));
+      const d = T.dir[i].set(0, 0, 1).applyEuler(_e).applyQuaternion(_q2);
+      // streamed back by the air, more toward the tip
+      if (stream > 0) d.lerp(air, stream * (0.25 + 0.5 * k)).normalize();
     }
     if (!T.ready || dt <= 0) {
       T.p[0].copy(root);
@@ -785,48 +902,61 @@ export class Fox {
       for (const v of T.v) v.set(0, 0, 0);
       T.ready = true;
     } else {
-      const steps = Math.min(6, Math.max(1, Math.ceil(dt / (1 / 120))));
+      const steps = Math.min(8, Math.max(1, Math.round(dt * 120)));
       const h = dt / steps;
-      // the air, as it moves past her (her own speed and a breeze);
       // underwater it's thick and she floats
       const wet = this.wet || 0;
-      const drag = lerp(3.2, 7, wet);
-      const grav = lerp(-9.8, -1.2, wet);
-      const vx = this.vel.x, vy = this.vel.y, vz = this.vel.z;
-      const ground = 0.04 - this.root.position.y;
+      const airDamp = lerp(1.6, 5, wet);
+      // (its shape already droops as it should: gravity here only weighs
+      // what moves away from it)
+      const grav = lerp(-4, -1, wet);
+      const sp = clamp(as / 20, 0, 1);
       const r0 = T.o[0].copy(T.p[0]);
+      T.v[0].subVectors(root, r0).divideScalar(dt);
       for (let s = 0; s < steps; s++) {
-        const f = (s + 1) / steps;
-        T.v[0].subVectors(root, r0).divideScalar(dt);
-        T.p[0].lerpVectors(r0, root, f);
+        const tt = t - dt + (s + 1) * h;
+        T.p[0].lerpVectors(r0, root, (s + 1) / steps);
         for (let i = 1; i < n; i++) {
-          const p = T.p[i], v = T.v[i];
-          T.o[i].copy(p);
+          const p = T.p[i], v = T.v[i], pv = T.v[i - 1];
           const k = i / (n - 1);
-          // gusts: a flutter running down the tail, stronger the faster
-          const g = Math.sin(t * 13 + s * 0.4 - k * 5) * 1.8 * sp * k + Math.sin(t * 7.3 - k * 3) * 0.9 * sp * k;
-          v.x += h * (-this.acc.x + drag * (-vx + g - v.x));
-          v.y += h * (grav - this.acc.y + drag * (-vy + g * 0.5 - v.y));
-          v.z += h * (-this.acc.z + drag * (-vz - v.z));
-          // (the brush is stiff with itself: each part of it is drawn to
-          // move with the part before it, so the stride ripples down it
-          // rather than whipping it)
-          v.lerp(T.v[i - 1], 1 - Math.exp(-11 * h));
+          // the shape's bend at this joint, carried on from where the part
+          // before it actually is
+          let d = T.dir[i];
+          if (i > 1) {
+            const pd = _pd.subVectors(T.p[i - 1], T.p[i - 2]).normalize();
+            _qb.setFromUnitVectors(T.dir[i - 1], pd);
+            d = _dt.copy(T.dir[i]).applyQuaternion(_qb).lerp(T.dir[i], 0.25).normalize();
+          }
+          _v.copy(T.p[i - 1]).addScaledVector(d, L);
+          // a damped spring toward it (stiff at the root, soft at the tip,
+          // damped against the part before it), the air's drag, gravity,
+          // her own acceleration thrown back at it, and in a strong headwind
+          // a little flutter running down it
+          const w = lerp(42, 15, Math.pow(k, 0.8)) * (1 - 0.35 * wet);
+          const c = 2 * lerp(0.8, 0.6, k) * w;
+          const fl = sp * k * k;
+          const ax = w * w * (_v.x - p.x) - c * (v.x - pv.x) - airDamp * v.x - this.acc.x + 1.1 * fl * Math.sin(tt * 8.3 - k * 4);
+          const ay = w * w * (_v.y - p.y) - c * (v.y - pv.y) - airDamp * v.y + grav - this.acc.y + 0.7 * fl * Math.sin(tt * 6.1 - k * 3 + 1);
+          const az = w * w * (_v.z - p.z) - c * (v.z - pv.z) - airDamp * v.z - this.acc.z;
+          v.x += ax * h;
+          v.y += ay * h;
+          v.z += az * h;
           p.addScaledVector(v, h);
-          // held toward its shape: stiff at the root, loose at the tip
-          const stiff = lerp(45, 6, Math.pow(k, 0.6)) * (1 - 0.5 * wet);
-          _v.copy(T.p[i - 1]).addScaledVector(T.dir[i], L);
-          p.lerp(_v, 1 - Math.exp(-stiff * h));
-          // kept to its length
+          // kept to its length (and the stretch taken out of its motion)
           _v.subVectors(p, T.p[i - 1]);
           const len = _v.length() || 1;
-          p.copy(T.p[i - 1]).addScaledVector(_v, L / len);
-          if (p.y < ground) p.y = ground;
-          v.subVectors(p, T.o[i]).divideScalar(h);
+          _v.divideScalar(len);
+          p.copy(T.p[i - 1]).addScaledVector(_v, L);
+          const rel = (v.x - pv.x) * _v.x + (v.y - pv.y) * _v.y + (v.z - pv.z) * _v.z;
+          v.addScaledVector(_v, -rel);
+          if (p.y + this.root.position.y < 0.04) {
+            p.y = 0.04 - this.root.position.y;
+            if (v.y < 0) v.y = 0;
+          }
         }
       }
     }
-    // onto the bones
+    // onto the bones (each turned from the one before it, so none flips)
     _qi.copy(rootQ).invert();
     for (let i = 0; i < n - 1; i++) {
       _d.subVectors(T.p[i + 1], T.p[i]).applyQuaternion(_qi);
@@ -861,6 +991,45 @@ export class Fox {
   }
 }
 
+// The impulse response of a damped spring (frequency Hz, damping ratio),
+// starting `delay` seconds after t = 0, scaled to peak at about 1: a jolt
+// that rings out.
+function impulse(t, freq, zeta, delay) {
+  t -= delay;
+  if (t <= 0) return 0;
+  const w = TAU * freq, r = Math.sqrt(1 - zeta * zeta);
+  if (t * zeta * w > 8) return 0;
+  const peak = r * Math.exp((-zeta / r) * Math.atan(r / zeta));
+  return (Math.exp(-zeta * w * t) * Math.sin(w * r * t)) / peak;
+}
+
+// Evenly spaced keys over 0..1, eased through (Catmull-Rom).
+function kf(keys, p) {
+  const n = keys.length - 1;
+  const x = clamp(p, 0, 1) * n;
+  const i = Math.min(n - 1, Math.floor(x));
+  const t = x - i;
+  const k0 = keys[Math.max(0, i - 1)], k1 = keys[i], k2 = keys[i + 1], k3 = keys[Math.min(n, i + 2)];
+  const t2 = t * t, t3 = t2 * t;
+  return 0.5 * (2 * k1 + (k2 - k0) * t + (2 * k0 - 5 * k1 + 4 * k2 - k3) * t2 + (3 * k1 - k0 - 3 * k2 + k3) * t3);
+}
+// in the air: the body's pitch and the spine's flex through the flight
+const PITCH_LEAP = [0.3, 0.12, -0.02, -0.16, -0.24];
+const FLEX_LEAP = [-0.3, 0.05, 0.18, 0.02, -0.1];
+const PITCH_POUNCE = [0.95, 0.6, -0.25, -1.1, -1.45];
+const FLEX_POUNCE = [0.0, 0.2, 0.42, 0.25, 0.15];
+
+// A foot placed in the body's own frame (pitched by `pitch` about its
+// middle), written in her root space.
+function bodyFoot(P, f, x, y, z, pitch) {
+  const piv = 0.4;
+  const c = Math.cos(pitch), s = Math.sin(pitch);
+  const yy = y - piv;
+  P[f[0]] = x;
+  P[f[1]] = piv + yy * c - z * s;
+  P[f[2]] = yy * s + z * c;
+}
+
 // Through the keys [u, z, y] (u ascending, ending near 1): Catmull-Rom.
 function pathLine(keys, u, out) {
   const n = keys.length;
@@ -889,6 +1058,14 @@ const _hk = new THREE.Vector3();
 const _qi = new THREE.Quaternion();
 const _hipsQ = new THREE.Quaternion();
 const _tr = new THREE.Vector3();
+const _hp = new THREE.Vector3();
+const _np = new THREE.Vector3();
+const _hq = new THREE.Quaternion();
+const _crouchP = new Float32Array(N);
+const _air = new THREE.Vector3();
+const _pd = new THREE.Vector3();
+const _dt = new THREE.Vector3();
+const _qb = new THREE.Quaternion();
 const _d = new THREE.Vector3();
 const _dn = new THREE.Vector3();
 const _bn = new THREE.Vector3();

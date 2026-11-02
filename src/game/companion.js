@@ -93,6 +93,7 @@ export class Companion {
     this.spinV = 0;
     this.goal = { x: this.x, dz: this.dz, w: 6, wz: 2.5, low: 0 };
     this.air = null;
+    this.windup = null;
     this.beat = null;
     this.beatT = 0;
     this.restT = rand(1.5, 3);
@@ -233,6 +234,7 @@ export class Companion {
         b.place(_p, _q, 0, 0);
         ctx.mode = 'ride';
       }
+      ctx.crouch = 0;
       ctx.speed = g.speed;
       _vel.set(g.player.vx, 0, -g.speed);
       ctx.vel.copy(_vel);
@@ -255,6 +257,8 @@ export class Companion {
       ctx.airKind = this.air.kind;
     } else if (this.sitting) ctx.mode = 'sit';
     else ctx.mode = Math.abs(vf) > 0.3 || g.state === 'running' ? 'run' : 'stand';
+    ctx.crouch = this.windup ? this.windup.t / this.windup.dur : 0;
+    ctx.crouchKind = this.windup ? this.windup.kind : 'leap';
     b.spin = 0;
     // where she's looking, in her own space
     let at = null;
@@ -301,13 +305,14 @@ export class Companion {
     this.x = this.goal.x;
     this.dz = this.goal.dz;
     this.vx = this.vdz = 0;
-    if (this.grounded) {
+    if (this.grounded && !this.windup) {
       this.sitting = true;
       // turned toward the camera, a little toward the runner
       const cam = g.cam.camera.position;
       const want = Math.atan2(-(cam.x - this.x), -(cam.z - (this.pz - this.dz))) + (tall ? 0.55 : -0.7);
       this.turnTo(want, 6, dt);
-    } else this.fall(dt);
+    } else if (!this.grounded) this.fall(dt);
+    this.windupStep(dt);
     // glances: up at the runner, at you, about
     if (this.lookT <= 0 && Math.random() < dt * 0.35) this.lookFor(rand(1.2, 2.6), Math.random() < 0.45 ? 'camera' : 'runner');
   }
@@ -511,7 +516,7 @@ export class Companion {
       case 'pounce':
       case 'twirl': {
         G.dz = Math.max(1.5, this.dz);
-        if (this.grounded && t > 0.2) this.endBeat();
+        if (this.grounded && !this.windup && t > 0.3) this.endBeat();
         break;
       }
       default:
@@ -628,7 +633,7 @@ export class Companion {
       const v0 = Math.sqrt(2 * this.C.gravity * H);
       const tUp = v0 / this.C.gravity;
       const gap = gem.d - (df + MOUTH[0]);
-      if (gap > 0 && gap < vf * tUp + 0.3 && this.canLeapAt(this.x, tUp * 2.1)) {
+      if (gap > 0 && gap < vf * (tUp + this.C.windup.hop) + 0.3 && this.canLeapAt(this.x, tUp * 2.1 + this.C.windup.hop)) {
         F.hopped = true;
         this.jump(H, 'hop');
       }
@@ -785,18 +790,23 @@ export class Companion {
       if (o) {
         // (caught late - swung into its lane by a wall - she springs harder,
         // so she's over its top by the time she reaches it)
+        // (she winds up first: the spring comes that beat later)
         const G = this.C.gravity;
+        const kind = Math.random() < 0.25 && o.y1 < 0.8 ? 'pounce' : 'leap';
+        const wind = this.C.windup[kind];
         let H = Math.max(this.C.leap, o.y1 + 0.42);
-        const tr = Math.max(0.04, (o.d - df - 0.5) / vf);
-        if (tr < Math.sqrt((2 * H) / G) * 0.8) {
-          const late = (o.y1 + 0.12) / tr + (G * tr) / 2;
-          H = clamp(Math.max(H, (late * late) / (2 * G)), 0, 2.4);
+        const tr = (o.d - df - 0.5) / vf - wind;
+        const late = tr < Math.sqrt((2 * H) / G) * 0.8;
+        if (late) {
+          const t = Math.max(0.04, tr + wind);
+          const v = (o.y1 + 0.12) / t + (G * t) / 2;
+          H = clamp(Math.max(H, (v * v) / (2 * G)), 0, 2.4);
         }
         const v0 = Math.sqrt(2 * this.C.gravity * H);
         const T = (2 * v0) / this.C.gravity;
         const mid = o.d + o.len / 2;
-        const at = mid - df - vf * T * 0.5 + 0.25;
-        if (at <= 0.05 && !this.threat(this.x, df, df + vf * T + 1, 'H')) this.jump(H, Math.random() < 0.25 && o.y1 < 0.8 ? 'pounce' : 'leap');
+        const at = mid - df - vf * (T * 0.5 + wind) + 0.25;
+        if (at <= 0.05 && !this.threat(this.x, df, df + vf * (T + wind) + 1, 'H')) this.jump(H, late ? 'leap' : kind, late && tr < 0.02);
       }
     }
     // out from under the runner's feet (unless she means to be there)
@@ -813,11 +823,27 @@ export class Companion {
   }
 
   // --- moving ------------------------------------------------------------------------------
-  jump(H, kind) {
+  // A jump starts with a wind-up: she sinks into her legs (for the pounce,
+  // rears up on her haunches) for a beat, then springs (now: no wind-up, if
+  // she's caught late).
+  jump(H, kind, now = false) {
+    if (!this.grounded || this.windup) return;
+    this.sitting = false;
+    const dur = now ? 0 : this.C.windup[kind] ?? 0.1;
+    if (dur <= 0) this.launch(H, kind);
+    else this.windup = { t: 0, dur, H, kind };
+  }
+
+  windupStep(dt) {
+    const W = this.windup;
+    if (W && (W.t += dt) >= W.dur) this.launch(W.H, W.kind);
+  }
+
+  launch(H, kind) {
     const G = this.C.gravity;
+    this.windup = null;
     this.vy = Math.sqrt(2 * G * H);
     this.grounded = false;
-    this.sitting = false;
     this.air = { t: 0, T: (2 * this.vy) / G, kind };
   }
 
@@ -853,6 +879,7 @@ export class Companion {
     // (while you run she never runs backwards over the ground; when you're
     // down she turns and trots back to you)
     if (g.state === 'running' && g.speed + this.vdz < 0) this.vdz = -g.speed;
+    this.windupStep(dt);
     if (!this.grounded) {
       this.fall(dt);
       if (this.spinV) this.spin = this.spinV * clamp(this.air.t / this.air.T, 0, 1);

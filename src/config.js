@@ -91,7 +91,8 @@ export const CONFIG = {
   },
 
   // The companion who runs with you (see game/companion.js): who it is
-  // ('none' to run alone; ?companion= overrides it), how high she leaps
+  // ('none' to run alone; ?companion= overrides it), her gravity (m/s²) and
+  // how long she winds up before each kind of jump (s), how high she leaps
   // (m: over a hurdle, the mousing pounce, a twirl), how far ahead of you she
   // ranges and how far back she drops (m), how much faster or slower than
   // you she can run (m/s), how long she rests between ideas (s), how long
@@ -101,6 +102,8 @@ export const CONFIG = {
   companion: {
     id: 'fox',
     gravity: 26,
+    // how long she winds up before each kind of jump (s)
+    windup: { leap: 0.1, pounce: 0.18, hop: 0.07, twirl: 0.1 },
     leap: 1.25,
     pounce: 1.55,
     twirl: 1.1,
