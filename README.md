@@ -12,7 +12,10 @@ once you're deep enough they stop holding their shape: slowly at first, then
 roads corkscrew, forests melt, skies swirl like wet paint. Every doorway also raises your score
 multiplier, so the strangest stretches are the ones worth the most. And every
 world has its own gemstone to collect, laid in runs that swerve round its
-walls, arc over its hurdles and lead you through its doorways.
+walls, arc over its hurdles and lead you through its doorways. And you never
+run alone: Sorrel, a red fox, runs with you — ranging ahead, dropping back,
+shooting out between your legs, riding on your shoulder, and now and then
+snapping a gem out of the air for you (see [The fox](#the-fox)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -677,6 +680,7 @@ Append to the URL:
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?runner=explorer` | who runs (`wayfarer`, `explorer`), over the one remembered |
+| `?companion=none` | run alone (or `fox`, the default: who runs with you) |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
@@ -707,6 +711,12 @@ Append to the URL:
   doors swinging, foliage swaying, wings and book covers flapping, drifting
   props and the curved-world bend are all done in the vertex shader from
   distance and time — no per-object CPU updates.
+- **A fox for four draw calls.** Sorrel is one skinned mesh (~15k
+  triangles), its ink hull, a layer of fur and a shadow decal: the fur is
+  four copies of the furred part of her surface in one buffer (~49k
+  triangles), so it costs one draw call however many layers there are. Her
+  gallop, legs, tail, ears and mind take about 0.05 ms a frame; nothing she
+  does allocates.
 - **One skinned runner and a cape.** The wayfarer is a single skinned mesh
   and the cape one more, each with its ink hull — four draw calls, ~22k
   sculpted triangles plus ~9k for the cape. Legs are placed by IK, the body
@@ -1110,6 +1120,134 @@ was downloaded or evaluated; the character, rig, animation and shading here are
 all original. A suitable base mesh could still be adopted later: the game only
 needs a skinned mesh whose bones are named like the ones `build.py` writes.
 
+## The fox
+
+![Sorrel: standing, sitting with her brush swept round, and three moments of her gallop; in the run, sitting by Rowan on the title screen, riding on his shoulder, and the one thing besides the cape still in colour in Hell](docs/fox.jpg)
+
+Sorrel is a red fox, and she runs with you whoever you pick. You don't steer
+her — she has a mind of her own (`src/game/companion.js`) — and she's almost
+all for show: faster than you and knowing it, playful, a little cunning,
+forever doing something. The one thing she does for you is fetch: now and
+then she spots a gem you'd have missed, races over to it, springs up and
+snaps it out of the air, and tosses it back to you.
+
+**Sculpted like the runners.** `tools/runner/fox.py` builds her the way
+`build.py` builds Rowan (it borrows its primitives, meshing, skinning and
+export): one continuous coat — the deep chest and tucked-up waist of a
+runner, a long fine muzzle, cheeks that flare back into a ruff of points, a
+ruff down the throat ending in points on her chest, slender legs with
+feathered elbows and breeches, neat paws — with her jaw, her ears (big,
+pointed and cupped forward) and her tail as their own surfaces. The tail is a
+great brush, swelling from a slim root to its fullest two-thirds of the way
+along and drawn out to a point, and clumped all over in shingles of fur, each
+lying toward the tip and breaking off in a point, so its outline is ragged
+the way fur is. She's skinned to a quadruped's skeleton: hips, spine, chest,
+neck, head, jaw and ears, four legs of three joints each, and eight bones down
+the tail. Each vertex carries how far inside the white it lies, how dark it
+runs, how far along the tail it is and how long its fur grows there, and the
+shader does the rest. To change her, edit the script and regenerate (about
+twelve seconds), then look at her in `tools/runner/fox.html` (`?pose=stand|
+sit|run|leap|pounce|hop|ride`, `&ts=` a moment for each view, `&v=` the pace,
+`&views=left,front,back,three`):
+
+```sh
+python3 tools/runner/fox.py   # -> assets/fox/
+```
+
+**Painted, and furry.** The character shader's fox (`FOX` in `CHAR_DETAIL`)
+brushes her coat in long strokes laid along the lie of the fur — deeper on her
+back, lighter where it catches the sun, a warm tone on the fur facing the
+light — and tears the white of her lips, cheeks, throat and tail tip into
+points where it meets the red, tufts of white running out into it and of red
+into the white. Her stockings run dark from the elbows and hocks down to
+black paws; the backs of her ears are black, their insides cream. Her eyes
+are sly almonds slanting up toward her ears under a heavy dark rim, amber with
+a slit pupil and a catch-light, the dark tear line running down the side of
+her muzzle from the inner corner; she blinks, and when she's pleased she
+squeezes them shut in happy arcs. Over all of it grows a short pile of fur
+(`SHELL`): her surface again four times over, each layer lifted off it by a
+share of how long the fur grows there (longest in the ruffs and the brush,
+short on the face and stockings, none round the eyes and nose), thinned to
+strands toward the tips and combed back by the air streaming past her, so her
+outline is soft and ragged at any distance. Like the cape and Wren's hair,
+she keeps her colour through Hell's drain: a little flame on the ash.
+
+**How she moves** (`src/game/fox.js`). A rotary gallop, her legs placed by IK
+along designed paths: the forefeet land one after the other and vault her
+body over them, her back gathers as the hind legs swing through under her,
+they drive off, and she flies stretched out flat, forelegs reaching and hind
+legs trailing — the spine flexing and stretching through every stride and her
+head held level and steady through all of it. The cannon of each hind leg is
+kept parallel to the thigh, as in every running dog, which makes a three-bone
+leg an exact two-bone solve. She leads with the leg on the inside of a turn,
+banks into it and bends her spine toward it. In the air she stretches out flat
+over a hurdle and gathers to land forefeet first; pounces like a fox after a
+mouse (up steeply, arching over the top and diving down nose first); hops to
+snap at a gem; and now and then leaps with a twirl. On the title screen she
+sits, haunches down and forelegs straight, her brush swept round beside her,
+looking about — up at the runner, out at you — her ears flicking; when you
+pick a runner she hops up to say hello.
+
+Her tail is simulated: a chain of particles from root to tip in a frame that
+moves with her but doesn't turn with her, so every turn swings it and it lags
+behind her body. Each step it's carried by the air (the headwind streaming it
+back, gusts fluttering down it), by gravity and by her own acceleration (a
+take-off leaves it hanging, a landing drops it, a lane change swings it out
+and back), held toward the shape her mood gives it — level behind her at a
+gallop, pumping gently with her stride; swept round on the ground when she
+sits; up and curling when she pounces; sweeping side to side when she's
+pleased — stiffly at the root and loosely at the tip, and each part of it is
+drawn to move with the part before it, so the stride ripples down it rather
+than whipping it. Under the sea it floats. Her ears are on springs: pricked
+or swivelled about, laid back by the wind and the pace, flattened when she
+slinks, flopping with every jolt.
+
+**Her mind.** Most of the time she lopes along a lane or two over, drifting
+ahead and dropping back; every few seconds she gets an idea:
+
+- **scout** — tears off ahead, then glances back over her shoulder at you with
+  a sly look;
+- **trail** — drops back almost under the camera, then dashes past;
+- **under** — comes up behind you in your lane, flattens herself and shoots
+  out between your legs;
+- **ride** — springs up onto your shoulder and rides there for a few seconds,
+  crouched, ears streaming, her brush hanging down your back, looking about
+  (and back at you); she leaps off ahead into a clear lane when she's had
+  enough, when something's coming, or the moment you slide or stumble;
+- **weave** — zigzags across the road in front of you;
+- **pounce** — the mousing leap, on open road (and now and then over a low
+  hurdle);
+- **twirl** — a leap with a spin, for joy (and often when you take a whole
+  run of gems);
+- **fetch** — every so often she looks for a gem in a lane you're not in (or,
+  now and then, cheekily, one right in front of you), far enough ahead to
+  reach with the way clear, races over, springs to meet it at the top of a
+  hop, jaws open, snaps it up and tosses it back to you: it flies to you in an
+  arc, its motes bursting as it arrives. It's yours — it scores, chimes and
+  counts toward its run as if you'd taken it — so she can save a run you'd
+  have broken.
+
+Under all of it she's careful. She reads the obstacles ahead: she keeps to a
+lane with room before its next wall, moves early when hers is running out
+(to the roomiest lane she can reach, never across a lane that's walled before
+she'd be through it), leaps hurdles and water with the top of the leap over
+their middle (harder if she was swung into the lane late), runs under the
+bars (she fits), won't jump where a bar or wall would meet her, won't step
+sideways into a hurdle too close to time a leap, and keeps out from under
+your feet unless she means to be there. When you stumble she lays her ears
+back and looks round; when you go down she turns, trots back and sits by
+you; when you get up she bounces. Everything she does is checked by a test
+that runs the game for minutes at a time with an autopilot runner and
+reports any frame she so much as grazes an obstacle.
+
+Her tunables (how high she leaps, how far ahead and behind she ranges, how
+much faster she runs, how often she gets ideas, how long she rides, how often
+and how eagerly she fetches) live in `CONFIG.companion`; `?companion=none`
+runs alone. Companions are listed in `src/game/companions.js` — the fox is
+the first — and `companion.js` is written for any of them: a new animal
+needs its body (a sculpt and a module like `fox.js` taking the same frame
+context) and an entry in the list.
+
 ## Project layout
 
 ```
@@ -1140,10 +1278,15 @@ src/game/                     game loop, player (the runners' shared core:
                               and splash (the screen splashed coming into it);
                               sands (the footprints in the Gallery's sand and
                               the surf lapping up it before a doorway into the
-                              sea)
+                              sea); the companion who runs with you
+                              (companions.js: who can; companion.js: her mind;
+                              fox.js: Sorrel's body, gallop, poses, tail and
+                              ears)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
+tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
 tools/runner/view.html        a runner turned round like their reference sheet
+tools/runner/fox.html         the fox turned round, posed
 tools/characters/             the reference sheets and the cut-out of the
                               title screen's cards -> assets/characters/
 vendor/three/                 three.js r185 (MIT)
@@ -1253,6 +1396,6 @@ light on the road and the motes they leave a colour of their own.
 
 ## Not in yet (on purpose)
 
-Keys, power-ups, more runners and most sound effects are left for the
-next pass; the ambient soundtrack (and the gems' chimes) is generated live
+Keys, power-ups (the fox will fetch those too), more runners, more
+companions and most sound effects are left for the next pass; the ambient soundtrack (and the gems' chimes) is generated live
 with Web Audio.

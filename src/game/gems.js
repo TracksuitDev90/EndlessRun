@@ -82,7 +82,7 @@ export class GemField {
     const limit = dist - 12;
     let w = 0;
     for (const g of this.gems) {
-      if (g.taken ? time - g.taken > 0.3 : g.d < limit) this.unput(g);
+      if (g.taken ? time - g.taken > (g.tossed ? 0.62 : 0.3) : g.d < limit) this.unput(g);
       else this.gems[w++] = g;
     }
     this.gems.length = w;
@@ -409,19 +409,28 @@ export class GemField {
     const y1 = p.y + p.height + reach;
     for (const g of this.gems) {
       if (g.taken || g.d < z0 || g.d > z1 || Math.abs(g.x - p.x) > hw || g.y < y0 || g.y > y1) continue;
-      g.taken = time;
-      for (const it of g.items) {
-        it.p2 = time;
-        it.p3 = dist - g.d;
-      }
-      g.world.batch('gems').dirty = true;
-      g.world.batch('gemGlow').dirty = true;
-      g.world.batch('gemPool').dirty = true;
-      const run = g.run;
-      run.taken++;
-      g.whole = run.taken === run.size && run.size >= 3 && (run.closed || this.cursor - run.last > 8);
-      out.push(g);
+      out.push(this.take(g, time, dist));
     }
     return out;
+  }
+
+  // Mark a gem taken: it starts being drawn into the runner from as far
+  // ahead of them as it was (tossed: a companion caught it, and throws it
+  // back to them in an arc - see gemCollect). It counts toward its run
+  // whoever took it; `whole` if it completed it.
+  take(g, time, dist, tossed = false) {
+    g.taken = time;
+    g.tossed = tossed;
+    for (const it of g.items) {
+      it.p2 = time;
+      it.p3 = dist - g.d + (tossed ? 1000 : 0);
+    }
+    g.world.batch('gems').dirty = true;
+    g.world.batch('gemGlow').dirty = true;
+    g.world.batch('gemPool').dirty = true;
+    const run = g.run;
+    run.taken++;
+    g.whole = run.taken === run.size && run.size >= 3 && (run.closed || this.cursor - run.last > 8);
+    return g;
   }
 }

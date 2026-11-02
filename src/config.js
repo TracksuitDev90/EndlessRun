@@ -90,6 +90,28 @@ export const CONFIG = {
     score: { gem: 10, crown: 30, perfect: 5 },
   },
 
+  // The companion who runs with you (see game/companion.js): who it is
+  // ('none' to run alone; ?companion= overrides it), how high she leaps
+  // (m: over a hurdle, the mousing pounce, a twirl), how far ahead of you she
+  // ranges and how far back she drops (m), how much faster or slower than
+  // you she can run (m/s), how long she rests between ideas (s), how long
+  // she rides on your shoulder (s), and her gem fetching: how often she
+  // looks for one (s), how far ahead of you it must be (m), the chance she
+  // goes for it, and the chance it's a cheeky one right in front of you.
+  companion: {
+    id: 'fox',
+    gravity: 26,
+    leap: 1.25,
+    pounce: 1.55,
+    twirl: 1.1,
+    ahead: 9,
+    behind: -2.8,
+    surge: [-7.5, 10],
+    rest: [1.2, 3.2],
+    ride: [2.6, 4.6],
+    fetch: { every: [7, 14], reach: [6, 26], chance: 0.6, mischief: 0.15 },
+  },
+
   // Hits
   stumbleWindow: 4.5, // a second hit within this many seconds ends the run
   stumbleSpeedMul: 0.72,

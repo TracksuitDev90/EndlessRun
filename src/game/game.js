@@ -17,6 +17,8 @@ import { Dream } from './dream.js';
 import { WaterFx } from './bubbles.js';
 import { Splash } from './splash.js';
 import { Sands } from './sands.js';
+import { Companion } from './companion.js';
+import { companionById } from './companions.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -31,7 +33,7 @@ const numeral = (n) => NUMERALS[n - 1] || String(n);
 // Orchestrates one run: streaming, obstacles, the player, doorways between
 // worlds, the camera and the two-pass portal render.
 export class Game {
-  constructor({ renderer, ui, audio, params, assets }) {
+  constructor({ renderer, ui, audio, params, assets, companionAssets = {} }) {
     this.renderer = renderer;
     this.ui = ui;
     this.audio = audio;
@@ -49,6 +51,9 @@ export class Game {
     for (const c of CHARACTERS) this.runners[c.id] = c.make(WORLD_DEFS[0].env, assets[c.id]);
     this.runnerId = characterById(params.runner || readString('er.runner')).id;
     this.player = this.runners[this.runnerId];
+    // the animal who runs with you (?companion=none to run alone)
+    const cdef = companionById(params.companion || CONFIG.companion.id);
+    this.companion = cdef && companionAssets[cdef.id] ? new Companion(this, cdef, cdef.make(WORLD_DEFS[0].env, companionAssets[cdef.id])) : null;
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
@@ -70,6 +75,7 @@ export class Game {
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
     this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
+    if (this.companion) this.sceneMain.add(...this.companion.objects);
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
@@ -138,6 +144,7 @@ export class Game {
     this.ui.setGemColor(this.current.def.gem?.color);
 
     this.player.reset();
+    this.companion?.reset(title);
     this.startDrain(this.current, 'settle');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
@@ -165,6 +172,7 @@ export class Game {
     this.cam.introTarget = 0;
     this.speed = 2;
     this.announceWorld(this.course.segAt(0));
+    this.companion?.start();
   }
 
   restart() {
@@ -197,6 +205,7 @@ export class Game {
       writeString('er.runner', this.runnerId);
     }
     this.player.greet();
+    this.companion?.greet();
     return true;
   }
 
@@ -227,6 +236,7 @@ export class Game {
     this.stumbleWindow = 0;
     this.speedMul = 0.85;
     this.speed = 0;
+    this.companion?.revived();
   }
 
   action(a) {
@@ -246,21 +256,27 @@ export class Game {
   // its run, and is sucked into the runner with a few motes of its colour;
   // taking a whole run pays a bonus on top. A gem missed costs nothing.
   collectGems() {
+    const got = this.gems.collect(this.player, this.prevDist, this.dist, this.time);
+    for (const g of got) this.creditGem(g);
+  }
+
+  // A gem is yours: taken by you, or caught by your companion (tossed: she
+  // throws it back to you, its motes bursting as it arrives - see
+  // companion.js).
+  creditGem(g, tossed = false) {
     const p = this.player;
-    const got = this.gems.collect(p, this.prevDist, this.dist, this.time);
-    if (!got.length) return;
     const S = CONFIG.gems.score;
-    for (const g of got) {
-      this.score += (g.crown ? S.crown : S.gem) * this.depth;
-      this.gemCount++;
-      this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, g.crown ? 1.25 : 1);
-      this.audio.gem(g.index, g.crown);
-      if (g.whole) {
-        const bonus = S.perfect * g.run.size * this.depth;
-        this.score += bonus;
-        this.ui.scorePop(bonus);
-        this.audio.gemRun();
-      }
+    if (tossed) this.gems.take(g, this.time, this.dist, true);
+    this.score += (g.crown ? S.crown : S.gem) * this.depth;
+    this.gemCount++;
+    if (!tossed) this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, g.crown ? 1.25 : 1);
+    this.audio.gem(g.index, g.crown);
+    if (g.whole) {
+      const bonus = S.perfect * g.run.size * this.depth;
+      this.score += bonus;
+      this.ui.scorePop(bonus);
+      this.audio.gemRun();
+      this.companion?.wholeRun();
     }
     this.ui.gem(this.gemCount);
   }
@@ -347,12 +363,14 @@ export class Game {
     this.speedMul = CONFIG.stumbleSpeedMul;
     this.player.stumble();
     this.cam.kick(0.75);
+    this.companion?.stumbled();
   }
 
   crash() {
     this.state = 'crashed';
     this.saveBest();
     this.player.crash();
+    this.companion?.crashed();
     this.cam.kick(1.25);
     this.crashTimer = 1.0;
     this.crashShown = false;
@@ -621,6 +639,7 @@ export class Game {
 
     const pz = -(this.dist - this.origin);
     this.player.place(pz, this.dist);
+    this.companion?.update(dt);
     this.sands.update(dt, this);
     this.updateWater(dt);
     this.callAhead();
@@ -642,6 +661,8 @@ export class Game {
     this.particles.update(this.dist);
     this.particles2.update(this.dist);
     for (const w of this.worlds) w.sky.position.copy(this.cam.camera.position);
+    // the companion is lit as the runner is, carried between worlds with them
+    if (this.companion) copyEnvUniforms(this.companion.body.u, this.player.u);
 
     this.current.flush(this.origin);
     if (this.next) this.next.flush(this.origin);
@@ -703,6 +724,10 @@ export class Game {
       r.forCompile?.(true);
     }
     scene.add(this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh, ...this.water.objects);
+    if (this.companion) {
+      scene.add(...this.companion.objects);
+      this.companion.forCompile(true);
+    }
     this.water.forCompile(true);
     scene.add(this.splash.mesh);
     try {
@@ -736,6 +761,11 @@ export class Game {
         for (const o of r.objects) o.removeFromParent();
       }
       this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
+      if (this.companion) {
+        this.companion.forCompile(false);
+        for (const o of this.companion.objects) o.removeFromParent();
+        this.sceneMain.add(...this.companion.objects);
+      }
       this.scenePortal.add(this.portal.stencilMesh);
     }
   }
