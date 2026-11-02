@@ -395,8 +395,11 @@ attribute vec4 aInst;
 // clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
 uniform float uWonk;
 #endif
-#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD)
+#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID)
 attribute float role;
+#endif
+#if defined(SCHOOL) || defined(LID)
+attribute vec4 fish;
 #endif
 #ifdef DUNES
 // x how much sand is running down here, y how deep it lies
@@ -424,7 +427,6 @@ uniform vec4 uCurrent;
 // stream flowing along +x, 1 a ball milling round the y axis, 2 a column
 // rising up y.
 uniform vec4 uSchool;
-attribute vec4 fish;
 #endif
 #ifdef JELLY
 // A jellyfish: the bell (role 0) squeezes and relaxes, a quick beat and a
@@ -433,6 +435,18 @@ attribute vec4 fish;
 // per second, y how hard the bell squeezes, z how far the trailing parts
 // ripple, w how far it lifts.
 uniform vec4 uJelly;
+#endif
+#ifdef LID
+// A lid that pops open now and then (a sunken chest). role 1 the lid, hinged
+// on the local x axis through (y, z) = (uLid.y, uLid.z); role 2 the bubbles
+// that pour out (each its own vertices round the origin, fish.xyz where it
+// starts and fish.w its own beat); role 3 coins flung up out of it, flipping
+// and falling back in. x seconds between pops, w how wide it flings open
+// (radians). Each pop is its own (see lidPop in game.js, which keeps time
+// with this for the sound): most fling it wide, some only burp it open a
+// little and let out a few bubbles, now and then it stays shut. It's held
+// shut once the runner is close (the bubbles still seep out round it).
+uniform vec4 uLid;
 #endif
 #ifdef CROSS
 // Something swimming across the run (a whale): it glides sideways along its
@@ -586,6 +600,60 @@ void main() {
   vec3 pivot = M[3].xyz;
   float aP = uCamPos.z - pivot.z;
   int mode = int(uAnim.x + 0.5);
+  #ifdef LID
+    {
+      float T = uLid.x;
+      float tt = uTime + phase * 0.15915 * T;
+      float cyc = floor(tt / T);
+      float c = tt - cyc * T;
+      float h = fract(cyc * 0.618034 + phase * 0.3183);
+      float pop = h < 0.15 ? 0.0 : h < 0.4 ? 0.4 : 1.0;
+      float allow = smoothstep(17.0, 27.0, aP);
+      if (role > 0.5 && role < 1.5) {
+        // something pushing from inside rattles it, then it pops open with an
+        // overshoot, bobs while the bubbles pour out, drops shut and bounces
+        float rattle = c < 0.42 ? sin(c * 72.0) * 0.045 * smoothstep(0.0, 0.42, c) : 0.0;
+        float up = 0.0;
+        if (c >= 0.42 && c < 0.6) up = easeOutBack((c - 0.42) / 0.18);
+        else if (c >= 0.6 && c < 1.75) up = 1.0 + 0.07 * sin((c - 0.6) * 8.0) * exp(-(c - 0.6) * 2.5);
+        else if (c >= 1.75 && c < 2.05) up = 1.0 - pow((c - 1.75) / 0.3, 2.0);
+        float bounce = c >= 2.05 && c < 2.4 ? sin((c - 2.05) / 0.35 * 3.14159) * 0.09 : 0.0;
+        float a = (rattle + up * uLid.w + bounce) * min(pop * 1.4, 1.0) * allow;
+        float cs = cos(a), sn = sin(a);
+        vec2 r = vec2(lp.y - uLid.y, lp.z - uLid.z);
+        lp.yz = vec2(uLid.y + r.x * cs + r.y * sn, uLid.z - r.x * sn + r.y * cs);
+        ln.yz = vec2(ln.y * cs + ln.z * sn, -ln.y * sn + ln.z * cs);
+        #ifdef OUTLINE
+          lo.yz = vec2(lo.y * cs + lo.z * sn, -lo.y * sn + lo.z * cs);
+        #endif
+      } else if (role > 1.5 && role < 2.5) {
+        // a bubble, let go while the lid's up (a burp lets out only a few):
+        // rising faster and faster, wobbling and swelling, then gone
+        float age = c - 0.48 - fish.w * 0.95;
+        float on = step(0.0, age) * step(age, 2.7) * step(fish.w, pop);
+        float grow = smoothstep(0.0, 0.12, age) * (1.0 + 0.28 * age) * (1.0 - smoothstep(2.2, 2.7, age));
+        float rise = 0.55 * age + 0.45 * age * age;
+        vec3 at = vec3(
+          fish.x * (1.0 + 0.35 * age) + sin(age * 6.0 + fish.w * 40.0) * 0.07 * age,
+          fish.y + rise,
+          fish.z - 0.18 * age + cos(age * 5.3 + fish.w * 31.0) * 0.06 * age);
+        float wob = sin(age * 14.0 + fish.w * 20.0) * 0.12;
+        lp = lp * vec3(1.0 + wob, 1.0 - wob, 1.0 + wob) * grow * on + at;
+      } else if (role > 2.5) {
+        // a coin flung up on a big pop, flipping over and over, falling back in
+        float age = c - 0.47 - fish.w * 0.12;
+        float on = step(0.0, age) * step(age, 1.25) * step(0.7, pop) * allow;
+        float spin = age * (9.0 + fish.w * 6.0);
+        float cs = cos(spin), sn = sin(spin);
+        lp.yz = vec2(lp.y * cs - lp.z * sn, lp.y * sn + lp.z * cs);
+        ln.yz = vec2(ln.y * cs - ln.z * sn, ln.y * sn + ln.z * cs);
+        #ifdef OUTLINE
+          lo.yz = vec2(lo.y * cs - lo.z * sn, lo.y * sn + lo.z * cs);
+        #endif
+        lp = lp * on + fish.xyz + vec3((fish.w - 0.5) * 0.8 * age, 2.3 * age - 1.84 * age * age, 0.3 * age);
+      }
+    }
+  #endif
 
   if (mode == 3) {
     float t = 1.0 - smoothstep(uAnim.y, uAnim.z, aP);
@@ -3462,7 +3530,7 @@ uniform vec4 uKindA[GEM_KINDS]; // x veins, y mottle, z speckle, w bands
 uniform vec4 uKindB[GEM_KINDS]; // x opaque, y rough, z texture scale (per meter), w band frequency
 uniform vec4 uKindC[GEM_KINDS]; // rgb second colour, w how the bands lie: 0 layers along it, 1 round its heart, 2 nested like its faces (octahedral zoning)
 uniform vec4 uKindD[GEM_KINDS]; // rgb vein colour, w how much veins take it (0: pale cracks)
-uniform vec4 uKindE[GEM_KINDS]; // x glints, y how much the bands wander, z metallic
+uniform vec4 uKindE[GEM_KINDS]; // x glints, y how much the bands wander, z metallic, w nacre (a pearl: its lustre and orient; second is the orient's overtone)
 uniform float uGemPolish;
 varying vec3 vLocalN;
 varying vec3 vLocal;
@@ -3594,6 +3662,40 @@ void main() {
     g *= mix(1.0, smoothstep(0.5, 0.75, vnoise(q * 5.0)) * 1.6, B.y);
     float tw = smoothstep(0.93, 1.0, sin(uTime * 2.7 + seed * 37.0)) * step(0.55, seed);
     col += vec3(g * 1.4 + tw * 0.75) * uGemK.y * uKindE[k].x;
+  } else if (vFx.x > 0.5 && uKindE[int(vKind + 0.5)].w > 0.0) {
+    // A pearl (a kind with nacre): lustre, not facets. A soft body in its own
+    // colour, brighter where it faces up to the light and darkening toward
+    // its edge; over it the orient — light thrown back from layer on layer
+    // of nacre, interfering into pink, green, gold and peacock blue — banded
+    // round it in the ring between the glint and the rim and sliding over it
+    // as it turns (the layers' thickness wanders through the pearl, fixed in
+    // its own space); a broad soft sheen in those colours and a crisp white
+    // window glint on top. Dark pearls (a Tahitian's peacock black) show their
+    // orient brightest, as real ones do.
+    int k = int(vKind + 0.5);
+    float nacre = uKindE[k].w;
+    float face = abs(dot(n, V));
+    float sky = smoothstep(-0.5, 0.9, R.y);
+    vec3 body = base * (0.6 + 0.5 * sky) * mix(0.66 - 0.3 * nacre * nacre, 1.0, smoothstep(0.0, 0.75, face));
+    body *= mix(mix(uShadowTint, vec3(1.0), 0.55 + 0.45 * uGemPolish), vec3(1.0), lit);
+    vec3 q = vLocal * 4.0;
+    float th = fbm(q + 2.3);
+    float ph = 6.2831 * (0.6 * face + 0.7 * th + 0.18 * R.y) + float(k) * 1.3;
+    vec3 film = 0.5 + 0.5 * cos(ph + vec3(0.0, 2.1, 4.2));
+    // (each kind's orient leans toward its own overtone: rosé, green, blue...)
+    film = mix(film, uKindC[k].rgb, 0.5);
+    const vec3 LUM = vec3(0.299, 0.587, 0.114);
+    float lum = dot(body, LUM);
+    // the orient shifts the body's hue at its own brightness (a dark pearl's
+    // a little brighter than its body, so it shows)
+    vec3 over = film / max(dot(film, LUM), 0.05) * (lum + 0.17 * nacre * nacre);
+    float ring = smoothstep(0.02, 0.45, face) * (1.0 - 0.7 * smoothstep(0.55, 0.95, face));
+    col = mix(body, over, ring * nacre * 0.75);
+    float sheen = pow(max(dot(R, L), 0.0), 7.0) * 0.3 + pow(max(dot(R, L2), 0.0), 9.0) * 0.16;
+    col += mix(vec3(1.0), film, 0.3) * sheen * (0.6 + nacre);
+    col += vec3(pow(max(dot(R, L2), 0.0), 60.0) * 0.95 + pow(max(dot(R, L), 0.0), 140.0) * 1.1);
+    // nacre has a faint fine grain to it
+    col *= 1.0 + (vnoise(q * 5.0) - 0.5) * 0.07;
   } else {
     // (gem.polish: polished stones that keep their own colour in any light,
     // a pearl's lustre rather than a mirror's)
@@ -3932,6 +4034,12 @@ export function makeToonMaterial(env, o = {}) {
     uniforms.uCross = { value: new THREE.Vector4(...o.cross) };
   }
   if (o.pleats) defines.PLEATS = '';
+  // a lid that pops open now and then: [seconds between pops, hinge height,
+  // hinge depth, how wide it opens (rad)]
+  if (o.lid) {
+    defines.LID = '';
+    uniforms.uLid = { value: new THREE.Vector4(...o.lid) };
+  }
   // the sands (env.sands): a ground strip heaped into drifts and piles, and
   // the threads of sand falling onto the piles ([height they fall from,
   // radius])
@@ -3954,7 +4062,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'JELLY', 'CROSS']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'JELLY', 'CROSS', 'LID']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -4135,7 +4243,9 @@ export function makePortalMaterial(mode) {
 // o.look = [self-lit, glints, facet hue spread, fire] (see FS_GEM), o.kinds
 // each stone kind's surface: { veins, veinColor, mottle, speckle, bands,
 // bandFreq, wander, rings ('round' its heart or 'nested' like its faces),
-// second, opaque, rough, metal, scale, glints }.
+// second, opaque, rough, metal, scale, glints, nacre }. A kind with nacre
+// lights its polished (metal) parts as pearls, its second colour the overtone
+// its orient leans toward.
 const GEM_KINDS = 8;
 export function makeGemMaterial(env, o = {}) {
   const v4 = (f) => ({ value: Array.from({ length: GEM_KINDS }, (_, i) => new THREE.Vector4(...f((o.kinds || [])[i] || {}))) });
@@ -4151,7 +4261,7 @@ export function makeGemMaterial(env, o = {}) {
     uKindB: v4((k) => [k.opaque ?? 0, k.rough ?? 0, k.scale ?? 6, k.bandFreq ?? 10]),
     uKindC: v4((k) => [...rgbOf(k.second ?? '#ffffff'), k.rings === 'nested' ? 2 : k.rings ? 1 : 0]),
     uKindD: v4((k) => [...rgbOf(k.veinColor ?? '#ffffff'), k.veinColor ? 1 : 0]),
-    uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, 0]),
+    uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, k.nacre ?? 0]),
     uGemPolish: { value: o.polish ?? 0 },
     uClear: { value: 1 },
   });

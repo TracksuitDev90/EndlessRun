@@ -1,5 +1,6 @@
 // DOM overlay: title, HUD buttons, score, world-name cards, tutorial hints,
-// the ink vignette that creeps in after a stumble, pause and crash cards.
+// the ink vignette that creeps in after a stumble, pause and crash cards (and
+// the gem exchange on the crash card).
 
 const $ = (id) => document.getElementById(id);
 const fmt = new Intl.NumberFormat();
@@ -34,7 +35,7 @@ export class UI {
     this.scoreEl = $('score-num');
     this.multEl = $('score-mult');
     this.scoreShown = -1;
-    this.multShown = -1;
+    this.worldsShown = -1;
     this.gemEl = $('gem-num');
     this.gemPill = $('gem-pill');
     this.gemColor = '';
@@ -60,6 +61,7 @@ export class UI {
       ['btn-sound-2', 'sound'],
       ['btn-title', 'title'],
       ['btn-title-2', 'title'],
+      ['btn-exchange', 'exchange'],
     ]) {
       const el = $(id);
       if (!el) continue;
@@ -144,16 +146,19 @@ export class UI {
   }
 
   // Called every frame; only touches the DOM when a shown digit changes.
-  setScore(score, mult) {
+  // worlds: how many worlds you've come through (the doorway-shaped badge on
+  // the end of the score pill), bumping as you come through another.
+  setScore(score, worlds) {
     const n = Math.floor(score);
     if (n !== this.scoreShown) {
       this.scoreShown = n;
       this.scoreEl.textContent = fmt.format(n);
     }
-    if (mult !== this.multShown) {
-      const grew = this.multShown > 0 && mult > this.multShown;
-      this.multShown = mult;
-      this.multEl.textContent = `×${mult}`;
+    if (worlds !== this.worldsShown) {
+      const grew = this.worldsShown >= 0 && worlds > this.worldsShown;
+      this.worldsShown = worlds;
+      this.multEl.textContent = String(worlds);
+      this.multEl.setAttribute('aria-label', worlds === 1 ? '1 world come through' : `${worlds} worlds come through`);
       if (grew) replay(this.multEl, 'bump');
     }
   }
@@ -176,10 +181,12 @@ export class UI {
     replay(this.gemPill, 'bump');
   }
 
-  setGemColor(hex) {
+  // (icon 'pearl': the world's gems are pearls, and every gem icon becomes one)
+  setGemColor(hex, icon) {
+    $('ui').classList.toggle('pearl', icon === 'pearl');
     if (!hex || hex === this.gemColor) return;
     this.gemColor = hex;
-    $('scorebox').style.setProperty('--gem', hex);
+    $('ui').style.setProperty('--gem', hex);
   }
 
   newBest() {
@@ -233,27 +240,69 @@ export class UI {
     this.inkEl.style.opacity = String(Math.min(1, q * 1.15));
   }
 
-  showPause(on, score = 0, gems = 0) {
+  // offer: the gems in hand and what they'd fetch at the exchange (see
+  // Game.exchangeOffer)
+  showPause(on, score = 0, offer = { gems: 0, bonus: 0 }) {
     if (on) {
       $('pause-score').textContent = fmt.format(Math.floor(score));
-      $('pause-gems').textContent = fmt.format(gems);
+      $('pause-gems').textContent = fmt.format(offer.gems);
+      $('pause-worth').textContent = offer.gems > 0 ? ` (worth +${fmt.format(offer.bonus)})` : '';
     }
     $('pause').classList.toggle('show', on);
   }
 
-  showCrash(continuesLeft, score, best, isNewBest, gems = 0) {
+  showCrash(continuesLeft, score, best, isNewBest, offer = { gems: 0, bonus: 0, haul: 1 }) {
+    cancelAnimationFrame(this.exchangeAnim);
     const btn = $('btn-continue');
     btn.style.display = continuesLeft > 0 ? '' : 'none';
     $('continue-count').textContent = continuesLeft === 1 ? '1 left' : `${continuesLeft} left`;
     $('crash-score').textContent = fmt.format(Math.floor(score));
     $('crash-best').textContent = fmt.format(Math.floor(best));
-    $('crash-gems').textContent = fmt.format(gems);
+    $('crash-gems').textContent = fmt.format(offer.gems);
     $('crash').classList.toggle('is-new-best', isNewBest);
     $('crash').querySelector('.sub').textContent = continuesLeft > 0 ? 'Dust off and keep going?' : 'One more go?';
+    // the exchange: cash the gems in hand in for points
+    const ex = $('exchange');
+    ex.hidden = offer.gems === 0;
+    ex.classList.remove('done');
+    const xb = $('btn-exchange');
+    xb.disabled = false;
+    xb.querySelector('.ex-label').innerHTML = `Exchange <b>${fmt.format(offer.gems)}</b> ${offer.gems === 1 ? 'gem' : 'gems'}`;
+    $('exchange-pts').textContent = fmt.format(offer.bonus);
+    const haul = Math.round(offer.haul * 100) / 100;
+    $('exchange-note').textContent = (haul >= 1.05 ? `×${haul} haul bonus · ` : '') + 'deeper finds are worth more';
     $('crash').classList.add('show');
   }
 
+  // The gems cashed in: the gem count drains to nothing as the score counts
+  // up by the bonus, and the button stamps itself done.
+  exchanged(offer, from, to, best, isNewBest) {
+    const ex = $('exchange');
+    const xb = $('btn-exchange');
+    xb.disabled = true;
+    ex.classList.add('done');
+    xb.querySelector('.ex-label').textContent = 'Exchanged';
+    replay(xb, 'cashed');
+    const t0 = performance.now();
+    const dur = 1100;
+    cancelAnimationFrame(this.exchangeAnim);
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      $('crash-gems').textContent = fmt.format(Math.round(offer.gems * (1 - e)));
+      $('crash-score').textContent = fmt.format(Math.floor(from + (to - from) * e));
+      if (k < 1) {
+        this.exchangeAnim = requestAnimationFrame(tick);
+        return;
+      }
+      $('crash-best').textContent = fmt.format(Math.floor(best));
+      if (isNewBest && !$('crash').classList.contains('is-new-best')) $('crash').classList.add('is-new-best');
+    };
+    this.exchangeAnim = requestAnimationFrame(tick);
+  }
+
   hideCrash() {
+    cancelAnimationFrame(this.exchangeAnim);
     $('crash').classList.remove('show');
   }
 

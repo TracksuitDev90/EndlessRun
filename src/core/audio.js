@@ -227,6 +227,48 @@ export class Ambient {
     }, 1500);
   }
 
+  // A sunken chest's lid popping open somewhere ahead (big: 1 flung wide,
+  // less a burp; ahead: how far off, metres): a muffled wooden clunk and a
+  // glug of bubbles rising in pitch, all of it quieter the further off.
+  chest(big, ahead) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const vol = Math.max(0.25, Math.min(1, 26 / Math.max(ahead, 1))) * (0.55 + 0.45 * big);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1400;
+    lp.connect(this.bus);
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(62, t + 0.12);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.16 * vol, t + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(og).connect(lp);
+    o.start(t);
+    o.stop(t + 0.22);
+    const n = Math.round(4 + 7 * big);
+    for (let i = 0; i < n; i++) {
+      const bt = t + 0.06 + (i / n) * 0.75 * (0.6 + 0.4 * big) + Math.random() * 0.05;
+      const f = 220 + Math.random() * 380;
+      const b = ctx.createOscillator();
+      b.type = 'sine';
+      b.frequency.setValueAtTime(f, bt);
+      b.frequency.exponentialRampToValueAtTime(f * 2.2, bt + 0.06);
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.0001, bt);
+      bg.gain.exponentialRampToValueAtTime(0.045 * vol, bt + 0.01);
+      bg.gain.exponentialRampToValueAtTime(0.0001, bt + 0.07);
+      b.connect(bg).connect(lp);
+      b.start(bt);
+      b.stop(bt + 0.09);
+    }
+    setTimeout(() => lp.disconnect(), 1400);
+  }
+
   // Something calling ahead of its obstacle (spec.call): 'whale', a humpback's
   // long low moan rising and falling, wavering, a fainter voice a fifth over it.
   call(kind) {
@@ -305,6 +347,21 @@ export class Ambient {
     if (!ctx || this.muted || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     [86, 90, 93, 98].forEach((m, i) => this.ting(hz(m), t + 0.1 + i * 0.06, 0.04));
+  }
+
+  // The gems exchanged: tings tumbling up the gem ladder as the score counts
+  // up (more of them, quicker, for a bigger haul), and a chord to finish.
+  exchange(gems) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const n = Math.min(16, 5 + Math.round(gems / 12));
+    for (let i = 0; i < n; i++) {
+      const k = i / n;
+      const m = GEM_NOTES[i % GEM_NOTES.length] - (i >= GEM_NOTES.length ? 12 : 0);
+      this.ting(hz(m), t + 1.0 * (1 - Math.pow(1 - k, 1.6)), 0.035);
+    }
+    [74, 81, 86, 90].forEach((m) => this.chime(hz(m), t + 1.12, 0.05));
   }
 
   // A bright little run of chimes the moment you beat your best.

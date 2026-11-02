@@ -9,10 +9,13 @@ half-minute or so a great doorway appears — through it you can already see the
 next world, nested inside this one. Run through, and you're in it. Keep
 running and the worlds come back around, each time a little stranger — and
 once you're deep enough they stop holding their shape: slowly at first, then
-roads corkscrew, forests melt, skies swirl like wet paint. Every doorway also raises your score
-multiplier, so the strangest stretches are the ones worth the most. And every
-world has its own gemstone to collect, laid in runs that swerve round its
-walls, arc over its hurdles and lead you through its doorways. And you never
+roads corkscrew, forests melt, skies swirl like wet paint. Every doorway you
+come through is counted on a little orange door by your score, and makes the
+road, and every obstacle you clear, worth more — so the strangest stretches
+are the ones worth the most. And every world has its own gemstone to collect
+(the Kelp Deep's are pearls), laid in runs that swerve round its walls, arc
+over its hurdles and lead you through its doorways — and at the end of the
+run, you can exchange your haul for a big bonus (see [Score](#score)). And you never
 run alone: Sorrel, a red fox, runs with you — ranging ahead, dropping back,
 shooting out between your legs, riding on your shoulder, once in a while
 chasing her own tail, and now and then snapping a gem out of the air for you
@@ -273,6 +276,23 @@ legs, arms and body and peeling off behind them, worked out on the GPU from
 the runner's position alone. The sand is the explorer's dust, lit by the
 road it comes off.
 
+**The treasure chest.** Every so often (each chest on its own clock, every
+4.6 s, toon option `lid`) something inside a sunken chest pushes: its lid
+rattles, pops open on its hinge with an overshoot — treasure heaped to the
+brim inside, gold glowing and pearls on it — and a gush of bubbles pours out,
+wobbling and swelling as they rise faster and faster, while a few gold coins
+flip up out of it and fall back in; then it drops shut and bounces. No two
+pops are quite alike: most fling it wide, some only burp it open and let a few
+bubbles out, now and then it stays shut. It's all in the vertex shader — the
+lid, each bubble and each coin carry what they are (`role`), the bubbles and
+coins where they start and their own beat — so a chest costs nothing on the
+CPU; it's heard, though (a muffled clunk and a glug, quieter the further off),
+because `lidPop` in `game.js` keeps the same time. Once you're close, it's held
+shut (the bubbles still seep out round the lid), so what you jump is always
+the chest you saw.
+
+![A sunken chest popping: shut and rattling, flung open on its treasure, bubbles pouring out and coins flipping up, then dropped shut as the last bubbles rise](docs/chest.jpg)
+
 **Its creatures.** A school of fish is one instance: every fish its own
 vertices, each carrying where it swims in the school and its own beat, and
 the vertex shader sends it along a snaking stream (shrinking away at the ends
@@ -407,7 +427,28 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Sky Road | **Aquamarine** turquoise | the complement of all that amber — a splinter of clear sky | a long leaning double-terminated aquamarine shard · a squat sky diamond · turquoise, sky blue in a web of dark matrix · fluorite, pale sea-green octahedra zoned in rings | a fan of three splinters |
 | Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
-| Kelp Deep | **Conch pearl** coral pink | coral pink against all that teal and green | conch pearl, the sea's own gem, porcelain pink and polished smooth, whole and baroque · red coral, polished branches · fire opal, flecked with gold · spessartine, an orange dodecahedron · rhodochrosite, banded rose and pink (the polished stones keep their pink under the teal water: `gem.polish`) | a great conch pearl in a scallop shell |
+| Kelp Deep | **Pearls**, iridescent, in every shade | lustrous and soft against all that teal and green, and the one gem the sea makes itself; the counter wears a pearl here | Akoya, white with a rosé glow · golden South Sea · pink freshwater, a button pearl with a blue-lavender sheen · Tahitian, peacock black shot with green and blue · a silver-grey drop · a cream baroque · a circled champagne pearl (see [Pearls](#pearls)) | a great pearl in an open scallop shell |
+
+### Pearls
+
+The Kelp Deep's gems are all pearls, and a pearl isn't cut: it's lit in its
+own branch of the gem shader (a stone kind with `nacre`). Its body keeps its
+own colour, brighter where it faces up to the light and deepening toward its
+edge; over it lies the *orient* — light thrown back from layer on layer of
+nacre and interfering into pink, green, gold and peacock blue — banded round
+it between the glint and the rim. The nacre's thickness wanders through the
+pearl (fixed in its own space, so the colours slide over it as it turns), the
+orient shifts the body's hue at its own brightness, and each kind leans
+toward its own overtone (its `second` colour: rosé on the Akoyas, peach on the
+golds, blue-lavender on the pinks, green on the Tahitians). On top, a broad
+soft sheen in those colours and a crisp white window glint. Dark pearls show
+their orient brightest, as real ones do. They're smooth — the baroque and the
+circled pearls are spheres pushed out of round, their normals worked out
+from the surface itself so there's no seam — and white in the geometry: each
+pearl's shade is its instance colour, picked between its kind's few close
+tints, so no two in a run quite match.
+
+![Every pearl of the Kelp Deep, its crown last: Akoya, golden South Sea, pink freshwater, Tahitian, silver drop, baroque, circled champagne, and a great pearl in a scallop shell](docs/pearls.jpg)
 
 The natural stones are made the way real ones are bounded: cleaved out of a
 block by flat planes — the faces of a crystal's habit (a sapphire barrel is a
@@ -499,19 +540,40 @@ how much a run mixes its stones, points) live in `CONFIG.gems`.
 
 ## Score
 
-You score **one point per meter × your depth** — ×1 in the first world, ×2
-once through the first doorway, ×3 after the next, and so on — plus a **clear
-bonus** of 10 × depth for every obstacle you get past without touching it
-(double for full-width rows). So surviving deeper is worth far more than
-running further: the multiplier is the badge stamped on the end of the score
-pill, and it bumps every time you come through a door. Stumbling costs you that
-obstacle's bonus; a Continue keeps your score and multiplier.
+The little orange doorway stamped on the end of the score pill counts the
+**worlds you've come through** — 0 in the first, 1 once through the first
+doorway, and so on — and bumps every time you come through another. Each one
+makes the run worth more: you score **one point per meter × your depth** (1
+in the first world, 2 in the second, …), and every obstacle you get past
+without touching it pays a **clear bonus** that climbs faster still with every
+world: 10, 25, 45, 70, 100, 135, 175, 220, 270… (`clear` × depth × (1 +
+`grow` × worlds come through), to the nearest 5; double for full-width rows).
+So surviving deeper is worth far more than running further. Stumbling costs
+you that obstacle's bonus; a Continue keeps your score and your count.
 
 **Gems** pay 10 × depth each (a crown stone 30 × depth), with a glassy ting
 that climbs the pentatonic scale along the run; take a whole run (three gems
 or more) and it pays 5 × its length × depth on top, with a sparkle of notes.
 The gem counter sits under the score, its little gem in the colour of the
-world you're in, and the pause and crash cards tally the run's gems.
+world you're in (a pearl, in the Kelp Deep), and the pause card tallies the
+gems in hand and what they're worth.
+
+**The exchange.** Every gem also banks a *worth* as you take it — and the
+later and deeper you find it, the more it's worth: 10 × (1 + ½ × the worlds
+you'd come through) × (1 + ¾ × how far through its world it was), a crown
+stone three times that. So a gem at the very start of the run is worth 10, one
+at the far end of the first world 17, and one at the far end of the ninth 87.
+When you crash, the card offers to **exchange** the gems in hand for that many
+points, plus a haul bonus for a big pile (up to ×1.5 at 400 gems): tap it and
+the gem count drains away as the score counts up, to a tumble of tings. In all
+it comes to about two fifths again on top of what the run scored. Exchange
+and Continue, and you carry on with none in hand (the next crash offers
+whatever you've found since); Continue without exchanging and your haul rides
+on, growing. Whatever's still in hand when you leave the card for good is
+exchanged anyway, so a haul is never lost. (Later on, gems will buy things;
+for now, they're points.) Tunables live in `CONFIG.gems.exchange`.
+
+![The crash card in the Kelp Deep: 25 pearls offered for +335, then exchanged — the count drained to nothing, the score and best counted up](docs/exchange.jpg)
 
 Your best is saved on the device, shown on the title screen, and the moment you
 pass it mid-run a *new best!* ribbon pops under the score with a little run of
@@ -621,7 +683,9 @@ stand (an hourglass in your way turns over within its own footprint, its
 pendulum bobs only sway along the run, rising as they swing), so a jump or a
 slide is never mistimed by something moving. In the Kelp Deep: a dome of brain
 coral, a giant clam gaping on the sand or a sunken treasure chest, gold
-glowing through its sprung lid (jump; a ridge of reef across the whole path),
+glowing through its sprung lid and a string of pearls caught under it (jump;
+it pops open now and then, see [Under the sea](#under-the-sea); a ridge of
+reef across the whole path),
 an arch of rock crusted with coral, a fringe of it along its face (slide), a
 thicket of kelp, a tower of rock crowded with coral and a great violet sea
 fan (go around) — and the whale crossing the path (slide; see
@@ -1471,12 +1535,16 @@ up with `rx: FACE`. `texture` is the stone's surface, every key optional:
 `mottle`, `speckle`, `veins` (cracks, pale unless `veinColor` makes them dark
 matrix), `bands` with `bandFreq`, `wander` and `rings` (`'round'` or
 `'nested'`) in a `second` colour, `opaque`, `rough`, `metal`, `glints` and
-`scale`. Then `motion` (`[turn, bob rate, bob height, nod]`), `look`
+`scale` — or, for a pearl, `nacre` (0..1: how strongly its orient shows; its
+polished `metal()` parts, white with `tint: 1` so the instance colour is its
+shade, are lit as pearls, and `second` is the overtone the orient leans
+toward). Then `motion` (`[turn, bob rate, bob height, nod]`), `look`
 (`[self-lit, glints, facet hue spread, fire]`) and `glow` / `pool` (halo and
 ground-light strength); `polish` (0..1) lets polished stones (`metal()`) keep
 their own colour in any light, a pearl's lustre rather than a mirror's. Pick a colour nothing else in the world is. For stones
 too dark (or pale) to glow in their own colour, `light` gives the halo, the
-light on the road and the motes they leave a colour of their own.
+light on the road and the motes they leave a colour of their own; and `icon:
+'pearl'` swaps the counter's little gem for a pearl while you're in the world.
 
 ## Not in yet (on purpose)
 

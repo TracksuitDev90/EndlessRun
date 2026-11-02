@@ -161,6 +161,7 @@ async function boot() {
     ui.setSound(audio.muted);
   });
   ui.on('continue', () => game.continueRun());
+  ui.on('exchange', () => game.exchangeGems());
   ui.on('title', () => {
     audio.resume();
     game.toTitle();
