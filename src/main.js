@@ -5,6 +5,7 @@ import { makeMarksTexture, makeNoiseTexture } from './render/textures.js';
 import { Game } from './game/game.js';
 import { loadRunner } from './game/runner-asset.js';
 import { CHARACTERS } from './game/characters.js';
+import { COMPANIONS } from './game/companions.js';
 import { Input } from './core/input.js';
 import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
@@ -14,7 +15,8 @@ import { Quality, gpuClass } from './core/quality.js';
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
 // ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
 // 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god,
-// ?runner=<id> (who runs: wayfarer, explorer)
+// ?runner=<id> (who runs: wayfarer, explorer), ?companion=<id> (who runs
+// with you: fox, or none)
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
@@ -29,6 +31,7 @@ function parseParams() {
     god: q.has('god'),
     manual: q.has('manual'),
     runner: q.get('runner') || undefined,
+    companion: q.get('companion') || undefined,
   };
 }
 
@@ -62,9 +65,13 @@ async function boot() {
   const gpu = gpuClass(renderer); // (named in the ?debug overlay)
 
   const assets = {};
-  await Promise.all(CHARACTERS.map(async (c) => (assets[c.id] = await loadRunner(c.asset))));
+  const companionAssets = {};
+  await Promise.all([
+    ...CHARACTERS.map(async (c) => (assets[c.id] = await loadRunner(c.asset))),
+    ...COMPANIONS.map(async (c) => (companionAssets[c.id] = await loadRunner(c.asset))),
+  ]);
   const audio = new Ambient();
-  const game = new Game({ renderer, ui, audio, params, assets });
+  const game = new Game({ renderer, ui, audio, params, assets, companionAssets });
   window.__game = game;
 
   // --- frame timing and adaptive resolution (see core/pacer.js, core/quality.js) ---

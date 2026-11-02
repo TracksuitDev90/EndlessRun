@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fox viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #f6efe4; overflow: hidden; }
+      canvas { display: block; }
+      #label { position: fixed; left: 8px; top: 6px; font: 12px ui-monospace, monospace; color: #6b5a4a; }
+    </style>
+  </head>
+  <body>
+    <div id="label"></div>
+    <script type="module">
+      // Sorrel turned round like a reference sheet - her left side, the
+      // front, the back, three-quarters - posed (?pose=sit|stand|run|leap|
+      // pounce|hop|ride) at ?t=<seconds> into it (for run: ?v=<m/s>; for the
+      // air poses ?p=<0..1> through the flight). Serve the repository root
+      // and open tools/runner/fox.html?pose=run
+      import * as THREE from '../../vendor/three/three.module.min.js';
+      import { shared } from '../../src/render/shaders.js';
+      import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
+      import { loadRunner } from '../../src/game/runner-asset.js';
+      import { Fox } from '../../src/game/fox.js';
+      import { WORLD_DEFS } from '../../src/world/index.js';
+
+      const q = new URLSearchParams(location.search);
+      const pose = q.get('pose') || 'stand';
+      const T = Number(q.get('t') || 1.2);
+      const views = (q.get('views') || 'left,front,back,three').split(',');
+      const zoom = Number(q.get('zoom') || 1);
+      const focusY = Number(q.get('y') || 0.36);
+      const focusZ = Number(q.get('z') || 0);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.autoClear = false;
+      document.body.appendChild(renderer.domElement);
+      shared.uMarks.value = makeMarksTexture();
+      shared.uNoise.value = makeNoiseTexture();
+      shared.uResolution.value.set(innerWidth, innerHeight);
+      const asset = await loadRunner('../../assets/fox/');
+      const env = WORLD_DEFS[Number(q.get('world') || 0)].env;
+      const fox = new Fox(env, asset);
+      // (no sun glowing through her: the camera here looks level, into it)
+      fox.u.uSunColor.value.set(0, 0, 0);
+      const scene = new THREE.Scene();
+      scene.add(fox.root);
+      if (q.get('shells') === '0') fox.furMesh.visible = false;
+      if (q.get('ink') === '0') fox.inkMesh.visible = false;
+      const cam = new THREE.PerspectiveCamera(22 / zoom, innerWidth / views.length / innerHeight, 0.1, 50);
+      const dt = 1 / 60;
+      const v = Number(q.get('v') || 14);
+      const at = new THREE.Vector3();
+      const qi = new THREE.Quaternion();
+      // (&ts=a,b,c: a moment for each view, &ps=: a point through the
+      // flight for each)
+      const ts = (q.get('ts') || '').split(',').filter(Boolean).map(Number);
+      const ps = (q.get('ps') || '').split(',').filter(Boolean).map(Number);
+      function poseAt(T, P) {
+        fox.reset();
+        const vel = new THREE.Vector3(0, 0, pose === 'sit' || pose === 'stand' || pose === 'ride' ? 0 : -v);
+        const n = Math.max(1, Math.round(T / dt));
+        for (let i = 0; i < n; i++) {
+          let ctx;
+          if (pose === 'run') ctx = { speed: v, vel, mode: 'run' };
+          else if (pose === 'leap' || pose === 'pounce' || pose === 'hop' || pose === 'twirl') {
+            ctx = { speed: v, vel, mode: i < n - 20 ? 'run' : 'air', airT: P * 0.6, airDur: 0.6, airKind: pose };
+          } else ctx = { speed: 0, vel, mode: pose };
+          fox.place(at, qi);
+          fox.update(dt, ctx);
+        }
+        fox.place(at, qi, 0, 0);
+      }
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(3, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
+      ground.position.y = -0.001;
+      scene.add(ground);
+      for (let k = 0; k <= 10; k++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.03), new THREE.MeshBasicMaterial({ color: k % 5 ? 0xb8a890 : 0x8a7a64 }));
+        m.position.set(-0.5, k * 0.1, 0.5);
+        scene.add(m);
+      }
+      const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2, three: -0.7, backThree: Math.PI - 0.7, top: 0 };
+      const w = innerWidth / views.length;
+      renderer.setClearColor(0xf6efe4, 1);
+      renderer.clear();
+      views.forEach((name, i) => {
+        if (i === 0 || ts.length || ps.length) poseAt(ts[i] ?? T, ps[i] ?? Number(q.get('p') || 0.4));
+        const a = yaws[name] ?? 0;
+        const d = 4.2;
+        const up = name === 'top' ? 4 : Number(q.get('up') || 0.35);
+        cam.position.set(Math.sin(a) * d, focusY + up, focusZ - Math.cos(a) * d);
+        cam.lookAt(0, focusY, focusZ);
+        shared.uCamPos.value.copy(cam.position);
+        renderer.setViewport(i * w, 0, w, innerHeight);
+        renderer.setScissor(i * w, 0, w, innerHeight);
+        renderer.setScissorTest(true);
+        renderer.render(scene, cam);
+      });
+      document.getElementById('label').textContent = `fox · ${pose}`;
+      window.__ready = true;
+    </script>
+  </body>
+</html>

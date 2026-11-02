@@ -889,6 +889,11 @@ void main() {
   #ifdef OUTLINE
     vec3 lo = onrm;
   #endif
+  #ifdef SHELL
+    float fur = aD.w * uFurWind.w;
+    lp += ln * fur * aShell;
+    vShell = aShell;
+  #endif
   #ifdef USE_SKINNING
     mat4 skinM = skinWeight.x * getBoneMatrix(skinIndex.x)
       + skinWeight.y * getBoneMatrix(skinIndex.y)
@@ -1855,6 +1860,16 @@ attribute float aMat;
 uniform float uOutline;
 attribute vec3 onrm;
 #endif
+#ifdef SHELL
+// Fur (the fox's): the surface again, a few times over, each layer lifted off
+// it along its normal by a share of how long the fur grows there (aD.w), and
+// combed: bent along uFurWind.xyz (the lie of the fur, gravity and the wind
+// through it; world space, m per m of fur) more toward the tips. The
+// fragment shader thins each layer to strands.
+attribute float aShell; // 0..1: which layer
+uniform vec4 uFurWind; // xyz the comb, w how long the fur is (a scale on aD.w)
+varying float vShell;
+#endif
 #ifdef CAPE
 // The cape: each vertex knows only where it lies on the particle grid; the
 // surface is rebuilt here through the simulated particles (Catmull-Rom, so it
@@ -1967,6 +1982,11 @@ void main() {
       lo = (aCape.w > 0.5 ? safeNormalize(nC * side + e) : nC * side) * 0.6;
     #endif
   #endif
+  #ifdef SHELL
+    float fur = aD.w * uFurWind.w;
+    lp += ln * fur * aShell;
+    vShell = aShell;
+  #endif
   #ifdef USE_SKINNING
     mat4 skinM = skinWeight.x * getBoneMatrix(skinIndex.x)
       + skinWeight.y * getBoneMatrix(skinIndex.y)
@@ -1980,6 +2000,9 @@ void main() {
     #endif
   #endif
   vec3 wp = (modelMatrix * vec4(lp, 1.0)).xyz;
+  #ifdef SHELL
+    wp += uFurWind.xyz * fur * aShell * aShell;
+  #endif
   vPos = wp;
   #ifdef OUTLINE
     float w = length(lo);
@@ -2045,7 +2068,154 @@ float band(float d, float halfw) {
 float lines(float x, float halfw) {
   return band(abs(fract(x + 0.5) - 0.5), halfw);
 }
-#if defined(ITEMS)
+#if defined(FOX)
+// --- Sorrel, the red fox ------------------------------------------------------------
+// (d: x how far inside the white (m), y how dark (the stockings, the backs of
+// the ears), z how far along the tail (-1 off it), w how long the fur grows;
+// r: the rest position. See tools/runner/fox.py.)
+#define F_LIGHT 13
+#define F_DEEP 14
+#define F_WHITE 15
+#define F_CREAM 16
+#define F_STOCK 17
+#define F_EARBACK 18
+#define F_NOSE 19
+#define F_MOUTH 20
+#define F_IRIS 23
+#define F_INK 24
+#define F_EARIN 25
+#define F_IRIS_IN 27
+// x eyes open (0 shut .. 1), y how happily they're squeezed shut (arcs), zw
+// where the pupils look (across, up; -1..1)
+uniform vec4 uFace;
+#ifdef SHELL
+varying float vShell;
+#endif
+float foxHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float foxNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(foxHash(i), foxHash(i + vec3(1, 0, 0)), f.x), mix(foxHash(i + vec3(0, 1, 0)), foxHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(foxHash(i + vec3(0, 0, 1)), foxHash(i + vec3(1, 0, 1)), f.x), mix(foxHash(i + vec3(0, 1, 1)), foxHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// The lie of the fur at a rest position: back along the body and down the
+// tail, down the legs. Strokes and strands are drawn stretched along it.
+vec3 foxStretch(vec3 r, float tail) {
+  float leg = (1.0 - smoothstep(0.22, 0.3, r.y)) * (1.0 - tail);
+  return mix(vec3(1.0, 1.0, 0.22), vec3(1.0, 0.25, 1.0), leg);
+}
+// One eye, drawn on the side of the face (q: the rest position, mirrored onto
+// the right side): an almond slanting up toward the ear under a heavy dark
+// rim, the inner corner running down the muzzle in the fox's dark tear line;
+// an amber iris with a slit pupil and a catch-light. It shuts (uFace.x) under
+// a lid of fur, or squeezes shut in a happy arc (uFace.y).
+vec3 foxEye(vec3 c, vec3 q, inout float unlit) {
+  vec3 E = vec3(0.0345, 0.612, -0.488);
+  vec3 ne = normalize(vec3(0.52, 0.2, -1.0));
+  vec3 ea = normalize(vec3(0.7, 0.42, 0.58));
+  ea = normalize(ea - ne * dot(ea, ne));
+  vec3 ev = normalize(cross(ne, ea));
+  if (ev.y < 0.0) ev = -ev;
+  vec3 o = q - E;
+  if (dot(o, ne) < -0.02) return c;
+  vec2 e = vec2(dot(o, ea), dot(o, ev));
+  float hl = 0.0145, hh = 0.0078;
+  float x = clamp(e.x / hl, -1.0, 1.0);
+  float prof = pow(max(1.0 - x * x, 0.0), 0.75);
+  // the almond (signed, m): the top a little fuller than the bottom
+  float top = hh * prof * 1.08;
+  float bot = -hh * prof * 0.86;
+  float dA = max(max(e.y - top, bot - e.y), abs(e.x) - hl);
+  float open = clamp(uFace.x, 0.0, 1.0) * (1.0 - uFace.y);
+  // the lid comes down from the top
+  float lid = mix(bot, top, open);
+  float dS = max(dA, e.y - lid);
+  vec3 ink = uPal[F_INK];
+  // the rim, and the tear line running from the inner corner down the
+  // side of the muzzle
+  float rim = fill(dA - 0.0016) * (1.0 - fill(dS));
+  vec2 t0 = e - vec2(-hl * 0.96, -0.0008);
+  vec2 td = normalize(vec2(-0.42, -0.9));
+  float along = dot(t0, td);
+  float across = t0.x * td.y - t0.y * td.x - 0.02 * along * along / 0.016;
+  float tear = band(across, 0.0014 * (1.0 - 0.55 * smoothstep(0.0, 0.017, along))) * step(0.0, along) * (1.0 - smoothstep(0.012, 0.018, along));
+  float flick = band(e.y - top * 0.3 - (e.x - hl * 0.8) * 0.5, 0.0011) * step(hl * 0.8, e.x) * step(e.x, hl * 1.3);
+  c = mix(c, ink, max(max(rim, tear * 0.85), flick));
+  // the eye itself
+  float eye = fill(dS);
+  vec2 look = uFace.zw * vec2(0.0035, 0.0018);
+  vec2 ic = e - look - vec2(-0.0006, 0.0006);
+  float ir = length(ic);
+  vec3 iris = mix(uPal[F_IRIS], uPal[F_IRIS_IN], smoothstep(0.0072, 0.002, ir));
+  iris = mix(iris, ink, smoothstep(0.0058, 0.0074, ir) * 0.6);
+  // a slit pupil, a little rounded
+  float pup = fill(length(ic / vec2(0.32, 1.0)) - 0.0046);
+  iris = mix(iris, ink, pup);
+  float glint = fill(length(e - look - vec2(0.0024, 0.0028)) - 0.0016);
+  iris = mix(iris, vec3(1.0), glint);
+  c = mix(c, iris, eye);
+  unlit = max(unlit, eye * (0.35 + 0.65 * glint));
+  // the lid's line, while it's coming down
+  float lidLine = band(e.y - lid, 0.0011) * step(abs(e.x), hl * prof + 0.001) * step(dA, 0.0) * (1.0 - step(0.98, open));
+  c = mix(c, ink, lidLine);
+  // happy: shut tight in an arc, bowed up
+  float arc = band(e.y - (hh * 0.35) * (1.0 - x * x) + 0.0015, 0.0013) * step(abs(e.x), hl * 0.95);
+  c = mix(c, ink, arc * smoothstep(0.3, 0.7, uFace.y));
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 5) {
+    // inside the mouth: the roof and the tongue
+    return mix(uPal[F_MOUTH], uPal[F_MOUTH] * 1.35 + vec3(0.08, 0.0, 0.02), smoothstep(0.553, 0.562, r.y));
+  }
+  float tail = step(0.0, d.z);
+  // painted fur: long strokes laid along the lie of the fur, deeper and
+  // lighter, more of them on the back and the brush
+  vec3 sc = foxStretch(r, tail);
+  float st = foxNoise(r * sc * 62.0 + vec3(0.0, 0.0, d.z * 3.0));
+  float st2 = foxNoise(r * sc * 150.0 + 7.3);
+  float s = st * 0.6 + st2 * 0.4;
+  float back = smoothstep(0.36, 0.47, r.y) * (1.0 - tail) * smoothstep(-0.36, -0.25, r.z);
+  c = mix(c, uPal[F_DEEP], (smoothstep(0.48, 0.22, s) * 0.38 + back * 0.3) * (1.0 - smoothstep(0.85, 1.0, d.z)));
+  c = mix(c, uPal[F_LIGHT], smoothstep(0.58, 0.82, s) * 0.42);
+  // the tail darkens a little toward the tip before it goes white
+  c = mix(c, uPal[F_DEEP] * 0.9, tail * smoothstep(0.55, 0.8, d.z) * 0.35);
+  // the white, torn into points where it meets the red: tufts of white
+  // pointing out into it, and of red into the white
+  float jag = (foxNoise(r * sc * 260.0) - 0.5) * 0.014 + (st2 - 0.5) * 0.008;
+  float wh = smoothstep(-0.0015, 0.0015, d.x + jag);
+  vec3 white = mix(uPal[F_WHITE], uPal[F_CREAM], smoothstep(0.45, 0.2, s) * 0.6);
+  if (m == 3) {
+    // the ears: cream inside, black behind and at the tips
+    c = mix(c, mix(uPal[F_EARIN], uPal[F_WHITE], smoothstep(0.5, 0.8, s)), wh);
+    c = mix(c, uPal[F_EARBACK], smoothstep(0.3, 0.7, d.y + (s - 0.5) * 0.25) * (1.0 - wh * 0.8));
+    return c;
+  }
+  c = mix(c, white, wh);
+  // the stockings: dark from the elbows and hocks down, brushed in
+  float dk = smoothstep(0.15, 0.75, d.y + (s - 0.5) * 0.35);
+  c = mix(c, mix(uPal[F_STOCK], uPal[F_EARBACK], smoothstep(0.7, 1.0, d.y)), dk);
+  if (m == 1 && r.z < -0.42 && r.y > 0.53) {
+    vec3 q = vec3(abs(r.x), r.y, r.z);
+    c = foxEye(c, q, unlit);
+    // the nose: black and damp, a glint on top
+    vec3 N = vec3(0.0, 0.575, -0.583);
+    float nd = length((r - N) * vec3(1.0, 1.2, 1.15)) - 0.0148;
+    c = mix(c, uPal[F_NOSE], fill(nd));
+    float ng = fill(length((r - N - vec3(0.0, 0.0085, -0.004)) * vec3(0.8, 2.0, 1.0)) - 0.0036);
+    c = mix(c, vec3(0.85), ng * 0.6);
+    unlit = max(unlit, ng * 0.6);
+  }
+  return c;
+}
+#elif defined(ITEMS)
 // --- the things that fly out of the explorer's backpack -------------------------
 // (d: x, y across the part, z which face: 1 the front, 2 the back, 0 an edge)
 #define I_INK 14
@@ -2431,7 +2601,19 @@ uniform sampler2D uNoise;
 void main() {
   int m = int(vMat + 0.5);
   float unlit = 0.0;
-  #if defined(EXPLORER) && !defined(ITEMS)
+  #if defined(FOX)
+    #ifdef SHELL
+      // the fur's strands: each a cell of the surface stretched along the
+      // lie of the fur, standing to its own height; the layers thin out
+      // toward the tips
+      vec3 sc = foxStretch(vRest, step(0.0, vD.z));
+      float tall = foxNoise(vRest * sc * 260.0) * 0.65 + foxNoise(vRest * sc * 90.0 + 5.1) * 0.35;
+      if (tall < 0.3 + vShell * 0.5 || m == 5) discard;
+    #endif
+    // (a fox is a flame in the dark: its coat keeps its colour through a
+    // drain, as the cape does)
+    gKeep = 1.0;
+  #elif defined(EXPLORER) && !defined(ITEMS)
     #ifdef CAPE
       // (the long hair's ends part into locks; a dark edge where they do)
       float cut = hairCut(vD);
@@ -2453,7 +2635,10 @@ void main() {
   vec3 V = v / dist;
   // one broad, crisp shadow shape (softer on the cape, so its folds shade in
   // soft gradients like the cloth they are)
-  #ifdef EXPLORER
+  #if defined(FOX)
+    // fur takes the light softly
+    float soft = 0.13;
+  #elif defined(EXPLORER)
     float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
   #else
     float soft = m == 10 ? 0.16 : m == 9 ? 0.09 : 0.045;
@@ -2467,15 +2652,28 @@ void main() {
     float fold = smoothstep(0.8, 4.0, vFx.x) - 0.25 * smoothstep(1.0, 5.0, -vFx.x);
     col *= mix(vec3(1.0), mix(sh, vec3(1.0), 0.3), clamp(fold, -0.3, 1.0) * 0.7);
   }
-  #ifdef EXPLORER
+  #if defined(FOX)
+  if (m <= 4) {
+    // sunlit fur: a warm lighter tone where it faces the light, broken up
+    // along the strokes
+    float hl = smoothstep(0.45, 0.62, dot(n, uLightDir) + (foxNoise(vRest * foxStretch(vRest, step(0.0, vD.z)) * 90.0) - 0.5) * 0.35);
+    col = mix(col, min(base * uPal[30] * 1.22, vec3(1.0)), hl * 0.5 * (1.0 - smoothstep(0.6, 0.85, base.g)));
+  }
+  #ifdef SHELL
+    // the roots of the fur lie in their own shade, the tips catch the light
+    col *= mix(0.9, 1.04, vShell);
+  #endif
+  #elif defined(EXPLORER)
   if (m == 2 || m == 10) {
   #else
   if (m == 2) {
   #endif
+  #if !defined(FOX)
     // one restrained lighter tone where the curls face the light from above
     float hl = smoothstep(0.58, 0.64, dot(n, uLightDir)) * smoothstep(0.25, 0.5, n.y);
     col = mix(col, uPal[30], hl * 0.8);
   }
+  #endif
   float fres = 1.0 - abs(dot(n, V));
   float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
   float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y));
@@ -2491,7 +2689,9 @@ void main() {
 const FS_CHAR_INK = FS_HEAD + CHAR_DETAIL + /* glsl */ `
 void main() {
   int m = int(vMat + 0.5);
-  #if defined(EXPLORER) && !defined(ITEMS)
+  #if defined(FOX)
+    gKeep = 1.0;
+  #elif defined(EXPLORER) && !defined(ITEMS)
     #ifdef CAPE
       if (hairCut(vD) > 0.0) discard;
     #endif
@@ -3101,21 +3301,28 @@ float easeOutBack(float t) {
   return 1.0 + 2.5 * u * u * u + 1.5 * u * u;
 }
 // x: 0..1 through the pick-up (-1 before), y: the gem's size, z: how far it's
-// been drawn in (accelerating, like suction)
-vec3 gemCollect(float at) {
+// been drawn in (accelerating, like suction). A gem a companion caught is
+// tossed to the runner instead (dz carried 1000 over): it flies back to them
+// in an arc over a little over half a second, full size until it arrives.
+vec3 gemCollect(float at, float dz) {
   if (at <= 0.0) return vec3(-1.0, 1.0, 0.0);
-  float ct = clamp((uTime - at) / 0.26, 0.0, 1.0);
-  float pull = ct * ct;
-  return vec3(ct, 1.0 - pull, pull);
+  float toss = step(500.0, dz);
+  float ct = clamp((uTime - at) / mix(0.26, 0.56, toss), 0.0, 1.0);
+  float pull = mix(ct * ct, ct * ct * (3.0 - 2.0 * ct), toss);
+  return vec3(ct, 1.0 - mix(pull, smoothstep(0.72, 1.0, ct), toss), pull);
 }
 // Where a gem hangs, bobbing — or, once taken, where it is on its way into the
 // runner: held level with them as they run on (dz ahead of their chest), and
-// drawn in to it.
+// drawn in to it (tossed: over an arc).
 vec3 gemCentre(vec3 pivot, float phase, vec3 pick, float dz) {
   vec3 c = pivot + vec3(0.0, sin(uTime * uSpin.y + phase * 1.3) * uSpin.z, 0.0);
   if (pick.x < 0.0) return c;
+  float toss = step(500.0, dz);
+  dz -= toss * 1000.0;
   c.z = uGemAt.z + dz;
-  return mix(c, uGemAt, pick.z);
+  c = mix(c, uGemAt, pick.z);
+  c.y += toss * sin(pick.x * 3.14159) * (0.9 + 0.05 * abs(dz));
+  return c;
 }
 `;
 
@@ -3169,7 +3376,7 @@ void main() {
   #endif
   vec3 pivot = M[3].xyz;
   float aP = uCamPos.z - pivot.z;
-  vec3 pick = gemCollect(at);
+  vec3 pick = gemCollect(at, dz);
   // turning on its own axis with a gentle nod, spun up as it's drawn in
   float spin = uTime * uSpin.x + phase + max(pick.x, 0.0) * 5.0;
   float nod = sin(uTime * uSpin.y * 0.5 + phase * 0.7) * uSpin.w;
@@ -3184,7 +3391,7 @@ void main() {
     vec3 to = uGemAt - c;
     float len = length(to);
     vec3 dir = to / max(len, 1e-4);
-    off += dir * dot(off, dir) * 3.2 * pick.z * (1.0 - pick.z) * smoothstep(0.05, 0.3, len);
+    off += dir * dot(off, dir) * 3.2 * pick.z * (1.0 - pick.z) * smoothstep(0.05, 0.3, len) * (1.0 - 0.75 * step(500.0, dz));
   }
   vec3 wp = c + off;
   vPos = wp;
@@ -3408,7 +3615,7 @@ void main() {
   float sc = length(M[0].xyz);
   float phase = aInst.x;
   float aP = uCamPos.z - pivot.z;
-  vec3 pick = gemCollect(aInst.z);
+  vec3 pick = gemCollect(aInst.z, aInst.w);
   float fade = (1.0 - smoothstep(uAnim.y, uAnim.z, aP)) * (0.82 + 0.18 * sin(uTime * 2.4 + phase * 1.7));
   if (pick.x >= 0.0) fade *= (1.0 - pick.x) * (1.0 - pick.x);
   #ifdef POOL
@@ -3755,8 +3962,8 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // carries the palette shift; its doorway-swell terms never reach this close).
   // o.style: 'explorer' draws her details (see CHAR_DETAIL).
   while (rig.length < 3) rig.push(new THREE.Vector4());
-  const uniforms = withShared(env, { uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }); // rig: [Vector4 x 3]
-  const style = o.style === 'explorer' ? { EXPLORER: '' } : o.style === 'items' ? { ITEMS: '' } : {};
+  const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
+  const style = o.style === 'explorer' ? { EXPLORER: '' } : o.style === 'items' ? { ITEMS: '' } : o.style === 'fox' ? { FOX: '' } : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
     const u = Object.assign({}, uniforms, extra);
@@ -3772,7 +3979,9 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
     ];
   };
   const [mat, ink] = make({}, {});
-  if (!cape) return { mat, ink };
+  // o.shell: a material for the layers of fur grown over the body (see SHELL)
+  const shell = o.shell ? new THREE.ShaderMaterial({ uniforms: Object.assign({}, uniforms, { uFurWind: { value: o.shell } }), defines: Object.assign({ SHELL: '' }, style), vertexShader: VS_CHAR, fragmentShader: FS_CHAR }) : null;
+  if (!cape) return { mat, ink, shell };
   const [capeMat, capeInk] = make({ CAPE: '' }, { uCape: { value: cape.texture }, uCapeGrid: { value: cape.grid } });
   return { mat, ink, capeMat, capeInk };
 }
