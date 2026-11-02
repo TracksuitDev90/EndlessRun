@@ -14,8 +14,9 @@ multiplier, so the strangest stretches are the ones worth the most. And every
 world has its own gemstone to collect, laid in runs that swerve round its
 walls, arc over its hurdles and lead you through its doorways. And you never
 run alone: Sorrel, a red fox, runs with you — ranging ahead, dropping back,
-shooting out between your legs, riding on your shoulder, and now and then
-snapping a gem out of the air for you (see [The fox](#the-fox)).
+shooting out between your legs, riding on your shoulder, once in a while
+chasing her own tail, and now and then snapping a gem out of the air for you
+(see [The fox](#the-fox)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -30,7 +31,7 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | II | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, a trodden path through long grass (taller still in among the trunks), ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; the way out is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
 | III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights, washing stirring on the lines strung across it | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
 | IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
-| V | **The Glasshouse** — a white-ribbed greenhouse tunnel of monstera, ferns, hanging blossom and orange trees | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration |
+| V | **The Glasshouse** — a white-ribbed greenhouse tunnel run wild: beds crowded with zinnias and spilling over their edges, ferns and monstera, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias |
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump (see [The sands of time](#the-sands-of-time)), your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
@@ -646,6 +647,37 @@ shimmer. Wherever a log has been sawn, its end shows growth rings round a pith
 a little off-centre, darker heartwood, pale sapwood by the bark, and checks
 split in from the rim as it dried.
 
+### The Glasshouse, run wild
+
+![The Glasshouse: beds of zinnias spilling over their planters, a Venus flytrap grown huge in its pot gaping in the lane, flytraps in the beds, baskets on brackets and on long chains from the roof, ivy up the ribs, a pot row in flower; the same at dusk and on the bioluminescent night](docs/glasshouse.jpg)
+
+The Glasshouse is packed to the glass. Its planter beds are crowded end to end
+with zinnias — pinks, corals, peach, gold, cream and plum, held up on their
+stems over jostling mounds of leaves — with leaves tumbling over the front of
+every planter, and ferns, monstera and potted cypress standing up out of it
+all. Ivy climbs some of the ribs from the beds to the arch; others carry an
+iron bracket with a basket hung off it, and more baskets hang high over the
+beds on long chains from the roof, each trailing stems and in flower. Slatted
+shelves of little pots (ferns, trailing pothos, zinnias, tiny flytraps) stand
+against the glass. And here and there in the beds is a Venus flytrap that's
+been left to grow: a rosette of traps on leafy stalks, each gaping, its
+wine-dark mouth fringed with pale teeth, a few clamped shut, white blossom on
+tall stalks over it all. (No true reds in any of it: those belong to the
+rubies, so they still stand out against all the green.)
+
+The obstacles grow too. The pot rows, planters and hanging baskets come into
+flower each its own way (a cluster of zinnias, of a colour of its own, on
+some of the pots and none on others: `extras` on the obstacle's spec), and
+their leaves take a tint each, a little yellower or bluer. There's a long low
+trough of young flytraps to jump, and a wall: a Venus flytrap grown in a great
+pot till it fills the lane, its traps up over your head, gaping at you.
+
+There's a great deal of it, so it's cheap: every petal and leaf is a handful
+of triangles, and all the small greenery grows up out of the beds as you come
+(and the baskets and vines let down from the roof) — toon anim mode 2, which
+also means the far stretch, lost in the haze anyway, isn't drawn at all. It
+costs about what the Cypress Lane does.
+
 ## Run it locally
 
 No build step and no dependencies to install — it's plain ES modules with
@@ -1122,7 +1154,7 @@ needs a skinned mesh whose bones are named like the ones `build.py` writes.
 
 ## The fox
 
-![Sorrel: standing, sitting with her brush swept round, and her gallop - flying stretched out, her forefeet down, gathered with her hind legs right under her chest; the mousing pounce - reared up, springing, turning over the top and diving nose first, her tail lagging behind every move; in the run, sitting by Rowan on the title screen, riding on his shoulder, and the one thing besides the cape still in colour in Hell](docs/fox.jpg)
+![Sorrel: standing and sitting, and her face - round amber eyes, a button nose, a cheek ruff flaring out in points, white tufts in her ears, a cowlick; the mousing pounce from a run, arched over the top and down nose first along its flight, her brush streaming out behind; chasing her tail - pulling up, curling round after it and running on; the same in the run on the Cypress Lane; sitting by the runner on the title screen, and crossing the road on a slant](docs/fox.jpg)
 
 Sorrel is a red fox, and she runs with you whoever you pick. You don't steer
 her — she has a mind of her own (`src/game/companion.js`) — and she's almost
@@ -1134,10 +1166,14 @@ snaps it out of the air, and tosses it back to you.
 **Sculpted like the runners.** `tools/runner/fox.py` builds her the way
 `build.py` builds Rowan (it borrows its primitives, meshing, skinning and
 export): one continuous coat — the deep chest and tucked-up waist of a
-runner, a long fine muzzle, cheeks that flare back into a ruff of points, a
-ruff down the throat ending in points on her chest, slender legs with
-feathered elbows and breeches, neat paws — with her jaw, her ears (big,
-pointed and cupped forward) and her tail as their own surfaces. The tail is a
+runner; a round head with a high, full brow and a fine muzzle, not too long,
+ending in a button nose; puffed cheeks with a ruff flaring out and back off
+each of them in a fan of pointed tufts, red up by the ear and white round
+under the jaw, like the triangles of fur in a drawing of a fox; a cowlick
+standing up between her ears; a full ruff down the throat ending in points on
+her chest; slender legs with feathered elbows and breeches, neat paws — with
+her jaw, her ears (big, pointed, cupped forward, with tufts of white fur
+standing out of them) and her tail as their own surfaces. The tail is a
 great brush, swelling from a slim root to its fullest two-thirds of the way
 along and drawn out to a point, and clumped all over in shingles of fur, each
 lying toward the tip and breaking off in a point, so its outline is ragged
@@ -1146,11 +1182,12 @@ neck, head, jaw and ears, four legs of three joints each, and eight bones down
 the tail. Each vertex carries how far inside the white it lies, how dark it
 runs, how far along the tail it is and how long its fur grows there, and the
 shader does the rest. To change her, edit the script and regenerate (about
-twelve seconds), then look at her in `tools/runner/fox.html` — turned round
-(`?pose=stand|sit|ride|run|leap|pounce|hop|twirl`, `&views=left,front,back,
+twenty seconds), then look at her in `tools/runner/fox.html` — turned round
+(`?pose=stand|sit|ride|run|leap|pounce|hop|whirl`, `&views=left,front,back,
 three`, `&v=` the pace, `&t=` how long into it) or as a film strip of her
 moving (`&strip=12&every=2`: twelve frames, two frames apart at 60 a second;
-`&from=` where it starts), the jumps driven as the game drives them:
+`&from=` where it starts), the jumps and the whirl driven as the game drives
+them:
 
 ```sh
 python3 tools/runner/fox.py   # -> assets/fox/
@@ -1163,10 +1200,11 @@ light — and tears the white of her lips, cheeks, throat and tail tip into
 points where it meets the red, tufts of white running out into it and of red
 into the white. Her stockings run dark from the elbows and hocks down to
 black paws; the backs of her ears are black, their insides cream. Her eyes
-are sly almonds slanting up toward her ears under a heavy dark rim, amber with
-a slit pupil and a catch-light, the dark tear line running down the side of
-her muzzle from the inner corner; she blinks, and when she's pleased she
-squeezes them shut in happy arcs. Over all of it grows a short pile of fur
+are big and round, only a little almond, tipped up toward her ears under a
+dark rim: amber round a big dark pupil (a fox's slit, opened wide), with a
+big catch-light up toward the ear and a little one below, and the dark tear
+line running down the side of her muzzle from the inner corner; she blinks,
+and when she's pleased she squeezes them shut in happy arcs. Over all of it grows a short pile of fur
 (`SHELL`): her surface again four times over, each layer lifted off it by a
 share of how long the fur grows there (longest in the ruffs and the brush,
 short on the face and stockings, none round the eyes and nose), thinned to
@@ -1191,15 +1229,22 @@ two-bone solve). Her head is held steady while everything under it works, as
 a running fox's is: whatever the stride's bounce, rocking and gathering do to
 her neck, the head keeps a height and an angle that change only slowly. She
 leads with the leg on the inside of a turn, banks into it and bends her spine
-toward it.
+toward it. And she goes where her nose points: she crosses the road on a
+slant, never crabwise and never broadside to you — how fast she can go across
+is a share of how fast she's covering the ground (steeper only to dodge a
+wall), she gathers that speed and sheds it rather than jolting sideways, and
+she never comes across faster than she can pull up on her line, so she doesn't
+sail past it.
 
 Every jump has weight: she winds up first — sinking into her legs, coiled,
-all four feet planted (for the pounce, rearing up on her haunches with her
-forepaws drawn to her chest) — then springs. Over a hurdle she drives off with
+all four feet planted (for the pounce, gathering up a little on her haunches
+with her forepaws drawn in) — then springs. Over a hurdle she drives off with
 her hind legs stretched out behind, tucks them up under her over the top with
 her forelegs reaching ahead, and comes down forefeet first, nose dipping; the
-pounce is the mousing leap — springing almost straight up, turning over the
-top and diving down nose first, forepaws together, hind legs trailing up. She
+pounce is the mousing leap taken at a run — up at about the angle she climbs,
+her back arched over the top, and down nose first at about the angle she
+falls, forepaws together reaching for the ground, her brush streaming out
+behind along her flight (never stood on end, never tipped over). She
 lands forefeet first, the front dipping as they take it, then her weight comes
 down into all four legs, folding them and gathering her back, and she springs
 back up out of it, deeper the harder she came down. On the title screen she
@@ -1217,9 +1262,11 @@ streams out behind as a real fox's does. On that shape it's a chain of damped
 springs: each part is held to the shape relative to the part before it (not
 to her body), stiffly at the root and softly at the tip, so a swing at the
 root runs down it as a wave; her own acceleration throws it — it hangs below
-her as she springs up, streams up behind her as she falls, whips down on a
-landing, swings out wide as a counterweight in a turn — gravity weighs it and
-the air damps it. On the run its root rides only a little of the pelvis's
+her as she springs up, whips down on a landing, swings out wide as a
+counterweight in a turn — gravity weighs it and the air damps it. (In free
+fall nothing throws it: falling with her, it floats. It used to be flung
+straight up over every descent, a flag on a pole; its own weight is counted
+against her fall now.) On the run its root rides only a little of the pelvis's
 rocking, so it ripples rather than flaps. Under the sea it floats. (The
 headwind used to be a force fighting the chain's length every step, which set
 its tip thrashing; it's in the shape now, and the tip moves a few degrees a
@@ -1240,11 +1287,15 @@ ahead and dropping back; every few seconds she gets an idea:
   crouched, ears streaming, her brush hanging down your back, looking about
   (and back at you); she leaps off ahead into a clear lane when she's had
   enough, when something's coming, or the moment you slide or stumble;
-- **weave** — zigzags across the road in front of you;
 - **pounce** — the mousing leap, on open road (and now and then over a low
-  hurdle);
-- **twirl** — a leap with a spin, for joy (and often when you take a whole
-  run of gems);
+  hurdle) — a treat: rare, and never within twenty seconds of the last;
+- **whirl** — rarer still: for the joy of it (and sometimes when you take a
+  whole run of gems) she runs out ahead into a lane of her own, pulls up and
+  chases her tail round once — her back curled into a C, her head right round
+  after it, the brush flung out round her, ears up and mouth open in a grin —
+  then bounds off after you; never twice in thirty-five seconds (so about
+  once a minute or two), and she doesn't stop dead, so you don't run past her
+  off the screen;
 - **fetch** — every so often she looks for a gem in a lane you're not in (or,
   now and then, cheekily, one right in front of you), far enough ahead to
   reach with the way clear, races over, springs to meet it at the top of a
@@ -1264,14 +1315,16 @@ your feet unless she means to be there. When you stumble she lays her ears
 back and looks round; when you go down she turns, trots back and sits by
 you; when you get up she bounces. `tools/companion/audit.js` checks all of
 it: it plays the game for minutes at a time without drawing it, with an
-autopilot runner, and reports any frame she so much as grazes an obstacle
-(serve the repository, then `node tools/companion/audit.js "?seed=2" 240`;
-it needs Playwright).
+autopilot runner, and reports any frame she so much as grazes an obstacle,
+what she got up to, and how far she ever turns off the line of the road as
+she runs (serve the repository, then `node tools/companion/audit.js "?seed=2"
+240`; it needs Playwright).
 
 Her tunables (her gravity and how long she winds up for each kind of jump,
 how high she leaps, how far ahead and behind she ranges, how much faster she
-runs, how often she gets ideas, how long she rides, how often
-and how eagerly she fetches) live in `CONFIG.companion`; `?companion=none`
+runs, how she crosses the road, how long chasing her tail takes and how
+seldom, how often she gets ideas, how long she rides, how often and how
+eagerly she fetches) live in `CONFIG.companion`; `?companion=none`
 runs alone. Companions are listed in `src/game/companions.js` — the fox is
 the first — and `companion.js` is written for any of them: a new animal
 needs its body (a sculpt and a module like `fox.js` taking the same frame

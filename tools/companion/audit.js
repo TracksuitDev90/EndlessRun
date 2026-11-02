@@ -2,7 +2,11 @@
 // simple autopilot runner (it dodges walls, jumps hurdles and slides under
 // bars as a player would), and reports every frame the companion's body so
 // much as touches an obstacle - plus what she got up to (her ideas, fetches,
-// rides, jumps) and anything that went wrong.
+// rides, jumps), how far she ever turns off the line of the road while she
+// runs on her feet (heading: the widest, in degrees, and the share of the
+// time she's more than 30 and 45 degrees off it - a fox crosses the road on
+// a slant, she shouldn't turn broadside to it), and anything that went
+// wrong.
 //
 // Serve the repository root (python3 -m http.server 8000), then:
 //
@@ -28,7 +32,8 @@ const { chromium } = require('playwright');
     const c = g.companion;
     if (!c) return { error: 'no companion' };
     g.start();
-    const out = { seconds: secs, worlds: new Set(), runnerCrashes: 0, touches: [], touchFrames: 0, ideas: {}, fetches: 0, caught: 0, rides: 0, jumps: 0, gems: 0, nan: 0 };
+    const out = { seconds: secs, worlds: new Set(), runnerCrashes: 0, touches: [], touchFrames: 0, ideas: {}, fetches: 0, caught: 0, rides: 0, jumps: 0, gems: 0, nan: 0, heading: { max: 0, over30: 0, over45: 0 } };
+    let runFrames = 0;
     let lastBeat = null, wasRide = false, wasAir = false, wasFetch = false;
     const credit = g.creditGem.bind(g);
     g.creditGem = (gem, tossed) => {
@@ -71,6 +76,17 @@ const { chromium } = require('playwright');
       if (!c.grounded && !wasAir) out.jumps++;
       wasAir = !c.grounded;
       if (c.ride) continue;
+      // which way she faces, off the line of the road (not counting her
+      // tail-chasing whirl, which is meant to go all the way round)
+      if (g.state === 'running' && c.grounded && !c.whirl && !c.sitting) {
+        let a = Math.abs(c.yaw) % (Math.PI * 2);
+        if (a > Math.PI) a = Math.PI * 2 - a;
+        const deg = (a * 180) / Math.PI;
+        runFrames++;
+        out.heading.max = Math.max(out.heading.max, deg);
+        if (deg > 30) out.heading.over30++;
+        if (deg > 45) out.heading.over45++;
+      }
       // her body, rump to nose; her back's height above her feet
       const df = g.dist + c.dz;
       for (const o of g.obstacles.records) {
@@ -88,6 +104,9 @@ const { chromium } = require('playwright');
       }
     }
     out.gems = g.gemCount;
+    out.heading.max = Math.round(out.heading.max);
+    out.heading.over30 = ((100 * out.heading.over30) / Math.max(1, runFrames)).toFixed(2) + '%';
+    out.heading.over45 = ((100 * out.heading.over45) / Math.max(1, runFrames)).toFixed(2) + '%';
     out.worlds = [...out.worlds];
     out.touches = out.touches.slice(0, 30);
     return out;

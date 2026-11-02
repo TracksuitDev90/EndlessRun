@@ -71,6 +71,18 @@ FRONT = dict(shoulder=(0.064, 0.352, -0.205), elbow=(0.06, 0.226, -0.162), wrist
 # makes the three-bone leg a two-bone solve.
 HIND = dict(hip=(0.07, 0.385, 0.21), stifle=(0.074, 0.252, 0.143), hock=(0.068, 0.128, 0.268), foot=(0.064, 0.03, 0.243), toe=(0.064, 0.012, 0.2))
 
+NOSE = (0, 0.577, -0.566)
+# the cheek ruff's points (right side; x, y, z) and how thick each starts,
+# from the top of the fan, up by the ear, round to under the jaw
+RUFF = [
+    ((0.114, 0.614, -0.37), 0.022),
+    ((0.136, 0.58, -0.36), 0.028),
+    ((0.138, 0.543, -0.364), 0.03),
+    ((0.12, 0.508, -0.38), 0.027),
+    ((0.092, 0.484, -0.4), 0.023),
+    ((0.056, 0.476, -0.424), 0.018),
+]
+
 TAIL_ROOT = V(0, 0.425, 0.3)
 TAIL_DIR = V(0, -0.24, 1.0) / np.linalg.norm(V(0, -0.24, 1.0))
 TAIL_LEN = 0.66
@@ -163,29 +175,35 @@ def shingles(s, ang, spacing, cols, amp, seed=0.0):
 
 
 def head_prims():
-    skull = ellipsoid((0, 0.607, -0.425), (0.066, 0.06, 0.074))
-    brow = ellipsoid((0, 0.618, -0.462), (0.05, 0.036, 0.04))
-    # the muzzle: long and fine, a touch flat on top, its tip the nose
-    muzzle = stroke([(0, 0.592, -0.455), (0, 0.583, -0.52), (0, 0.574, -0.578)], [0.037, 0.024, 0.0125])
-    nose = ellipsoid((0, 0.575, -0.583), (0.0145, 0.0115, 0.012))
-    cheeks = [ellipsoid((s * 0.046, 0.577, -0.44), (0.036, 0.032, 0.046)) for s, _ in SIDES]
-    # the ruff flaring back off each cheek in points
+    # a round head and a high, full brow (the kit's look, for all she's
+    # grown), the muzzle not too long
+    skull = ellipsoid((0, 0.61, -0.423), (0.071, 0.066, 0.075))
+    brow = ellipsoid((0, 0.624, -0.457), (0.054, 0.04, 0.043))
+    # the muzzle: fine, a touch flat on top, its tip a button of a nose
+    muzzle = stroke([(0, 0.590, -0.455), (0, 0.582, -0.512), (0, 0.575, -0.561)], [0.038, 0.026, 0.0142])
+    nose = ellipsoid(NOSE, (0.0172, 0.0132, 0.0135))
+    cheeks = [ellipsoid((s * 0.05, 0.574, -0.44), (0.043, 0.037, 0.049)) for s, _ in SIDES]
+    # the ruff: a fan of pointed tufts flaring out and back off each cheek,
+    # from up by the ear (red) round to under the jaw (white), each a
+    # triangle of fur; and a cowlick standing up between the ears
     ruff = []
     for s, _ in SIDES:
-        ruff += [
-            tuft((s * 0.05, 0.57, -0.43), (s * 0.118, 0.54, -0.362), 0.032),
-            tuft((s * 0.05, 0.587, -0.42), (s * 0.112, 0.592, -0.352), 0.025),
-            tuft((s * 0.045, 0.553, -0.425), (s * 0.092, 0.5, -0.37), 0.026),
-        ]
-    return skull, brow, muzzle, nose, cheeks, ruff
+        for tip, r in RUFF:
+            ruff.append(tuft((s * 0.052, 0.565 + (tip[1] - 0.55) * 0.25, -0.438), (s * tip[0], tip[1], tip[2]), r))
+    crown = [
+        tuft((0, 0.66, -0.43), (0.004, 0.712, -0.452), 0.017),
+        tuft((0, 0.66, -0.415), (-0.012, 0.703, -0.402), 0.014),
+    ]
+    return skull, brow, muzzle, nose, cheeks, ruff + crown
 
 
 def neck_prims():
     neck = round_cone((0, 0.43, -0.25), (0, 0.565, -0.385), 0.088, 0.062)
     # the ruff down the throat, ending in points on the chest
-    bib = ellipsoid((0, 0.445, -0.33), (0.07, 0.1, 0.06), rot_x(0.5))
-    points = [tuft((x, 0.4, -0.355), (x * 1.25, 0.315, -0.33 + abs(x) * 0.2), 0.026) for x in (-0.03, 0.0, 0.03)]
-    points += [tuft((s * 0.055, 0.47, -0.32), (s * 0.085, 0.4, -0.29), 0.024) for s, _ in SIDES]
+    bib = ellipsoid((0, 0.445, -0.335), (0.074, 0.105, 0.064), rot_x(0.5))
+    # a full, fluffy ruff, ending in points on the chest
+    points = [tuft((x, 0.41, -0.36), (x * 1.3, 0.3 + abs(x) * 0.5, -0.34 + abs(x) * 0.2), 0.03 - abs(x) * 0.1) for x in (-0.05, -0.025, 0.0, 0.025, 0.05)]
+    points += [tuft((s * 0.058, 0.475, -0.325), (s * 0.094, 0.395, -0.29), 0.026) for s, _ in SIDES]
     return neck, bib, points
 
 
@@ -324,7 +342,7 @@ def white_coat(p, n):
     pale along the belly."""
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     # below the line along the side of the face
-    line = np.interp(z, [-0.6, -0.56, -0.5, -0.45, -0.4, -0.36], [0.566, 0.57, 0.581, 0.588, 0.585, 0.56])
+    line = np.interp(z, [-0.6, -0.56, -0.5, -0.45, -0.4, -0.36], [0.566, 0.57, 0.579, 0.581, 0.571, 0.545])
     face = (line - y) * np.where(z < -0.355, 1.0, 0.0) - np.maximum(0, z + 0.355) * 4
     # the throat and the bib, in front of a sloping line down the neck
     q = (p - V(0, 0.46, -0.38)) @ rot_x(0.5)
@@ -332,7 +350,7 @@ def white_coat(p, n):
     # the belly, pale underneath
     belly = np.minimum((0.29 - y) * np.where(np.abs(z + 0.02) < 0.2, 1.0, 0.0) - np.maximum(0, np.abs(z + 0.02) - 0.2), 0.045 - np.abs(x))
     # not the nose
-    nose = np.sqrt((x / 1.0) ** 2 + (y - 0.575) ** 2 + (z + 0.583) ** 2) - 0.02
+    nose = np.sqrt((x / 1.0) ** 2 + (y - NOSE[1]) ** 2 + (z - NOSE[2]) ** 2) - 0.022
     return np.minimum(np.maximum(np.maximum(face, bib), belly * 0.5), nose)
 
 
@@ -346,9 +364,12 @@ def fur_coat(p, n, dark):
     muzzle = smooth(-0.47, -0.52, z) * head
     f = f * (1 - muzzle) + 0.002 * muzzle
     # the ruffs: cheeks and throat
-    cheek = smooth(0.045, 0.075, np.abs(x)) * smooth(-0.46, -0.41, z) * smooth(-0.33, -0.37, z) * smooth(0.5, 0.53, y)
+    cheek = smooth(0.045, 0.08, np.abs(x)) * smooth(-0.46, -0.41, z) * smooth(-0.33, -0.37, z) * smooth(0.46, 0.5, y)
     throat = smooth(-0.26, -0.32, z) * smooth(0.5, 0.4, y) * smooth(0.28, 0.33, y)
-    f = np.maximum(f, 0.02 * cheek + 0.0)
+    f = np.maximum(f, 0.022 * cheek + 0.0)
+    # the cowlick
+    crown = smooth(0.66, 0.69, y) * smooth(0.03, 0.01, np.abs(x)) * smooth(-0.47, -0.45, z)
+    f = np.maximum(f, 0.012 * crown)
     f = np.maximum(f, 0.019 * throat)
     # breeches on the backs of the thighs
     f = np.maximum(f, 0.016 * smooth(0.2, 0.26, z) * smooth(0.18, 0.26, y) * smooth(0.42, 0.36, y))
@@ -357,8 +378,8 @@ def fur_coat(p, n, dark):
     for s in (-1, 1):
         e = np.sqrt((x - s * 0.035) ** 2 + (y - 0.613) ** 2 + (z + 0.47) ** 2)
         f *= smooth(0.012, 0.028, e)
-    nose = np.sqrt(x ** 2 + (y - 0.575) ** 2 + (z + 0.583) ** 2)
-    f *= smooth(0.016, 0.028, nose)
+    nose = np.sqrt(x ** 2 + (y - NOSE[1]) ** 2 + (z - NOSE[2]) ** 2)
+    f *= smooth(0.018, 0.03, nose)
     return f
 
 
@@ -369,8 +390,8 @@ def fur_coat(p, n, dark):
 
 def jaw_prims():
     # slim, and tucked up under the muzzle: only its underside shows
-    jaw = stroke([(0, 0.543, -0.448), (0, 0.548, -0.505), (0, 0.556, -0.548)], [0.024, 0.0145, 0.0068])
-    chin = ellipsoid((0, 0.542, -0.465), (0.016, 0.012, 0.03))
+    jaw = stroke([(0, 0.543, -0.448), (0, 0.548, -0.5), (0, 0.556, -0.537)], [0.024, 0.0148, 0.0072])
+    chin = ellipsoid((0, 0.543, -0.463), (0.016, 0.012, 0.028))
     return jaw, chin
 
 
@@ -384,7 +405,7 @@ def g_jaw():
         out = np.zeros((len(p), 4))
         out[:, 0] = 0.02  # white all over
         out[:, 2] = -1.0
-        out[:, 3] = 0.004 * smooth(-0.53, -0.47, p[:, 2]) * smooth(0.0, -0.4, n[:, 1])
+        out[:, 3] = 0.004 * smooth(-0.52, -0.47, p[:, 2]) * smooth(0.0, -0.4, n[:, 1])
         return out
 
     def mats(p, n, own):
@@ -395,7 +416,7 @@ def g_jaw():
         return m
 
     jaw, chin = jaw_prims()
-    return Garment('jaw', MAT['jaw'], 0.0022, (-0.05, 0.5, -0.59), (0.05, 0.585, -0.4), jaw_field, [(jaw, rigid('jaw')), (chin, rigid('jaw'))], 700, details=details, mats=mats, outline=0.12)
+    return Garment('jaw', MAT['jaw'], 0.0022, (-0.05, 0.5, -0.58), (0.05, 0.585, -0.4), jaw_field, [(jaw, rigid('jaw')), (chin, rigid('jaw'))], 700, details=details, mats=mats, outline=0.04)
 
 
 def tri_iso(px, py, qx, qy):
@@ -425,9 +446,19 @@ def ear_frame(s):
     return base, up, front, across, L
 
 
+# the white tufts in each ear: from how far up the hollow (m), to how far up,
+# how far across toward the inner edge, how far out in front, and how thick
+EAR_TUFTS = [
+    (0.012, 0.072, -0.016, 0.018, 0.0085),
+    (0.016, 0.06, 0.004, 0.02, 0.009),
+    (0.01, 0.048, 0.02, 0.016, 0.0075),
+]
+
+
 def ear_field(s):
     base, up, front, across, L = ear_frame(s)
     half = 0.039
+    tufts = [tuft(base + up * u0 + front * 0.002, base + up * u1 + across * (v1 * s) + front * w1, r) for u0, u1, v1, w1, r in EAR_TUFTS]
 
     def fn(p):
         q = p - base
@@ -443,7 +474,9 @@ def ear_field(s):
         d3 = tri_iso(v, (L * 0.86) - u, half * 0.66, L * 0.86 + 0.02)
         hollow = np.maximum(d3, -(w - 0.0016))
         d = smax(outer, -hollow, 0.003)
-        # a few tufts of white fur standing out of the hollow
+        # tufts of white fur standing out of the hollow, fanned up and out
+        for t in tufts:
+            d = smin(d, t.fn(p), 0.004)
         return d
 
     lo = base - 0.15
@@ -470,7 +503,9 @@ def g_ears():
             # the inside is cream, its rim and the back black
             facing = n @ front
             d3 = -tri_iso(v, (Ln * 0.9) - u, 0.039 * 0.72, Ln * 0.9 + 0.025)
-            inner += own[:, i] * np.where(facing > -0.1, d3, -0.01)
+            # (out in front of the hollow: the tufts, white all round)
+            tufts = (q @ front) - 0.006
+            inner += own[:, i] * np.maximum(np.where(facing > -0.1, d3, -0.01), np.where(u < Ln * 0.8, tufts, -0.01))
             dark += own[:, i] * (smooth(0.1, -0.35, facing) * 0.95 + smooth(0.6, 0.92, u / Ln) * 0.6)
         out[:, 0] = inner
         out[:, 1] = np.clip(dark, 0, 1)
@@ -550,7 +585,7 @@ def build():
         jaw=r5(JAW),
         # the face, for the shader: each eye's centre (right side), the nose
         eye=[0.035, 0.613, -0.47],
-        nose=[0.0, 0.575, -0.583],
+        nose=list(NOSE),
     )
     B.export(garments, OUT, MAT, rig, 'fox', 'fox.py')
     print(f'fox: {time.time() - t0:.1f}s')

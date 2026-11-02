@@ -14,9 +14,10 @@
     <script type="module">
       // Sorrel turned round like a reference sheet, or a film strip of her
       // moving. Serve the repository root and open tools/runner/fox.html.
-      //   ?pose=stand|sit|ride|run|leap|pounce|hop|twirl  what she's doing
-      //   &t=<s>        how long into it (for the jumps: how long she runs
-      //                 first, then winds up and jumps)
+      //   ?pose=stand|sit|ride|run|leap|pounce|hop|whirl  what she's doing
+      //   &t=<s>        how long into it (for the jumps and the whirl: how
+      //                 long she runs first, then winds up and jumps, or
+      //                 pulls up and chases her tail)
       //   &v=<m/s>      her pace over the ground (run and the jumps)
       //   &views=left,front,back,right,three,backThree   one view each...
       //   &strip=<n>&every=<frames>   ...or a film strip: n frames of the
@@ -89,7 +90,18 @@
       // --- the simulation ---------------------------------------------------
       const dt = 1 / 60;
       const v = Number(q.get('v') || 14);
-      const jump = { leap: CONFIG.companion.leap, pounce: CONFIG.companion.pounce, hop: 0.45, twirl: CONFIG.companion.twirl }[pose];
+      const jump = { leap: CONFIG.companion.leap, pounce: CONFIG.companion.pounce, hop: 0.45 }[pose];
+      // chasing her tail: as companion.js's whirlStep (once round, after a
+      // beat to pull up; her back curls toward the turn and straightens out)
+      const WD = CONFIG.companion.whirl.dur;
+      const whirlAt = (s) => {
+        if (pose !== 'whirl' || s < T) return [0, 0];
+        const w = s - T, lead = 0.14;
+        const k = Math.min(1, Math.max(0, (w - lead) / WD));
+        const e = k * k * k * (k * (k * 6 - 15) + 10);
+        const c = Math.min(1, w / (lead + 0.12)) * (1 - Math.min(1, Math.max(0, (k - 0.78) / 0.22)));
+        return k >= 1 ? [0, 0] : [Math.PI * 2 * e, c * c * (3 - 2 * c)];
+      };
       const G = CONFIG.companion.gravity;
       const wind = CONFIG.companion.windup[pose] || 0;
       const at = new THREE.Vector3();
@@ -97,7 +109,8 @@
       const vel = new THREE.Vector3();
       let y = 0, vy = 0, air = null, crouch = null, jumped = false;
       function step(i) {
-        const moving = pose === 'run' || jump;
+        const moving = pose === 'run' || pose === 'whirl' || jump;
+        const [spin, curl] = whirlAt(i * dt);
         if (jump && !jumped && i * dt >= T) {
           crouch = { t: 0 };
           jumped = true;
@@ -123,17 +136,16 @@
         }
         vel.set(0, air ? vy : 0, moving ? -v : 0);
         at.set(0, y, 0);
-        const spin = air && pose === 'twirl' ? (air.t / air.T) * Math.PI * 2 : 0;
         qi.setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
         fox.place(at, qi, 0, 0);
         let ctx;
-        if (air) ctx = { speed: v, vel, mode: 'air', airT: air.t, airDur: air.T, airKind: pose };
-        else if (moving) ctx = { speed: v, vel, mode: 'run', crouch: crouch ? crouch.t / wind : 0, crouchKind: pose };
+        if (air) ctx = { speed: v, vel, mode: 'air', airT: air.t, airDur: air.T, airKind: pose, fall: G };
+        else if (moving) ctx = { speed: curl ? Math.max(v, 6) : v, vel, mode: 'run', crouch: crouch ? crouch.t / wind : 0, crouchKind: pose, curl };
         else ctx = { speed: 0, vel, mode: pose };
         fox.update(dt, ctx);
       }
       // (&from=<s>: start the strip that far in instead)
-      const start = Math.max(1, Math.round((q.has('from') ? Number(q.get('from')) : jump ? Math.max(0.5, T - 0.05) : T) / dt));
+      const start = Math.max(1, Math.round((q.has('from') ? Number(q.get('from')) : jump || pose === 'whirl' ? Math.max(0.5, T - 0.05) : T) / dt));
       let frame = 0;
       for (; frame < start; frame++) step(frame);
       if (strip) {

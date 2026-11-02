@@ -93,23 +93,31 @@ export const CONFIG = {
   // The companion who runs with you (see game/companion.js): who it is
   // ('none' to run alone; ?companion= overrides it), her gravity (m/s²) and
   // how long she winds up before each kind of jump (s), how high she leaps
-  // (m: over a hurdle, the mousing pounce, a twirl), how far ahead of you she
-  // ranges and how far back she drops (m), how much faster or slower than
-  // you she can run (m/s), how long she rests between ideas (s), how long
-  // she rides on your shoulder (s), and her gem fetching: how often she
-  // looks for one (s), how far ahead of you it must be (m), the chance she
-  // goes for it, and the chance it's a cheeky one right in front of you.
+  // (m: over a hurdle, the mousing pounce; and never a pounce within
+  // pounceEvery s of the last), how far ahead of you she ranges
+  // and how far back she drops (m), how much faster or slower than you she
+  // can run (m/s), how she crosses the road (lateral: her speed across as a
+  // share of her speed along - slant, or dodge when a wall's coming - plus
+  // base m/s; how hard she can gather and shed it, m/s², on her feet,
+  // dodging and in the air), chasing her tail (whirl: how long once round
+  // takes, s, and never again within every s), how long she rests between
+  // ideas (s), how long she rides on your shoulder (s), and her gem
+  // fetching: how often she looks for one (s), how far ahead of you it must
+  // be (m), the chance she goes for it, and the chance it's a cheeky one
+  // right in front of you.
   companion: {
     id: 'fox',
     gravity: 26,
     // how long she winds up before each kind of jump (s)
-    windup: { leap: 0.1, pounce: 0.18, hop: 0.07, twirl: 0.1 },
+    windup: { leap: 0.1, pounce: 0.2, hop: 0.07 },
     leap: 1.25,
-    pounce: 1.55,
-    twirl: 1.1,
+    pounce: 1.45,
+    pounceEvery: 20,
     ahead: 9,
     behind: -2.8,
     surge: [-7.5, 10],
+    lateral: { slant: 0.4, dodge: 0.62, base: 0.6, acc: 10, accDodge: 24, accAir: 5 },
+    whirl: { dur: 0.82, every: 35 },
     rest: [1.2, 3.2],
     ride: [2.6, 4.6],
     fetch: { every: [7, 14], reach: [6, 26], chance: 0.6, mischief: 0.15 },

@@ -21,10 +21,11 @@ import { TAU, clamp, smooth, Spring } from './rig.js';
 //     back gathers as the hind legs swing under, they drive off and she
 //     flies stretched out flat - the spine flexing and extending through
 //     every stride, the head held level through all of it;
-//   - leaps (stretched out over a hurdle), the mousing pounce (up, over, and
-//     down nose first), little hops to snap at a gem, a twirl for the joy of
-//     it; sitting with her tail curled round her paws; crouched riding on a
-//     runner's shoulder; slinking low;
+//   - leaps (stretched out over a hurdle), the mousing pounce (up in an
+//     arch and down nose first), little hops to snap at a gem; chasing her
+//     tail (curled into a C, head round after it); sitting with her tail
+//     curled round her paws; crouched riding on a runner's shoulder;
+//     slinking low;
 //   - her tail simulated as a chain of particles: held by her mood (level
 //     at a gallop, waving when she's pleased, curled round her when she
 //     sits), swung by every turn, take-off and landing, streamed back by the
@@ -106,7 +107,7 @@ export class Fox {
     this.wS = { gallop: new Spring(), stand: new Spring(1), sit: new Spring(), air: new Spring(), ride: new Spring() };
     this.w = { gallop: 0, stand: 1, sit: 0, air: 0, ride: 0 };
     this.springs = {};
-    for (const k of ['headP', 'headY', 'neckY', 'roll', 'bend', 'earL', 'earR', 'earLo', 'earRo', 'earLs', 'earRs', 'jaw', 'land', 'low', 'wag', 'lift']) this.springs[k] = new Spring();
+    for (const k of ['headP', 'headY', 'neckY', 'roll', 'bend', 'earL', 'earR', 'earLo', 'earRo', 'earLs', 'earRs', 'jaw', 'land', 'low', 'wag', 'lift', 'curl']) this.springs[k] = new Spring();
     this.tail = this.buildTail();
     this.tailHold = new Spring();
     this.face = new THREE.Vector4(1, 0, 0, 0);
@@ -259,6 +260,7 @@ export class Fox {
     this.acc = new THREE.Vector3();
     this.velS = new THREE.Vector3();
     this.lat = 0;
+    this.curlTarget = 0;
     for (const k in this.wS) this.wS[k].reset(k === 'sit' ? 1 : 0);
     for (const s of Object.values(this.springs)) s.reset();
     this.tail.ready = false;
@@ -272,18 +274,24 @@ export class Fox {
   // --- the frame ----------------------------------------------------------------------
   // ctx: { speed: m/s over the ground, vel: world velocity, mode: 'run' |
   // 'air' | 'sit' | 'stand' | 'ride', airT / airDur / airKind while in the
-  // air, low: 0..1 slinking, lat: sideways speed (m/s, + to her right) }
+  // air, fall: her gravity while she's falling free (m/s²), low: 0..1
+  // slinking, lat: sideways speed (m/s, + to her right), curl: -1..1 how far
+  // she's curled round chasing her tail (+ toward her left) }
   update(dt, ctx) {
     this.time += dt;
     const t = this.time;
     this.speed = ctx.speed;
     this.mode = ctx.mode;
     this.lat = ctx.lat || 0;
+    this.curlTarget = ctx.curl || 0;
     if (ctx.vel) {
       if (!this.tail.ready) this.velS.copy(ctx.vel);
       _v.copy(this.velS);
       this.velS.lerp(ctx.vel, 1 - Math.exp(-dt * 30));
       if (dt > 0) this.acc.subVectors(this.velS, _v).divideScalar(dt).clampLength(0, 80);
+      // (in free fall nothing pulls on her tail but its own weight: falling
+      // with her, it floats - it isn't thrown up off her)
+      this.acc.y += ctx.fall || 0;
       this.vel.copy(ctx.vel);
     }
     if (this.mode === 'air') {
@@ -373,12 +381,12 @@ export class Fox {
       const pounce = this.crouchKind === 'pounce';
       P[C.y] -= (pounce ? 0.06 : this.crouchKind === 'hop' ? 0.06 : 0.1) * e;
       P[C.flex] += (pounce ? 0.05 : 0.22) * e;
-      P[C.pitch] += (pounce ? 0.85 : 0.05) * e;
+      P[C.pitch] += (pounce ? 0.32 : 0.05) * e;
       for (let i = 0; i < 4; i++) {
         const f = FEET[i], toe = this.legs[i].toe;
         let x = toe.x * (i < 2 ? 0.92 : 1), y = toe.y, z = toe.z + (i < 2 ? -0.03 : -0.05);
         if (pounce && i < 2) {
-          bodyFoot(_crouchP, FEET[0], toe.x * 0.6, 0.24, -0.3, P[C.pitch]);
+          bodyFoot(_crouchP, FEET[0], toe.x * 0.7, 0.14, -0.26, P[C.pitch]);
           x = _crouchP[0];
           y = _crouchP[1];
           z = _crouchP[2];
@@ -417,10 +425,29 @@ export class Fox {
       for (const [, iy] of FEET) P[iy] = Math.min(P[iy], 0.012 + (P[iy] - 0.012) * (1 - 0.5 * lo));
     }
     // turning: she banks into it, the spine bends toward it, the head leads
+    // (bend + curls her toward her left, -x)
     const S = this.springs;
     const lat = this.mode === 'ride' ? 0 : this.lat;
-    P[C.roll] += S.roll.step(clamp(-this.acc.x * 0.012, -0.35, 0.35), 2.6, 0.6, dt);
-    P[C.bend] += S.bend.step(clamp(lat * 0.03, -0.3, 0.3), 3, 0.7, dt);
+    P[C.roll] += S.roll.step(clamp(-this.acc.x * 0.012, -0.25, 0.25), 2.2, 0.75, dt);
+    P[C.bend] += S.bend.step(clamp(-lat * 0.03, -0.22, 0.22), 2.4, 0.8, dt);
+    // chasing her tail: her back curled into a C toward it, her head right
+    // round after it, the brush swept round to meet her; ears up, mouth open
+    // in a grin
+    const cu = S.curl.step(this.curlTarget, 3.2, 0.85, dt);
+    const ca = Math.abs(cu);
+    if (ca > 1e-3) {
+      P[C.bend] += 0.62 * cu;
+      P[C.neckY] += 0.5 * cu;
+      P[C.headY] += 0.55 * cu;
+      P[C.headP] += 0.18 * ca;
+      P[C.tailSide] -= 0.55 * cu;
+      P[C.tailLift] += 0.15 * ca;
+      P[C.y] -= 0.03 * ca;
+      P[C.pitch] += 0.06 * ca;
+      P[C.earBack] -= 0.3 * ca;
+      P[C.jaw] = Math.max(P[C.jaw], 0.45 * ca);
+      P[C.headR] += 0.2 * cu;
+    }
     P[C.headY] += 0.6 * P[C.bend];
     // pleased: the tail sweeps (wags) and lifts
     P[C.tailWag] += this.springs.wag.step(this.wag, 2, 0.9, dt);
@@ -637,11 +664,11 @@ export class Fox {
   // stretched out behind and her forelegs folding up, tucks her hind legs
   // up under her over the top with her forelegs reaching ahead, and comes
   // down forefeet first, reaching for the road, nose dipping. pounce (the
-  // mousing leap): reared up, she springs almost straight up with her
-  // forepaws drawn to her chest, arches over the top and dives down nose
-  // first, forepaws together reaching down and hind legs trailing up. hop:
-  // a little spring, head up, snapping at something. twirl: a leap with a
-  // spin.
+  // mousing leap, from a run): gathered up a little, forepaws drawn in, she
+  // springs up at about the angle she climbs, arches her back over the top
+  // and comes down nose first at about the angle she falls, forepaws
+  // together reaching down, hind legs trailing, her brush streaming out
+  // behind. hop: a little spring, head up, snapping at something.
   poseAir(P, p, kind) {
     const F = this.legs;
     const pounce = kind === 'pounce', hop = kind === 'hop';
@@ -688,8 +715,10 @@ export class Fox {
     P[C.headP] = pounce ? kf([-0.5, -0.4, -0.2, -0.15, -0.1], p) : hop ? -0.15 * Math.sin(Math.PI * p) : 0.22 - pitch * 0.5;
     P[C.headY] = 0;
     P[C.headR] = 0;
-    P[C.tailLift] = pounce ? kf([-0.4, -0.2, 0.4, 0.8, 0.9], p) : kf([0.25, 0.2, 0.1, 0.05, 0.1], p);
-    P[C.tailEnd] = P[C.tailLift] + (pounce ? 0.4 : 0.1);
+    // (diving, her hips are tipped up: the brush is held down from them, so
+    // it streams out behind her along her flight, its tip curling up)
+    P[C.tailLift] = pounce ? kf([-0.15, -0.1, -0.22, -0.5, -0.62], p) : kf([0.25, 0.2, 0.1, 0.05, 0.1], p);
+    P[C.tailEnd] = P[C.tailLift] + (pounce ? 0.35 : 0.1);
     P[C.tailSide] = 0;
     P[C.tailWag] = 0;
     P[C.earBack] = pounce ? -0.3 : hop ? -0.15 : 0.6;
@@ -1016,8 +1045,11 @@ function kf(keys, p) {
 // in the air: the body's pitch and the spine's flex through the flight
 const PITCH_LEAP = [0.3, 0.12, -0.02, -0.16, -0.24];
 const FLEX_LEAP = [-0.3, 0.05, 0.18, 0.02, -0.1];
-const PITCH_POUNCE = [0.95, 0.6, -0.25, -1.1, -1.45];
-const FLEX_POUNCE = [0.0, 0.2, 0.42, 0.25, 0.15];
+// (the pounce's pitch follows its flight - up at about the angle she climbs
+// at a run, arched over the top, down at about the angle she falls - never
+// stood on end)
+const PITCH_POUNCE = [0.55, 0.32, -0.04, -0.42, -0.62];
+const FLEX_POUNCE = [0.0, 0.22, 0.4, 0.26, 0.12];
 
 // A foot placed in the body's own frame (pitched by `pitch` about its
 // middle), written in her root space.
