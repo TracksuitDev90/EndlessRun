@@ -1123,8 +1123,15 @@ float furrow(vec2 q, float len, float w) {
   float push = exp(-pow((q.y - 0.07) / 0.07, 2.0)) * smoothstep(w * 0.6, 0.0, abs(q.x));
   return trough - 0.35 * rim - 0.5 * push;
 }
+// The hole a walking stick's tip punches (the elder's), a little sand
+// squeezed up round it.
+float stickHole(vec2 q) {
+  float d = length(q) - 0.021;
+  float rim = smoothstep(0.018, 0.004, d) * smoothstep(-0.004, 0.006, d);
+  return smoothstep(0.003, -0.012, d) - rim * 0.35;
+}
 float printShape(vec2 q, vec4 A, vec4 B, float fine) {
-  return A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
+  return A.w > 2.5 ? stickHole(q) : A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
 }
 // The runner's footprints round p: how deep they press the sand here (m);
 // the slope they give it is added to grad (dh/dx, dh/dd).
@@ -2042,6 +2049,18 @@ void main() {
       float gu = aCape.x / (uCapeGrid.x - 1.0);
       float th = uCapeGrid.z * mix(1.5, 0.45, smoothstep(0.15, 1.0, gv)) * (0.8 + 0.2 * cos(gu * 50.0 + gv * 3.0));
       lp = P + nC * (th * (side + 1.0));
+    #elif defined(ELDER)
+      if (uCapeGrid.w > 0.5) {
+        // the long beard (w: a hair sheet): the inside on the simulated
+        // surface, the outside standing off it - full under the chin,
+        // thinning to the tips, in wavy clumps
+        float gv = aCape.y / (uCapeGrid.y - 1.0);
+        float gu = aCape.x / (uCapeGrid.x - 1.0);
+        float th = uCapeGrid.z * mix(1.7, 0.35, smoothstep(0.05, 1.0, gv)) * (0.78 + 0.22 * cos(gu * 38.0 + gv * 9.0));
+        lp = P + nC * (th * (side + 1.0));
+      } else {
+        lp = P + nC * (side * uCapeGrid.z);
+      }
     #else
       lp = P + nC * (side * uCapeGrid.z);
     #endif
@@ -2349,6 +2368,208 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     c = mix(c, c * 0.72, max(mid, vein * 0.6) * front);
   }
   return c;
+}
+#elif defined(ELDER)
+// --- the elder ------------------------------------------------------------------
+// (palette: see COL in game/elder.js; r is the rest position, the head being
+// sculpted where it sits)
+#define L_ROBE_DEEP 14
+#define L_ROBE_IN 15
+#define L_SKIN_LINE 16
+#define L_SKIN_WARM 17
+#define L_BOOT_DARK 18
+#define L_WOOD_DARK 19
+#define L_WOOD_LIGHT 20
+#define L_HAIR_SHADE 21
+#define L_EYE 22
+#define L_IRIS 23
+#define L_INK 24
+#define L_MOUTH 25
+#define L_FLUSH 26
+#define L_GLASS_DEEP 27
+#define L_GLINT 28
+#define L_SASH_DARK 29
+#define L_LEG_DARK 31
+float elderHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float elderNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(elderHash(i), elderHash(i + vec3(1, 0, 0)), f.x), mix(elderHash(i + vec3(0, 1, 0)), elderHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(elderHash(i + vec3(0, 0, 1)), elderHash(i + vec3(1, 0, 1)), f.x), mix(elderHash(i + vec3(0, 1, 1)), elderHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// Worn cloth, washed like a watercolour: soft blotches a shade deeper and a
+// shade paler, and long streaks down the fall of the cloth.
+vec3 elderWorn(vec3 c, vec3 deep, vec3 q) {
+  float n = elderNoise(q * vec3(9.0, 4.0, 9.0)) * 0.65 + elderNoise(q * 23.0 + 3.1) * 0.35;
+  float streak = elderNoise(vec3(q.x * 40.0 + q.z * 40.0, q.y * 2.0, 1.7));
+  c = mix(c, deep, smoothstep(0.5, 0.8, n) * 0.45 + smoothstep(0.62, 0.85, streak) * 0.2);
+  return mix(c, c * 1.12 + 0.02, smoothstep(0.38, 0.12, n) * 0.4);
+}
+// His face, drawn on the front of the head: small, deep-set, kindly eyes
+// under heavy drooping lids (pale blue-grey, a catch-light in each), bags
+// under them and crow's feet fanning from their corners; three long lines
+// across the high forehead; the weathered tan flushed at the tip of the nose
+// and on the cheeks, darker in the creases; age spots on the bald crown.
+vec3 drawFace(vec3 base, vec3 r, float ear, inout float unlit) {
+  vec3 c = base;
+  // weathering: a warm, uneven tan, darker in its creases
+  float n = elderNoise(r * 60.0);
+  c = mix(c, uPal[L_SKIN_WARM], smoothstep(0.55, 0.85, n) * 0.35);
+  // age spots on the crown
+  float spots = smoothstep(0.72, 0.8, elderNoise(r * 95.0 + 4.0)) * smoothstep(1.93, 1.97, r.y);
+  c = mix(c, uPal[L_SKIN_LINE], spots * 0.5);
+  // the ears: a deeper flush in their bowls
+  c = mix(c, uPal[L_FLUSH], ear * 0.3);
+  float front = smoothstep(-0.055, -0.085, r.z);
+  if (front <= 0.0) return c;
+  vec2 f = vec2(abs(r.x), r.y);
+  // flush: the nose's long tip, the cheekbones
+  c = mix(c, uPal[L_FLUSH], 0.45 * (1.0 - smoothstep(0.004, 0.026, length(vec3(r.x, r.y - 1.815, r.z + 0.158)))) * front);
+  c = mix(c, uPal[L_FLUSH], 0.22 * (1.0 - smoothstep(0.2, 1.0, length((f - vec2(0.058, 1.838)) / vec2(0.02, 0.012)))) * front);
+  vec3 line = mix(c, uPal[L_SKIN_LINE], 0.75);
+  // forehead: three long wavy lines
+  float fh = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float y0 = 1.912 + 0.0125 * float(k);
+    fh = max(fh, band(r.y - y0 - 0.0035 * sin(r.x * 70.0 + float(k)) - 0.06 * r.x * r.x, 0.0009) * step(abs(r.x), 0.052 - 0.008 * float(k)));
+  }
+  c = mix(c, line, fh * front * 0.8);
+  // the eye: a small almond under a heavy, drooping lid
+  vec2 E = vec2(0.041, 1.859);
+  vec2 q = f - E;
+  float dA = (length(q / vec2(0.0135, 0.0082)) - 1.0) * 0.0082;
+  float lid = q.y - (0.0034 - 18.0 * (q.x + 0.004) * (q.x + 0.004) - 0.07 * q.x);
+  float dS = max(dA, lid);
+  float eye = fill(dS) * front;
+  c = mix(c, uPal[L_EYE], eye);
+  unlit = max(unlit, eye * 0.3);
+  vec2 ic = q - vec2(-0.0012, -0.0012);
+  c = mix(c, uPal[L_IRIS], fill(max(length(ic) - 0.0064, dS)) * front);
+  c = mix(c, uPal[L_INK], fill(max(length(ic) - 0.0031, dS)) * front);
+  float hl = fill(max(length(q - vec2(0.0022, 0.0018)) - 0.0018, dS)) * front;
+  c = mix(c, vec3(1.0), hl);
+  unlit = max(unlit, hl);
+  // the heavy upper lid's line, and the fold of skin over it
+  float lash = band(lid, 0.001 + 0.0006 * smoothstep(-0.01, 0.012, q.x)) * step(abs(q.x), 0.0145) * step(dA, 0.0012);
+  c = mix(c, uPal[L_INK], lash * front);
+  float fold = band(q.y - 0.0072 + 22.0 * (q.x + 0.002) * (q.x + 0.002), 0.0008) * step(abs(q.x + 0.001), 0.016);
+  c = mix(c, line, fold * front * 0.8);
+  // bags under the eyes: two soft arcs
+  float bag = band(length((q - vec2(0.0, 0.004)) / vec2(0.0165, 0.0175)) - 1.0, 0.045) * step(q.y, -0.006) * step(abs(q.x), 0.014);
+  bag = max(bag, band(length((q - vec2(0.0, 0.003)) / vec2(0.019, 0.023)) - 1.0, 0.035) * step(q.y, -0.01) * step(abs(q.x), 0.013) * 0.7);
+  c = mix(c, line, bag * front * 0.7);
+  // crow's feet: three short lines fanning from the outer corner
+  vec2 cf = q - vec2(0.0165, 0.0005);
+  float crow = 0.0;
+  for (int k = -1; k <= 1; k++) {
+    float a = 0.38 * float(k);
+    vec2 dir = vec2(cos(a), sin(a));
+    float along = dot(cf, dir);
+    float across = cf.x * dir.y - cf.y * dir.x;
+    crow = max(crow, band(across, 0.0007) * step(0.002, along) * step(along, 0.012 - 0.003 * abs(float(k))));
+  }
+  c = mix(c, line, crow * front * 0.8);
+  return c;
+}
+// Strands drawn along a lock: a few darker lines that wander a little.
+float elderStrands(float u, float v, float k) {
+  float s = u * k + 0.45 * sin(v * 9.0 + u * 17.0);
+  return lines(s, 0.08);
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    c = drawFace(base, d.xyz, d.w, unlit);
+  } else if (m == 8) {
+    // old hands: the knuckles and the backs of the hands a shade deeper
+    c = mix(c, uPal[L_SKIN_WARM], smoothstep(0.5, 0.8, elderNoise(r * 70.0)) * 0.35);
+  } else if (m == 2) {
+    // white hair, combed into strands falling down round the head (and
+    // down the beard), a cool grey in their depths
+    float a = atan(r.x, -(r.z + 0.01));
+    float st = lines(a * 34.0 + sin(r.y * 95.0 + a * 6.0) * 0.35, 0.1) * d.x;
+    c = mix(c, uPal[L_HAIR_SHADE], st * 0.5 + (1.0 - d.x) * 0.15);
+  } else if (m == 3 || m == 4) {
+    // the robe: worn teal cloth (the sea-green under-robe down the V), the
+    // outer robe's open edge turned back along the V; the bell sleeves
+    // darker inside (d: x on the body, y down the arm, z across the V's
+    // edge, w inside a sleeve)
+    vec3 deep = m == 3 ? uPal[L_ROBE_DEEP] : uPal[L_ROBE_IN];
+    c = elderWorn(c, deep, r);
+    float edge = band(d.z - 0.004, 0.0035) * d.x;
+    c = mix(c, uPal[L_ROBE_DEEP], edge * 0.8);
+    c = mix(c, deep * 0.72, d.w);
+  } else if (m == 9) {
+    // the hood: its seam sinks into its middle, its lining shows at its mouth
+    c = elderWorn(c, uPal[L_ROBE_DEEP], r);
+    c = mix(c, uPal[L_ROBE_IN], d.w * 0.85);
+    c = mix(c, c * 0.8, band(d.x, 0.04) * step(0.02, d.y));
+    c = mix(c, c * 0.7, band(d.y - 0.005, 0.0015));
+  } else if (m == 10) {
+    // the skirt (d: x across, y down, w the lining side): worn teal,
+    // deepening toward the hem; the lining sea-green
+    float v = smoothstep(0.1, 1.0, d.y);
+    vec3 q = vec3(d.x * 1.6, d.y * 0.9, 0.0);
+    c = elderWorn(c, uPal[L_ROBE_DEEP], q);
+    c = mix(c, uPal[L_ROBE_DEEP], v * 0.45);
+    vec3 lin = elderWorn(uPal[4], uPal[L_ROBE_IN], q + 5.0);
+    c = mix(c, mix(lin, uPal[L_ROBE_IN], v * 0.5), step(0.5, d.w));
+  } else if (m == 13) {
+    // the long beard (d: x across, y down, w the inside): strands down its
+    // length, a cool grey in its depths and on the inside
+    c = mix(c, uPal[L_HAIR_SHADE], elderStrands(d.x, d.y, 30.0) * 0.5);
+    c = mix(c, uPal[L_HAIR_SHADE], step(0.5, d.w) * 0.45 + smoothstep(0.6, 1.0, d.y) * 0.12);
+  } else if (m == 5) {
+    // leggings: wrinkled at the ankles
+    c = mix(c, uPal[L_LEG_DARK], lines(r.y / 0.018, 0.08) * smoothstep(0.26, 0.17, r.y) * 0.6);
+  } else if (m == 6) {
+    // the sash: a coarse weave, its edges darker
+    c = mix(c, uPal[L_SASH_DARK], lines(r.y * 140.0 + d.x * 0.0, 0.12) * 0.35 * (1.0 - d.x));
+    c = mix(c, uPal[L_SASH_DARK], lines((r.y + abs(r.x) * 0.2) * 60.0, 0.1) * 0.4 * d.x);
+  } else if (m == 7) {
+    // old boots: a dark worn sole, the cuff's turned edge, the strap,
+    // scuffs
+    float y = r.y - 0.035 * pow(smoothstep(-0.1, -0.2, r.z), 2.0);
+    c = mix(c, uPal[L_BOOT_DARK], fill(y - uRig[0].z));
+    c = mix(c, uPal[L_BOOT_DARK], d.y * 0.8);
+    c = mix(c, c * 1.15, d.x * 0.6);
+    c = mix(c, uPal[L_BOOT_DARK], smoothstep(0.62, 0.85, elderNoise(r * 80.0)) * 0.35);
+  } else if (m == 11) {
+    // the stick (d: its own frame, up its length): twisted grain spiralling
+    // round it, knots; dark with the dirt of the road at its foot, worn pale
+    // and smooth where his hand holds it
+    float a = atan(d.z, d.x) / 6.2832;
+    float grain = lines(a * 5.0 + d.y * 4.2, 0.16);
+    float fine = lines(a * 13.0 + d.y * 4.2 + sin(d.y * 31.0) * 0.15, 0.12);
+    c = mix(c, uPal[L_WOOD_DARK], grain * 0.55 + fine * 0.25);
+    c = mix(c, uPal[L_WOOD_LIGHT], smoothstep(0.6, 0.85, elderNoise(vec3(a * 6.0, d.y * 9.0, 0.0))) * 0.4);
+    c = mix(c, uPal[L_WOOD_LIGHT], smoothstep(1.02, 1.09, d.y) * smoothstep(1.24, 1.14, d.y) * 0.35);
+    c = mix(c, uPal[L_WOOD_DARK] * 0.8, smoothstep(0.14, 0.0, d.y) * 0.7);
+  } else if (m == 12) {
+    // orange spectacles: a deeper orange round their inner edges
+    c = mix(c, uPal[L_GLASS_DEEP], 0.25);
+  }
+  return c;
+}
+// The long beard parts into pointed, wavy locks toward its end, and the
+// skirt's hem is ragged, hanging in long uneven points: > 0 past an edge
+// (d.x across the sheet, d.y down it).
+float elderCut(int m, vec4 d) {
+  bool beard = m == 13;
+  float n = beard ? 7.0 : 13.0;
+  float k = d.x * n + (beard ? 0.25 * sin(d.y * 14.0) : 0.0);
+  float i = floor(k);
+  float h = fract(sin(i * 12.9898 + (beard ? 2.3 : 7.7)) * 43758.5453);
+  float x = abs(fract(k) - 0.5) * 2.0;
+  float end = beard ? 0.995 - 0.1 * h : 0.995 - 0.06 * h;
+  float depth = beard ? 0.22 + 0.1 * fract(h * 7.31) : 0.09 + 0.08 * fract(h * 5.17);
+  return d.y - (end - depth * pow(x, beard ? 1.2 : 1.6));
 }
 #elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
@@ -2702,12 +2923,22 @@ void main() {
     #endif
     // (her hair burns on through a drain, as his cape does)
     gKeep = (m == 2 || m == 10) ? 1.0 : 0.0;
+  #elif defined(ELDER)
+    #ifdef CAPE
+      // (the beard parts into locks, the skirt's hem is ragged)
+      float cut = elderCut(m, vD);
+      if (cut > 0.0) discard;
+    #endif
+    // (his robe and his orange spectacles keep their colour through a drain)
+    gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
   vec3 base = charDetail(m, uPal[m], vRest, vD, unlit);
   #if defined(EXPLORER) && defined(CAPE)
     base = mix(base, uPal[m] * 0.32, smoothstep(-0.016, -0.003, cut) * 0.85);
+  #elif defined(ELDER) && defined(CAPE)
+    base = mix(base, uPal[m] * (m == 13 ? 0.6 : 0.4), smoothstep(-0.014, -0.002, cut) * 0.7);
   #endif
   vec3 n = normalize(vNormal);
   n = gl_FrontFacing ? n : -n;
@@ -2721,13 +2952,19 @@ void main() {
     float soft = 0.13;
   #elif defined(EXPLORER)
     float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
+  #elif defined(ELDER)
+    float soft = m == 10 ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
   #else
     float soft = m == 10 ? 0.16 : m == 9 ? 0.09 : 0.045;
   #endif
   float lit = smoothstep(-soft, soft, dot(n, uLightDir) + 0.15);
   vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
   vec3 col = base * mix(sh, vec3(1.0), max(lit, unlit));
+  #if defined(ELDER)
+  if (m == 10 || m == 13) {
+  #else
   if (m == 10) {
+  #endif
     // the cape's folds and waves keep a soft shadow in their valleys, under
     // any light (as a painter would shade them)
     float fold = smoothstep(0.8, 4.0, vFx.x) - 0.25 * smoothstep(1.0, 5.0, -vFx.x);
@@ -2746,6 +2983,8 @@ void main() {
   #endif
   #elif defined(EXPLORER)
   if (m == 2 || m == 10) {
+  #elif defined(ELDER)
+  if (m == 2 || m == 13) {
   #else
   if (m == 2) {
   #endif
@@ -2777,6 +3016,11 @@ void main() {
       if (hairCut(vD) > 0.0) discard;
     #endif
     gKeep = (m == 2 || m == 10) ? 1.0 : 0.0;
+  #elif defined(ELDER)
+    #ifdef CAPE
+      if (elderCut(m, vD) > 0.0) discard;
+    #endif
+    gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -4081,10 +4325,13 @@ export function makeInkMaterial(toon, width) {
 export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // The runner keeps their own colours however deep the dream goes (uDream3
   // carries the palette shift; its doorway-swell terms never reach this close).
-  // o.style: 'explorer' draws her details (see CHAR_DETAIL).
+  // o.style: 'explorer' draws her details, 'elder' his (see CHAR_DETAIL).
+  // cape may be a list of them (one pair of materials each: the elder's
+  // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const style = o.style === 'explorer' ? { EXPLORER: '' } : o.style === 'items' ? { ITEMS: '' } : o.style === 'fox' ? { FOX: '' } : {};
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER' };
+  const style = STYLES[o.style] ? { [STYLES[o.style]]: '' } : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
     const u = Object.assign({}, uniforms, extra);
@@ -4103,8 +4350,8 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // o.shell: a material for the layers of fur grown over the body (see SHELL)
   const shell = o.shell ? new THREE.ShaderMaterial({ uniforms: Object.assign({}, uniforms, { uFurWind: { value: o.shell } }), defines: Object.assign({ SHELL: '' }, style), vertexShader: VS_CHAR, fragmentShader: FS_CHAR }) : null;
   if (!cape) return { mat, ink, shell };
-  const [capeMat, capeInk] = make({ CAPE: '' }, { uCape: { value: cape.texture }, uCapeGrid: { value: cape.grid } });
-  return { mat, ink, capeMat, capeInk };
+  const sheets = (Array.isArray(cape) ? cape : [cape]).map((c) => make({ CAPE: '' }, { uCape: { value: c.texture }, uCapeGrid: { value: c.grid } }));
+  return { mat, ink, capeMat: sheets[0][0], capeInk: sheets[0][1], sheets };
 }
 
 export function makeGlassMaterial(env, o = {}) {

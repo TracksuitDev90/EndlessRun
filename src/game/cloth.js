@@ -251,7 +251,8 @@ export class Cloth {
   // hard the wake pulls in, per metre off the middle), gust (m/s), gustSpeed
   // (m/s down the cape), gustLen (m), curl (m/s at the free edges), kn, kt
   // (aero gains), damp (1/s), floor, groundV (how fast the ground runs back
-  // under the runner), lift (allowed rise above the pins), t }
+  // under the runner), lift (allowed rise above the pins), spread (optional:
+  // the headwind parting round the body), t }
   //
   // (Each phase of a substep is its own small method, called with integers
   // only: one big function of nested loops kept V8 cycling between tiers
@@ -369,6 +370,11 @@ export class Cloth {
     // adds nor removes energy)
     const vs = 1 / this.hPrev;
     const fax = f.ax, fay = f.ay, faz = f.az, wake = f.wake, draw = f.draw;
+    // (spread: how hard the headwind parts round the body - it pushes the
+    // cloth out from the middle in proportion to how far off it it is, so a
+    // hanging beard slides off one side of a belly instead of plastering
+    // over it)
+    const spread = f.spread || 0;
     const kn = f.kn, kt = f.kt, gx = f.gx, gy = f.gy, gz = f.gz;
     for (let k = cols; k < n; k++) {
       const o = k * 3;
@@ -385,6 +391,7 @@ export class Cloth {
         az *= 1 - wake * kw;
         ax -= draw * az * px * Math.min(1, (pz - 0.05) * 4);
       }
+      if (az > 0) ax += spread * az * px;
       const wx = ax + nx * tb - vx;
       const wy = fay + ny * tb - vy;
       const wz = az + nz * tb - vz;

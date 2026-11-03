@@ -1,5 +1,6 @@
 import { Wayfarer } from './wayfarer.js';
 import { Explorer } from './explorer.js';
+import { Elder } from './elder.js';
 
 // Who you can run as. Each has their sculpted asset (tools/runner/), the art
 // their card on the title screen is cut from (tools/characters/cards.py), a
@@ -25,6 +26,16 @@ export const CHARACTERS = [
     card: 'assets/characters/explorer.webp',
     tint: ['#9fdcc8', '#3f9a8c'],
     make: (env, asset) => new Explorer(env, asset),
+  },
+  {
+    id: 'elder',
+    name: 'Alder',
+    title: 'the elder',
+    blurb: 'ancient · hobbles on his stick',
+    asset: 'assets/elder/',
+    card: 'assets/characters/elder.webp',
+    tint: ['#9fd0c6', '#2f6f7c'],
+    make: (env, asset) => new Elder(env, asset),
   },
 ];
 
