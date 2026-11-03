@@ -365,12 +365,12 @@ def g_hair():
 # jaw and cheeks, up to the sideburns, and the drooping moustache; the long
 # beard hangs from under it (simulated: src/game/elder.js), its roots pinned
 # along this line under the jaw (head space, by angle round from the chin).
-BEARD = dict(c=(0.0, 1.79, -0.02), rx=0.074, rz=0.046, y0=1.748, y1=1.79, reach=1.3)
+BEARD = dict(c=(0.0, 1.792, -0.024), rx=0.088, rz=0.05, y0=1.742, y1=1.8, reach=1.36, cols=11)
 
 
 def beard_root(u):
     """Where the long beard's column u (-1 at his right jaw .. 1 at his left,
-    0 under the chin) is rooted, under the sculpted beard."""
+    0 under the chin) is rooted, inside the sculpted beard."""
     th = u * BEARD['reach']
     c = V(*BEARD['c'])
     y = BEARD['y0'] + (BEARD['y1'] - BEARD['y0']) * abs(u) ** 1.6
@@ -378,40 +378,60 @@ def beard_root(u):
 
 
 def g_beard():
-    """The hair of the beard where it grows on his face: over the jaw and the
-    chin, up the cheeks under the cheekbones to the sideburns, and the
-    moustache drooping from under his nose over his mouth."""
+    """The hair of the beard where it grows on his face, big and bushy: over
+    the jaw and the chin and well out from them, up the cheeks under the
+    cheekbones to the sideburns, full jowls of it either side, its surface
+    broken into tufts; and the moustache drooping from under his nose over his
+    mouth and down into it."""
 
     def growth(p):
         th = np.abs(np.arctan2(p[:, 0], -(p[:, 2] + 0.01)))
-        top = np.interp(th, [0, 0.25, 0.55, 0.95, 1.25, 1.42, 1.6], [1.785, 1.79, 1.81, 1.828, 1.86, 1.885, 1.885])
+        top = np.interp(th, [0, 0.25, 0.55, 0.95, 1.25, 1.42, 1.6], [1.787, 1.792, 1.815, 1.834, 1.866, 1.89, 1.89])
         return np.maximum(p[:, 1] - top, (th - 1.5) * 0.1)
 
-    thick = lambda p: 0.008 + 0.03 * smooth(1.83, 1.74, p[:, 1])
-    mass = Prim(lambda p: smax(skull(p) - thick(p), growth(p), 0.01), (-0.12, 1.68, -0.13), (0.12, 1.9, 0.08))
-    # it fills out under the chin, where the long beard hangs from
-    chinful = ellipsoid((0, 1.75, -0.052), (0.078, 0.05, 0.058))
+    # (thicker the lower it grows: it stands well out from the jaw and chin)
+    thick = lambda p: 0.011 + 0.04 * smooth(1.84, 1.74, p[:, 1])
+    mass = Prim(lambda p: smax(skull(p) - thick(p), growth(p), 0.012), (-0.15, 1.64, -0.17), (0.15, 1.92, 0.1))
+    # it fills right out under the chin, where the long beard hangs from, and
+    # in jowls either side
+    chinful = ellipsoid((0, 1.742, -0.056), (0.096, 0.062, 0.072))
+    jowls = [ellipsoid((s * 0.064, 1.775, -0.045), (0.052, 0.058, 0.056)) for s, _ in SIDES]
+    # tufts breaking up its surface (seeded, so the same every build)
+    rnd = np.random.default_rng(31)
+    tufts = []
+    for th in np.linspace(-1.35, 1.35, 9):
+        for row, y in enumerate((1.79, 1.755, 1.72)):
+            if row == 2 and abs(th) > 1.0:
+                continue
+            r = 0.105 - 0.012 * row + rnd.uniform(-0.006, 0.006)
+            c = V(math.sin(th) * r * 0.85, y + rnd.uniform(-0.008, 0.008), -0.03 - math.cos(th) * r * 0.62)
+            tufts.append(stroke([c + V(0, 0.018, 0.008), c, c + V(math.sin(th) * 0.008, -0.028, -math.cos(th) * 0.006)], [0.02, 0.019, 0.008]))
     stache = []
     for s, _ in SIDES:
-        stache.append(stroke([V(s * 0.004, 1.797, -0.145), V(s * 0.032, 1.79, -0.138), V(s * 0.058, 1.765, -0.116), V(s * 0.066, 1.73, -0.1)], [0.013, 0.016, 0.013, 0.005]))
+        stache.append(stroke([V(s * 0.004, 1.798, -0.146), V(s * 0.034, 1.791, -0.14), V(s * 0.062, 1.764, -0.12), V(s * 0.072, 1.722, -0.104)], [0.015, 0.019, 0.016, 0.006]))
 
     def field(p):
-        d = smin(mass(p), chinful(p), 0.02)
+        d = smin(mass(p), chinful(p), 0.025)
+        for q in jowls:
+            d = smin(d, q(p), 0.025)
+        for q in tufts:
+            d = smin(d, q(p), 0.012)
         for q in stache:
             d = smin(d, q(p), 0.008)
         return d
 
     head = rigid('head')
-    owners = [(mass, head), (chinful, head)] + [(q, head) for q in stache]
+    owners = [(mass, head), (chinful, head)] + [(q, head) for q in jowls] + [(q, head) for q in tufts] + [(q, head) for q in stache]
+    ns = len(stache)
 
     def details(p, n, own):
         # x: 1 (strands everywhere), y: on the moustache
-        return np.stack([np.ones(len(p)), own[:, 2:].sum(1), np.zeros(len(p)), np.zeros(len(p))], 1)
+        return np.stack([np.ones(len(p)), own[:, -ns:].sum(1), np.zeros(len(p)), np.zeros(len(p))], 1)
 
     def mats(p, n, own):
         return np.full(len(p), MAT['hair'])
 
-    return Garment('beard', MAT['hair'], 0.002, (-0.13, 1.68, -0.17), (0.13, 1.92, 0.09), field, owners, 1900, tau=0.006, details=details, mats=mats)
+    return Garment('beard', MAT['hair'], 0.002, (-0.16, 1.62, -0.19), (0.16, 1.93, 0.11), field, owners, 2300, tau=0.006, details=details, mats=mats)
 
 
 GLASSES = dict(y=1.86, z=-0.122, half=(0.029, 0.022), r=0.0048, gap=0.017, tilt=0.12)
@@ -903,7 +923,7 @@ def build():
         cran=[list(CRAN[0]), list(CRAN[1])],
         # the long beard: its roots (head-space points under the jaw, by
         # column), and what it is kept off
-        beardRoots=[[round(float(x), 5) for x in beard_root(u)] for u in np.linspace(-1, 1, 9)],
+        beardRoots=[[round(float(x), 5) for x in beard_root(u)] for u in np.linspace(-1, 1, BEARD['cols'])],
         beard=beard_colliders(),
         # the skirt: hung from round his waist, under the sash
         skirt=dict(y=SKIRT_TOP, w=0.142, back=0.118, front=0.15, z=-0.01, colliders=skirt_colliders()),

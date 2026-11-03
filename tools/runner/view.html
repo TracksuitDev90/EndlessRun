@@ -51,7 +51,10 @@
       if (pose !== 'bind') {
         if (pose === 'jump') {
           for (let i = 0; i < 60; i++) runner.update(dt, 14, () => 0);
-          if (q.get('trick')) runner.deck = [q.get('trick')];
+          if (q.get('trick')) {
+            runner.deck = [q.get('trick')];
+            runner.nextTrick = q.get('trick');
+          }
           runner.action('up');
           const n = Math.round(Number(q.get('jt') || 0.3) / dt);
           for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
@@ -63,6 +66,8 @@
           const n = Math.round(Number(q.get('jt') || 0.3) / dt);
           for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
         } else {
+          // (&carry=1: the elder picks up his stick as soon as he can)
+          if (q.get('carry') && runner.carry) runner.carry.next = 0;
           const n = Math.round(T / dt);
           for (let i = 0; i < n; i++) runner.update(dt, pose === 'run' ? 14 : 0, () => 0);
         }

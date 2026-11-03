@@ -6,6 +6,8 @@ import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
 import { Player, C, hermite } from './player.js';
 import { CONFIG } from '../config.js';
 import { Dust } from './dust.js';
+import { Sparks } from './sparks.js';
+import { rgb } from '../render/geo.js';
 
 // The elder: an incredibly old man, the tallest of the runners, bent at the
 // waist and hobbling along on his long twisted walking stick - and every bit
@@ -18,10 +20,18 @@ import { Dust } from './dust.js';
 //     is - see staffStep). He pushes himself from lane to lane with it,
 //     planting it on the far side and shoving off, vaults over it to jump,
 //     plants it to land, and drags it behind him like a skid in a slide;
-//   - his incredibly long white beard is simulated like Wren's hair
+//   - his incredibly long, full white beard is simulated like Wren's hair
 //     (cloth.js): hanging from his chin, it streams in the headwind, slides
 //     off his pot belly to one side and round him, swings out across a lane
-//     change, flies up through a vault and slaps down on landing;
+//     change, flops up through a jump and slaps down on landing - and now and
+//     then a gust flicks it up over his shoulder to tap him on the back;
+//   - now and then he picks his stick up, swings it onto his shoulder and
+//     just walks, a little straighter, before quickly putting it back down;
+//   - now and then a little poof of sparks comes off its knob, in the
+//     colours of the gems he's been picking up (sparks.js);
+//   - he has two jumps: the hop vault, pushing off his stick, and a pole
+//     vault - up onto the top of the stick in a wobbly handstand, over, and
+//     down;
 //   - the skirt of his robe is simulated too, hung from his waist under the
 //     sash and open down the front; the bell sleeves hang and swing on
 //     springs; his wispy hair and bushy brows bounce.
@@ -65,11 +75,12 @@ export const COL = {
 // The long beard: cols x rows particles; u runs across (0 at his right jaw,
 // round under the chin, 1 at his left), v down from the roots to the tip.
 export const BEARD = {
-  cols: 9,
-  rows: 14,
-  length: 0.76, // from under the chin to the tip, hanging
-  tipW: 0.05, // how wide it narrows to at the tip (each side)
-  thick: 0.013, // half its depth, before the taper (see VS_CHAR)
+  cols: 11,
+  rows: 16,
+  length: 0.98, // from under the chin to the tip, hanging
+  tipW: 0.035, // how wide it narrows to at the tip (each side)
+  bulge: 0.125, // ...and how wide it swells out to below the chin (each side)
+  thick: 0.02, // half its depth, before the taper (see VS_CHAR: fullest under the chin)
   subU: 3,
   subV: 2,
   margin: 0.007,
@@ -142,9 +153,10 @@ function resample(path, n, out, col, cols) {
 }
 
 // The rest fall of the beard: each column from its root under the jaw,
-// curving down under the chin and hanging, the columns drawing together
-// toward a point; it drapes over the front of his chest and the round of his
-// belly - then is let fall onto them.
+// curving down under the chin and hanging, the columns spreading out into a
+// full spade below the chin and drawing together toward a point; it drapes
+// over the front of his chest and the round of his belly - then is let fall
+// onto them.
 function beardBind(rig) {
   const { cols, rows } = BEARD;
   const pts = new Float32Array(cols * rows * 3);
@@ -156,15 +168,21 @@ function beardBind(rig) {
     const belly = by * by < 1 ? -0.05 - 0.162 * Math.sqrt(1 - by * by) : -0.05;
     return Math.min(-0.085, belly - 0.022);
   };
+  const rw = Math.max(...roots.map((r) => Math.abs(r[0])));
+  // (its half-width down its length: from the jaw, swelling out, then in to a point)
+  const width = (t) => {
+    const out = rw + (BEARD.bulge - rw) * smooth(0, 0.22, t);
+    return out + (BEARD.tipW - out) * Math.pow(smooth(0.22, 1.0, t), 0.85);
+  };
   for (let i = 0; i < cols; i++) {
     const u = (i / (cols - 1)) * 2 - 1;
     const R = new THREE.Vector3(...roots[i]);
+    const xr = R.x / rw;
     const path = [];
     for (let k = 0; k <= 40; k++) {
       const t = k / 40;
       const y = R.y + (tipY - R.y) * t;
-      const close = smooth(0.05, 1.0, t);
-      const x = R.x + (u * BEARD.tipW - R.x) * close;
+      const x = R.x + (xr * width(t) - R.x) * smooth(0, 0.12, t);
       // (it leaves the chin heading forward and down, then hangs)
       const z = Math.min(R.z - 0.015 * Math.sin(Math.PI * Math.min(1, t * 4)), front(y));
       path.push(new THREE.Vector3(x, y, z));
@@ -298,14 +316,16 @@ export class Elder extends Player {
     mk(BEARD, this.beardRest, this.asset.meta.materials.beard, mats.sheets[0]);
     mk(SKIRT, this.skirtRest, this.asset.meta.materials.skirt, mats.sheets[1]);
     this.dust = new Dust(this.u);
+    this.sparks = new Sparks(this.u);
   }
 
   get objects() {
-    return [this.root, this.shadow, this.dust.points];
+    return [this.root, this.shadow, this.dust.points, this.sparks.points];
   }
 
   forCompile(on) {
     this.dust.forCompile(on);
+    this.sparks.forCompile(on);
   }
 
   buildSim() {
@@ -334,7 +354,12 @@ export class Elder extends Player {
     leash(this.skirt, this.skirtRest, SKIRT.cols, SKIRT.rows, 0.22, 3);
     this.skirt.frontOff = 0.5;
     this.skirt.backOff = 0.08;
-    this.skirtDefs = this.rig.skirt.colliders.map((c) => ({ ...c }));
+    // (kept off his legs and seat - and his arms, chest and head too, for
+    // when he's upside down on top of his stick and it falls over him;
+    // limbs first, the body's own volumes last)
+    const up = this.rig.beard.filter((c) => /^(arm|clav|fore|neck)/.test(c.bone) || (c.kind === 'ell' && /^(chest|head)/.test(c.bone)));
+    const all = this.rig.skirt.colliders.concat(up);
+    this.skirtDefs = all.filter((c) => c.kind !== 'ell').concat(all.filter((c) => c.kind === 'ell')).map((c) => ({ ...c }));
     this.skirt.setColliderCount(this.skirtDefs.length);
     this.skirtFold = new Float32Array(SKIRT.cols * SKIRT.rows);
     this.skirtWind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.25, draw: 0.6, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.5, floor: 0, lift: 0.22, t: 0 };
@@ -351,6 +376,13 @@ export class Elder extends Player {
     // own space: the sands take a hole from each)
     this.strikes = { n: 0, at: [0, 1, 2, 3].map(() => new THREE.Vector3()) };
     this.staffM = new THREE.Matrix4();
+    // the beard flicked up over his shoulder (t: since it was), the stick
+    // carried on his shoulder, the pole vault's turn, the sparks' colours
+    this.flick = { t: 9, side: 1, next: 6 };
+    this.carry = { on: false, t: 0, dur: 0, next: 9 };
+    this.spin = { value: 0, from: 0, to: 0, start: 0, t: 0, delay: 0, dur: 1, ease: null };
+    this.gemCols = [];
+    this.knob = new THREE.Vector3();
   }
 
   resetSim() {
@@ -371,11 +403,66 @@ export class Elder extends Player {
     this.stickK = NaN;
     this.toeOffK = null;
     this.dust?.clear();
+    this.sparks?.clear();
+    if (this.flick) {
+      this.flick.t = 9;
+      this.flick.next = 5 + 5 * Math.random();
+    }
+    if (this.carry) {
+      this.carry.on = false;
+      this.carry.next = 7 + 6 * Math.random();
+    }
+    this.carryW = 0;
+    this.carryE = 0;
+    if (this.spin) {
+      const S = this.spin;
+      S.value = S.from = S.to = S.start = 0;
+      S.ease = null;
+    }
+    this.trick = 'hop';
+    this.hops = 0;
+    this.sparkT = 2 + 3 * Math.random();
+    this.vyWas = 0;
+    this.poleTop = false;
   }
 
   update(dt, speed, groundAt) {
     this.lastDt = dt;
     super.update(dt, speed, groundAt);
+    const running = this.mode === 'run' && !this.crashed && speed > 4;
+    // the top of a jump: the beard flops up
+    if (!this.grounded && this.vyWas > 0 && this.vy <= 0 && !this.crashed) this.kickBeard(0, 3.6, -0.5, 0.15);
+    this.vyWas = this.grounded ? 0 : this.vy;
+    // now and then a gust flicks the beard up over his shoulder onto his back
+    const F = this.flick;
+    F.t += dt;
+    if (running && this.grounded && !this.sliding && F.t > 2.5) {
+      F.next -= dt;
+      if (F.next <= 0) this.flickBeard();
+    }
+    // now and then he picks his stick up and just walks
+    const K = this.carry;
+    const free = running && this.grounded && !this.sliding && !this.plant.on && this.jumpT > 0.5 && this.w.run > 0.9;
+    if (K.on) {
+      K.t += dt;
+      if (K.t > K.dur || !free) this.endCarry();
+    } else if (free) {
+      K.next -= dt;
+      if (K.next <= 0) {
+        K.on = true;
+        K.t = 0;
+        K.dur = 1.3 + 0.8 * Math.random();
+      }
+    }
+    // (up onto his shoulder over a quarter of a second; back down quicker)
+    this.carryW = K.on ? Math.min(1, this.carryW + dt / 0.26) : Math.max(0, this.carryW - dt / 0.15);
+    this.carryE = this.carryW * this.carryW * (3 - 2 * this.carryW);
+    // now and then a poof of sparks off the knob
+    this.sparkT -= dt;
+    if (this.sparkT <= 0 && !this.crashed) {
+      this.sparkPoof(6 + Math.floor(4 * Math.random()));
+      this.sparkT = running ? 2.8 + 4 * Math.random() : 4 + 5 * Math.random();
+    }
     // a stick planted in the world stays where it is as he goes past it
     // (sliding back no faster than slip m/s: at full tilt it would be gone
     // in a frame - this way the push still shows)
@@ -392,6 +479,7 @@ export class Elder extends Player {
   place(z, dist = 0) {
     super.place(z);
     this.dust.update(this.lastDt, this.root, z, dist);
+    this.sparks.update(this.lastDt, this.root, z, dist);
     this.lastDt = 0;
   }
 
@@ -436,34 +524,238 @@ export class Elder extends Player {
   onDodge(dir) {
     this.dodgeT = 0;
     this.dodgeDir = dir;
+    this.endCarry();
     if (this.mode === 'run' && this.grounded && !this.sliding && !this.crashed) {
       _p.set(dir < 0 ? 0.55 : -0.42, 0, -0.62);
       this.startPlant(_p, 0.2, 7, 2);
     }
   }
 
-  // The jump: he plants the stick ahead and vaults up over it.
+  // The jump: he plants the stick ahead and vaults up over it - pushing off
+  // it (the hop), or now and then right up onto the top of it (the pole
+  // vault: never twice running, and never more than three hops between).
   jump() {
-    const fromRun = this.grounded && !this.sliding;
+    const fromRun = this.grounded && !this.sliding && !this.crashed;
     super.jump();
-    if (fromRun && !this.crashed) {
+    this.endCarry();
+    this.hurry(0.18);
+    // (nextTrick: asked for by the viewer - see tools/runner/view.html)
+    const want = this.nextTrick;
+    this.nextTrick = null;
+    const pole = fromRun && (want ? want === 'pole' : this.trick !== 'pole' && (this.hops >= 3 || Math.random() < 0.4));
+    this.trick = pole ? 'pole' : 'hop';
+    this.hops = pole ? 0 : this.hops + 1;
+    this.poleTop = false;
+    if (pole) {
+      // (forward, over the top of the stick: slowing through the handstand)
+      this.spinTo(-1, 0.03, this.feel.jump.time * 0.86, POLE_EASE);
+      _p.set(0.04, 0, -0.72);
+      if (!this.wet) this.stickPuff(_p, 3);
+      this.strike(_p);
+      this.kickBeard(0, -1.6, 0.8, 0.2);
+    } else if (fromRun) {
       _p.set(0.2, 0, -0.62);
       this.startPlant(_p, 0.16, 8, 3);
+      this.kickBeard(0, -1.2, 0.6, 0.2);
     }
   }
 
+  onFastFall() {
+    this.hurry(0.14);
+  }
+
+  startSlide() {
+    super.startSlide();
+    this.endCarry();
+    this.hurry(0.1);
+  }
+
   onLand(hit) {
+    this.hurry(0.1);
     if (this.crashed || this.mode !== 'run') return;
+    // the beard slaps down
+    this.kickBeard(0, -2.4 * Math.min(1.3, hit), 0, 0.2);
     // the stick comes down first, just ahead of him, and takes his weight
     _p.set(0.26, 0, -0.42);
     this.startPlant(_p, 0.16, 6, hit > 0.5 ? 3 : 1);
   }
 
+  crash() {
+    super.crash();
+    this.endCarry();
+  }
+
+  // Put the stick back down (if he'd picked it up): it strikes the road.
+  endCarry() {
+    const K = this.carry;
+    if (!K || !K.on) return;
+    K.on = false;
+    K.next = 9 + 10 * Math.random();
+  }
+
+  // A gem: a sympathetic little spark off the stick in its colour, now and
+  // then, and its colour is one the sparks come in for a while.
+  onGem(g) {
+    const c = g.light || g.tint;
+    if (!c) return;
+    this.gemCols.push(c);
+    if (this.gemCols.length > 6) this.gemCols.shift();
+    if (Math.random() < 0.3) this.sparkPoof(4, c);
+  }
+
+  // A colour for a spark: one of the last few gems he picked up, else one
+  // of this world's own stones.
+  sparkColor() {
+    if (this.gemCols.length) return this.gemCols[Math.floor(Math.random() * this.gemCols.length)];
+    const G = this.gemSpec;
+    if (G && G.stones) {
+      const st = G.stones[Math.floor(Math.random() * G.stones.length)];
+      const tints = st.rgbSpark || (st.rgbSpark = st.tints.map((t) => rgb(t)));
+      return tints[Math.floor(Math.random() * tints.length)];
+    }
+    return SPARK_DEFAULT;
+  }
+
+  // A little poof of sparks off the knob of the stick: n of them, flung out
+  // every which way and left behind as he runs on (colour: one for all of
+  // them, or each its own).
+  sparkPoof(n, color = null, power = 1) {
+    if (this.wet && Math.random() < 0.5) return;
+    const r = Math.random;
+    const run = _dv.set(this.vx, this.grounded ? 0 : this.vy, -this.speed).applyQuaternion(this.invQ);
+    const base = color || this.sparkColor();
+    for (let k = 0; k < n; k++) {
+      const c = color || (k % 3 === 2 ? this.sparkColor() : base);
+      const a = r() * Math.PI * 2, e = (r() - 0.3) * 1.6;
+      const sp = (0.7 + 1.1 * r()) * power;
+      _v.set(Math.cos(a) * Math.cos(e) * sp, Math.sin(e) * sp + 0.5, Math.sin(a) * Math.cos(e) * sp);
+      _v.addScaledVector(run, 0.55 + 0.15 * r());
+      _p.copy(this.knob);
+      _p.x += (r() - 0.5) * 0.04;
+      _p.y += (r() - 0.5) * 0.04;
+      _p.z += (r() - 0.5) * 0.04;
+      this.sparks.emit(_p, _v, 0.08 + 0.06 * r(), c);
+    }
+  }
+
+  // --- the beard's moments ----------------------------------------------------------
+  // Push the beard (m/s, world axes), more toward its tip than its roots
+  // (from: the share of its length that's left alone).
+  kickBeard(vx, vy, vz, from = 0.2) {
+    const cl = this.beard;
+    if (!cl || !this.simReady) return;
+    const { cols, rows } = BEARD;
+    const h = cl.hPrev;
+    const j0 = from * (rows - 1);
+    for (let j = 1; j < rows; j++) {
+      const w = smooth(j0, rows - 1, j);
+      if (w <= 0) continue;
+      for (let i = 0; i < cols; i++) {
+        const o = (j * cols + i) * 3;
+        cl.q[o] -= vx * w * h;
+        cl.q[o + 1] -= vy * w * h;
+        cl.q[o + 2] -= vz * w * h;
+      }
+    }
+  }
+
+  // A gust flicks the beard up over his shoulder (the side it's streaming
+  // to), and it comes down on his back with a pat before it slides off (see
+  // flickStep).
+  flickBeard() {
+    const F = this.flick;
+    const cl = this.beard;
+    const { cols, rows } = BEARD;
+    let x = 0;
+    for (let i = 0; i < cols; i++) x += cl.p[((rows - 1) * cols + i) * 3];
+    F.side = Math.abs(x) > 0.02 * cols ? Math.sign(x) : Math.random() < 0.5 ? -1 : 1;
+    F.t = 0;
+    F.next = 7 + 8 * Math.random();
+    this.kickBeard(F.side * 1.5, 3.5, 0, 0.2);
+  }
+
+  // The flick, steered: for a moment the beard is laid along a path - out
+  // wide past his arm, up over his shoulder, then down onto his upper back
+  // (a pat) - each part of it drawn toward its own place along the path
+  // (the tip furthest), then let go: the body's own volumes route it round
+  // him, and the wind slides it back off.
+  flickStep(dt) {
+    const F = this.flick;
+    if (F.t > 1.2 || !this.simReady) return;
+    const cl = this.beard;
+    const { cols, rows } = BEARD;
+    const Q = this.root.quaternion;
+    const M = this.boneM('chest');
+    const s = F.side;
+    // the path's points (bind space on his chest, carried with it, in
+    // simulation space): the chin, then out wide and up (getting there), or
+    // over the shoulder and down his back (there)
+    const there = smooth(0.2, 0.34, F.t);
+    const A = _X.set(0, 0, 0);
+    for (let i = 0; i < cols; i++) A.x += cl.p[i * 3] / cols, A.y += cl.p[i * 3 + 1] / cols, A.z += cl.p[i * 3 + 2] / cols;
+    const Bp = _Y.set(s * (0.44 - 0.32 * there), 1.5 + 0.42 * there, -0.22 + 0.24 * there).applyMatrix4(M).applyQuaternion(Q);
+    const Cp = _Z.set(s * (0.2 - 0.18 * there), 1.9 - 0.52 * there, 0.0 + 0.21 * there).applyMatrix4(M).applyQuaternion(Q);
+    const k = 48 - 14 * there;
+    const c = 3 + 3 * there;
+    const h = cl.hPrev;
+    const vs = 1 / h;
+    for (let j = 2; j < rows; j++) {
+      const u = j / (rows - 1);
+      const w = smooth(0.12, 0.5, u) * smooth(0, 0.06, F.t) * (1 - smooth(1.0, 1.2, F.t));
+      if (w <= 0) continue;
+      // (along the path: the chin to the middle point by 0.45 of the way
+      // down the beard, on to the far point by its tip)
+      if (u < 0.45) _v.copy(A).lerp(Bp, u / 0.45);
+      else _v.copy(Bp).lerp(Cp, (u - 0.45) / 0.55);
+      for (let i = 0; i < cols; i++) {
+        const o = (j * cols + i) * 3;
+        for (let a2 = 0; a2 < 3; a2++) {
+          const v = (cl.p[o + a2] - cl.q[o + a2]) * vs;
+          const acc = k * (_v.getComponent(a2) - cl.p[o + a2]) - c * v;
+          cl.q[o + a2] -= acc * w * dt * h;
+        }
+      }
+    }
+  }
+
   // Picked on the title screen: a gust in his beard and robe, and he lifts
-  // his stick and thumps it down.
+  // his stick and thumps it down - in a poof of sparks.
   greet() {
     this.gustT = 1;
     this.greetT = 0;
+    this.sparkT = 0.5;
+  }
+
+  // --- the pole vault's turn ------------------------------------------------------
+  // A turn of the whole body about a point POLE_PIVOT up (negative turns go
+  // over forward), eased from one angle to the next over dur seconds after a
+  // delay; cut short, it whips round to finish quickly.
+  spinTo(turns, delay, dur, ease = null) {
+    const S = this.spin;
+    S.from = S.start = S.value;
+    S.ease = ease;
+    // (always at least half a turn still to go)
+    S.to = Math.floor((S.value - Math.PI) / TAU) * TAU - (Math.abs(turns) - 1) * TAU;
+    S.t = 0;
+    S.delay = delay;
+    S.dur = dur;
+  }
+
+  hurry(dur = 0.14) {
+    const S = this.spin;
+    if (!S || S.value === S.to) return;
+    S.from = S.value;
+    S.t = 0;
+    S.delay = 0;
+    S.dur = dur;
+    S.ease = null;
+  }
+
+  // how far round the turn he is, 0..1
+  get turned() {
+    const S = this.spin;
+    const span = S.to - S.start;
+    return span ? clamp((S.value - S.start) / span, 0, 1) : 1;
   }
 
   // --- poses -------------------------------------------------------------------
@@ -502,13 +794,30 @@ export class Elder extends Player {
     r[C.hipRoll] += 0.04 * Math.sin(f);
     r[C.spSide] -= 0.05 * Math.sin(f);
     r[C.chLean] += 0.05 * lurch;
-    this.handBehind(r);
+    // (carrying his stick he walks a little straighter, chin up, his free
+    // arm swinging)
+    const c = this.carryE || 0;
+    this.handBehind(r, 1 - c);
     // the stick hand swings with the stick: forward as it swings through,
     // back as he goes past it
     r[C.shRx] = 0.55 + 0.32 * Math.cos(f);
     r[C.shRz] = 0.3;
     r[C.shRy] = -0.2;
     r[C.elR] = 0.75 - 0.15 * Math.cos(f);
+    if (c > 0) {
+      const m = (i, v) => (r[i] += (v - r[i]) * c);
+      r[C.spLean] -= 0.2 * c;
+      r[C.chLean] -= 0.14 * c + 0.05 * lurch * c;
+      r[C.hdPitch] -= 0.3 * c;
+      r[C.hipY] += (0.01 + 0.012 * lurch) * c;
+      // the stick up on his shoulder, his hand on it in front
+      m(C.shRx, 0.95);
+      m(C.shRz, 0.3);
+      m(C.shRy, -0.3);
+      m(C.elR, 2.0);
+      m(C.wrR, -0.2);
+      m(C.clR, 0.08);
+    }
   }
 
   // Standing: leaning on his stick, bent over it, the other hand in the
@@ -534,6 +843,7 @@ export class Elder extends Player {
   // both knees up high and to the side as he goes over, his free arm flung
   // out, beard flying; and reaches down with both feet and the stick to land.
   poseJump(j) {
+    if (this.trick === 'pole') return this.posePole(j);
     const u = clamp(0.5 - 0.5 * this.vyPose / this.V0, 0, 1);
     const k = (a, b, c) => hermite(VAULT_T, [a, b, c, c], 0, 0, u);
     j.fill(0);
@@ -569,6 +879,28 @@ export class Elder extends Player {
     j[C.elR] = k(0.25, 0.9, 0.5);
     j[C.clR] = k(0.1, 0.12, 0.08);
     j[C.sq] = 1;
+  }
+
+  // The pole vault (keyed on how far round the turn he is - see POLE): he
+  // reaches out for the stick planted ahead, dives up onto it, arms over his
+  // head and legs kicking up behind, swings up into a handstand right on top
+  // of it (a little wobbly - he is very old), then pushes off, his legs
+  // whipping over, and comes round to land.
+  posePole(j) {
+    const u = this.turned;
+    j.fill(0);
+    j[C.hipY] = this.HIP_Y;
+    j[C.sq] = 1;
+    for (const [i, v] of POLE_KEYS) j[i] = hermite(POLE_TS, v, 0, 0, u);
+    j[C.elL] = Math.max(0, j[C.elL]);
+    j[C.elR] = Math.max(0, j[C.elR]);
+    // the wobble at the top
+    const top = smooth(0.36, 0.46, u) * (1 - smooth(0.56, 0.66, u));
+    const t = this.time;
+    j[C.spSide] += 0.07 * Math.sin(t * 9) * top;
+    j[C.thLz] += 0.1 * Math.sin(t * 9 + 0.6) * top;
+    j[C.thRz] -= 0.1 * Math.sin(t * 9 + 0.6) * top;
+    j[C.knL] += 0.25 * Math.max(0, Math.sin(t * 7)) * top;
   }
 
   // Ducking under: he drops into a squat right down on his heels, folded
@@ -649,6 +981,23 @@ export class Elder extends Player {
 
   // --- the stick ---------------------------------------------------------------
   afterPose(dt, cw) {
+    // the pole vault's turn goes on after the pose, about POLE_PIVOT
+    const S = this.spin;
+    if (S.value !== S.to) {
+      S.t += dt;
+      const u = clamp((S.t - S.delay) / S.dur, 0, 1);
+      const e = S.ease ? S.ease(u) : u * u * (3 - 2 * u);
+      S.value = u >= 1 ? S.to : S.from + (S.to - S.from) * e;
+    }
+    const pitch = (S.value % TAU) * (1 - cw);
+    if (pitch !== 0) {
+      const b = this.body;
+      _q.setFromAxisAngle(_X.set(1, 0, 0), pitch);
+      b.quaternion.premultiply(_q);
+      _p.set(0, POLE_PIVOT, 0);
+      _v.copy(_p).applyQuaternion(_q);
+      b.position.applyQuaternion(_q).add(_p).sub(_v);
+    }
     this.staffStep(dt, cw);
   }
 
@@ -691,12 +1040,42 @@ export class Elder extends Player {
     // jumping: carried, swinging under him like a pendulum - planted ahead
     // as he goes up (see jump), swept back under him as he goes over, and
     // swung forward again to meet the road
-    if (W.jump > 0) {
+    let poleHand = 0;
+    if (W.jump > 0 && this.trick === 'pole') {
+      // the pole vault: planted on the road under him as he goes up onto
+      // it (it slides along with him: he's going far too fast for it to stay
+      // put), let go of at the push-off and swung forward to meet the road
+      const u = this.turned;
+      const pw = 1 - smooth(0.54, 0.68, u);
+      const gy = (this.groundY || 0) - this.y;
+      const phi = -0.25 + 0.7 * smooth(0.62, 1, u);
+      _v2.set(0.05, Math.cos(phi), Math.sin(phi));
+      _v.copy(Gfk).addScaledVector(_v2, -L);
+      _v3.set(0.04, gy, -0.72 + 0.78 * smooth(0, 0.5, u));
+      _v.lerp(_v3, pw);
+      add(_v, W.jump / tot);
+      // (both hands on it, from the reach to the push-off)
+      poleHand = smooth(0.02, 0.12, u) * (1 - smooth(0.56, 0.66, u)) * (W.jump / tot);
+      // a poof of sparks as he gets to the top
+      if (!this.poleTop && u > 0.47) {
+        this.poleTop = true;
+        this.poleSpark = true;
+      }
+    } else if (W.jump > 0) {
       const u = clamp(0.5 - 0.5 * this.vyPose / this.V0, 0, 1);
       const phi = hermite(VAULT_STICK_T, VAULT_STICK, 0, 0, u);
       _v2.set(0.06, Math.cos(phi), Math.sin(phi));
       _v.copy(Gfk).addScaledVector(_v2, -L);
       add(_v, W.jump / tot);
+    }
+    // picked up and carried on his shoulder: the knob end in his hand in
+    // front of it, the rest angled back and up over it
+    const c = this.carryE || 0;
+    if (c > 0) {
+      _v2.set(-0.24, -0.62, -1).normalize();
+      _v.copy(Gfk).addScaledVector(_v2, -L);
+      T.lerp(_v, c);
+      D.lerp(_v2, c);
     }
     // planted in the world: a push off it, the vault's take-off, a landing
     const P = this.plant;
@@ -754,6 +1133,53 @@ export class Elder extends Player {
     b.staff.updateMatrixWorld(true);
     this.staffTip = this.staffTip || new THREE.Vector3();
     this.staffTip.copy(_T);
+    // where the knob is (the sparks come off it)
+    this.knob.set(0, R.staff.length - 0.03, 0).applyMatrix4(this.staffM);
+    if (this.poleSpark) {
+      this.poleSpark = false;
+      this.sparkPoof(12, null, 1.3);
+    }
+    // the free hand on the stick too, just under the other, in the pole vault
+    if (poleHand > 0.001) {
+      _v.copy(this.staffTip).addScaledVector(_D.set(0, 1, 0).applyQuaternion(b.staff.quaternion), L - 0.15);
+      const SL = _S.setFromMatrixPosition(b.armL.matrixWorld);
+      // (the wrist a little off the shaft, toward his shoulder)
+      _v2.subVectors(SL, _v);
+      _v2.addScaledVector(_D, -_v2.dot(_D)).normalize();
+      _v.addScaledVector(_v2, 0.05);
+      this.reachLeft(SL, _v, poleHand);
+    }
+  }
+
+  // Two-bone solve of the left arm toward a wrist target W, blended over the
+  // pose by w (the hand keeps its own turn).
+  reachLeft(S, Wt, w) {
+    const b = this.b;
+    const ua = this.rig.upperArm, fa = this.rig.forearm;
+    const d0 = Math.max(1e-4, Wt.distanceTo(S));
+    const d = clamp(d0, Math.abs(ua - fa) + 0.01, ua + fa - 0.002);
+    const n = _v2.subVectors(Wt, S).divideScalar(d0);
+    // the pole: out to his left, back and a little down
+    const cm = b.chest.matrixWorld.elements;
+    _p.set(-cm[0] * 0.4 + cm[8] * 0.7 - cm[4] * 0.6, -cm[1] * 0.4 + cm[9] * 0.7 - cm[5] * 0.6, -cm[2] * 0.4 + cm[10] * 0.7 - cm[6] * 0.6);
+    _p.addScaledVector(n, -_p.dot(n)).normalize();
+    const a = (ua * ua - fa * fa + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, ua * ua - a * a));
+    const E = _E.copy(S).addScaledVector(n, a).addScaledVector(_p, h);
+    _Y.subVectors(S, E).normalize();
+    _Z.copy(n).addScaledVector(_Y, -n.dot(_Y));
+    if (_Z.lengthSq() < 1e-8) _Z.copy(_p);
+    _Z.normalize().negate();
+    _X.crossVectors(_Y, _Z);
+    _m.makeBasis(_X, _Y, _Z);
+    _q.setFromRotationMatrix(_m);
+    _q2.setFromRotationMatrix(_m2.extractRotation(b.clavL.matrixWorld)).invert();
+    _q.premultiply(_q2);
+    b.armL.quaternion.slerp(_q, w);
+    const cosE = clamp((ua * ua + fa * fa - d * d) / (2 * ua * fa), -1, 1);
+    const elbow = Math.PI - Math.acos(cosE);
+    b.foreL.rotation.x += (elbow - b.foreL.rotation.x) * w;
+    b.armL.updateMatrixWorld(true);
   }
 
   // The stick's tip in the run (his own space), by the stride's phase: it
@@ -770,7 +1196,7 @@ export class Elder extends Player {
     const n = Math.floor(u);
     u -= n;
     // (a strike: a little puff of dust off the tip, most strides)
-    if (n > this.stickK && this.mode === 'run' && this.grounded && !this.sliding && !this.crashed && freq > 0) {
+    if (n > this.stickK && this.mode === 'run' && this.grounded && !this.sliding && !this.crashed && freq > 0 && (this.carryE || 0) < 0.3) {
       _p.set(STICK.x, 0, zTD);
       this.strike(_p);
       if (!this.wet && Math.random() < 0.7) this.stickPuff(_p, 1, 0.8 + 0.4 * Math.random());
@@ -883,11 +1309,25 @@ export class Elder extends Player {
     const B = this.breeze;
     const still = 1 + 1.2 * (1 - Math.min(1, W / 6));
     f.ax = clamp(-this.vx * 0.42, -6, 6) + B.x * (1.1 + 0.03 * W) * still;
-    f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.45, -4, 3) + B.y * still;
+    // (falling, the air flops it up; in a jump it may come up past his
+    // chin - see lift)
+    f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.5, -4, 6) + B.y * still;
+    if (!this.grounded && this.frameAcc.y < -10) f.gy = Math.max(f.gy, -1.6);
     f.az = (W > 0 ? 0.85 * W + 1 : 0) + B.z * still;
     // (only at a run does the headwind part round him strongly enough to
     // push the beard off to one side)
     f.spread = 0.9 * smooth(5, 12, W);
+    // flicked up over his shoulder: thrown up and round to the side, then
+    // the air draws it in onto his back (instead of off it) a moment, and
+    // lets it slide away
+    const F = this.flick;
+    const tap = smooth(0, 0.08, F.t) * (1 - smooth(1.1, 1.6, F.t));
+    if (tap > 0) {
+      f.gy *= 1 - 0.6 * tap;
+      f.spread *= 1 - tap;
+      this.flickStep(dt);
+    }
+    f.lift = 0.06 + 0.5 * Math.max(tap, this.w.jump);
     f.gust = 0.45 * still + 0.12 * W;
     f.gustSpeed = 1.4 + 0.3 * W;
     f.gustLen = 0.45 + 0.01 * W;
@@ -990,4 +1430,56 @@ const VAULT_T = [0, 0.45, 0.92, 1];
 // meet the road.
 const VAULT_STICK_T = [0, 0.18, 0.42, 0.7, 1];
 const VAULT_STICK = [0.55, 0.05, -0.85, -0.3, 0.45];
+
+// The pole vault, keyed on how far round the turn he is (0 upright at
+// take-off, 0.5 upside down on top of the stick, 1 upright again): reaching
+// for the stick, diving onto it (arms over his head, legs kicking up), the
+// handstand on its top, the push-off (back arching, legs whipping over), and
+// coming round to land. The whole body turns about POLE_PIVOT, so at the top
+// his hands are a stick's length off the road. (Lateral channels are per-side
+// magnitudes, as everywhere.)
+const POLE_PIVOT = 0.8;
+const POLE_T = [0, 0.14, 0.3, 0.44, 0.56, 0.68, 0.82, 1];
+const POLE = {
+  hipPitch: [0.1, 0.05, 0, -0.02, -0.02, -0.05, 0.05, 0.08],
+  spLean: [0.45, 0.2, 0.0, -0.05, -0.05, -0.25, 0.1, 0.35],
+  chLean: [0.15, 0.1, 0.0, -0.05, -0.05, -0.15, 0.05, 0.2],
+  hdPitch: [0.4, -0.1, -0.35, -0.45, -0.45, -0.3, 0.15, 0.45],
+  thLx: [1.1, 0.35, 0.15, 0.2, 0.25, 0.45, 0.95, 0.55],
+  knL: [1.3, 0.5, 0.15, 0.1, 0.1, 0.75, 1.45, 0.7],
+  anL: [0.2, -0.3, -0.5, -0.55, -0.55, -0.2, 0.3, 0.15],
+  thRx: [-0.45, -0.75, -0.3, -0.2, -0.25, 0.3, 0.85, 0.45],
+  knR: [0.5, 0.25, 0.1, 0.1, 0.1, 0.9, 1.5, 0.8],
+  anR: [-0.4, -0.5, -0.5, -0.55, -0.55, -0.1, 0.3, 0.15],
+  thLz: [0.08, 0.06, 0.08, 0.14, 0.16, 0.12, 0.12, 0.1],
+  thRz: [0.06, 0.06, 0.08, 0.14, 0.16, 0.12, 0.12, 0.1],
+  shLx: [1.6, 2.6, 2.95, 3.05, 3.05, 2.9, 1.2, 0.5],
+  shRx: [1.6, 2.6, 2.95, 3.05, 3.05, 2.9, 1.0, 0.6],
+  elL: [0.5, 0.2, 0.08, 0.05, 0.05, 0.2, 0.5, 0.5],
+  elR: [0.5, 0.2, 0.08, 0.05, 0.05, 0.25, 0.6, 0.5],
+  shLz: [0.25, 0.15, 0.12, 0.12, 0.12, 0.3, 1.2, 0.8],
+  shRz: [0.25, 0.15, 0.12, 0.12, 0.12, 0.25, 0.5, 0.35],
+  clL: [0.1, 0.2, 0.25, 0.28, 0.28, 0.2, 0.1, 0.05],
+  clR: [0.1, 0.2, 0.25, 0.28, 0.28, 0.2, 0.1, 0.05],
+  wrL: [0, -0.3, -0.5, -0.6, -0.6, -0.3, 0, 0.1],
+  wrR: [0, -0.3, -0.5, -0.6, -0.6, -0.3, 0, 0.1],
+};
+const POLE_KEYS = Object.entries(POLE).map(([k, v]) => [C[k], Float64Array.from(v)]);
+const POLE_TS = Float64Array.from(POLE_T);
+// How the turn runs: easing out of the dive, slowing right down through the
+// handstand on top of the stick (so it shows), quickening as he whips over.
+const POLE_EASE = (() => {
+  const n = 160;
+  const a = new Float64Array(n + 1);
+  const v = (u) => Math.pow(Math.sin(Math.PI * u), 1.1) * (1 - 0.74 * Math.exp(-(((u - 0.5) / 0.1) ** 2))) * (1 + 0.35 * Math.exp(-(((u - 0.74) / 0.1) ** 2))) + 0.02;
+  for (let i = 1; i <= n; i++) a[i] = a[i - 1] + (v((i - 1) / n) + v(i / n)) / 2;
+  for (let i = 1; i <= n; i++) a[i] /= a[n];
+  return (u) => {
+    const x = clamp(u, 0, 1) * n;
+    const i = Math.min(n - 1, Math.floor(x));
+    return a[i] + (a[i + 1] - a[i]) * (x - i);
+  };
+})();
+// (sparks before he's picked up a gem, in a world without stones)
+const SPARK_DEFAULT = [1.0, 0.82, 0.45];
 

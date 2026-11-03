@@ -919,12 +919,12 @@ are, their card and how to make them live in `characters.js`).
 |---|---|---|---|
 | Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick |
 | Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly |
-| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long beard (9×14 cloth) and the skirt of his robe (19×11); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip |
+| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth) and the skirt of his robe (19×11); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out |
-| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc; a vault: the stick planted ahead, up off it, his knees tucked up as it sweeps back under him, then swung forward to meet the road |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over |
 | Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces |
 | Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust |
-| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, his free hand in the small of his back and his stick striking the road every stride |
+| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, his free hand in the small of his back and his stick striking the road every stride — though now and then he swings it up onto his shoulder and just walks |
 
 ### Choosing who runs
 
@@ -939,7 +939,8 @@ The one you've picked stands taller, bobs, and wears an orange seal; picking
 one swaps the live runner on the road behind the cards (every runner is built,
 and their shaders compiled, at boot, so it's instant), and they say hello —
 a gust catches Rowan's cape, Wren's backpack pops and a page flutters out,
-Alder lifts his stick and thumps it down as a gust takes his beard. On
+Alder lifts his stick and thumps it down in a poof of sparks as a gust takes
+his beard. On
 a tall screen the title camera stands back so the runner shows above the
 cards; on a wide one the cards stand to the right. The pick is remembered
 (`localStorage`).
@@ -1047,9 +1048,10 @@ the cape's); her mesh is about 25k triangles to his 23k.
 To change a runner, edit their script and regenerate (about 15, 35 and 65
 seconds), then look at them turned round like their reference sheet in
 `tools/runner/view.html?runner=explorer` (also `&pose=idle|run|jump|slide|bind`,
-`&t=` seconds into it, `&trick=leap|flip|twist|handspring`, `&jt=` seconds into the jump
-or slide, `&side=1|-1` the slide's lead leg, `&views=front,left,back,right,three`,
-`&zoom=`, `&y=`):
+`&t=` seconds into it, `&trick=leap|flip|twist|handspring` (the elder's
+`hop|pole`), `&jt=` seconds into the jump or slide, `&side=1|-1` the slide's lead
+leg, `&carry=1` the elder picking up his stick as soon as he can,
+`&views=front,left,back,right,three`, `&zoom=`, `&y=`):
 
 ```sh
 pip install numpy scipy scikit-image fast-simplification pillow
@@ -1225,7 +1227,7 @@ needs a skinned mesh whose bones are named like the ones `build.py` writes.
 
 ### The elder
 
-![Alder from the front and his left side, hobbling on his stick, vaulting off it, tucked up over it, and squatting into a slide with it dragging behind](docs/elder.jpg)
+![Alder from the front, hobbling on his stick, walking with it over his shoulder, planting it to pole vault, upside down on top of it, and squatting into a slide](docs/elder.jpg)
 
 `tools/runner/elder.py` sculpts him to his reference sheet
 (`tools/characters/elder-sheet.jpg`) with `build.py`'s kit, as `explorer.py`
@@ -1262,20 +1264,33 @@ the top, dark with the road's dirt at its foot and worn pale where he holds
 it. His card on the title screen is cut from the sheet's front view.
 
 **His beard is simulated** (`cloth.js`, the same solver as the cape and
-Wren's hair): a sheet rooted along the underside of his jaw, under the
-sculpted beard, its rows under the chin leashed to the head and the rest
-free, kept off his chest, belly, arms and legs by their own volumes. It's
-wide at the jaw and draws in to a point, drawn by the GPU as a slab full
-under the chin and thinning to the tips in wavy clumps, strands down its
-length, its end parting into seven pointed locks of uneven length. It's
-light and answers every push: it streams back in the headwind, flies up
-through a vault and slaps down on landing, swings out across a lane change,
-sways in the breeze when he stands. And it goes round him rather than
-plastering over him: once he's running, the headwind parts round his body
-(`spread` in the cloth's wind: a push away from the middle in proportion to
-how far off it the cloth is), so the beard slides off his belly to one side
-and streams back past his hip, where you can see it from behind — and takes
-the other side when a lane change throws it across.
+Wren's hair): incredibly long — nearly a metre of it, down past his belt —
+and full. What grows on his face is sculpted big and bushy: standing well
+out from the jaw and the chin, up the cheeks to the sideburns, full jowls of
+it either side, its surface broken into tufts, the moustache drooping down
+into it. The rest is a sheet, 11×16, rooted along the underside of his jaw
+inside the sculpted beard, its rows under the chin leashed to the head and
+the rest free, kept off his chest, belly, arms and legs by their own
+volumes. It swells out wider than his face below the chin into a full spade
+and draws in to a point; the GPU draws it as a slab fullest right under the
+chin (about eleven centimetres deep there) and rounded across, thinning
+toward the tips, in wavy clumps with strands down them, its sides broken
+into tufts and its end parting into seven pointed locks of uneven length.
+It's light and answers every push: it streams back in the headwind, swings
+out across a lane change, sways in the breeze when he stands; at the top of
+a jump it flops up (a push up through its lower half, and the air under it
+as he falls), and it slaps down when he lands. It goes round him rather
+than plastering over him: once he's running, the headwind parts round his
+body (`spread` in the cloth's wind: a push away from the middle in
+proportion to how far off it the cloth is), so the beard slides off his
+belly to one side and streams back past his hip, where you can see it from
+behind — and takes the other side when a lane change throws it across.
+And every so often (7–15 s) a gust flicks it right up over his shoulder to
+tap him on the back: for about a second it's steered (`flickStep`), each
+part of it drawn toward its own place along a path — out wide past his arm,
+up over the top of his shoulder, then down onto his upper back, the tip
+furthest — while the body's own volumes route it round him; then it's let
+go, and the wind slides it back off.
 
 **So is the skirt of his robe** — a second sheet, 19×11, sewn round his
 waist under the sash and open down the front like the cape, falling to
@@ -1306,16 +1321,34 @@ the hand. When he's knocked flat the stick just goes where his hand goes.
 **He moves like it.** His run is a quick, short-stepping hobble — the
 quickest cadence of the three, short low steps shuffling over the road with
 the knees bent and the toes turned out, a lurch onto the stick each stride,
-his free hand tucked into the small of his back. A lane change: he plants
+his free hand tucked into the small of his back. Every so often (9–19 s,
+when he's running clear) he picks the stick up and swings it onto his
+shoulder — the knob end in his hand in front, the rest angled up and back
+over it — and just walks for a second or two, a little straighter, chin up,
+his free arm swinging, before quickly putting it back down (anything that
+needs it — a lane change, a jump, a slide — puts it down at once). A lane change: he plants
 the stick on the far side of him — swinging it across in front of himself to
 plant it on his left to go right — and shoves himself off it, the stick
 staying put in the road as he goes (it slides back no faster than 7 m/s: at
 full tilt it would be gone in a frame), with a hop, a hard lean and his free
 hand flung out. His jump has the plain arc, as fair as anyone's, and he
-vaults it: the stick planted ahead as he goes up, pushing up off it bent
-over it with one leg kicked back, then both knees tucked high and to the side
-as the stick sweeps back under him like a pendulum, then swung forward to
-meet the road with both feet. He lands frail — the stick comes down first,
+vaults it one of two ways. Mostly he hops it: the stick planted ahead as he
+goes up, pushing up off it bent over it with one leg kicked back, then both
+knees tucked high and to the side as the stick sweeps back under him like a
+pendulum, then swung forward to meet the road with both feet. But now and
+then (never twice running, and never more than three hops between) he pole
+vaults it: he reaches for the stick planted ahead with both hands (his left
+arm solved onto it just under his right), dives up onto it, arms over his
+head and legs kicking up behind, and swings right up into a handstand on
+top of it — upside down, the stick standing straight down from his hands to
+the road, legs in a V, his beard falling over his face and his robe over his
+chest, wobbling a little (he is very old) — in a poof of sparks; then he
+pushes off, lets go, whips his legs over and comes round to land. The whole
+body turns forward once about a point 0.8 m up (`spinTo`), the turn slowing
+right down through the handstand so it shows, and the pose is keyed on how
+far round he is (`POLE`), so a fast-fall or an early landing just hurries it
+round; the stick is planted under him on the road until the push-off,
+sliding along with him (he's far too fast for it to stay put). He lands frail — the stick comes down first,
 just ahead, and takes his weight, his knees buckle deep, he folds over it
 and wobbles back up in a couple of bounces. His slide is a squat right down
 on his heels, folded over his knees, robe pooling, his free arm out for
@@ -1324,10 +1357,20 @@ trailing dust off its tip; then he hauls himself back up. Standing on the
 title screen he leans on his stick with his other hand in the small of his
 back, breathing, looking about.
 
+**And the stick sparks.** Every few seconds a little poof of sparks comes off
+its knob (`sparks.js`): eight or so twinkling four-pointed glints, each with
+a white-hot heart and rays in its colour, flung out every which way and left
+behind in the world as he runs on, drifting down as they wink out. Their
+colours are the gems he's been picking up — the last six — or, before he's
+taken any, this world's own stones; and now and then a gem he takes sets off
+a sympathetic little spark in its own colour. They're drawn additively, and
+keep their colour through a drain. A pole vault's handstand and being picked
+on the title screen set off a bigger poof.
+
 Through Hell's drain his robe and his orange spectacles keep their colour.
-His simulation costs a little less per frame than the wayfarer's (two
-sheets, but smaller ones than the cape, and the arm's solve is a handful of
-vector sums); his mesh is about 26k triangles.
+His simulation costs about what the wayfarer's does per frame (two sheets
+and a beard larger than Wren's hair; the arms' solves are a handful of vector
+sums); his mesh is about 26k triangles.
 
 ## The fox
 
@@ -1527,7 +1570,8 @@ src/game/                     game loop, player (the runners' shared core:
                               outfit (his palette, cape, pouch, poses), explorer
                               (her palette, hair, backpack, moves), elder (his
                               palette, beard, skirt, stick and the arm that
-                              reaches for it, hobble and vault), spill
+                              reaches for it, hobble, vaults, carry), sparks
+                              (what comes off his stick), spill
                               (what flies out of it) and dust (what her slides
                               and his boots kick up), kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset

@@ -2056,7 +2056,9 @@ void main() {
         // thinning to the tips, in wavy clumps
         float gv = aCape.y / (uCapeGrid.y - 1.0);
         float gu = aCape.x / (uCapeGrid.x - 1.0);
-        float th = uCapeGrid.z * mix(1.7, 0.35, smoothstep(0.05, 1.0, gv)) * (0.78 + 0.22 * cos(gu * 38.0 + gv * 9.0));
+        // (fullest right under the chin, and rounded across: thickest down
+        // its middle, thinner at its sides)
+        float th = uCapeGrid.z * mix(2.7, 0.35, pow(smoothstep(0.0, 1.0, gv), 0.65)) * (0.8 + 0.2 * cos(gu * 38.0 + gv * 9.0)) * (0.55 + 0.45 * sin(3.1416 * clamp(gu, 0.0, 1.0)));
         lp = P + nC * (th * (side + 1.0));
       } else {
         lp = P + nC * (side * uCapeGrid.z);
@@ -2521,9 +2523,11 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     vec3 lin = elderWorn(uPal[4], uPal[L_ROBE_IN], q + 5.0);
     c = mix(c, mix(lin, uPal[L_ROBE_IN], v * 0.5), step(0.5, d.w));
   } else if (m == 13) {
-    // the long beard (d: x across, y down, w the inside): strands down its
-    // length, a cool grey in its depths and on the inside
-    c = mix(c, uPal[L_HAIR_SHADE], elderStrands(d.x, d.y, 30.0) * 0.5);
+    // the long beard (d: x across, y down, w the inside): wavy clumps down
+    // its length, strands in them, a cool grey in its depths and on the inside
+    float clump = 0.5 + 0.5 * sin(d.x * 15.0 + sin(d.y * 7.0 + d.x * 4.0) * 1.6);
+    c = mix(c, uPal[L_HAIR_SHADE], smoothstep(0.55, 0.95, clump) * 0.18);
+    c = mix(c, uPal[L_HAIR_SHADE], elderStrands(d.x, d.y, 34.0) * 0.35);
     c = mix(c, uPal[L_HAIR_SHADE], step(0.5, d.w) * 0.45 + smoothstep(0.6, 1.0, d.y) * 0.12);
   } else if (m == 5) {
     // leggings: wrinkled at the ankles
@@ -2569,7 +2573,14 @@ float elderCut(int m, vec4 d) {
   float x = abs(fract(k) - 0.5) * 2.0;
   float end = beard ? 0.995 - 0.1 * h : 0.995 - 0.06 * h;
   float depth = beard ? 0.22 + 0.1 * fract(h * 7.31) : 0.09 + 0.08 * fract(h * 5.17);
-  return d.y - (end - depth * pow(x, beard ? 1.2 : 1.6));
+  float cut = d.y - (end - depth * pow(x, beard ? 1.2 : 1.6));
+  if (beard) {
+    // (and its sides wavy, in tufts, below the chin)
+    float side = min(d.x, 1.0 - d.x);
+    float wave = 0.035 + 0.03 * sin(d.y * 31.0 + step(0.5, d.x) * 2.1) + 0.02 * sin(d.y * 67.0 + 1.3);
+    cut = max(cut, (wave - side) * smoothstep(0.12, 0.3, d.y));
+  }
+  return cut;
 }
 #elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
@@ -3495,6 +3506,53 @@ void main() {
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), alpha);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Sparks off the elder's walking stick (game/sparks.js): each a twinkling
+// four-pointed glint, a white-hot heart in its gem's colour, turning as it
+// flies; drawn additively (it lights what's behind it) and keeping its colour
+// through a drain, as magic should.
+// ---------------------------------------------------------------------------
+const VS_SPARK = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute vec3 aSpark; // x size (m), y brightness, z seed
+attribute vec3 aCol;
+varying vec3 vSpark;
+varying vec3 vCol;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 wp = bendPos(position);
+  vPos = wp;
+  vWorld = wp;
+  vec4 mv = viewMatrix * vec4(wp, 1.0);
+  float px = aSpark.x * projectionMatrix[1][1] * uResolution.y * 0.5 / max(-mv.z, 0.5);
+  gl_PointSize = clamp(px, 2.0, 96.0);
+  vSpark = aSpark;
+  vCol = aCol;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const FS_SPARK = FS_HEAD + /* glsl */ `
+varying vec3 vSpark;
+varying vec3 vCol;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float a = vSpark.z * 6.2832 + uTime * (2.0 + 3.0 * vSpark.z);
+  vec2 q = mat2(cos(a), -sin(a), sin(a), cos(a)) * c;
+  float r2 = dot(c, c);
+  float core = exp(-r2 / 0.004);
+  float halo = exp(-r2 / 0.03) * 0.35;
+  float rays = exp(-abs(q.x) * 46.0) * exp(-abs(q.y) * 6.5) + exp(-abs(q.y) * 46.0) * exp(-abs(q.x) * 6.5);
+  float tw = 0.7 + 0.3 * sin(uTime * 31.0 + vSpark.z * 50.0);
+  float k = (core + halo + rays * 0.8) * vSpark.y * tw;
+  if (k < 0.01) discard;
+  // (white only at the very heart: the rays and the halo are its colour)
+  vec3 col = mix(vCol * 1.15, vec3(1.0), clamp(core * core * 0.7, 0.0, 1.0));
+  gKeep = 1.0;
+  gl_FragColor = vec4(grade(col, uTrip), min(k, 1.0));
 }
 `;
 
@@ -4562,6 +4620,18 @@ export function makeDustMaterial(env) {
     fragmentShader: FS_DUST,
     transparent: true,
     depthWrite: false,
+  });
+}
+
+// The elder's sparks (game/sparks.js), graded by env.
+export function makeSparkMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_SPARK,
+    fragmentShader: FS_SPARK,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
   });
 }
 
