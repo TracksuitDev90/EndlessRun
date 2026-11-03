@@ -299,6 +299,7 @@ export class Game {
     this.gemCount++;
     this.gemWorth += this.gemWorthAt(g.d, g.crown);
     if (!tossed) this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, g.crown ? 1.25 : 1);
+    p.onGem?.(g);
     this.audio.gem(g.index, g.crown);
     if (g.whole) {
       const bonus = S.perfect * g.run.size * this.depth;
@@ -713,6 +714,8 @@ export class Game {
     // a doorway into the sea counts)
     this.sands.surf(dt, this);
     this.player.wet = this.obstacles.wetAt(this.player.x, this.dist) || this.sands.wetAt(this.player.x, this.dist);
+    // (this world's stones: the elder's sparks come in their colours)
+    this.player.gemSpec = this.current.def.gem;
     this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
     if (this.state === 'running') this.collide();
     if (this.state === 'running') this.collectGems();
