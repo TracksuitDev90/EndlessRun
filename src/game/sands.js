@@ -27,9 +27,9 @@ import { mulberry32 } from '../core/rng.js';
 
 const TAU = Math.PI * 2;
 // which print each runner leaves (see footprint in the shaders)
-const SOLE = { wayfarer: 0, explorer: 1 };
+const SOLE = { wayfarer: 0, explorer: 1, elder: 0 };
 // how deep each presses a running footprint in (m)
-const DEPTH = { wayfarer: 0.03, explorer: 0.024 };
+const DEPTH = { wayfarer: 0.03, explorer: 0.024, elder: 0.026 };
 // prints are let go this far behind the runner (m)
 const KEEP = 24;
 // the share of a wave's cycle it spends rolling up the beach
@@ -194,6 +194,12 @@ export class Sands {
       // one: keep the higher, so no foot comes down twice)
       if (n > this.stepK[side] || !(n >= this.stepK[side] - 1)) this.stepK[side] = n;
     }
+    // a walking stick struck (the elder's): a hole where its tip went in
+    const S = p.strikes;
+    if (S) {
+      for (let k = 0; k < S.n; k++) if (running && onSand) this.hole(game, S.at[k], wet);
+      S.n = 0;
+    }
     // a landing: both feet at once, deeper
     if (running && onSand && !this.wasGrounded) {
       this.step(game, 0, 1.6, wet);
@@ -240,6 +246,24 @@ export class Sands {
     pr.w = 0;
     pr.depth = (DEPTH[game.runnerId] ?? 0.03) * deep;
     pr.flip = side ? 1 : -1;
+  }
+
+  hole(game, at, wet) {
+    const p = game.player;
+    if (wet) {
+      if (Math.random() < 0.5) this.splash(game, at, 3, 0.8);
+      return;
+    }
+    _v.copy(at).applyQuaternion(p.root.quaternion).add(p.root.position);
+    const pr = this.add();
+    pr.x = _v.x;
+    pr.d = game.dist - (_v.z - p.root.position.z);
+    pr.yaw = 0;
+    pr.kind = 3;
+    pr.len = 0;
+    pr.w = 0;
+    pr.depth = 0.035;
+    pr.flip = 1;
   }
 
   plough(game, wet) {

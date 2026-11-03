@@ -21,15 +21,18 @@ from scipy import ndimage
 HERE = os.path.dirname(__file__)
 OUT = os.path.join(HERE, '..', '..', 'assets', 'characters')
 
-# id, sheet, crop box of the front view (left, top, right, bottom)
+# id, sheet, crop box of the front view (left, top, right, bottom), and the
+# paper's colour (if not the usual)
 JOBS = [
-    ('explorer', 'explorer-sheet.jpg', (60, 0, 400, 945)),
-    ('wayfarer', 'wayfarer-sheet.jpg', (30, 60, 410, 915)),
+    ('explorer', 'explorer-sheet.jpg', (60, 0, 400, 945), None),
+    ('wayfarer', 'wayfarer-sheet.jpg', (30, 60, 410, 915), None),
+    ('elder', 'elder-sheet.jpg', (8, 56, 380, 975), (242, 237, 234)),
 ]
 PAPER = np.array([250, 245, 239.0])
 
 
-def cut(sheet, box):
+def cut(sheet, box, paper=None):
+    PAPER = np.array(paper, float) if paper else globals()['PAPER']
     a = np.asarray(Image.open(os.path.join(HERE, sheet)).convert('RGB').crop(box)).astype(float)
     d = np.sqrt(((a - PAPER) ** 2).sum(-1))
     # light pixels touching the border are paper (and the soft floor shadow);
@@ -56,7 +59,7 @@ def cut(sheet, box):
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for name, sheet, box in JOBS:
-        img = cut(sheet, box)
+    for name, sheet, box, paper in JOBS:
+        img = cut(sheet, box, paper)
         img.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6)
         print(f'{name}: {img.size[0]}x{img.size[1]}')

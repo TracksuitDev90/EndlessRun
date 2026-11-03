@@ -1,8 +1,11 @@
 # EndlessRun
 
 An endless runner through worlds within worlds. Pick who runs — Rowan, a tall,
-heavy-striding wayfarer in a puffer jacket and an orange hooded cape, or Wren, a nimble
-explorer with a shock of vermilion hair and a backpack that won't stay shut —
+heavy-striding wayfarer in a puffer jacket and an orange hooded cape; Wren, a nimble
+explorer with a shock of vermilion hair and a backpack that won't stay shut; or
+Alder, an incredibly old man in a flowing teal robe and orange spectacles, bent
+double, a beard down to his belt, who hobbles along on his long twisted walking
+stick every bit as fast as the young ones —
 and run into the screen through a storybook world that never stops changing:
 scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
@@ -194,8 +197,10 @@ gems and shadows stand exactly where they always do.
 lugs, the explorer a trainer's wavy tread (drawn a third over life size, so
 they read from the camera), each pressed in where the foot was planted, the
 ball and toes dug in deepest, a rim of sand squeezed up round it, its walls
-lit and shaded by the world's light. A landing presses both feet in at once,
-deeper; a slide ploughs a furrow with the sand heaped up at its end.
+lit and shaded by the world's light — and the elder (in his old boots: the
+lugs again) a line of round holes beside them where his walking stick
+struck. A landing presses both feet in at once, deeper; a slide ploughs a
+furrow with the sand heaped up at its end.
 
 **The surf.** When the doorway out leads under the sea, the sea pours in
 through it as its doors swing open and laps up the beach in front of it
@@ -775,7 +780,7 @@ Append to the URL:
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
-| `?runner=explorer` | who runs (`wayfarer`, `explorer`), over the one remembered |
+| `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`), over the one remembered |
 | `?companion=none` | run alone (or `fox`, the default: who runs with you) |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
@@ -903,23 +908,23 @@ through it.
 
 ## The runners
 
-Two runners, chosen on the title screen. Each is sculpted offline
+Three runners, chosen on the title screen. Each is sculpted offline
 (`tools/runner/`), skinned to the same skeleton and driven by the same core —
 lanes, jumps, slides, the IK running legs, weight and follow-through
-(`src/game/player.js`) — and each dresses it, hangs a simulated sheet off it
-and moves in their own way (`wayfarer.js`, `explorer.js`; who they are, their
-card and how to make them live in `characters.js`).
+(`src/game/player.js`) — and each dresses it, hangs simulated sheets off it
+and moves in their own way (`wayfarer.js`, `explorer.js`, `elder.js`; who they
+are, their card and how to make them live in `characters.js`).
 
-| | Rowan, the wayfarer | Wren, the explorer |
-|---|---|---|
-| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook |
-| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun |
-| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides |
-| Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean |
-| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring |
-| Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after |
-| Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust |
-| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce |
+| | Rowan, the wayfarer | Wren, the explorer | Alder, the elder |
+|---|---|---|---|
+| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick |
+| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly |
+| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long beard (9×14 cloth) and the skirt of his robe (19×11); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip |
+| Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc; a vault: the stick planted ahead, up off it, his knees tucked up as it sweeps back under him, then swung forward to meet the road |
+| Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces |
+| Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust |
+| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, his free hand in the small of his back and his stick striking the road every stride |
 
 ### Choosing who runs
 
@@ -933,7 +938,8 @@ an ink shadow round the figure, a sunburst behind, their name on a paper plate.
 The one you've picked stands taller, bobs, and wears an orange seal; picking
 one swaps the live runner on the road behind the cards (every runner is built,
 and their shaders compiled, at boot, so it's instant), and they say hello —
-a gust catches Rowan's cape, Wren's backpack pops and a page flutters out. On
+a gust catches Rowan's cape, Wren's backpack pops and a page flutters out,
+Alder lifts his stick and thumps it down as a gust takes his beard. On
 a tall screen the title camera stands back so the runner shows above the
 cards; on a wide one the cards stand to the right. The pick is remembered
 (`localStorage`).
@@ -1038,7 +1044,7 @@ and out — then a smaller dip and a smaller bounce as it rings out.
 Her simulation costs about half his per frame (the hair grid is smaller than
 the cape's); her mesh is about 25k triangles to his 23k.
 
-To change either runner, edit their script and regenerate (about 15 and 35
+To change a runner, edit their script and regenerate (about 15, 35 and 65
 seconds), then look at them turned round like their reference sheet in
 `tools/runner/view.html?runner=explorer` (also `&pose=idle|run|jump|slide|bind`,
 `&t=` seconds into it, `&trick=leap|flip|twist|handspring`, `&jt=` seconds into the jump
@@ -1049,6 +1055,7 @@ or slide, `&side=1|-1` the slide's lead leg, `&views=front,left,back,right,three
 pip install numpy scipy scikit-image fast-simplification pillow
 python3 tools/runner/build.py      # the wayfarer -> assets/runner/
 python3 tools/runner/explorer.py   # the explorer -> assets/explorer/
+python3 tools/runner/elder.py      # the elder -> assets/elder/
 python3 tools/characters/cards.py  # the title screen's cards
 ```
 
@@ -1215,6 +1222,112 @@ environment this was built in could not reach any of those hosts, so nothing
 was downloaded or evaluated; the character, rig, animation and shading here are
 all original. A suitable base mesh could still be adopted later: the game only
 needs a skinned mesh whose bones are named like the ones `build.py` writes.
+
+### The elder
+
+![Alder from the front and his left side, hobbling on his stick, vaulting off it, tucked up over it, and squatting into a slide with it dragging behind](docs/elder.jpg)
+
+`tools/runner/elder.py` sculpts him to his reference sheet
+(`tools/characters/elder-sheet.jpg`) with `build.py`'s kit, as `explorer.py`
+does her: an incredibly old man, about two metres and eight heads tall stood
+up straight — the tallest of the runners — though he is sculpted upright only
+to be bent: the game folds him at the waist, rounds his upper back over and
+cranes his neck forward, his head tipped back up to see where he's going, so
+that even stooped he tops 1.8 m. He's rail thin but for a round pot belly,
+long in the leg and long in the arm. His face is long and lean — a high domed
+crown, bony cheekbones over hollow cheeks, a heavy brow — with a long hooked
+nose (a hump on the bridge, a heavy tip drooping over his moustache) and big
+ears standing right out from his head, their bowls hollowed out; his short
+wispy white hair grows round the back and sides of a bald crown, combed back
+behind the ears and falling past the skull to his nape in locks whose ends
+wisp out, a couple of flyaways over the ears and a few long strands lifting
+off the top. Bushy white brows spring up and out over large orange
+spectacles — thick rectangular rims with rounded corners, a bridge arched
+over his nose, the arms running back over his ears. The shader draws his
+face (small, deep-set, kindly pale blue-grey eyes under heavy drooping lids,
+the fold of skin over them, bags under them and crow's feet fanning from
+their corners, three long lines across his forehead), weathers his tan (warm
+and uneven, darker in its creases, flushed on the tip of his nose, his
+cheekbones and in the bowls of his ears) and spots his crown. A drooping
+moustache runs into the beard sculpted over his jaw and up his cheeks to the
+sideburns. His robe is a deep, worn teal — washed like a watercolour in soft
+blotches and streaks — open down the front over a sea-green under-robe (its
+edge turned back along the V), its hood down in bunched folds on his back,
+its wide bell sleeves cut on a slant so they hang in a long point; a brown
+sash wound round under his belly and knotted at his hip, its ends hanging;
+brown leggings and old soft boots with long rounded toes and turned-down
+cuffs. In his right fist is his walking stick: long, gnarled and twisted,
+kinking this way and that, its grain spiralling round it, a knotted knob at
+the top, dark with the road's dirt at its foot and worn pale where he holds
+it. His card on the title screen is cut from the sheet's front view.
+
+**His beard is simulated** (`cloth.js`, the same solver as the cape and
+Wren's hair): a sheet rooted along the underside of his jaw, under the
+sculpted beard, its rows under the chin leashed to the head and the rest
+free, kept off his chest, belly, arms and legs by their own volumes. It's
+wide at the jaw and draws in to a point, drawn by the GPU as a slab full
+under the chin and thinning to the tips in wavy clumps, strands down its
+length, its end parting into seven pointed locks of uneven length. It's
+light and answers every push: it streams back in the headwind, flies up
+through a vault and slaps down on landing, swings out across a lane change,
+sways in the breeze when he stands. And it goes round him rather than
+plastering over him: once he's running, the headwind parts round his body
+(`spread` in the cloth's wind: a push away from the middle in proportion to
+how far off it the cloth is), so the beard slides off his belly to one side
+and streams back past his hip, where you can see it from behind — and takes
+the other side when a lane change throws it across.
+
+**So is the skirt of his robe** — a second sheet, 19×11, sewn round his
+waist under the sash and open down the front like the cape, falling to
+mid-shin in soft folds round the back, its lining sea-green, its hem ragged
+in long uneven points. It's heavier than the beard: it streams back less and
+swings more, kicked about by his legs. The bell sleeves hang from their
+forearms on springs, toward the ground and lagging every swing; his wisps of
+hair and his brows bounce. (One runner can now have more than one sheet: the
+character materials take a list.)
+
+**The stick is planted in the world, not carried through it.** Each stride
+(at the left foot's mid-stance — a stick goes with the opposite foot) it
+strikes the road beside his right foot, ahead of him, and stays there while
+he hobbles past it, for as much road as it can stay planted for, never less
+than a few hundredths of a second (as his feet do: `stickRun`); then it
+swings through in an arc to strike ahead again, his hand swinging with it.
+Most strikes kick up a little puff of dust off its tip, and on the Gallery's
+sands each leaves a hole beside his footprints (a fourth kind of print). His
+right hand goes where the stick puts it (`staffStep`): each pose says where
+the stick's tip is — on the road, or hanging from where the hand would be —
+the weights blend them, the stick's top is set where the arm can grip it,
+turned about its own length so his wrist is on the side toward his shoulder,
+and the hand on it is placed exactly as it holds the stick in the sculpt;
+then the arm is solved to reach it, a two-bone solve with the elbow out and
+back (`solveArm`). If it can't reach, the stick comes up off the road with
+the hand. When he's knocked flat the stick just goes where his hand goes.
+
+**He moves like it.** His run is a quick, short-stepping hobble — the
+quickest cadence of the three, short low steps shuffling over the road with
+the knees bent and the toes turned out, a lurch onto the stick each stride,
+his free hand tucked into the small of his back. A lane change: he plants
+the stick on the far side of him — swinging it across in front of himself to
+plant it on his left to go right — and shoves himself off it, the stick
+staying put in the road as he goes (it slides back no faster than 7 m/s: at
+full tilt it would be gone in a frame), with a hop, a hard lean and his free
+hand flung out. His jump has the plain arc, as fair as anyone's, and he
+vaults it: the stick planted ahead as he goes up, pushing up off it bent
+over it with one leg kicked back, then both knees tucked high and to the side
+as the stick sweeps back under him like a pendulum, then swung forward to
+meet the road with both feet. He lands frail — the stick comes down first,
+just ahead, and takes his weight, his knees buckle deep, he folds over it
+and wobbles back up in a couple of bounces. His slide is a squat right down
+on his heels, folded over his knees, robe pooling, his free arm out for
+balance and his stick dragged along the road behind him like a skid,
+trailing dust off its tip; then he hauls himself back up. Standing on the
+title screen he leans on his stick with his other hand in the small of his
+back, breathing, looking about.
+
+Through Hell's drain his robe and his orange spectacles keep their colour.
+His simulation costs a little less per frame than the wayfarer's (two
+sheets, but smaller ones than the cape, and the arm's solve is a handful of
+vector sums); his mesh is about 26k triangles.
 
 ## The fox
 
@@ -1412,7 +1525,9 @@ src/game/                     game loop, player (the runners' shared core:
                               animation, IK legs, secondary motion, movement),
                               characters (who you can pick), wayfarer and
                               outfit (his palette, cape, pouch, poses), explorer
-                              (her palette, hair, backpack, moves), spill
+                              (her palette, hair, backpack, moves), elder (his
+                              palette, beard, skirt, stick and the arm that
+                              reaches for it, hobble and vault), spill
                               (what flies out of it) and dust (what her slides
                               and his boots kick up), kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset
@@ -1430,6 +1545,7 @@ src/game/                     game loop, player (the runners' shared core:
                               ears)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
+tools/runner/elder.py         offline sculpt of the elder -> assets/elder/
 tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
 tools/runner/view.html        a runner turned round like their reference sheet
 tools/runner/fox.html         the fox turned round, posed, or as a film strip
