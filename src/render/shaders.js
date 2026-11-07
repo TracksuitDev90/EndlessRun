@@ -2306,6 +2306,305 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#elif defined(DRAGON)
+// --- Iris, the wind dragon ----------------------------------------------------------
+// (on her body d: x, y her fish scales' grid (round her, along her: one scale
+// each), z how far inside the gold of her belly (m), w how pale (her hands,
+// forearms, shins and feet); on her mane x, y the same grid, w how long its
+// fur grows; on a feather or a frill x across the vane (-1..1), y along it;
+// on her antlers, claws and whiskers y along them. r: the rest position - she
+// is laid out straight, nose to -z, her spine along z at height 0.4. See
+// tools/runner/dragon.py.)
+#define D_DEEP 13
+#define D_TEAL 14
+#define D_GREEN 15
+#define D_VIOLET 16
+#define D_BELLY 17
+#define D_RIDGE 18
+#define D_PALE 19
+#define D_PALE2 20
+#define D_MAGENTA 21
+#define D_PURPLE 22
+#define D_IRIS 23
+#define D_INK 24
+#define D_MUZZLE 25
+#define D_BROW 26
+#define D_IRIS_IN 27
+#define D_MANE_V 28
+#define D_MANE_T 29
+#define D_SHINE 30
+// her spine's height laid out, and the scale her head is sculpted at (the
+// face is drawn in head units about its pivot)
+#define D_Y0 0.5
+#define D_HS 1.42
+// x eyes open (0 shut .. 1), y how happily they're squeezed shut (arcs), zw
+// where the pupils look
+uniform vec4 uFace;
+#ifdef SHELL
+varying float vShell;
+#endif
+// set by the lighting pass before the detail is drawn: how far the surface is
+// turned away from you (0 facing, 1 edge-on)
+float gFres = 0.0;
+// and handed back to it: how much of a scale's shine this point has
+float gShine = 0.0;
+float drHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float drNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(drHash(i), drHash(i + vec3(1, 0, 0)), f.x), mix(drHash(i + vec3(0, 1, 0)), drHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(drHash(i + vec3(0, 0, 1)), drHash(i + vec3(1, 0, 1)), f.x), mix(drHash(i + vec3(0, 1, 1)), drHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// Her scales' colours round a loop - violet, deep blue, teal, green - so
+// that turning a scale in the light slides its colour along it, as
+// iridescence does (h: 0 deep blue, 0.25 teal, 0.5 green, 0.75 violet).
+vec3 drIri(float h) {
+  h = fract(h) * 4.0;
+  vec3 a = uPal[D_DEEP], b = uPal[D_TEAL], c = uPal[D_GREEN], d = uPal[D_VIOLET];
+  float k = fract(h);
+  k = k * k * (3.0 - 2.0 * k);
+  if (h < 1.0) return mix(a, b, k);
+  if (h < 2.0) return mix(b, c, k);
+  if (h < 3.0) return mix(c, mix(b, d, 0.5), k);
+  return mix(d, a, k);
+}
+// Fish scales laid like shingles: rows round her, each half a scale over from
+// the last, each scale's front tucked under the row before, its free edge
+// rounded toward her tail. Returns x: where on its scale (0 just out from
+// under the one before .. 1 its free edge), y: a number of its own, z: how
+// near its free edge (in scales), w: round the scale (for its ridges).
+vec4 drScales(vec2 g) {
+  float R = 0.74;
+  vec2 A = vec2(1.0, 0.82);
+  float j0 = floor(g.y) - 1.0;
+  for (int dj = 0; dj < 3; dj++) {
+    float j = j0 + float(dj);
+    float off = 0.5 * mod(j, 2.0);
+    float i = floor(g.x - off + 0.5);
+    for (int di = -1; di <= 1; di++) {
+      vec2 c = vec2(i + float(di) + off, j);
+      vec2 q = (g - c) * A;
+      float r = length(q);
+      if (r < R) {
+        // out from under the row before: how far past its nearest scale's
+        // edge
+        float jp = j - 1.0;
+        float offp = 0.5 * mod(jp, 2.0);
+        float ip = floor(g.x - offp + 0.5);
+        float under = 9.0;
+        for (int dk = -1; dk <= 1; dk++) {
+          vec2 cp = vec2(ip + float(dk) + offp, jp);
+          under = min(under, length((g - cp) * A) - R);
+        }
+        float e1 = R - r;
+        float t = clamp(under / max(under + e1, 1e-3), 0.0, 1.0);
+        return vec4(t, drHash(vec3(c, 7.1)), e1, atan(q.x, q.y));
+      }
+    }
+  }
+  return vec4(0.5, 0.0, 1.0, 0.0);
+}
+// One eye, drawn on the side of her face (q the rest position mirrored onto
+// the right side): big and round, an orange iris round a big dark pupil, two
+// catch-lights, a dark rim heavier along the top in a sweep of lashes. It
+// shuts (uFace.x) under a lid, or squeezes shut in a happy arc (uFace.y).
+// (k: where on her it may be drawn. Drawn everywhere and masked, never
+// branched round: the antialiasing takes screen-space derivatives, which
+// aren't to be had across a branch.)
+vec3 drEye(vec3 c, vec3 q, float k, inout float unlit) {
+  vec3 E = vec3(0.0397, 0.0541, -0.138);
+  vec3 ne = normalize(vec3(0.62, 0.22, -0.75));
+  vec3 ea = normalize(vec3(0.6, 0.12, 0.79));
+  ea = normalize(ea - ne * dot(ea, ne));
+  vec3 ev = normalize(cross(ne, ea));
+  if (ev.y < 0.0) ev = -ev;
+  vec3 o = q - E;
+  k *= step(-0.025, dot(o, ne));
+  vec2 e = vec2(dot(o, ea), dot(o, ev));
+  float hl = 0.0205, hh = 0.0188;
+  float x = clamp(e.x / hl, -1.0, 1.0);
+  float prof = pow(max(1.0 - x * x, 0.0), 0.5);
+  float top = hh * prof * (1.0 + 0.06 * x);
+  float bot = -hh * prof * 0.9;
+  float dA = max(max(e.y - top, bot - e.y), abs(e.x) - hl);
+  float open = clamp(uFace.x, 0.0, 1.0) * (1.0 - uFace.y);
+  float lid = mix(bot, top, open);
+  float dS = max(dA, e.y - lid);
+  vec3 ink = uPal[D_INK];
+  // the rim, heavy along the top, and lashes flicking out at the back corner
+  float rimW = mix(0.0014, 0.0032, smoothstep(-0.3, 0.6, e.y / hh));
+  float rim = fill(dA - rimW) * (1.0 - fill(dS));
+  float lash = band(e.y - top * 0.55 - (e.x - hl * 0.85) * 0.75, 0.0013) * step(hl * 0.8, e.x) * step(e.x, hl * 1.35);
+  lash = max(lash, band(e.y - top * 0.95 - (e.x - hl * 0.55) * 0.55, 0.0011) * step(hl * 0.55, e.x) * step(e.x, hl * 1.15));
+  c = mix(c, ink, max(rim, lash) * k);
+  float eye = fill(dS) * k;
+  vec2 look = uFace.zw * vec2(0.004, 0.003);
+  vec2 ic = e - look - vec2(-0.0006, -0.0006);
+  float ir = length(ic);
+  vec3 iris = mix(uPal[D_IRIS], uPal[D_IRIS_IN], smoothstep(0.0125, 0.004, ir));
+  iris = mix(iris, ink, smoothstep(0.0128, 0.0158, ir) * 0.7);
+  // a big round pupil
+  float pup = fill(length(ic / vec2(0.88, 1.0)) - 0.0078);
+  iris = mix(iris, ink, pup);
+  // the white round it, only at the very corners
+  iris = mix(iris, vec3(0.98, 0.97, 1.0), smoothstep(0.0158, 0.0175, ir) * 0.85);
+  float glint = max(fill(length(e - look - vec2(0.0045, 0.0055)) - 0.0034), fill(length(e - look - vec2(-0.004, -0.0045)) - 0.0016) * 0.9);
+  iris = mix(iris, vec3(1.0), glint);
+  c = mix(c, iris, eye);
+  unlit = max(unlit, eye * (0.4 + 0.6 * glint));
+  float lidLine = band(e.y - lid, 0.0013) * step(abs(e.x), hl * prof + 0.001) * step(dA, 0.0) * (1.0 - step(0.98, open));
+  c = mix(c, ink, lidLine * k);
+  float arc = band(e.y - (hh * 0.35) * (1.0 - x * x) + 0.002, 0.0017) * step(abs(e.x), hl * 0.95);
+  c = mix(c, ink, arc * smoothstep(0.3, 0.7, uFace.y) * k);
+  return c;
+}
+// A feather's vane (or a frill): a dark shaft down its middle, barbs angled
+// out along it, colour running from root to tip.
+vec3 drFeather(vec3 root, vec4 d, inout float unlit) {
+  float a = abs(d.x), y = clamp(d.y, 0.0, 1.0);
+  vec3 c = mix(root, uPal[D_PURPLE], smoothstep(0.15, 0.6, y));
+  c = mix(c, uPal[D_MAGENTA], smoothstep(0.55, 0.95, y + 0.15 * a));
+  // barbs: fine lines sweeping out and back toward the tip
+  float barb = fract(y * 16.0 - a * 2.2);
+  float bw = fwidth(y * 16.0 - a * 2.2) * 0.75 + 1e-4;
+  float bl = smoothstep(0.5 - bw, 0.5, barb) * (1.0 - smoothstep(0.5, 0.5 + bw * 2.0, barb));
+  c = mix(c, c * 0.72, bl * 0.5 * smoothstep(0.08, 0.2, a));
+  // the shaft, pale; the vane lighter toward its edge
+  c = mix(c, mix(c, uPal[D_PALE], 0.55), band(a, 0.07) * (1.0 - smoothstep(0.85, 1.0, y)));
+  c = mix(c, c * 1.18 + 0.03, smoothstep(0.55, 1.0, a) * 0.6);
+  // the tips catch the light
+  unlit = max(unlit, smoothstep(0.8, 1.0, y) * 0.15);
+  return c;
+}
+// A feather's (or a frill's) edge frays into its barbs, and its tip into a
+// few points: > 0 where there's nothing (d.x across the vane, -1..1 edge to
+// edge; d.y along it).
+float drFray(int m, vec4 d) {
+  if (m != 7 && m != 9) return -1.0;
+  float a = abs(d.x), y = clamp(d.y, 0.0, 1.0);
+  float barb = fract(y * 16.0 - a * 2.2 + (d.x < 0.0 ? 0.5 : 0.0));
+  float saw = abs(barb - 0.5) * 2.0;
+  return a - (0.66 + 0.34 * saw) - smoothstep(0.0, 0.25, y) * 0.0 + smoothstep(0.88, 1.0, y) * 0.2 * (1.0 - saw);
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  if (m == 5) {
+    // inside the mouth: the roof and the tongue
+    return mix(uPal[5], uPal[5] * 1.4 + vec3(0.1, 0.0, 0.03), smoothstep(-0.02, -0.008, (r.y - D_Y0) / D_HS));
+  }
+  if (m == 3) {
+    // antlers: cream, golden toward the burr, ridged along
+    vec3 c = mix(base * vec3(0.93, 0.8, 0.6), base * 1.06, smoothstep(0.0, 0.5, d.y));
+    float rid = drNoise(vec3(r.x * 900.0, d.y * 18.0, r.z * 900.0));
+    c *= 0.93 + 0.12 * rid;
+    return c;
+  }
+  if (m == 6) {
+    // claws: dark, a glint along the top
+    return mix(base, base * 2.4 + 0.08, smoothstep(0.3, 1.0, d.y) * 0.4);
+  }
+  if (m == 7) return drFeather(base, d, unlit);
+  if (m == 9) return drFeather(base, d, unlit);
+  if (m == 8) {
+    // whiskers: deep blue to teal at the tips
+    return mix(base, uPal[D_TEAL], smoothstep(0.3, 1.0, d.y));
+  }
+  if (m == 2) {
+    // the mane: deep indigo, streaked violet, the tips catching teal
+    vec3 st = r * vec3(130.0, 60.0, 16.0);
+    float s1 = drNoise(st), s2 = drNoise(st * 2.3 + 4.1);
+    float s = s1 * 0.6 + s2 * 0.4;
+    float top = clamp((length(r.xy - vec2(0.0, D_Y0)) - 0.08) / 0.07, 0.0, 1.0);
+    vec3 c = mix(base * 0.8, uPal[D_MANE_V], smoothstep(0.45, 0.75, s) * 0.7);
+    c = mix(c, uPal[D_MANE_T], smoothstep(0.55, 0.85, s2) * top * 0.6);
+    #ifdef SHELL
+      c = mix(c, c * 1.25 + 0.04, vShell * 0.5);
+    #endif
+    return c;
+  }
+  // --- her body (and the jaw) ---
+  vec3 hq = vec3(r.x, r.y - D_Y0, r.z) / D_HS;
+  float head = 1.0 - smoothstep(-0.06, 0.03, r.z);
+  float rho = length(r.xy - vec2(0.0, D_Y0));
+  float side = atan(abs(r.x), r.y - D_Y0); // 0 her back, pi her belly
+  // her colour by where it lies: deep blue along her back, teal down her
+  // flanks, green low on them, violet creeping in toward her plume
+  float h = mix(0.02, 0.27, smoothstep(0.35, 1.6, side)) + 0.2 * smoothstep(1.7, 2.35, side);
+  h = mix(h, 0.86, smoothstep(1.2, 2.1, r.z) * 0.6);
+  // (her legs deeper: blue running to indigo)
+  float leg = smoothstep(D_Y0 - 0.13, D_Y0 - 0.2, r.y) * (1.0 - smoothstep(-0.02, 0.02, -r.z));
+  h = mix(h, 0.94, leg * 0.7);
+  // scales
+  vec2 g = d.xy;
+  float lod = smoothstep(0.32, 0.75, length(fwidth(g)));
+  vec4 sc = drScales(g);
+  float scaly = (1.0 - head) * (1.0 - smoothstep(0.35, 0.8, d.w)) * (1.0 - lod) * (m == 1 ? 1.0 : 0.0);
+  // each scale its own shade; turned in the light, its colour slides
+  float hue = h + (sc.y - 0.5) * 0.08 * scaly - 0.22 * gFres + 0.04 * sin(r.z * 7.0);
+  vec3 c = drIri(hue);
+  // the head: smooth, teal, lighter toward the muzzle, deeper over the crown
+  vec3 hc = mix(uPal[D_TEAL] * 0.95, uPal[D_DEEP] * 1.1, smoothstep(0.03, 0.08, hq.y) * smoothstep(-0.16, -0.06, hq.z));
+  hc = mix(hc, uPal[D_MUZZLE], smoothstep(-0.14, -0.2, hq.z) * smoothstep(0.035, -0.01, hq.y) * 0.75);
+  c = mix(c, hc, head);
+  // shading within each scale: dark where it comes out from under the row
+  // before, bright toward its free edge, a fine dark line along the edge and
+  // a bright one just inside it; fine ridges fanning out across it
+  float edgeW = fwidth(sc.z) + 1e-4;
+  float shade = mix(0.72, 1.1, smoothstep(0.0, 0.85, sc.x));
+  float rim = smoothstep(0.03 + edgeW, 0.03, sc.z) * smoothstep(0.0, 0.03 + edgeW, sc.z);
+  float line = 1.0 - smoothstep(0.0, 0.02 + edgeW, sc.z);
+  float ridges = 0.5 + 0.5 * sin(sc.w * 14.0);
+  ridges *= 1.0 - smoothstep(0.1, 0.4, fwidth(sc.w * 14.0));
+  vec3 cs = c * shade * (0.96 + 0.08 * ridges * sc.x);
+  cs = mix(cs, mix(c, uPal[D_SHINE], 0.45), rim * 0.65);
+  cs = mix(cs, c * 0.45, line * 0.6);
+  c = mix(c * mix(0.92, 1.0, lod), cs, scaly);
+  // (seen from afar, the scales a fine texture, only a soft sheen)
+  gShine = scaly * smoothstep(0.35, 1.0, sc.x) + 0.1 * (1.0 - head) * (1.0 - scaly);
+  // pale: her hands and feet, lavender-white, in its own soft shade
+  float pale = smoothstep(0.15, 0.85, d.w);
+  vec3 pc = mix(uPal[D_PALE], uPal[D_PALE2], smoothstep(0.85, 0.3, d.w) * 0.6);
+  c = mix(c, pc, pale);
+  // her belly: gold, ridged across in chevrons (each plate's V toward her
+  // tail), its edge scalloped by the scales
+  float bz = d.z + (sc.x - 0.5) * 0.004 * (1.0 - lod);
+  float bw = fwidth(bz) * 0.75 + 1e-5;
+  float bel = smoothstep(-bw, bw, bz);
+  if (m == 4) bel = smoothstep(-0.022, -0.03, hq.y);
+  float pz = (r.z - abs(r.x) * 0.9) / 0.03;
+  float pl = fract(pz);
+  float pw = fwidth(pz) * 0.8 + 1e-4;
+  float ridge = smoothstep(1.0 - pw * 1.5, 1.0, pl) + (1.0 - smoothstep(0.0, pw, pl));
+  ridge *= (1.0 - smoothstep(0.15, 0.45, pw)) * (1.0 - head * 0.8);
+  vec3 bc = mix(uPal[D_BELLY] * 0.9, uPal[D_BELLY] * 1.05, smoothstep(0.0, 0.9, pl));
+  bc = mix(bc, uPal[D_RIDGE], ridge * 0.75);
+  c = mix(c, bc, bel);
+  gShine *= 1.0 - bel;
+  // the face (drawn everywhere, kept to her face: see drEye)
+  {
+    float face = (m == 1 || m == 4) ? step(hq.z, -0.04) * step(-0.06, hq.y) : 0.0;
+    vec3 q = vec3(abs(hq.x), hq.y, hq.z);
+    // brows: a dark sweep over each eye
+    vec2 bq = vec2(q.z + 0.14, q.y - 0.075);
+    float brow = band(bq.y + 0.25 * bq.x + 6.0 * bq.x * bq.x, 0.0035 * (1.0 - smoothstep(0.0, 0.03, abs(bq.x)))) * step(abs(bq.x), 0.03) * step(0.025, q.x);
+    c = mix(c, uPal[D_BROW], brow * 0.85 * face);
+    c = drEye(c, q, face, unlit);
+    // nostrils: two dark commas on the nose
+    vec3 N = vec3(0.0105, 0.02, -0.226);
+    float nd = length((q - N) * vec3(1.6, 1.0, 1.3)) - 0.0042;
+    c = mix(c, uPal[D_INK] * 1.6, fill(nd) * 0.85 * face);
+    // the smile: a line up into the cheek from the corner of the mouth
+    vec2 mq = vec2(q.z + 0.1, q.y + 0.006);
+    float smile = band(mq.y - 0.25 * mq.x - 9.0 * mq.x * mq.x, 0.0016) * step(-0.02, mq.x) * step(mq.x, 0.012) * step(0.03, q.x);
+    c = mix(c, uPal[D_INK], smile * 0.8 * face);
+  }
+  return c;
+}
 #elif defined(ITEMS)
 // --- the things that fly out of the explorer's backpack -------------------------
 // (d: x, y across the part, z which face: 1 the front, 2 the back, 0 an edge)
@@ -2926,6 +3225,31 @@ void main() {
     // (a fox is a flame in the dark: its coat keeps its colour through a
     // drain, as the cape does)
     gKeep = 1.0;
+  #elif defined(DRAGON)
+    #ifdef SHELL
+      // her mane's fur: strands drawn out along it (back toward her tail,
+      // and up), the layers thinning toward the tips; where a strand would
+      // be under a couple of pixels, a soft solid fringe instead
+      vec3 fq = vRest * vec3(300.0, 150.0, 60.0);
+      float tall = drNoise(fq) * 0.65 + drNoise(vRest * vec3(110.0, 55.0, 22.0) + 5.1) * 0.35;
+      float lod = smoothstep(0.35, 1.1, length(fwidth(fq)));
+      tall = mix(tall, 1.0 - 0.9 * vShell, lod);
+      float thr = 0.3 + vShell * 0.5;
+      float aa = max(fwidth(tall), 1e-3);
+      if (smoothstep(thr - aa, thr + aa, tall) < 0.5) discard;
+    #endif
+    #ifndef SHELL
+      // her feathers' and frills' edges fray into barbs
+      if (drFray(m, vD) > 0.0) discard;
+    #endif
+    // (a dragon keeps her colours in the dark, as the fox does)
+    gKeep = 1.0;
+    {
+      // how far she's turned from you here: her scales' colours slide with it
+      vec3 nn = normalize(vNormal);
+      nn = gl_FrontFacing ? nn : -nn;
+      gFres = 1.0 - abs(dot(nn, normalize(vWorld - uCamPos)));
+    }
   #elif defined(EXPLORER) && !defined(ITEMS)
     #ifdef CAPE
       // (the long hair's ends part into locks; a dark edge where they do)
@@ -2961,6 +3285,9 @@ void main() {
   #if defined(FOX)
     // fur takes the light softly
     float soft = 0.13;
+  #elif defined(DRAGON)
+    // (scales a little crisper than fur; feathers soft)
+    float soft = (m == 2 || m == 7 || m == 9) ? 0.12 : 0.075;
   #elif defined(EXPLORER)
     float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
   #elif defined(ELDER)
@@ -2992,6 +3319,20 @@ void main() {
     // the roots of the fur lie in their own shade, the tips catch the light
     col *= mix(0.9, 1.04, vShell);
   #endif
+  #elif defined(DRAGON)
+  {
+    // her scales shine where the light glances off them, tinted by their
+    // own colour, brightest toward their free edges
+    vec3 hv = normalize(uLightDir - V);
+    float spec = pow(max(dot(n, hv), 0.0), 16.0);
+    col += mix(uPal[30], base, 0.5) * min(spec * gShine * 0.32, 0.2) * lit;
+    // her feathers, frills and mane: a lighter tone facing the light
+    if (m == 2 || m == 7 || m == 9) col = mix(col, min(base * 1.3 + 0.05, vec3(1.0)), smoothstep(0.45, 0.7, dot(n, uLightDir)) * 0.35);
+    #ifdef SHELL
+      col *= mix(0.88, 1.06, vShell);
+    #endif
+  }
+  if (m == 99) {
   #elif defined(EXPLORER)
   if (m == 2 || m == 10) {
   #elif defined(ELDER)
@@ -3021,6 +3362,9 @@ const FS_CHAR_INK = FS_HEAD + CHAR_DETAIL + /* glsl */ `
 void main() {
   int m = int(vMat + 0.5);
   #if defined(FOX)
+    gKeep = 1.0;
+  #elif defined(DRAGON)
+    if (drFray(m, vD) > 0.0) discard;
     gKeep = 1.0;
   #elif defined(EXPLORER) && !defined(ITEMS)
     #ifdef CAPE
@@ -4388,7 +4732,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON' };
   const style = STYLES[o.style] ? { [STYLES[o.style]]: '' } : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);

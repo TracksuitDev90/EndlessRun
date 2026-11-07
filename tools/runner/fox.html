@@ -24,6 +24,7 @@
       //                 first view, every so many frames apart (at 60 a second)
       //   &from=<s>     where the strip starts (default: just before the jump)
       //   &zoom=, &y=, &z=, &up=   framing; &shells=0, &ink=0 hide layers
+      //   &bg=0         a transparent background (for portraits)
       // The jumps are driven as the game drives them (a wind-up crouch, a
       // launch, a flight under her gravity, a landing).
       import * as THREE from '../../vendor/three/three.module.min.js';
@@ -43,7 +44,9 @@
       const zoom = Number(q.get('zoom') || 1);
       const focusY = Number(q.get('y') || 0.36);
       const focusZ = Number(q.get('z') || 0);
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      const transparent = q.get('bg') === '0';
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: transparent, preserveDrawingBuffer: true });
+      if (transparent) document.body.style.background = document.documentElement.style.background = 'transparent';
       renderer.setPixelRatio(Math.min(2, devicePixelRatio));
       renderer.setSize(innerWidth, innerHeight);
       renderer.autoClear = false;
@@ -62,8 +65,8 @@
       if (q.get('ink') === '0') fox.inkMesh.visible = false;
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(4, 4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
       ground.position.y = -0.001;
-      scene.add(ground);
-      for (let k = 0; k <= 15; k++) {
+      if (!transparent) scene.add(ground);
+      for (let k = 0; k <= 15 && !transparent; k++) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.03), new THREE.MeshBasicMaterial({ color: k % 5 ? 0xb8a890 : 0x8a7a64 }));
         m.position.set(-0.6, k * 0.1, 0.6);
         scene.add(m);
@@ -71,7 +74,7 @@
       const cam = new THREE.PerspectiveCamera(22 / zoom, innerWidth / views.length / innerHeight, 0.1, 50);
       const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2, three: -0.7, backThree: Math.PI - 0.7, top: 0 };
       const w = innerWidth / views.length;
-      renderer.setClearColor(0xf6efe4, 1);
+      renderer.setClearColor(0xf6efe4, transparent ? 0 : 1);
       renderer.clear();
       function render(i) {
         const name = views[i];
@@ -154,7 +157,7 @@
           for (let k = 0; k < every; k++) step(frame++);
         }
       } else views.forEach((_, i) => render(i));
-      document.getElementById('label').textContent = `fox · ${pose}${strip ? ` · every ${every} frames` : ''}`;
+      document.getElementById('label').textContent = transparent ? '' : `fox · ${pose}${strip ? ` · every ${every} frames` : ''}`;
       window.__ready = true;
     </script>
   </body>

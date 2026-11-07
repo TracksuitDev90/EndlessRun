@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dragon viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #f6efe4; overflow: hidden; }
+      canvas { display: block; }
+      #label { position: fixed; left: 8px; top: 6px; font: 12px ui-monospace, monospace; color: #6b5a4a; }
+    </style>
+  </head>
+  <body>
+    <div id="label"></div>
+    <script type="module">
+      // Iris turned round like her reference sheet, or a film strip of her
+      // moving. Serve the repository root and open tools/runner/dragon.html.
+      //   ?pose=stand|crouch|fly|weave|loop|corkscrew|land   what she's doing
+      //   &t=<s>        how long into it
+      //   &v=<m/s>      the runner's pace (flying: the road streams past)
+      //   &views=left,front,back,right,three,backThree,top,chase   one view
+      //                 each...
+      //   &strip=<n>&every=<frames>   ...or a film strip: n frames of the
+      //                 first view, every so many frames apart (60 a second)
+      //   &zoom=, &y=, &up=, &dist=, &fx=, &fz=   framing (fx, fz: the
+      //                 point looked at, standing); &shells=0, &ink=0 hide
+      //                 layers
+      //   &bg=0         a transparent background (for portraits)
+      // Flying, the camera rides along with her (her path is laid in a frame
+      // moving at the pace, as the game's is).
+      import * as THREE from '../../vendor/three/three.module.min.js';
+      import { shared } from '../../src/render/shaders.js';
+      import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
+      import { loadRunner } from '../../src/game/runner-asset.js';
+      import { Dragon } from '../../src/game/dragon.js';
+      import { WORLD_DEFS } from '../../src/world/index.js';
+
+      const q = new URLSearchParams(location.search);
+      const pose = q.get('pose') || 'stand';
+      const T = Number(q.get('t') || 2);
+      const strip = Number(q.get('strip') || 0);
+      const every = Number(q.get('every') || 3);
+      const views = strip ? Array(strip).fill((q.get('views') || 'left').split(',')[0]) : (q.get('views') || 'left,front,back,three').split(',');
+      const zoom = Number(q.get('zoom') || 1);
+      const transparent = q.get('bg') === '0';
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: transparent, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.autoClear = false;
+      document.body.appendChild(renderer.domElement);
+      if (transparent) document.body.style.background = document.documentElement.style.background = 'transparent';
+      shared.uMarks.value = makeMarksTexture();
+      shared.uNoise.value = makeNoiseTexture();
+      shared.uResolution.value.set(innerWidth, innerHeight);
+      const asset = await loadRunner('../../assets/dragon/');
+      const env = WORLD_DEFS[Number(q.get('world') || 0)].env;
+      const dr = new Dragon(env, asset);
+      dr.u.uSunColor.value.set(0, 0, 0);
+      const scene = new THREE.Scene();
+      scene.add(dr.root);
+      if (!transparent) scene.add(dr.shadow);
+      if (q.get('shells') === '0') dr.furMesh.visible = false;
+      if (q.get('ink') === '0') dr.inkMesh.visible = false;
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
+      ground.position.y = -0.001;
+      if (!transparent) scene.add(ground);
+      const marks = new THREE.Group();
+      for (let k = 0; k <= 20; k++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.03), new THREE.MeshBasicMaterial({ color: k % 5 ? 0xb8a890 : 0x8a7a64 }));
+        m.position.set(-0.9, k * 0.1, 0.4);
+        marks.add(m);
+      }
+      if (!transparent) scene.add(marks);
+      const cam = new THREE.PerspectiveCamera(24 / zoom, innerWidth / views.length / innerHeight, 0.1, 80);
+      const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2, three: -0.7, backThree: Math.PI - 0.7, top: 0, chase: Math.PI };
+      const w = innerWidth / views.length;
+      renderer.setClearColor(0xf6efe4, transparent ? 0 : 1);
+      renderer.clear();
+      const focus = new THREE.Vector3();
+      function render(i) {
+        const name = views[i];
+        const a = yaws[name] ?? 0;
+        const d = Number(q.get('dist') || (pose === 'stand' || pose === 'crouch' ? 5.2 : 8));
+        const up = name === 'top' ? d : name === 'chase' ? 2.8 : Number(q.get('up') || 0.4);
+        const fy = q.has('y') ? Number(q.get('y')) : focus.y;
+        cam.position.set(focus.x + Math.sin(a) * d, fy + up, focus.z - Math.cos(a) * d);
+        cam.lookAt(focus.x, fy, focus.z - (name === 'chase' ? 3 : 0));
+        shared.uCamPos.value.copy(cam.position);
+        renderer.setViewport(i * w, 0, w, innerHeight);
+        renderer.setScissor(i * w, 0, w, innerHeight);
+        renderer.setScissorTest(true);
+        renderer.render(scene, cam);
+      }
+
+      // --- the simulation ---------------------------------------------------
+      const dt = 1 / 60;
+      const v = Number(q.get('v') || (pose === 'stand' || pose === 'crouch' ? 0 : 14));
+      const head = new THREE.Vector3();
+      const prev = new THREE.Vector3();
+      const vel = new THREE.Vector3();
+      const spot = new THREE.Vector3();
+      let frameZ = 0;
+      const ctx = { mode: 'fly', head, vel, frameZ: 0, wind: 5, speed: v, spot, yaw: 0, swim: 1, spin: 0, upright: 1 };
+      // where her head flies, in the frame (x across, y up, z: - ahead)
+      function path(t, out) {
+        if (pose === 'weave') return out.set(1.6 * Math.sin(t * 1.3), 1.5 + 0.5 * Math.sin(t * 0.9), -1 + 1.2 * Math.sin(t * 0.6));
+        if (pose === 'loop') {
+          const k = Math.min(1, Math.max(0, (t - T) / 1.5));
+          const e = k * k * (3 - 2 * k);
+          const a = e * Math.PI * 2;
+          return out.set(0, 1.6 + 1.2 * (1 - Math.cos(a)), -1.2 * Math.sin(a));
+        }
+        return out.set(0.4 * Math.sin(t * 0.7), 1.5 + 0.15 * Math.sin(t * 1.1), 0);
+      }
+      function step(i) {
+        const t = i * dt;
+        frameZ -= v * dt;
+        ctx.frameZ = frameZ;
+        ctx.speed = v;
+        ctx.wind = 3.5 + 0.2 * v;
+        if (pose === 'stand' || pose === 'crouch' || (pose === 'land' && t > T)) {
+          ctx.mode = pose === 'crouch' ? 'crouch' : 'stand';
+          spot.set(0, 0, frameZ);
+          dr.standHead(spot, 0, ctx.mode, head);
+        } else {
+          ctx.mode = 'fly';
+          path(t, head);
+          head.z += frameZ;
+        }
+        ctx.spin = pose === 'corkscrew' && t > T && t < T + 1.2 ? Math.PI * 2 / 1.2 : 0;
+        ctx.upright = pose === 'loop' && t > T && t < T + 1.6 ? 0 : 1;
+        if (i === 0) prev.copy(head);
+        vel.subVectors(head, prev).divideScalar(dt);
+        prev.copy(head);
+        dr.update(dt, ctx);
+        focus.copy(dr.P[pose === 'stand' ? 6 : 9]);
+        if (pose === 'stand' || pose === 'crouch') focus.set(Number(q.get('fx') || 0.15), 0.6, frameZ + Number(q.get('fz') || 0.2));
+      }
+      const start = Math.max(1, Math.round((q.has('from') ? Number(q.get('from')) : T) / dt));
+      let frame = 0;
+      for (; frame < start; frame++) step(frame);
+      if (strip) {
+        for (let i = 0; i < views.length; i++) {
+          render(i);
+          for (let k = 0; k < every; k++) step(frame++);
+        }
+      } else views.forEach((_, i) => render(i));
+      document.getElementById('label').textContent = transparent ? '' : `dragon · ${pose}${strip ? ` · every ${every} frames` : ''}`;
+      // (for poking at her from the console: change something, then render())
+      window.__view = { dr, scene, shared, renderer, render: () => { renderer.setScissorTest(false); renderer.clear(); views.forEach((_, i) => render(i)); } };
+      window.__ready = true;
+    </script>
+  </body>
+</html>

@@ -15,8 +15,8 @@ import { Quality, gpuClass } from './core/quality.js';
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
 // ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
 // 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god,
-// ?runner=<id> (who runs: wayfarer, explorer), ?companion=<id> (who runs
-// with you: fox, or none)
+// ?runner=<id> (who runs: wayfarer, explorer, elder), ?companion=<id> (who
+// runs with you: fox, dragon, or none)
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
@@ -124,6 +124,12 @@ async function boot() {
   };
   ui.setRunners(CHARACTERS, game.runnerId);
   ui.on('pick', pick);
+  // and who runs with you: the badges under the cards
+  const pickPal = (id) => {
+    if (game.selectCompanion(id)) ui.showCompanion(game.companionId);
+  };
+  if (!game.alone) ui.setCompanions(COMPANIONS.filter((c) => game.companions[c.id]), game.companionId);
+  ui.on('pal', pickPal);
   new Input(canvas, {
     onAction: (a) => {
       if (a === 'pause') {
@@ -166,6 +172,7 @@ async function boot() {
     audio.resume();
     game.toTitle();
     ui.showRunner(game.runnerId, false);
+    ui.showCompanion(game.companionId, false);
     ui.showTitle(true);
   });
   ui.on('again', () => game.restart());

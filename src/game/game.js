@@ -17,8 +17,7 @@ import { Dream } from './dream.js';
 import { WaterFx } from './bubbles.js';
 import { Splash } from './splash.js';
 import { Sands } from './sands.js';
-import { Companion } from './companion.js';
-import { companionById } from './companions.js';
+import { COMPANIONS, companionById } from './companions.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -63,9 +62,14 @@ export class Game {
     for (const c of CHARACTERS) this.runners[c.id] = c.make(WORLD_DEFS[0].env, assets[c.id]);
     this.runnerId = characterById(params.runner || readString('er.runner')).id;
     this.player = this.runners[this.runnerId];
-    // the animal who runs with you (?companion=none to run alone)
-    const cdef = companionById(params.companion || CONFIG.companion.id);
-    this.companion = cdef && companionAssets[cdef.id] ? new Companion(this, cdef, cdef.make(WORLD_DEFS[0].env, companionAssets[cdef.id])) : null;
+    // the animal who runs with you: every one you can pick built up front, as
+    // the runners are (?companion=none to run alone)
+    this.companions = {};
+    for (const c of COMPANIONS) if (companionAssets[c.id]) this.companions[c.id] = c.mind(this, c, c.make(WORLD_DEFS[0].env, companionAssets[c.id]));
+    this.alone = params.companion === 'none';
+    const cdef = this.alone ? null : companionById(params.companion || readString('er.companion') || CONFIG.companion.id);
+    this.companionId = cdef && this.companions[cdef.id] ? cdef.id : null;
+    this.companion = this.companionId ? this.companions[this.companionId] : null;
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
@@ -231,6 +235,26 @@ export class Game {
     }
     this.player.greet();
     this.companion?.greet();
+    return true;
+  }
+
+  // Pick who runs with you (title screen only): they appear beside the
+  // runner, lit by the same world, and say hello.
+  selectCompanion(id) {
+    const def = companionById(id);
+    const next = def && this.companions[def.id];
+    if (this.state !== 'title' || !next) return false;
+    if (next !== this.companion) {
+      if (this.companion) this.sceneMain.remove(...this.companion.objects);
+      this.companion = next;
+      this.companionId = def.id;
+      next.reset(true);
+      copyEnvUniforms(next.body.u, this.player.u);
+      next.body.u.uDrain.value.copy(this.current.u.uDrain.value);
+      this.sceneMain.add(...next.objects);
+      writeString('er.companion', def.id);
+    }
+    this.companion.greet();
     return true;
   }
 
@@ -809,9 +833,9 @@ export class Game {
       r.forCompile?.(true);
     }
     scene.add(this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh, ...this.water.objects);
-    if (this.companion) {
-      scene.add(...this.companion.objects);
-      this.companion.forCompile(true);
+    for (const c of Object.values(this.companions)) {
+      scene.add(...c.objects);
+      c.forCompile(true);
     }
     this.water.forCompile(true);
     scene.add(this.splash.mesh);
@@ -846,11 +870,11 @@ export class Game {
         for (const o of r.objects) o.removeFromParent();
       }
       this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
-      if (this.companion) {
-        this.companion.forCompile(false);
-        for (const o of this.companion.objects) o.removeFromParent();
-        this.sceneMain.add(...this.companion.objects);
+      for (const c of Object.values(this.companions)) {
+        c.forCompile(false);
+        for (const o of c.objects) o.removeFromParent();
       }
+      if (this.companion) this.sceneMain.add(...this.companion.objects);
       this.scenePortal.add(this.portal.stencilMesh);
     }
   }

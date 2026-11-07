@@ -101,8 +101,10 @@ export const CONFIG = {
     exchange: { base: 10, perWorld: 0.5, into: 0.75, crown: 3, haul: 0.5, big: 400 },
   },
 
-  // The companion who runs with you (see game/companion.js): who it is
-  // ('none' to run alone; ?companion= overrides it), her gravity (m/s²) and
+  // The companion who runs with you (see game/companions.js): who it is by
+  // default ('fox' or 'dragon'; 'none' to run alone; the title screen's
+  // pick, then ?companion=, override it). The fox (game/companion.js): her
+  // gravity (m/s²) and
   // how long she winds up before each kind of jump (s), how high she leaps
   // (m: over a hurdle, the mousing pounce; and never a pounce within
   // pounceEvery s of the last), how far ahead of you she ranges
@@ -132,6 +134,41 @@ export const CONFIG = {
     rest: [1.2, 3.2],
     ride: [2.6, 4.6],
     fetch: { every: [7, 14], reach: [6, 26], chance: 0.6, mischief: 0.15 },
+    // A companion who flies (the dragon - see game/flyer.js): the wind her
+    // body streams back in (m/s: base + a share of your pace; less of it and
+    // she coils and ripples more, more and she streams out straighter); how
+    // hard she can change her speed (m/s²: across, up and down, along) and
+    // how fast she goes across and up and down (m/s) and along, slower or
+    // faster than you; the height she glides at (m, her head), how far
+    // ahead of you she keeps (m), the height she clears you at when she
+    // passes over you, the highest she'll go to sail over a wall or a bar
+    // (any taller and she goes round, or under), how far in from the edges
+    // of the screen she keeps (NDC: 1 the edge), how far ahead and behind
+    // she ever goes; how long she
+    // rests between ideas (s); the twirl she says hello with (s, m); her
+    // loop-the-loop and corkscrew (how long, how big, how far the loop's
+    // turned out toward the edge of the road, how many turns, never again
+    // within every s); and her gem fetching (how often she looks,
+    // how far ahead it must be, the chance she goes for it).
+    flyer: {
+      wind: [2.6, 0.08],
+      acc: [8, 8, 8],
+      vmax: [5.5, 4.5],
+      surge: [-6, 9],
+      cruise: [1.3, 1.8],
+      slot: [0.4, 2.8],
+      over: 2.85,
+      overWalls: 4.3,
+      screen: 0.74,
+      ahead: 9,
+      behind: -1.5,
+      rest: [2.5, 5],
+      twirl: 2.2,
+      twirlHeight: 0.95,
+      loop: { dur: 1.9, radius: 1.0, tilt: 0.9, every: 24 },
+      screw: { dur: 1.4, radius: 0.5, turns: 1, every: 12 },
+      fetch: { every: [8, 15], reach: [9, 28], chance: 0.6 },
+    },
   },
 
   // Hits

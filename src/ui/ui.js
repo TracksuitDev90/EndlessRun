@@ -130,6 +130,46 @@ export class UI {
     return o[(i + dir + o.length) % o.length];
   }
 
+  // The badges for who runs with you (see game/companions.js), under the
+  // runners' cards: their portrait, name and what they are. Tapping one
+  // picks them.
+  setCompanions(list, selected) {
+    const root = $('pals');
+    for (const el of root.querySelectorAll('.pal')) el.remove();
+    this.pals = {};
+    for (const c of list) {
+      const b = document.createElement('button');
+      b.className = 'pal';
+      b.type = 'button';
+      b.dataset.id = c.id;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', `${c.name}, ${c.title}: ${c.blurb}`);
+      b.title = c.blurb;
+      b.style.setProperty('--c1', c.tint[0]);
+      b.style.setProperty('--c2', c.tint[1]);
+      b.innerHTML = `<span class="pal-face"><img src="${c.face}" alt="" draggable="false" /></span><span class="pal-text"><span class="pal-name"></span><span class="pal-title"></span></span>`;
+      b.querySelector('.pal-name').textContent = c.name;
+      b.querySelector('.pal-title').textContent = c.title;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.handlers.pal?.(c.id);
+      });
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());
+      root.appendChild(b);
+      this.pals[c.id] = b;
+    }
+    root.hidden = list.length < 2;
+    this.showCompanion(selected, false);
+  }
+
+  showCompanion(id, hop = true) {
+    for (const [k, b] of Object.entries(this.pals || {})) {
+      b.setAttribute('aria-checked', String(k === id));
+      b.tabIndex = k === id ? 0 : -1;
+      if (k === id && hop) replay(b, 'hop');
+    }
+  }
+
   loaded() {
     $('loading').classList.remove('show');
   }

@@ -19,10 +19,15 @@ are the ones worth the most. And every world has its own gemstone to collect
 (the Kelp Deep's are pearls), laid in runs that swerve round its walls, arc
 over its hurdles and lead you through its doorways — and at the end of the
 run, you can exchange your haul for a big bonus (see [Score](#score)). And you never
-run alone: Sorrel, a red fox, runs with you — ranging ahead, dropping back,
-shooting out between your legs, riding on your shoulder, once in a while
-chasing her own tail, and now and then snapping a gem out of the air for you
-(see [The fox](#the-fox)).
+run alone: pick who runs with you. Sorrel, a red fox, runs at your side —
+ranging ahead, dropping back, shooting out between your legs, riding on your
+shoulder, once in a while chasing her own tail, and now and then snapping a
+gem out of the air for you (see [The fox](#the-fox)). Or Iris, a wind
+dragon — iridescent scales, deer's antlers, a feathered mane and plume —
+flies beside you, flowing after her own head like a ribbon in the wind,
+swimming through the air, sailing over carts and slipping under beams, now
+and then loop-the-looping or corkscrewing ahead, and always keeping out of
+your way (see [The dragon](#the-dragon)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -781,7 +786,7 @@ Append to the URL:
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`), over the one remembered |
-| `?companion=none` | run alone (or `fox`, the default: who runs with you) |
+| `?companion=dragon` | who runs with you (`fox`, the default, or `dragon`), over the one remembered; `none` runs alone |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
@@ -944,6 +949,15 @@ his beard. On
 a tall screen the title camera stands back so the runner shows above the
 cards; on a wide one the cards stand to the right. The pick is remembered
 (`localStorage`).
+
+Under the cards, a badge for each companion picks who runs with you: their
+portrait (rendered from their own sculpt and shader by
+`tools/characters/faces.js` into `assets/characters/<id>-face.webp`) in a
+round window washed in their colours, their name and what they are. Picking
+one swaps the companion beside the runner (both are built and compiled at
+boot, as the runners are) and they say hello — the fox hops, the dragon
+twirls up into the air round where she stood and settles back on her hind
+legs. That pick is remembered too.
 
 ### The explorer
 
@@ -1546,9 +1560,170 @@ runs, how she crosses the road, how long chasing her tail takes and how
 seldom, how often she gets ideas, how long she rides, how often and how
 eagerly she fetches) live in `CONFIG.companion`; `?companion=none`
 runs alone. Companions are listed in `src/game/companions.js` — the fox is
-the first — and `companion.js` is written for any of them: a new animal
-needs its body (a sculpt and a module like `fox.js` taking the same frame
-context) and an entry in the list.
+the first, the dragon the second — each with its body and its mind:
+`companion.js` is the mind of one who runs (written for any animal on its
+feet: a new one needs its body, a sculpt and a module like `fox.js` taking
+the same frame context), `flyer.js` the mind of one who flies (see the
+dragon, below). Both answer the same calls from the game.
+
+## The dragon
+
+![Iris: stood up on her hind legs from the front, her left side, the back and her right side, as on her reference sheet; flying, a wave swimming down her from neck to plume; on the title screen, picked under the runners' cards; gliding a lane over from the runner; landed on all fours by a runner who's gone over; and on all fours](docs/dragon.jpg)
+
+Iris is a wind dragon, and she flies with you whoever you pick: a long,
+slender serpent of a dragon after her reference sheet
+(`tools/characters/dragon-sheet.jpg`), with an easy, liquid
+way of moving — weaving, rising and falling, flowing after her own head —
+that keeps out of your way. Like Sorrel she's almost all for show, and like
+Sorrel she fetches gems. (One day both companions will have gifts of their
+own, growing with their loyalty the further you run.)
+
+**Sculpted like the others.** `tools/runner/dragon.py` builds her with
+`build.py`'s kit, laid out straight — nose to −z, her spine level, her legs
+hanging under her as if on all fours — because she's never shown like that:
+the game bends her spine into any curve. So her spine is a chain of thirty
+bones bound straight along it, each moved and turned on its own, with her
+head, jaw, frills, limbs and whiskers hanging off it; and because she's laid
+out straight, the shader can tell where on her a point lies from its rest
+position alone. A short rounded head, sculpted large, with big eyes, a smile
+and a little upturned nose; deer's antlers, branching; fans of feathered
+frills behind the cheeks; long whiskers from the snout; a slim neck, the
+chest, a tucked waist, haunches, and a tail as long as all the rest of her,
+tapering into a plume — a fountain of long curling feathers sprayed back, up
+and out round it. A mane of feathery locks lies back down her from between
+her antlers to the plume, falling to both sides of her neck and narrowing
+to a crest along her back and tail; feathered fur tufts off her forearms and
+thighs; slim arms with three-fingered hands, long digitigrade legs, and a
+hooked, needle-pointed claw on every finger and toe. About 2.4 m nose to
+plume; stood up, she comes to the runner's shoulder, antlers and all. Each
+vertex carries her scale grid (round her, along her: one scale each, sized to
+how thick she is there), how far inside the gold of her belly it lies and how
+pale it runs (her forearms, hands, shins and feet); on a feather or a frill,
+where across and along its vane it lies. To change her, edit the script and
+regenerate (about two minutes), then look at her in
+`tools/runner/dragon.html` (`?pose=stand|crouch|fly|weave|loop|corkscrew|land`,
+`&views=`, `&strip=` and the rest, as the fox's viewer):
+
+```sh
+python3 tools/runner/dragon.py   # -> assets/dragon/
+```
+
+**Painted** (`DRAGON` in `CHAR_DETAIL`): fish scales laid like shingles in
+offset rows, each one's front tucked under the row before and its free edge
+rounded toward her tail — dark where it comes out from under, bright toward
+its edge, a fine dark line along the edge and a bright one just inside it,
+fine ridges fanning across it. Her colour runs deep blue along her back,
+teal down her flanks, green low on them, violet toward her plume and indigo
+down her legs — and it's iridescent: each scale's colour sits on a loop
+(violet, deep blue, teal, green) and slides along it as she turns from you,
+so her edges shade into violet and her flanks shimmer as she banks, a soft
+glint playing on the scales' free edges. Where scales would be under a couple
+of pixels they melt into her colour rather than shimmer. Her belly is gold,
+ridged across in chevrons (each plate's V toward her tail), its edge
+scalloped by the scales; her hands and feet lavender-white; her claws dark;
+her antlers cream, golden toward the burr and ridged along. Her frills and
+plume run teal (or blue) at the root through purple to magenta tips, each
+vane with a pale shaft and barbs sweeping out along it, its edges frayed
+into the barbs (cut away in the shader, outline and all). Her face is smooth
+teal, lighter on the muzzle: big round eyes — an orange iris round a big dark
+pupil, two catch-lights, a heavy dark rim and lashes flicking out behind —
+under a dark brow; two nostrils; a smile up into her cheek. She blinks, and
+squeezes her eyes shut in happy arcs. Her mane is deep indigo streaked with
+violet, catching teal at its tips, with a short pile of fur grown over it
+(`SHELL`, as on the fox). She keeps her colour through Hell's drain.
+
+**How she moves** (`src/game/dragon.js`). Flying, her body flows after her
+head like a ribbon in the wind. Her head's path is kept in the runner's
+frame, blown back by a wind of its own, and her spine is laid along it by arc
+length (Catmull-Rom through the path): every swerve, climb and dive runs down
+her body as a wave, and her tail passes where her head has been. Each point
+of the path keeps how her head was turned there — so a bank (her lift tipped
+into the turn, as a bird's is) or a corkscrew runs down her as a twist — and
+each bone is turned along the curve from it. On top of that she swims: a wave
+travels down her from neck to plume, small at her head and growing toward
+her tail, rising and falling more than side to side, as a dragon swims
+through cloud; then she's laid back out to her true length along it, so she
+never stretches. In open air the wind is gentle, so her body keeps a good
+deal of her weaving as S-curves; threading obstacles it runs at the road's
+own speed, so her body follows exactly the line her head took through the
+world, gap after gap, over and under. (It's never slower than her head is
+dropping back through it, or she'd fold back over herself — except in a
+loop, where she means to.) Standing up on her hind legs, her spine is drawn
+into an S — hips over her feet, chest up, neck back, head forward — and her
+tail laid round on the ground; down on all fours, her back is level and her
+neck raised. Both are drawn by bending along her length from her hips, so
+she's never a centimetre longer or shorter; she breathes, her tail stirs on
+the ground, and she glides between them and flight (quicker taking off than
+settling). Her legs are placed by IK: hands curled up under her chest and
+hind legs trailing back along her tail as she flies, planted under her as she
+stands. Her whiskers are chains of particles in the runner's frame, flung by
+every turn of her head, dragged along with the air and streamed back by it,
+drooping in long curves when she's still, fluttering in a strong wind; her
+frills are on springs (laid back by the wind, flattened when she's startled,
+flaring when she's pleased); her mane's fur is combed back by the air; the
+end of her tail flutters; she looks at what interests her, her neck taking a
+share of the turn; her jaw opens to snap at a gem, or a little in a grin. Her
+shadow is a long soft stroke laid along her body on the ground, fading as
+she climbs.
+
+**Her mind** (`src/game/flyer.js`). The runner and the road just ahead of
+them are yours. Her place is the lane beside you (never yours; on her own
+side of you; higher in a lane you might swerve into, lower two lanes over),
+a little ahead and a couple of metres up, gliding on the wind and never
+quite still — a slow wander of sines at odd rates laid over wherever she
+means to be. She stays on the screen: each frame she works out from the
+camera how much of the road it sees at her depth (a tall phone sees not much
+more than a lane either side of you) and keeps her slot inside it. When you
+swerve under her she lifts clear over you — higher if you jump — before she
+slips aside; when she changes sides she goes high and ahead, never low across
+you. Every few seconds she gets an idea:
+
+- **soar** — up high and over to your other side, then down again;
+- **skim** — down along her lane a hand's breadth off the road, whiskers
+  streaming, and up again;
+- **linger** — drops back level with you, lower, and looks at you a while;
+- **corkscrew** — tears ahead rolling over and over round her own length
+  (and sometimes when you take a whole run of gems, or after a catch);
+- **loop** — a loop-the-loop ahead in her own lane, her body following her
+  head right round it like a ribbon, the loop turned out toward the edge of
+  the road so from behind you see it open as a ring (the rarest);
+- **fetch** — spots a gem in a lane you're not in, that she can see and
+  reach, swoops on it holding steady, jaws open, snaps it up and sends it to
+  you (it scores and counts toward its run as if you'd taken it).
+
+Under all of it she reads the road, for her whole long body has to follow
+her head through. Walls come a row at a time: she threads the gaps — in the
+gap of the row coming at her, as near as it lets her to the gap in the row
+after it, so a slalom is a sway and not a scramble — and keeps to it till the
+row's by her tail. But most walls aren't so very tall to look at (a cart, a
+wardrobe, a boulder: she measures each prop), so rather than squeeze into
+your lane to get by one she sails over it, if that's not off the top of the
+screen. Bars she slips under, low, or — near you, or if she's nearer their
+top — goes over, decided once for each (and changed to over if the walls
+have put her near you and there's time to climb); hurdles she keeps above.
+She takes them in the order they come, counting only those too close
+together to get from under one to over the next as one, and commits early and
+hard. Her flourishes are only for open air, in a clear lane of her own, well
+away from you. When you go down she hovers by you while you slide to a stop,
+then lands on all fours beside you, facing you, and looks at you; when you
+get up she takes off again. On the title screen she stands up on her hind
+legs beside the runner, turned toward you, looking about, and now and then
+goes down on all fours for a stretch, and back up.
+
+`tools/companion/audit.js` checks her too (`node tools/companion/audit.js
+"?manual&seed=2&companion=dragon" 240`): every bone of her spine against the
+obstacles (walls and bars as tall as they stand to look at), and how much she
+gets in your way — the share of the time any of her body is over the runner
+on the screen (in front of them, or anywhere), how often she's low in the road
+just ahead of you, and how often she's off the screen. Over three minutes of
+play on a tall phone's screen she touches nothing (bar, in the odd run, a
+graze of a fraction of a second); she's over the runner 1.5–3% of the time
+(in front of them 1–2%), low in the road ahead of them 0.5–3%, off the
+screen 1–5%, and she catches about half the gems she goes for. Her tunables (the wind her body streams in, how hard and fast she moves,
+her glide's height and slot, how high she clears you and how high she'll
+sail over a wall, how far in from the screen's edges she keeps, her rests
+between ideas, the twirl she says hello with, the loop, the corkscrew and her
+fetching) live in `CONFIG.companion.flyer`.
 
 ## Project layout
 
@@ -1584,19 +1759,27 @@ src/game/                     game loop, player (the runners' shared core:
                               sands (the footprints in the Gallery's sand and
                               the surf lapping up it before a doorway into the
                               sea); the companion who runs with you
-                              (companions.js: who can; companion.js: her mind;
-                              fox.js: Sorrel's body, gallop, poses, tail and
-                              ears)
+                              (companions.js: who can; companion.js: the
+                              mind of one who runs; fox.js: Sorrel's body,
+                              gallop, poses, tail and ears; flyer.js: the
+                              mind of one who flies; dragon.js: Iris's body,
+                              her spine laid along her flight, swim, poses,
+                              legs, whiskers and frills)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/elder.py         offline sculpt of the elder -> assets/elder/
 tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
+tools/runner/dragon.py        offline sculpt of the dragon -> assets/dragon/
 tools/runner/view.html        a runner turned round like their reference sheet
 tools/runner/fox.html         the fox turned round, posed, or as a film strip
+tools/runner/dragon.html      the dragon turned round, posed, flying, or as a
+                              film strip
 tools/companion/audit.js      plays the game unseen, checking the companion
-                              never touches an obstacle
+                              never touches an obstacle (and that one who
+                              flies keeps out of your way)
 tools/characters/             the reference sheets and the cut-out of the
-                              title screen's cards -> assets/characters/
+                              title screen's cards -> assets/characters/;
+                              faces.js renders the companions' portraits
 vendor/three/                 three.js r185 (MIT)
 ```
 
@@ -1708,6 +1891,7 @@ light on the road and the motes they leave a colour of their own; and `icon:
 
 ## Not in yet (on purpose)
 
-Keys, power-ups (the fox will fetch those too), more runners, more
+Keys, power-ups (the companions will fetch those too), the companions' own
+gifts (growing with their loyalty the further you run), more runners, more
 companions and most sound effects are left for the next pass; the ambient soundtrack (and the gems' chimes) is generated live
 with Web Audio.
