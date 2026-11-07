@@ -47,7 +47,6 @@ const _v = new THREE.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10);
-const easeD = (t) => 30 * t * t * (t - 1) * (t - 1);
 
 // A critically damped spring toward target, solved exactly; [x, v] in out.
 function follow(x, v, target, w, dt, out) {
@@ -59,6 +58,7 @@ function follow(x, v, target, w, dt, out) {
   return out;
 }
 const _f = [0, 0];
+let _a = 0;
 
 export class Flyer {
   constructor(game, def, body) {
@@ -67,8 +67,11 @@ export class Flyer {
     this.body = body;
     this.C = CONFIG.companion.flyer;
     this.later = [];
-    this.ctx = { mode: 'stand', head: new THREE.Vector3(), vel: new THREE.Vector3(), frameZ: 0, wind: 2, speed: 0, spot: new THREE.Vector3(), yaw: 0, swim: 1, spin: 0, upright: 1, loop: 0 };
+    this.ctx = { mode: 'stand', head: new THREE.Vector3(), vel: new THREE.Vector3(), frameZ: 0, wind: 2, speed: 0, spot: new THREE.Vector3(), yaw: 0, swim: 1, roll: null, upright: 1, loop: 0 };
+    // (where her head was last frame, in the runner's frame - so the
+    // floating origin moving on under her is never taken for a lunge)
     this.prevHead = new THREE.Vector3();
+    this.prevReady = false;
     this.reset(true);
   }
 
@@ -83,7 +86,10 @@ export class Flyer {
     this.y = 1.2;
     this.dz = 0.7;
     this.vx = this.vy = this.vdz = 0;
+    this.ax = this.ay = this.adz = 0;
     this.off = { x: 0, y: 0, dz: 0 };
+    this.offV = { x: 0, y: 0, dz: 0 };
+    this.prevReady = false;
     this.script = null;
     this.spot = new THREE.Vector3(this.x, 0, 0);
     this.yaw = 0.4;
@@ -202,6 +208,17 @@ export class Flyer {
     this.place(dt);
   }
 
+  // The floating origin moved on by d (the scene's z of everything along the
+  // road jumps by d): where she stands, or means to set down, is kept in the
+  // scene's own z, and goes with it.
+  rebase(d) {
+    this.spot.z += d;
+    if (this.landing) {
+      this.landing.spot.z += d;
+      this.landing.head.z += d;
+    }
+  }
+
   // --- where she is ----------------------------------------------------------------
   get pz() {
     return -(this.game.dist - this.game.origin);
@@ -232,9 +249,18 @@ export class Flyer {
       this.y = c.head.y;
       this.dz = pz - c.head.z;
     }
-    if (dt > 0) c.vel.subVectors(c.head, this.prevHead).divideScalar(dt);
-    else c.vel.set(0, 0, -g.speed);
-    this.prevHead.copy(c.head);
+    // her head's velocity: how it moved in the runner's frame, plus the
+    // runner's own pace (taken from world positions, the floating origin's
+    // jump back every half kilometre came through as one frame's lunge of
+    // thousands of metres a second - her head flipped round and a half
+    // twist ran down her body)
+    _v.set(c.head.x, c.head.y, c.head.z - pz);
+    if (dt > 0 && this.prevReady) {
+      c.vel.subVectors(_v, this.prevHead).divideScalar(dt);
+      c.vel.z -= g.speed;
+    } else c.vel.set(0, 0, -g.speed);
+    this.prevHead.copy(_v);
+    this.prevReady = true;
     // the wind she streams in: less in a loop (her body follows her head
     // right round), a breath of it standing still
     const sc = this.script;
@@ -248,7 +274,7 @@ export class Flyer {
     c.wind = this.wind;
     c.loop = loop;
     c.upright = 1 - loop;
-    c.spin = sc?.kind === 'corkscrew' ? sc.spin : 0;
+    c.roll = sc?.kind === 'corkscrew' ? sc.roll : null;
     c.swim += ((this.swim ?? 1) - c.swim) * (1 - Math.exp(-dt * 3));
     b.happy = this.happyT > 0 ? 1 : 0;
     b.alarm = this.alarmT > 0 ? 1 : 0;
@@ -279,19 +305,30 @@ export class Flyer {
     const wy = (0.2 * Math.sin(t * 0.71 + 2) + 0.1 * Math.sin(t * 1.63)) * calm * (1 - 0.6 * this.thread);
     const wz = (0.55 * Math.sin(t * 0.37 + 0.5) + 0.3 * Math.sin(t * 0.97 + 2)) * calm;
     const A = this.C.acc;
-    const step = (pos, vel, target, w, amax, vmin, vmax) => {
-      follow(pos, vel, target, w, dt, _f);
-      const nv = clamp(clamp(_f[1], vel - amax * dt, vel + amax * dt), vmin, vmax);
-      return nv;
-    };
     const urgent = G.urgent ? 1.8 : 1;
+    // (and her pull toward it builds and eases off smoothly, never snapping
+    // on at full strength - a swerve is a curve, not a kink; quicker when
+    // there's a wall coming)
+    const J = this.C.jerk * urgent * urgent;
+    const step = (pos, vel, a0, target, w, amax, vmin, vmax) => {
+      follow(pos, vel, target, w, dt, _f);
+      const want = dt > 0 ? (clamp(clamp(_f[1], vel - amax * dt, vel + amax * dt), vmin, vmax) - vel) / dt : 0;
+      const a = clamp(want, a0 - J * dt, a0 + J * dt);
+      _a = a;
+      // (going faster than she likes - a flourish cut short hands its own
+      // speed on - she eases back to it rather than being clipped to it)
+      return clamp(vel + a * dt, vmin * 1.35, vmax * 1.35);
+    };
     // (gliding along beside you, her wander kept on the screen too)
     let tx = G.x + wx;
     if (G.vis && !this.threading && !this.fetching && !this.beat) tx = clamp(tx, Math.min(G.x, G.vis[0]), Math.max(G.x, G.vis[1]));
     G.vis = null;
-    this.vx = step(this.x, this.vx, tx, G.wx * urgent, A[0] * urgent, -this.C.vmax[0], this.C.vmax[0]);
-    this.vy = step(this.y, this.vy, G.y + wy, G.wy * urgent, A[1] * urgent, -this.C.vmax[1], this.C.vmax[1]);
-    this.vdz = step(this.dz, this.vdz, G.dz + wz, G.wz, A[2], this.C.surge[0], this.C.surge[1]);
+    this.vx = step(this.x, this.vx, this.ax, tx, G.wx * urgent, A[0] * urgent, -this.C.vmax[0], this.C.vmax[0]);
+    this.ax = _a;
+    this.vy = step(this.y, this.vy, this.ay, G.y + wy, G.wy * urgent, A[1] * urgent, -this.C.vmax[1], this.C.vmax[1]);
+    this.ay = _a;
+    this.vdz = step(this.dz, this.vdz, this.adz, G.dz + wz, G.wz, A[2], this.C.surge[0], this.C.surge[1]);
+    this.adz = _a;
     // (while you run she never flies backward over the ground)
     if (g.state === 'running' && g.speed + this.vdz < 0) this.vdz = -g.speed;
     this.x += this.vx * dt;
@@ -306,6 +343,7 @@ export class Flyer {
       this.vy = vy;
       this.vdz = vdz;
       this.vx = 0;
+      this.ax = this.ay = this.adz = 0;
       this.goal.x = this.x;
       this.goal.y = this.y + 0.6;
       this.goal.dz = this.dz + 0.5;
@@ -340,6 +378,7 @@ export class Flyer {
       this.landing = null;
       this.body.land(0.7);
       this.vx = this.vy = this.vdz = 0;
+      this.ax = this.ay = this.adz = 0;
       return true;
     }
     // (turning to face the way she'll stand as she comes in)
@@ -630,16 +669,22 @@ export class Flyer {
   // (laid over where she's going; eased in and out, so she never jerks)
   startScript(kind) {
     const C = kind === 'loop' ? this.C.loop : this.C.screw;
-    this.script = { kind, t: 0, dur: C.dur, spin: 0, dir: Math.random() < 0.5 ? 1 : -1 };
+    this.script = { kind, t: 0, dur: C.dur, roll: 0, dir: Math.random() < 0.5 ? 1 : -1 };
   }
 
   endScript() {
     if (!this.script) return;
-    // (whatever's left of the flourish she makes up as she flies on)
+    // (whatever's left of the flourish she makes up as she flies on - where
+    // it had got her to, and the way it was carrying her: cut short, she
+    // swings on out of it rather than turning on a sixpence)
     this.x += this.off.x;
     this.y += this.off.y;
     this.dz += this.off.dz;
+    this.vx += this.offV.x;
+    this.vy += this.offV.y;
+    this.vdz += this.offV.dz;
     this.off.x = this.off.y = this.off.dz = 0;
+    this.offV.x = this.offV.y = this.offV.dz = 0;
     this.script = null;
   }
 
@@ -650,6 +695,7 @@ export class Flyer {
     const k = clamp(S.t / S.dur, 0, 1);
     const e = ease(k);
     const O = this.off;
+    const ox = O.x, oy = O.y, oz = O.dz;
     if (S.kind === 'loop') {
       // up, back over (upside down at the top) and down: a circle stood up
       // on the road and turned out toward its edge, so from behind you see
@@ -671,7 +717,8 @@ export class Flyer {
       O.x = rr * Math.sin(a);
       O.y = rr * (1 - Math.cos(a)) * 0.8;
       O.dz = 0;
-      S.spin = (easeD(k) / S.dur) * Math.PI * 2 * turns * S.dir;
+      // (how far round she's rolled, exactly: whole turns by the end)
+      S.roll = a;
       this.swim = 0.6;
     } else if (S.kind === 'twirl') {
       // up off her feet, once round the place she stood, and down again
@@ -694,6 +741,11 @@ export class Flyer {
         this.cheer(1.2);
       }
       return;
+    }
+    if (dt > 0) {
+      this.offV.x = (O.x - ox) / dt;
+      this.offV.y = (O.y - oy) / dt;
+      this.offV.dz = (O.dz - oz) / dt;
     }
     if (k >= 1) this.endScript();
   }

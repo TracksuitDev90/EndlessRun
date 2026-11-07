@@ -895,13 +895,21 @@ Append to the URL:
   Jumps and lane changes are integrated exactly, so they follow the same
   path at any frame rate.
 - **Adaptive resolution** (`src/core/quality.js`). Renders at up to 2× device
-  pixels; averaged over ~1.5 s, frames slower than ~50 fps step it down a
-  notch (0.25), and on a fast screen with room to spare it steps up once.
-  If stepping down doesn't make frames any quicker (the browser holding the
+  pixels; averaged over ~1.5 s, frames slower than ~50 fps — or more than
+  one frame in ten dropped (a 60 Hz phone dropping a frame every half second
+  averages 55 fps and stutters all the while) — step it down a notch (0.25),
+  and on a fast screen with room to spare it steps up once. If stepping down
+  doesn't make frames any quicker or drop fewer (the browser holding the
   rate down, or a bottleneck that isn't pixels) the resolution is put back.
   It never changes the frame rate. What it settles on is remembered on the
   device; the next session starts a notch above it. Resizes happen at most
-  once a frame and only when the size really changed.
+  once a frame, only when the size really changed, in a single reallocation
+  (`setDrawingBufferSize`), and always at the top of a frame before it's
+  drawn — resizing a canvas clears it, and one resized after the frame was
+  drawn showed a blank, black frame (a flicker every time the resolution
+  changed). The splash's copy of the frame is allocated under the loading
+  screen, not the instant the first one hits; the score's digits are
+  redrawn twenty times a second, not every frame.
 - **No strobing at speed.** At 28 m/s the road moves further in a frame than
   its cobbles or slates are deep, and a crisp line across the road seems to
   strobe or crawl backwards; the ground's lines across the run are smeared
@@ -931,10 +939,10 @@ and moves in their own way (`wayfarer.js`, `explorer.js`, `elder.js`,
 | Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet |
 | Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth) and the skirt of his robe (19×11); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out | spring 38/s: a quick sideways hop, knees tucked, arms out |
-| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the same airtime but the highest apex of all (2.3 m to the others' 1.6); a rabbit's bound stretched out flat, a float down hanging from something out of his satchel, or a webster side flip |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the same airtime but the highest apex of all (2.3 m to the others' 1.6); a rabbit's bound stretched out flat and twisted side-on, a long float down (a whole second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip — each to a side picked at random |
 | Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces | a precision landing on springs: down onto the balls of his big feet, arms swung forward, and straight back up onto his toes, ears bouncing |
 | Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust | a dive roll: arms reaching for the road, tucked into a ball, over once and up into a crouch, in a little cloud of dust |
-| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, his free hand in the small of his back and his stick striking the road every stride — though now and then he swings it up onto his shoulder and just walks | a sprinter's: quick little legs turning over fast under a strong forward lean, knees driving, arms pumping, ears streaming back |
+| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | a sprinter's: quick little legs turning over fast under a strong forward lean, knees driving, arms pumping, ears streaming back |
 
 ### Choosing who runs
 
@@ -1345,8 +1353,17 @@ the hand. When he's knocked flat the stick just goes where his hand goes.
 
 **He moves like it.** His run is a quick, short-stepping hobble — the
 quickest cadence of the three, short low steps shuffling over the road with
-the knees bent and the toes turned out, a lurch onto the stick each stride,
-his free hand tucked into the small of his back. Every so often (9–19 s,
+the knees bent and the toes turned out, bent well over at the waist, his
+free hand tucked into the small of his back — and a limp: his left leg is
+the bad one, the stick in his right hand taking its weight. He's quick off
+it and lingers on the good one (each stride's clock is warped, `HOBBLE`, to
+run fast through the left foot's stance and slow through the right's, each
+leg's planted stretch laid at the pace its clock runs there so neither foot
+skids), the bad leg dragging through stiff and a little wide; every stance
+on it comes down heavily onto the stick — the hips dropping and rolling
+toward it (laid on before the feet are placed, so a planted foot stays on
+the road), the body ducking forward over it with a nod of the head — and he
+rises up again over the good leg. Every so often (9–19 s,
 when he's running clear) he picks the stick up and swings it onto his
 shoulder — the knob end in his hand in front, the rest angled up and back
 over it — and just walks for a second or two, a little straighter, chin up,
@@ -1452,14 +1469,19 @@ pockets, rocking up onto his toes and back, his head cocked, looking about.
 **He jumps the highest.** Every runner's jump takes the same time
 (`CONFIG.jump.time`), so every gap is as fair whoever you are — but his goes
 up to 2.3 m where the others' go to 1.6 (every gem laid on a jump's arc is
-still in his reach on the way up and the way down). He has three, dealt from a
-shuffled deck so the same one never comes twice running:
+still in his reach on the way up and the way down); only his float keeps him
+up longer. He has three, dealt from a shuffled deck so the same one never
+comes twice running, each to one side or the other at random:
 
 - **the bound** — a rabbit's leap, as in the sheet's drawings: he springs off
   both feet and stretches right out through the air, his whole body tipped
   forward flat over the top, arms reaching ahead, legs trailing long behind
   with the toes pointed, ears laid back, then swings his legs through under
-  him to land (keyed on how far through the jump he is: `LEAP`);
+  him to land (keyed on how far through the jump he is: `LEAP`) — and he
+  twists side-on into it, to his left or his right (`TWIST`): from behind,
+  flying flat out toward you he'd be all hat and feet, turned to the side
+  you see the whole stretch of him; he unwinds to face the way he's going
+  before he lands;
 - **the float** — as he springs up, knees tucked, his left hand dives into the
   satchel (its flap flies up) and pulls something out (`src/game/props.js`):
   a big umbrella in teal and cream panels, furled as it comes out and
@@ -1468,17 +1490,32 @@ shuffled deck so the same one never comes twice running:
   or a giant dandelion clock, grown out of nothing on its long stem. He
   hangs from it as he drifts down, legs dangling and pedalling gently,
   swinging a little under it, the air coming up past him lifting his ears.
-  The arc is its own — a pop straight up to the top in a quarter of a second,
-  then a drift down, gravity giving way to a steady sinking speed, landing
-  in exactly the same airtime (solved exactly, piece by piece, the same at any
-  frame rate: `solveFloat`). When he lands the umbrella is furled and put
-  away, the balloon let go of — it's left behind in the world, rising and
-  turning and drifting back past you into the sky — and the dandelion's
-  seeds blow off in a puff (a few stream off it all the way down:
-  `src/game/seeds.js`, each a tuft of fine white hairs on a stalk, the seed a
-  brown spindle at its foot, rocking down slowly and left hanging in the air
-  as he runs on). A fast-fall drops him out of the float on plain gravity
-  (and puts the thing away at once). Never the same thing twice running;
+  It's a real float: a pop straight up to the top in a quarter of a second,
+  then a long drift down, gravity giving way to a steady sinking speed — a
+  whole second in the air, half as long again as any jump (`FLOAT`; solved
+  exactly, piece by piece, the same at any frame rate: `solveFloat`), and he
+  comes down soft. Each thing lets him down its own way: the umbrella
+  catches the air at once, a steady parachute's pace; the balloon holds him
+  up at the top, buoyant, and only gathers speed toward the end; the
+  dandelion's in between. Since it keeps him up longer, he only reaches for
+  the satchel when the road's clear that far ahead (`Game.roadClear`: never
+  coming down onto a bar or a wall nobody could have seen coming) — else he
+  does something else, and floats another time. A few seeds stream off the
+  dandelion all the way down (`src/game/seeds.js`, each a tuft of fine white
+  hairs on a stalk, the seed a brown spindle at its foot, rocking down slowly
+  and left hanging in the air as he runs on). When he lands he lets it go,
+  and it floats away, each its own way (`Props.update`): the **balloon**
+  rises straight up and away, quicker as it goes, swaying on its string like
+  a pendulum, shrinking into the sky; the **umbrella** is caught by a gust —
+  up it goes, tumbling end over end and twirling round its shaft, its canopy
+  fluttering, sailing out over the edge of the road and then sinking,
+  rocking, as the gust lets it down; the **dandelion** (with a puff of seeds
+  as he lets go) drifts lazily up, rocking side to side like a feather and
+  turning, shedding its seeds in a stream behind it till its head is bald —
+  and then its bare stalk tips over and sinks away. Each drifts back from him
+  slowly at first, as if carried a moment in the rush of air behind him, so
+  you see it go. A fast-fall drops him out of the float on plain gravity (and
+  he lets it go at once). Never the same thing twice running;
 - **the webster side flip** — off one foot, the other leg kicking up and out
   to throw him over, arms flung up; tucked tight over the top, knees to his
   chest; opening out, arms wide, to land on the leg he kicked with. He turns a
@@ -1754,7 +1791,17 @@ length (Catmull-Rom through the path): every swerve, climb and dive runs down
 her body as a wave, and her tail passes where her head has been. Each point
 of the path keeps how her head was turned there — so a bank (her lift tipped
 into the turn, as a bird's is) or a corkscrew runs down her as a twist — and
-each bone is turned along the curve from it. On top of that she swims: a wave
+each bone is turned along the curve from it. She banks only by how hard
+she's turning across her line of flight (never by climbing or diving:
+pulling out of a climb taken for a turn tipped her lift over toward her
+back, and she rolled half over and back), never past about fifty degrees,
+by an acceleration smoothed the same at any frame rate. A corkscrew is a
+roll of its own laid on top, so righting herself never fights it: she goes
+exactly round, and cut short she carries on round to the next whole turn
+rather than unrolling the short way. Her steering is jerk-limited
+(`CONFIG.companion.flyer.jerk`), so every swerve curves in; and her head's
+velocity is taken in the runner's frame, so the floating origin moving on
+under her every half kilometre is never taken for a lunge. On top of that she swims: a wave
 travels down her from neck to plume, small at her head and growing toward
 her tail, rising and falling more than side to side, as a dragon swims
 through cloud; then she's laid back out to her true length along it, so she

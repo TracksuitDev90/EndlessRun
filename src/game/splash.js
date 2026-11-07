@@ -207,6 +207,19 @@ export class Splash {
     if (this.active) this.t += dt;
   }
 
+  // Draw one, unseen (under the loading screen), so its frame texture is
+  // allocated and its program used before the run.
+  warm(renderer) {
+    const t = this.t;
+    this.t = 0;
+    try {
+      this.render(renderer);
+    } finally {
+      this.t = t;
+      renderer.clear(true, true, true);
+    }
+  }
+
   // Over the finished frame: copy it, then draw it again through the water.
   render(renderer) {
     if (!this.active) return;

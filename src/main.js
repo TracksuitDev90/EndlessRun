@@ -87,7 +87,10 @@ async function boot() {
 
   // Resizing reallocates the canvas (and its multisampled buffers), so it is
   // only done when the size really changed, at most once a frame — a phone's
-  // address bar sliding away fires a burst of resize events.
+  // address bar sliding away fires a burst of resize events — and always at
+  // the top of a frame, before it's drawn: resizing a canvas clears it, and
+  // one resized after drawing shows the page a blank frame (a black flash).
+  // (One reallocation, not two: setPixelRatio then setSize each resize it.)
   let sizeKey = '';
   let resizePending = true;
   function resize() {
@@ -98,8 +101,7 @@ async function boot() {
     const key = `${w}x${h}@${dpr}`;
     if (key === sizeKey) return;
     sizeKey = key;
-    renderer.setPixelRatio(dpr);
-    renderer.setSize(w, h, false);
+    renderer.setDrawingBufferSize(w, h, dpr);
     shared.uPixelRatio.value = dpr;
     shared.uResolution.value.set(Math.max(1, w * dpr), Math.max(1, h * dpr));
     game.resize(w, h);
@@ -217,7 +219,8 @@ async function boot() {
     // (a splash is a second and a half of an extra pass: not a reason to
     // lower the resolution for good)
     if (game.splash.active) quality.hold(0.3);
-    if (quality.sample(pacer.raw)) resize();
+    // (a new resolution is taken up at the top of the next frame)
+    if (quality.sample(pacer.raw, pacer.late)) resizePending = true;
     if (stats) stats(dt, js);
   }
 

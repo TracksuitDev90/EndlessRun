@@ -198,8 +198,15 @@ export class UI {
   setScore(score, worlds) {
     const n = Math.floor(score);
     if (n !== this.scoreShown) {
-      this.scoreShown = n;
-      this.scoreEl.textContent = fmt.format(n);
+      // (ticking along with the road it's redrawn twenty times a second: any
+      // more is a blur, and every change is a repaint over the game; a
+      // bonus, or a fresh run, shows at once)
+      const now = performance.now();
+      if (now - (this.scoreAt || 0) >= 50 || n - this.scoreShown > 40 || n < this.scoreShown) {
+        this.scoreAt = now;
+        this.scoreShown = n;
+        this.scoreEl.textContent = fmt.format(n);
+      }
     }
     if (worlds !== this.worldsShown) {
       const grew = this.worldsShown >= 0 && worlds > this.worldsShown;

@@ -57,6 +57,8 @@ body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s ease-out;
+  /* (its own layer: easing its opacity never repaints the gradient) */
+  will-change: opacity;
   background:
     radial-gradient(ellipse at center, rgba(12, 6, 4, 0) 48%, rgba(12, 6, 4, 0.55) 74%, rgba(12, 6, 4, 0.92) 100%);
 }

@@ -16,13 +16,16 @@ import { Seeds } from './seeds.js';
 //   - a sprinter's run, quick little legs turning over under a forward
 //     lean, arms pumping, ears streaming back;
 //   - three jumps, dealt so the same one never comes twice running: a
-//     rabbit's bound, stretched out long through the air; a float - he
-//     pulls something out of his satchel at take-off (an umbrella, a
-//     balloon, a giant dandelion: props.js) and drifts down hanging from it;
-//     and a webster side flip, off one foot, the other leg kicking up and
-//     over as he turns a whole sideways somersault. All have the same
-//     airtime as everyone else's jump, so every gap is as fair - but the
-//     highest apex in the game;
+//     rabbit's bound, stretched out long through the air and turned side-on
+//     to it, one way or the other; a float - he pulls something out of his
+//     satchel at take-off (an umbrella, a balloon, a giant dandelion:
+//     props.js), drifts down hanging from it, a good while longer in the air
+//     than any other jump (only when the road ahead is clear for it), and
+//     lets it go when he lands, to float away each in its own way; and a
+//     webster side flip, off one foot, the other leg kicking up and over as
+//     he turns a whole sideways somersault, to one side or the other. The
+//     bound and the flip have the same airtime as everyone else's jump, so
+//     every gap is as fair - but the highest apex in the game;
 //   - a dive roll under the bars, a springy precision landing, a hop into
 //     every lane change;
 //   - his fluffy tail wags, in quick little flicks; his ears flop and
@@ -103,16 +106,27 @@ const FEEL = {
   land: { freq: 5.0, zeta: 0.24, thud: 0 },
 };
 
-// The float's arc: a pop straight up to its apex in RISE s, then a drift
-// down - gravity FALL_G until he's sinking at a steady speed, then that
-// speed to the road - in exactly the rest of the airtime.
-const FLOAT = { height: 2.15, rise: 0.24, fallG: 32 };
-function solveFloat(H, T) {
+// The float's arc: a pop straight up to its apex (height, m) in rise s,
+// then a drift down - gravity (fallG) until he's sinking at a steady speed,
+// then that speed to the road - in exactly the rest of its airtime (time, s:
+// half as long again as any other jump - a real float, and he only goes for
+// it with the road clear that far ahead: see jump). Each thing sinks in its
+// own way: the umbrella catches the air at once and lets him down at a
+// steady parachute's pace; the balloon holds him up at the top, buoyant, and
+// only gathers speed toward the end; the dandelion's in between.
+const FLOAT = { height: 2.0, rise: 0.26, time: 1.0, fallG: { umbrella: 14, dandelion: 10, balloon: 7 } };
+function solveFloat(H, T, fallG) {
   const t1 = FLOAT.rise;
   const Td = T - t1;
-  const g2 = Math.max(FLOAT.fallG, (2 * H) / (Td * Td) + 0.5);
+  const g2 = Math.max(fallG, (2 * H) / (Td * Td) + 0.5);
   return { G1: (2 * H) / (t1 * t1), V0: (2 * H) / t1, G2: g2, VT: g2 * (Td - Math.sqrt(Td * Td - (2 * H) / g2)) };
 }
+
+// The bound turned side-on (rad): from behind - where you see him from -
+// flying flat out toward you he's all hat and feet; turned to the side, you
+// see the whole stretch of him. He twists into it off the road and unwinds
+// to face the way he's going before he lands.
+const TWIST = 1.2;
 
 // His jumps, dealt from a shuffled deck so the same one never comes twice
 // running (the bound a little more often than the others).
@@ -216,6 +230,7 @@ const _Y = new THREE.Vector3();
 const _Z = new THREE.Vector3();
 const _dv = new THREE.Vector3();
 const AX = new THREE.Vector3(1, 0, 0);
+const AY = new THREE.Vector3(0, 1, 0);
 const AZ = new THREE.Vector3(0, 0, 1);
 
 // Rotate the body about a point pivot m up it (and fwd m along it).
@@ -235,7 +250,14 @@ export class Bunny extends Player {
 
   configure() {
     super.configure();
-    const F = solveFloat(FLOAT.height, this.feel.jump.time);
+    this.floats = {};
+    for (const k of KINDS) this.floats[k] = solveFloat(FLOAT.height, FLOAT.time, FLOAT.fallG[k]);
+    this.useFloat(KINDS[0]);
+  }
+
+  // the float's arc for what he's floating on
+  useFloat(kind) {
+    const F = this.floats[kind] || this.floats[KINDS[0]];
     this.FG1 = F.G1;
     this.FV0 = F.V0;
     this.FG2 = F.G2;
@@ -272,6 +294,8 @@ export class Bunny extends Player {
     this.props.attach(this.root);
     this.dust = new Dust(this.u);
     this.seeds = new Seeds(this.u);
+    // (the dandelion, let go of, sheds its seeds as it floats away)
+    this.props.seeds = this.seeds;
     // the satchel, its flap's hinge (bind space) and the way it swings
     const R = this.rig.bag;
     this.bagSide = new THREE.Vector3(...R.side);
@@ -359,6 +383,7 @@ export class Bunny extends Player {
     this.floating = false;
     this.floatFast = false;
     this.tilt = 0;
+    this.twist = 0;
     this.hopLift = 0;
     this.flapKick = 0;
     this.flapOpen = 0;
@@ -406,8 +431,8 @@ export class Bunny extends Player {
     super.place(z);
     if (this.letGoPending) {
       this.letGoPending = false;
-      _dv.set(this.vx, this.grounded ? 0 : this.vy, -this.speed);
-      this.props.letGo(this.root, z, dist, _dv);
+      _dv.set(this.vx, this.grounded ? 0 : this.vy, 0);
+      if (this.prop.kind) this.props.letGo(this.prop.kind, this.root, dist, _dv);
       if (this.prop.state === 'gone') {
         this.prop.kind = null;
         this.prop.state = 'none';
@@ -468,15 +493,27 @@ export class Bunny extends Player {
         this.deck = d;
       }
       this.trick = this.deck.pop();
+      // the float keeps him up a good while longer than any jump: he only
+      // goes for it with the road clear that far ahead (roomAhead: the
+      // game's), else he does something else and floats another time
+      if (this.trick === 'float' && this.roomAhead && !this.roomAhead(FLOAT.time)) {
+        this.deck.unshift('float');
+        const i = this.deck.findIndex((t) => t !== 'float');
+        this.trick = i >= 0 ? this.deck.splice(i, 1)[0] : 'leap';
+      }
     }
     super.jump();
+    // (which way he goes - the leg he leads with, the way the flip turns
+    // and the bound twists - is anyone's guess, not just turn and turn about)
+    this.jumpSide = Math.random() < 0.5 ? -1 : 1;
     this.floatFast = false;
     this.floating = this.trick === 'float';
     this.hurry('pitch', 0.16);
     if (this.floating) {
+      this.startFloat();
+      this.useFloat(this.prop.kind);
       this.vy = this.FV0;
       this.vyPose = this.FV0;
-      this.startFloat();
     } else if (this.prop.state === 'hold' || this.prop.state === 'out') {
       this.endFloat();
     }
@@ -508,19 +545,20 @@ export class Bunny extends Player {
     this.flapKick += 17;
   }
 
-  // Done with it: the umbrella's furled and put away, the balloon let go,
-  // the dandelion's seeds blown off in a puff.
+  // Done with it: he lets it go, and it floats away, each its own way (see
+  // Props.update): the balloon rises straight up and away, swaying on its
+  // string; the umbrella's caught by a gust and goes tumbling up and over,
+  // twirling, out over the edge of the road; the dandelion drifts lazily
+  // up, rocking like a feather and streaming its seeds, till it's bald and
+  // its stalk tips over and sinks away. (A puff of seeds as he lets go of
+  // the dandelion.)
   endFloat() {
     const P = this.prop;
-    if (!P.kind || P.state === 'away' || P.state === 'gone') return;
-    P.state = 'away';
-    P.end = P.t;
-    if (P.kind === 'balloon') {
-      // (let go of in place, once he's where he is this frame)
-      this.letGoPending = true;
-      P.state = 'gone';
-    } else if (P.kind === 'dandelion') this.seedBurst(20);
-    else this.flapKick += 12;
+    if (!P.kind || P.state === 'gone') return;
+    if (P.kind === 'dandelion') this.seedBurst(8, 0.6);
+    // (let go of in place, once he's where he is this frame)
+    this.letGoPending = true;
+    P.state = 'gone';
   }
 
   onFastFall() {
@@ -635,6 +673,7 @@ export class Bunny extends Player {
 
   poseJump(j) {
     this.tilt = 0;
+    this.twist = 0;
     if (this.trick === 'webster') return this.poseWebster(j);
     if (this.trick === 'float') return this.poseFloat(j);
     return this.poseLeap(j);
@@ -647,6 +686,8 @@ export class Bunny extends Player {
     j[C.sq] = 1;
     for (const [i, v] of LEAP_KEYS) j[i] = hermite(LEAP_TS, v, 0, 0, u);
     this.tilt = hermite(LEAP_TS, LEAP_TILT_V, 0, 0, u);
+    // side-on: twisting into it off the road, unwinding to land
+    this.twist = this.jumpSide * TWIST * smooth(0.02, 0.32, u) * (1 - smooth(0.6, 0.94, u));
     if (this.jumpSide < 0) mirror(j);
   }
 
@@ -793,6 +834,10 @@ export class Bunny extends Player {
     b.position.y += this.hopLift * this.w.idle * live;
     const tilt = this.tilt * this.w.jump * live;
     if (tilt !== 0) turnAbout(b, _q.setFromAxisAngle(AX, tilt), TILT_PIVOT);
+    // (the bound's twist side-on: the whole stretched-out shape of him turned
+    // about the upright through his middle)
+    const twist = this.twist * this.w.jump * live;
+    if (twist !== 0) turnAbout(b, _q.setFromAxisAngle(AY, twist), TILT_PIVOT);
     const pitch = (this.spins.pitch.value % TAU) * live;
     if (pitch !== 0) turnAbout(b, _q.setFromAxisAngle(AX, pitch), this.spins.pitch.pivot, ROLL_FWD);
     const roll = (this.spins.roll.value % TAU) * live;
@@ -892,7 +937,7 @@ export class Bunny extends Player {
 
   // What he's floating on: pulled out of the satchel at his left hand,
   // grown or opened as he lifts it, held overhead while he drifts down, and
-  // put away (or let go of, or blown away) when he lands.
+  // let go of when he lands (see endFloat).
   propStep(dt) {
     const P = this.prop;
     if (!P.kind) {
@@ -900,29 +945,11 @@ export class Bunny extends Player {
       return;
     }
     P.t += dt;
-    // (a balloon just let go of stays where it is until it's handed over)
+    // (just let go of, it stays where it is until it's handed over)
     if (P.state === 'gone') return;
-    let size, open;
-    if (P.state === 'away') {
-      const a = P.t - P.end;
-      if (P.kind === 'umbrella') {
-        open = 1 - smooth(0, 0.1, a);
-        size = 1 - smooth(0.12, 0.3, a);
-      } else {
-        open = 1 - smooth(0, 0.22, a);
-        size = 1 - smooth(0.2, 0.4, a);
-      }
-      if (size <= 0.001) {
-        P.kind = null;
-        P.state = 'none';
-        this.props.hide();
-        return;
-      }
-    } else {
-      size = smooth(0.05, 0.14, P.t);
-      open = smooth(P.kind === 'umbrella' ? 0.15 : 0.1, P.kind === 'umbrella' ? 0.24 : 0.28, P.t);
-      if (P.t > 0.14) P.state = 'hold';
-    }
+    const size = smooth(0.05, 0.14, P.t);
+    const open = smooth(P.kind === 'umbrella' ? 0.15 : 0.1, P.kind === 'umbrella' ? 0.24 : 0.28, P.t);
+    if (P.t > 0.14) P.state = 'hold';
     // the grip: in his left fist, the thing standing up out of it, mostly
     // upright and leaning back a little in the headwind
     const b = this.b;
@@ -932,7 +959,7 @@ export class Bunny extends Player {
     const grip = _p.setFromMatrixPosition(M).addScaledVector(_Y, 0.045);
     const lean = 0.18 + 0.012 * this.speed;
     _v.set(0, 1, lean).normalize();
-    _Y.lerp(_v, P.state === 'away' ? 0.3 : 0.7).normalize();
+    _Y.lerp(_v, 0.7).normalize();
     _Z.set(0, 0, 1);
     _X.crossVectors(_Y, _Z).normalize();
     _Z.crossVectors(_X, _Y);

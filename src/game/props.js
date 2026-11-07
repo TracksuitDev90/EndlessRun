@@ -10,9 +10,10 @@ import { part, merge, M } from './spill.js';
 // round where his hand grips it (+y up away from his hand), in two parts: the
 // part that opens or grows (the canopy, the balloon, the clock of seeds) and
 // the rest. While he holds one it's a child of his own root, placed at his
-// hand each frame (see Bunny.propStep); a balloon he lets go of is left
-// behind in the world (track coordinates), rising and drifting off as he runs
-// on. At most one held and one let go (four draw calls each, none at rest).
+// hand each frame (see Bunny.propStep); when he lands he lets it go, and it
+// floats away on its own (track coordinates, kept a little way back from
+// him at first so you see it go), each in its own way (see update). At most
+// one held and one of each let go (four draw calls each, none at rest).
 
 const COL = {
   1: '#3d9db0', // the umbrella's canopy: teal panels...
@@ -117,8 +118,21 @@ export const KINDS = ['umbrella', 'balloon', 'dandelion'];
 const MAKE = { umbrella, balloon, dandelion };
 
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion();
 const _s = new THREE.Vector3();
+const _X = new THREE.Vector3(1, 0, 0);
+const _Y = new THREE.Vector3(0, 1, 0);
+const _Z = new THREE.Vector3(0, 0, 1);
+const smooth = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+// Let go of, each turns about a point of its own (up it from his grip):
+// the umbrella about the middle of its shaft, the balloon about the end of
+// its string, the dandelion about its head (its stalk swinging under it).
+const PIVOT = { umbrella: 0.42, balloon: 0, dandelion: 0.8 };
 
 export class Props {
   constructor(env) {
@@ -128,7 +142,7 @@ export class Props {
       return mats;
     };
     this.mats = make();
-    // (the balloon let go of keeps its own colour while another is held)
+    // (let go of: a balloon keeps its own colour while another is held)
     this.freeMats = make();
     this.models = {};
     for (const k of KINDS) {
@@ -158,18 +172,22 @@ export class Props {
       g.add(rest, grow);
       this.held[k] = { g, grow };
     }
-    // let go of: the balloon, left behind in the world
+    // let go of: one of each, floating away in the world
     this.free = new THREE.Group();
     this.free.name = 'props';
-    const fb = this.models.balloon;
-    this.freeBalloon = new THREE.Group();
-    this.freeBalloon.add(pair(fb.rest, this.freeMats));
-    const fg = pair(fb.grow, this.freeMats);
-    fg.position.fromArray(fb.growAt);
-    this.freeBalloon.add(fg);
-    this.freeBalloon.visible = false;
-    this.free.add(this.freeBalloon);
-    this.loose = { live: false, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, spin: 0, q: new THREE.Quaternion() };
+    this.loose = {};
+    for (const k of KINDS) {
+      const m = this.models[k];
+      const g = new THREE.Group();
+      g.add(pair(m.rest, this.freeMats));
+      const grow = pair(m.grow, this.freeMats);
+      grow.position.fromArray(m.growAt);
+      g.add(grow);
+      g.visible = false;
+      this.free.add(g);
+      this.loose[k] = { kind: k, g, grow, live: false, x: 0, y: 0, rel: 0, vx: 0, vy: 0, vrel: 0, age: 0, s: 1, side: 1, ph: 0, seedT: 0, q: new THREE.Quaternion() };
+    }
+    this.seeds = null; // (the bunny's: the dandelion sheds them as it goes)
     this.shown = null;
   }
 
@@ -220,72 +238,185 @@ export class Props {
     return out.copy(H.grow.position).applyMatrix4(H.g.matrix);
   }
 
-  // Let the held balloon go: it's left behind in the world, rising.
-  letGo(root, z, dist, vel) {
-    const H = this.held.balloon;
-    if (this.shown !== 'balloon') return;
-    const L = this.loose;
+  // Let go of the one he's holding (kind): it floats away from where it is
+  // (dist: how far he's run; vel: his own sideways and upward speed, which
+  // it keeps a little of).
+  letGo(kind, root, dist, vel) {
+    const H = this.held[kind];
+    if (!H || this.shown !== kind) return;
+    const L = this.loose[kind];
     H.g.matrix.decompose(_v, _q, _s);
-    const w = _v.applyQuaternion(root.quaternion).add(root.position);
+    L.q.copy(root.quaternion).multiply(_q);
+    L.s = _s.x;
+    // (where its pivot is, in the world)
+    _v2.set(0, PIVOT[kind] * L.s, 0).applyQuaternion(L.q);
+    const w = _v.applyQuaternion(root.quaternion).add(root.position).add(_v2);
     L.live = true;
     L.x = w.x;
     L.y = w.y;
-    L.d = dist - (w.z - z);
-    // (it keeps most of his speed at first, so it's seen rising away over
-    // him before the still air takes it and it drifts back past you)
-    L.vx = vel.x * 0.4 + (Math.random() - 0.5) * 0.6;
-    L.vy = 1.4 + Math.random() * 0.5;
-    L.vd = -vel.z * 0.8;
+    // (ahead of him, - behind: it starts in his hand and is let fall back)
+    L.rel = -(w.z - root.position.z);
     L.age = 0;
-    L.s = _s.x;
-    L.spin = (Math.random() - 0.5) * 1.4;
-    L.q.copy(root.quaternion).multiply(_q);
-    this.freeMats.mat.uniforms.uPal.value[4].copy(this.mats.mat.uniforms.uPal.value[4]);
-    this.freeMats.ink.uniforms.uPal.value[4].copy(this.mats.mat.uniforms.uPal.value[4]);
+    L.ph = Math.random() * Math.PI * 2;
+    // (toward the nearer edge of the road, mostly)
+    L.side = Math.sign(w.x + (Math.random() - 0.5) * 2.4) || 1;
+    L.seedT = 0;
+    L.vx = vel.x * 0.35;
+    L.vy = vel.y * 0.25;
+    L.vrel = 0;
+    if (kind === 'balloon') {
+      L.vy += 1.2;
+      L.vx += (Math.random() - 0.5) * 0.5;
+      this.freeMats.mat.uniforms.uPal.value[4].copy(this.mats.mat.uniforms.uPal.value[4]);
+      this.freeMats.ink.uniforms.uPal.value[4].copy(this.mats.mat.uniforms.uPal.value[4]);
+    } else if (kind === 'umbrella') {
+      // (a gust catches it under its canopy)
+      L.vy += 4.4;
+      L.vx += L.side * 1.5;
+    } else {
+      L.vy += 0.9;
+      L.vx += L.side * 0.35;
+    }
+    // (as it was: open, grown, blown up)
+    L.grow.scale.copy(H.grow.scale);
     this.hide();
   }
 
-  // The balloon let go of: it rises, bobbing and turning, the still air
-  // taking his speed off it, and it shrinks away into the sky.
+  // Everything let go of, floating away: the air takes it off him - it
+  // drifts back from where he's got to, slowly at first (it's carried along
+  // in the rush of air behind him a moment), faster and faster, back past
+  // you - while it goes its own way:
+  //   - the balloon rises straight up and away, quicker as it goes, swaying
+  //     on its string like a pendulum and turning slowly, shrinking away
+  //     into the sky;
+  //   - the umbrella is caught by a gust: up it goes, tumbling end over end
+  //     and twirling round its shaft, sailing out over the edge of the road,
+  //     then sinking, rocking, as the gust lets it down;
+  //   - the dandelion drifts lazily up, rocking side to side like a feather
+  //     and turning, shedding its seeds in a stream behind it till its head
+  //     is bald - and then its bare stalk tips over and sinks away.
   update(dt, z, dist) {
-    const L = this.loose;
-    if (!L.live) {
-      this.freeBalloon.visible = false;
-      return;
+    // (how fast he's running: the seeds the dandelion sheds go at its pace)
+    const run = dt > 0 && this.lastDist !== undefined ? (dist - this.lastDist) / dt : 0;
+    this.run = run > 0 && run < 60 ? run : 0;
+    this.lastDist = dist;
+    for (const k of KINDS) {
+      const L = this.loose[k];
+      if (!L.live) {
+        L.g.visible = false;
+        continue;
+      }
+      L.age += dt;
+      const a = L.age;
+      const g = L.g;
+      let life, fade;
+      if (k === 'balloon') {
+        L.vy += (2.8 - L.vy) * (1 - Math.exp(-1.4 * dt));
+        L.vx *= Math.exp(-0.9 * dt);
+        L.vrel += (-4 - L.vrel) * (1 - Math.exp(-0.7 * dt));
+        L.x += (L.vx + 0.3 * Math.sin(a * 2.1 + L.ph)) * dt;
+        L.y += L.vy * dt;
+        L.rel += L.vrel * dt;
+        // (righting itself as it rises, string hanging; swaying, and turning
+        // a little this way and that - never right round: the shine's drawn
+        // on it, and it would come round to face you and white it out)
+        const up = Math.min(1, a * 1.6);
+        _q.setFromAxisAngle(_Z, 0.28 * Math.sin(a * 2.1 + L.ph + 1.3) * up);
+        _q2.setFromAxisAngle(_Y, 0.3 * Math.sin(a * 1.1 + L.ph));
+        _q.multiply(_q2);
+        g.quaternion.copy(L.q).slerp(_q, up);
+        life = 3.4;
+        fade = smooth(2.2, 3.4, a);
+      } else if (k === 'umbrella') {
+        // the gust: it lifts it, then lets it down
+        L.vy += (0.3 - L.vy) * (1 - Math.exp(-1.1 * dt));
+        L.vx *= Math.exp(-0.5 * dt);
+        L.vrel += (-4.2 - L.vrel) * (1 - Math.exp(-0.8 * dt));
+        L.x += (L.vx + 0.25 * Math.sin(a * 3.3 + L.ph)) * dt;
+        L.y = Math.max(0.45, L.y + L.vy * dt);
+        L.rel += L.vrel * dt;
+        // tumbling end over end (over backward, the canopy leading), quick
+        // at first, slowing as the gust drops; twirling round its shaft;
+        // rocking as it sails
+        const tumble = -(5.5 * (1 - Math.exp(-a)) + 0.6 * a);
+        _q.setFromAxisAngle(_X, tumble);
+        _q2.setFromAxisAngle(_Z, L.side * (0.5 * smooth(0, 0.6, a) + 0.22 * Math.sin(a * 3.3 + L.ph)));
+        _q.premultiply(_q2);
+        g.quaternion.copy(L.q).premultiply(_q);
+        g.quaternion.multiply(_q2.setFromAxisAngle(_Y, L.side * (8.4 * (1 - Math.exp(-a / 1.2)) + 1.5 * a)));
+        // (its canopy fluttering)
+        const fl = 1 + 0.06 * Math.sin(a * 13 + L.ph) * Math.exp(-a * 0.8);
+        L.grow.scale.set(fl, 1 / fl, fl);
+        life = 3.0;
+        fade = smooth(2.3, 3.0, a);
+      } else {
+        // a feather on the air: up lazily, rocking; once bald, down again
+        const bald = smooth(1.3, 2.1, a);
+        L.vy += (0.35 * (1 - bald) - 0.9 * bald - L.vy) * (1 - Math.exp(-1.6 * dt));
+        L.vx *= Math.exp(-1.2 * dt);
+        L.vrel += (-3.2 - L.vrel) * (1 - Math.exp(-0.6 * dt));
+        const rock = Math.sin(a * 2.6 + L.ph);
+        L.x += (L.vx + 0.45 * rock) * dt;
+        L.y = Math.max(0.3, L.y + (L.vy + 0.18 * Math.abs(rock)) * dt);
+        L.rel += L.vrel * dt;
+        // (rocking about its head as it slides side to side, turning; its
+        // bare stalk tipping over as it sinks)
+        const up = Math.min(1, a * 1.2);
+        _q.setFromAxisAngle(_Z, -0.45 * rock * up + L.side * 1.3 * bald);
+        _q2.setFromAxisAngle(_X, 0.25 * Math.sin(a * 1.7 + L.ph) * up);
+        _q.multiply(_q2);
+        _q.multiply(_q2.setFromAxisAngle(_Y, 0.9 * a));
+        g.quaternion.copy(L.q).slerp(_q, up);
+        // its clock blown away, seed by seed
+        const left = 1 - smooth(0.05, 1.9, a);
+        L.grow.scale.setScalar(Math.max(1e-3, 0.12 + 0.88 * left) * (left > 0.02 ? 1 : left / 0.02));
+        L.seedT -= dt;
+        if (left > 0.03 && L.seedT <= 0 && this.seeds) {
+          L.seedT = 0.035 + 0.04 * Math.random();
+          this.shed(L, dist, left);
+        }
+        life = 3.4;
+        fade = smooth(2.7, 3.4, a);
+      }
+      if (a >= life || L.rel < -14) {
+        L.live = false;
+        g.visible = false;
+        continue;
+      }
+      g.visible = true;
+      // (placed by its pivot)
+      g.scale.setScalar(L.s * (k === 'balloon' ? 1 - 0.45 * fade : 1 - fade));
+      _v.set(0, -PIVOT[k] * g.scale.x, 0).applyQuaternion(g.quaternion);
+      g.position.set(L.x + _v.x, L.y + _v.y, z - L.rel + _v.z);
     }
-    L.age += dt;
-    const k = Math.exp(-1.1 * dt);
-    L.vx *= k;
-    L.vd *= k;
-    L.vy += (2.2 - L.vy) * (1 - Math.exp(-1.2 * dt));
-    L.x += (L.vx + 0.25 * Math.sin(L.age * 2.3)) * dt;
-    L.y += L.vy * dt;
-    L.d += L.vd * dt;
-    const fade = 1 - Math.min(1, Math.max(0, (L.age - 1.8) / 1.4));
-    if (fade <= 0 || L.d < dist - 30) {
-      L.live = false;
-      this.freeBalloon.visible = false;
-      return;
+  }
+
+  // A seed or two off the loose dandelion's clock, blown back off it into
+  // the air, rising a little on it.
+  shed(L, dist, left) {
+    const r = Math.random;
+    const n = 1 + (r() < 0.5 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      _v2.set(r() - 0.5, r() - 0.2, r() - 0.5).normalize();
+      const rad = 0.22 * L.s * (0.12 + 0.88 * left);
+      const d = dist + L.rel - _v2.z * rad;
+      this.seeds.emitWorld(L.x + _v2.x * rad, L.y + _v2.y * rad, d, _v2.x * 0.6 + L.vx, 0.3 + 0.5 * r(), this.run + L.vrel + (r() - 0.6) * 0.8, 0.07 + 0.03 * r(), 0.12 + 0.2 * r());
     }
-    const B = this.freeBalloon;
-    B.visible = true;
-    B.position.set(L.x, L.y, z - (L.d - dist));
-    _q.setFromAxisAngle(_v.set(0, 1, 0), L.spin * L.age);
-    B.quaternion.copy(L.q).premultiply(_q);
-    // (it rights itself as it rises, string hanging)
-    B.quaternion.slerp(_q, Math.min(1, L.age * 1.5));
-    B.scale.setScalar(L.s * (0.6 + 0.4 * fade));
   }
 
   clear() {
     this.hide();
-    this.loose.live = false;
-    this.freeBalloon.visible = false;
+    for (const k of KINDS) {
+      this.loose[k].live = false;
+      this.loose[k].g.visible = false;
+    }
   }
 
   forCompile(on) {
-    for (const k of KINDS) this.held[k].g.visible = on;
-    this.freeBalloon.visible = on;
+    for (const k of KINDS) {
+      this.held[k].g.visible = on;
+      this.loose[k].g.visible = on;
+    }
     if (!on) this.shown = null;
   }
 }
