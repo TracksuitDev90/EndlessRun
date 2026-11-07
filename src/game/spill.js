@@ -36,7 +36,7 @@ const COL = {
 // vertex carries the part's own uv and which face it's on (1 front, 2 back,
 // 0 an edge) for the shader to draw on.
 const _n = new THREE.Vector3();
-function part(geo, m, M, faces = true) {
+export function part(geo, m, M, faces = true) {
   if (M) geo.applyMatrix4(M);
   const g = geo.index ? geo : geo;
   const nrm = g.getAttribute('normal');
@@ -52,7 +52,7 @@ function part(geo, m, M, faces = true) {
   return { g, m, d };
 }
 
-function merge(parts, outline = 1) {
+export function merge(parts, outline = 1) {
   let nv = 0, ni = 0;
   for (const p of parts) {
     nv += p.g.getAttribute('position').count;
@@ -85,7 +85,7 @@ function merge(parts, outline = 1) {
   return geo;
 }
 
-const M = (x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1));
+export const M = (x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1));
 
 // bend a flat box's vertices: z += f(x, y)
 function bend(geo, f) {

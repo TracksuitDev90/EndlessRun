@@ -77,10 +77,12 @@ export class UI {
     this.handlers[name] = fn;
   }
 
-  // The title screen's cards, one per runner (see game/characters.js): each
-  // their cut-out art standing up out of a card in their colours. Tapping
+  // The title screen's cards, one per runner (see game/characters.js), in a
+  // grid two by two: each their cut-out art standing up out of a card in
+  // their colours, and under the grid a line about whoever's picked. Tapping
   // one picks them (it doesn't start the run).
   setRunners(list, selected) {
+    this.runnerDefs = Object.fromEntries(list.map((c) => [c.id, c]));
     const root = $('pick');
     root.textContent = '';
     this.cards = {};
@@ -97,10 +99,10 @@ export class UI {
         `<span class="pick-bg"></span>` +
         `<img class="pick-fig" src="${c.card}" alt="" draggable="false" />` +
         `<span class="pick-plate"><span class="pick-name"></span><span class="pick-title"></span></span>` +
-        `<span class="pick-blurb"></span><span class="pick-seal" aria-hidden="true">✓</span>`;
+        `<span class="pick-seal" aria-hidden="true">✓</span>`;
       b.querySelector('.pick-name').textContent = c.name;
       b.querySelector('.pick-title').textContent = c.title;
-      b.querySelector('.pick-blurb').textContent = c.blurb;
+      b.title = c.blurb;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         this.handlers.pick?.(c.id);
@@ -120,6 +122,11 @@ export class UI {
       if (k === id && hop) replay(b, 'hop');
     }
     this.runnerShown = id;
+    const line = $('pick-line');
+    if (line) {
+      line.textContent = this.runnerDefs?.[id]?.blurb || '';
+      if (hop) replay(line, 'hop');
+    }
   }
 
   // The runner beside the one shown (dir -1 / +1), for the arrow keys and

@@ -1,6 +1,7 @@
 import { Wayfarer } from './wayfarer.js';
 import { Explorer } from './explorer.js';
 import { Elder } from './elder.js';
+import { Bunny } from './bunny.js';
 
 // Who you can run as. Each has their sculpted asset (tools/runner/), the art
 // their card on the title screen is cut from (tools/characters/cards.py), a
@@ -36,6 +37,16 @@ export const CHARACTERS = [
     card: 'assets/characters/elder.webp',
     tint: ['#9fd0c6', '#2f6f7c'],
     make: (env, asset) => new Elder(env, asset),
+  },
+  {
+    id: 'bunny',
+    name: 'Bramble',
+    title: 'the tumbler',
+    blurb: 'small · springy · jumps the highest',
+    asset: 'assets/bunny/',
+    card: 'assets/characters/bunny.webp',
+    tint: ['#ffd36b', '#e0702e'],
+    make: (env, asset) => new Bunny(env, asset),
   },
 ];
 

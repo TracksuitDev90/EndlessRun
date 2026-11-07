@@ -67,8 +67,11 @@ export class ChaseCamera {
 
     // title framing: low, close, a little to the side, looking past the
     // runner; on a tall screen, further back and looking down the road, so
-    // they stand up in the middle of it above the cards that choose them
+    // they stand up in the middle of it above the grid of cards that choose
+    // them (the taller the screen, the further down: the grid takes more of
+    // a phone's height)
     const tall = (this.aspect || 1) < 1.25;
+    const phone = 1 - Math.min(1, Math.max(0, ((this.aspect || 1) - 0.55) / 0.35));
     const tx = tall ? 1.05 : 1.7;
     const tY = tall ? 1.3 : 1.35;
     const tz = playerZ + (tall ? 4.9 : 3.6);
@@ -76,7 +79,7 @@ export class ChaseCamera {
     py = py + (tY - py) * i;
     pz = pz + (tz - pz) * i;
     lx = lx + ((tall ? -0.55 : -0.4) - lx) * i;
-    ly = ly + ((tall ? -1.55 : 1.25) - ly) * i;
+    ly = ly + ((tall ? -1.55 - 2.6 * phone : 1.25) - ly) * i;
     lz = lz + (playerZ - 6 - lz) * i;
 
     // shake

@@ -9,10 +9,12 @@ assets/characters/<id>.webp. The select screen frames them (css/style.css).
 Run from the repository root:
 
     pip install numpy scipy pillow
-    python3 tools/characters/cards.py
+    python3 tools/characters/cards.py          # every card
+    python3 tools/characters/cards.py bunny    # just these
 """
 
 import os
+import sys
 
 import numpy as np
 from PIL import Image
@@ -27,6 +29,7 @@ JOBS = [
     ('explorer', 'explorer-sheet.jpg', (60, 0, 400, 945), None),
     ('wayfarer', 'wayfarer-sheet.jpg', (30, 60, 410, 915), None),
     ('elder', 'elder-sheet.jpg', (8, 56, 380, 975), (242, 237, 234)),
+    ('bunny', 'bunny-sheet.jpg', (0, 0, 428, 1000), (248, 242, 236)),
 ]
 PAPER = np.array([250, 245, 239.0])
 
@@ -59,7 +62,10 @@ def cut(sheet, box, paper=None):
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
+    only = set(sys.argv[1:])
     for name, sheet, box, paper in JOBS:
+        if only and name not in only:
+            continue
         img = cut(sheet, box, paper)
         img.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6)
         print(f'{name}: {img.size[0]}x{img.size[1]}')
