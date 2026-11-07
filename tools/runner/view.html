@@ -55,6 +55,8 @@
             runner.deck = [q.get('trick')];
             runner.nextTrick = q.get('trick');
           }
+          // (&item=umbrella|balloon|dandelion: what the bunny floats on)
+          if (q.get('item')) runner.nextItem = q.get('item');
           runner.action('up');
           const n = Math.round(Number(q.get('jt') || 0.3) / dt);
           for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);

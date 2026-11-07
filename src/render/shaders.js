@@ -1130,8 +1130,24 @@ float stickHole(vec2 q) {
   float rim = smoothstep(0.018, 0.004, d) * smoothstep(-0.004, 0.006, d);
   return smoothstep(0.003, -0.012, d) - rim * 0.35;
 }
+// A rabbit's print (the bunny's big bare feet): a long sole pad, three round
+// toe pads ahead of it, the toes dug in deepest; drawn a little over life
+// size, as the others are.
+float pawPrint(vec2 q) {
+  q /= 1.15;
+  float sole = (length((q - vec2(0.0, -0.02)) / vec2(0.036, 0.085)) - 1.0) * 0.036;
+  float toes = 9.0;
+  for (int k = -1; k <= 1; k++) toes = min(toes, length(q - vec2(float(k) * 0.023, 0.088 - 0.012 * abs(float(k)))) - 0.0135);
+  float k = 0.012;
+  float hh = clamp(0.5 + 0.5 * (toes - sole) / k, 0.0, 1.0);
+  float sdf = mix(toes, sole, hh) - k * hh * (1.0 - hh);
+  float inner = smoothstep(0.003, -0.007, sdf);
+  float dig = mix(0.45, 1.0, smoothstep(-0.09, 0.07, q.y));
+  float rim = smoothstep(0.028, 0.005, sdf) * smoothstep(-0.004, 0.006, sdf);
+  return inner * dig - rim * 0.3;
+}
 float printShape(vec2 q, vec4 A, vec4 B, float fine) {
-  return A.w > 2.5 ? stickHole(q) : A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
+  return A.w > 3.5 ? pawPrint(q) : A.w > 2.5 ? stickHole(q) : A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
 }
 // The runner's footprints round p: how deep they press the sand here (m);
 // the slope they give it is added to grad (dh/dx, dh/dd).
@@ -2881,6 +2897,253 @@ float elderCut(int m, vec4 d) {
   }
   return cut;
 }
+#elif defined(BUNNY) && defined(PROPS)
+// --- what the bunny pulls out of his satchel (game/props.js) -----------------------
+// (d: x, y the part's own uv, z which part: see props.js)
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    // the umbrella's canopy: panels in two colours, a hem round its edge
+    float k = fract(d.x * 8.0 + 0.25);
+    c = mix(uPal[1], uPal[2], step(0.5, fract(d.x * 4.0)));
+    c = mix(c, c * 0.82, smoothstep(0.42, 0.5, abs(k - 0.5)) * 0.6);
+    c = mix(c, uPal[3], smoothstep(0.93, 0.96, d.y));
+  } else if (m == 4) {
+    // the balloon: a soft shine up on one side, and its knot
+    float hl = 1.0 - smoothstep(0.0, 0.22, length(vec2(d.x - 0.32, (d.y - 0.68) * 1.3)));
+    c = mix(c, vec3(1.0), hl * 0.75);
+    unlit = max(unlit, hl * 0.6);
+  } else if (m == 6) {
+    // the dandelion's clock: a soft white ball of seeds, each one's tuft a
+    // little star of hairs, the seeds themselves dark specks deep in it
+    vec2 g = d.xy * vec2(46.0, 26.0);
+    vec2 cell = floor(g);
+    float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5);
+    vec2 f = fract(g) - 0.5 - (vec2(h, fract(h * 7.3)) - 0.5) * 0.4;
+    float a = atan(f.y, f.x);
+    float star = (1.0 - smoothstep(0.0, 0.45, length(f))) * (0.5 + 0.5 * cos(a * 6.0 + h * 6.28));
+    c = mix(c * 0.9, c, star);
+    c = mix(c, uPal[7] * 0.7, (1.0 - smoothstep(0.0, 0.07, length(f))) * 0.4);
+    unlit = max(unlit, 0.75);
+  }
+  return c;
+}
+#elif defined(BUNNY)
+// --- the bunny ------------------------------------------------------------------
+// (palette: see COL in game/bunny.js; r is the rest position - he is
+// sculpted where he stands; see tools/runner/bunny.py)
+#define N_FUR_DEEP 16
+#define N_FUR_LIGHT 17
+#define N_CREAM 18
+#define N_PINK 19
+#define N_SHIRT_LINE 20
+#define N_RUST_DEEP 21
+#define N_EYE 22
+#define N_IRIS 23
+#define N_INK 24
+#define N_MOUTH 25
+#define N_BLUSH 26
+#define N_HAT_DEEP 27
+#define N_OLIVE_DEEP 28
+#define N_BRASS_LIGHT 29
+#define N_PAD 31
+float bunHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float bunNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(bunHash(i), bunHash(i + vec3(1, 0, 0)), f.x), mix(bunHash(i + vec3(0, 1, 0)), bunHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(bunHash(i + vec3(0, 0, 1)), bunHash(i + vec3(1, 0, 1)), f.x), mix(bunHash(i + vec3(0, 1, 1)), bunHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// Painted fur: short strokes running down him (the noise stretched along
+// y), a shade deeper and a shade lighter.
+vec3 bunFur(vec3 c, vec3 q, float k) {
+  float n = bunNoise(q * vec3(120.0, 48.0, 120.0)) * 0.6 + bunNoise(q * vec3(260.0, 110.0, 260.0) + 3.7) * 0.4;
+  c = mix(c, uPal[N_FUR_DEEP], smoothstep(0.56, 0.86, n) * 0.42 * k);
+  return mix(c, uPal[N_FUR_LIGHT], smoothstep(0.42, 0.14, n) * 0.32 * k);
+}
+// Stitching: dashes along a line (along: distance along it in stitches).
+float bunStitch(float across, float along, float halfw) {
+  return band(across, halfw) * step(0.42, fract(along));
+}
+// The cream of his muzzle, his lower cheeks and his chin, faded into the
+// brown in tufts.
+float bunCream(vec3 r) {
+  vec2 f = vec2(abs(r.x), r.y);
+  float mz = length((f - vec2(0.019, 0.867)) / vec2(0.047, 0.034));
+  float ch = length((f - vec2(0.056, 0.852)) / vec2(0.042, 0.024));
+  float chin = length((f - vec2(0.0, 0.833)) / vec2(0.048, 0.028));
+  float k = min(min(mz, ch), chin);
+  float jag = (bunNoise(r * vec3(380.0, 160.0, 380.0)) - 0.5) * 0.34;
+  return (1.0 - smoothstep(0.8, 1.02, k + jag)) * smoothstep(-0.03, -0.065, r.z);
+}
+// His face, drawn on the front of his head: big round eyes (dark brown
+// irises, two catch-lights each) behind his glasses, brows springing up over
+// them; a soft blush; the little 'w' of his mouth under his nose.
+vec3 drawFace(vec3 c, vec3 r, inout float unlit) {
+  float front = smoothstep(-0.06, -0.085, r.z);
+  vec2 f = vec2(abs(r.x), r.y);
+  c = mix(c, uPal[N_BLUSH], 0.25 * (1.0 - smoothstep(0.2, 1.0, length((f - vec2(0.078, 0.884)) / vec2(0.022, 0.013)))) * front);
+  // the eye: a big round white, a little taller than wide
+  vec2 E = vec2(0.055, 0.942);
+  vec2 q = f - E;
+  float dA = (length(q / vec2(0.0245, 0.0278)) - 1.0) * 0.0245;
+  float eye = fill(dA) * front;
+  vec3 ink = uPal[N_INK];
+  c = mix(c, ink, fill(dA - 0.0016) * front);
+  c = mix(c, uPal[N_EYE], eye);
+  unlit = max(unlit, eye * 0.35);
+  // the iris: looking a touch in toward his nose and up, curious
+  vec2 ic = q - vec2(-0.0038, 0.0016);
+  float ir = length(ic / vec2(0.9, 1.0));
+  vec3 iris = mix(uPal[N_IRIS], uPal[N_IRIS] * 1.6 + 0.04, smoothstep(0.005, 0.016, ir) * 0.5 * step(ic.y, 0.0));
+  iris = mix(iris, ink, fill(ir - 0.0088));
+  float inI = fill(max(ir - 0.0168, dA)) * front;
+  c = mix(c, iris, inI);
+  float g1 = fill(length(q - vec2(0.0018, 0.0082)) - 0.005);
+  float g2 = fill(length(q - vec2(-0.0072, -0.0044)) - 0.0023);
+  float glint = max(g1, g2 * 0.9) * inI;
+  c = mix(c, vec3(1.0), glint);
+  unlit = max(unlit, max(inI * 0.25, glint));
+  // the upper lid's line, heavier at the outer corner
+  float lid = band(dA, 0.0011 + 0.0012 * smoothstep(-0.01, 0.02, q.x)) * step(0.004, q.y) * front;
+  c = mix(c, ink, lid);
+  // brows: a couple of darker tufts springing up and out over the rims
+  vec2 bq = f - vec2(0.058, 0.992 - 6.0 * (f.x - 0.05) * (f.x - 0.05));
+  float brow = fill(length(bq / vec2(0.02, 0.0044)) - 1.0) * step(0.036, f.x);
+  c = mix(c, uPal[N_FUR_DEEP] * 0.82, brow * front);
+  // the mouth: a line down from the nose parting into two little arcs
+  float mfront = smoothstep(-0.095, -0.112, r.z);
+  float phil = band(f.x, 0.0009) * step(0.8615, r.y) * step(r.y, 0.884);
+  float arc = band(length(f - vec2(0.0115, 0.8665)) - 0.0115, 0.0009) * step(r.y, 0.8665) * step(f.x, 0.0225);
+  float tip = band(length(f - vec2(0.0225, 0.8705)) - 0.004, 0.0008) * step(r.y, 0.8705) * step(0.0225, f.x) * step(f.x, 0.0268);
+  c = mix(c, uPal[N_MOUTH], max(max(phil, arc), tip) * mfront);
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    // brown fur, the cream of his muzzle, his face
+    c = bunFur(c, r, 1.0);
+    vec3 cream = mix(uPal[N_CREAM], uPal[N_CREAM] * 1.06 + 0.02, bunNoise(r * 220.0));
+    c = mix(c, cream, bunCream(r));
+    // (his tufts a shade deeper toward their roots)
+    c = mix(c, uPal[N_FUR_DEEP], d.w * 0.25);
+    c = drawFace(c, r, unlit);
+  } else if (m == 15) {
+    // the nose: pink, a darker underside and a shine on top
+    vec3 q = r - vec3(0.0, 0.893, -0.122);
+    c = mix(c, c * 0.7, smoothstep(0.002, -0.006, q.y) * 0.6);
+    float hl = fill(length((q - vec3(0.0, 0.0045, -0.006)) * vec3(0.8, 1.6, 1.0)) - 0.0042);
+    c = mix(c, vec3(1.0, 0.93, 0.9), hl * 0.7);
+    unlit = max(unlit, hl * 0.5);
+  } else if (m == 2) {
+    // the ears: brown fur outside, pink inside (deeper down its middle, a
+    // paler rim of fur round it)
+    float n = bunNoise(vec3(d.z * 3.0, d.y * 60.0, 0.0)) * 0.6 + bunNoise(vec3(d.z * 9.0, d.y * 150.0, 3.0)) * 0.4;
+    c = mix(c, uPal[N_FUR_DEEP], smoothstep(0.55, 0.85, n) * 0.4);
+    c = mix(c, uPal[N_FUR_LIGHT], smoothstep(0.42, 0.15, n) * 0.3);
+    vec3 pink = mix(uPal[N_PINK], uPal[N_PINK] * vec3(0.9, 0.78, 0.8), (1.0 - abs(d.z)) * smoothstep(0.15, 0.6, d.y) * 0.5);
+    pink = mix(pink, uPal[N_CREAM], smoothstep(0.6, 0.85, abs(d.z)) * 0.6);
+    c = mix(c, pink, smoothstep(0.25, 0.75, d.x));
+  } else if (m == 6 || m == 8) {
+    c = bunFur(c, r, 1.0);
+  } else if (m == 7) {
+    // big feet: tan, the shin's brown fur running down onto the instep,
+    // three toes, a pinker pad underneath
+    vec3 fq = vec3(r.x * 1.5, r.y, r.z * 0.6);
+    c = mix(c, uPal[6], smoothstep(0.045, 0.075, r.y + 0.25 * max(0.0, r.z)) * 0.85);
+    c = bunFur(c, fq, 0.6);
+    c = mix(c, uPal[N_PAD], d.x * 0.7);
+    float toe = band(abs(d.y) - 1.0, 0.09) * smoothstep(-0.11, -0.14, r.z) * step(0.008, r.y);
+    c = mix(c, uPal[N_FUR_DEEP], toe * 0.65);
+  } else if (m == 11) {
+    // the tail: cream, fluffy
+    c = mix(c, uPal[N_CREAM], bunNoise(r * 300.0) * 0.5);
+    c = mix(c, c * 1.08, smoothstep(0.5, 0.8, bunNoise(r * 140.0 + 2.0)));
+  } else if (m == 3) {
+    // the shirt (d: x on the body, y down the arm, z on the collar):
+    // buttons down the front, the edges of the placket, the sleeves' hems
+    float frontB = smoothstep(-0.05, -0.065, r.z) * d.x;
+    float plk = band(abs(r.x) - 0.0075, 0.0007) * step(r.y, 0.738) * frontB;
+    float yb = (r.y - 0.534) / 0.039;
+    float bi = floor(yb + 0.5);
+    float btn = fill(length(vec2(r.x, (yb - bi) * 0.039)) - 0.0048) * step(0.5, bi) * step(bi, 5.5) * frontB;
+    float btnRim = band(length(vec2(r.x, (yb - bi) * 0.039)) - 0.0048, 0.0007) * step(0.5, bi) * step(bi, 5.5) * frontB;
+    c = mix(c, uPal[N_SHIRT_LINE], max(plk, btnRim * 0.9));
+    c = mix(c, c * 0.93, btn * (1.0 - btnRim));
+    float hem = band(d.y - 0.064, 0.0011) * (1.0 - d.x);
+    c = mix(c, uPal[N_SHIRT_LINE], hem * 0.9);
+    c = mix(c, uPal[N_SHIRT_LINE], smoothstep(0.55, 0.85, bunNoise(r * vec3(80.0, 30.0, 80.0))) * 0.18);
+  } else if (m == 4) {
+    // the trousers: rust, deeper in their folds; the waistband's edge, the
+    // fly, slant pockets, gathers into the cuffs
+    float n = bunNoise(r * vec3(40.0, 18.0, 40.0));
+    c = mix(c, uPal[N_RUST_DEEP], smoothstep(0.5, 0.85, n) * 0.35);
+    float bandLine = band(r.y - 0.527, 0.0011);
+    c = mix(c, uPal[N_RUST_DEEP] * 0.75, bandLine);
+    float frontT = smoothstep(-0.04, -0.07, r.z);
+    float fly = band(r.x - 0.012 * smoothstep(0.43, 0.41, r.y) * (1.0 - smoothstep(0.38, 0.4, r.y)), 0.0009) * step(0.39, r.y) * step(r.y, 0.526) * frontT;
+    vec2 pk = vec2(abs(r.x), r.y);
+    float pocket = band((pk.x - 0.068) - (0.526 - pk.y) * 0.55, 0.0011) * step(0.45, pk.y) * step(pk.y, 0.526) * frontT;
+    c = mix(c, uPal[N_RUST_DEEP] * 0.7, max(fly, pocket));
+    float cx = r.x - sign(r.x) * 0.079;
+    float a = atan(cx, r.z);
+    float gather = lines(a * 1.43, 0.12) * smoothstep(0.24, 0.16, r.y) * smoothstep(0.1, 0.16, r.y);
+    c = mix(c, uPal[N_RUST_DEEP], gather * 0.45 + d.y * 0.2);
+    c = mix(c, uPal[N_RUST_DEEP] * 0.75, band(r.y - 0.1185, 0.0012) * d.y + band(r.y - 0.1525, 0.0012) * d.y);
+  } else if (m == 5) {
+    // the suspenders: stitched down both edges
+    c = mix(c, c * 1.35 + 0.03, bunStitch(abs(d.x) - 0.66, r.y * 110.0, 0.09));
+  } else if (m == 14) {
+    // brass: a brighter rim where it catches the light
+    c = mix(c, uPal[N_BRASS_LIGHT], 0.35);
+  } else if (m == 9) {
+    // the satchel (d: xyz its own coordinates; w 0 its body, 1 the flap, 2
+    // the strap): stitched round its faces and its flap's edge, and down
+    // both edges of the strap
+    vec3 q = d.xyz;
+    vec3 deep = uPal[N_OLIVE_DEEP];
+    c = mix(c, deep, smoothstep(0.55, 0.85, bunNoise(r * 70.0)) * 0.25);
+    if (d.w > 1.5) {
+      c = mix(c, c * 1.3 + 0.03, bunStitch(abs(q.x) - 0.7, q.y * 120.0, 0.08));
+    } else if (d.w > 0.5) {
+      float edge = -0.012 - 0.016 * cos(clamp(q.x / 0.058, -1.0, 1.0) * 1.5708);
+      c = mix(c, c * 1.3 + 0.03, bunStitch(q.y - edge - 0.0065, q.x * 130.0, 0.0008) * step(0.0, q.z));
+      c = mix(c, deep * 0.8, band(q.y - edge, 0.0012) * step(0.0, q.z));
+    } else {
+      float s = max(bunStitch(abs(q.x) - 0.049, q.y * 130.0, 0.0008), bunStitch(q.y + 0.053, q.x * 130.0, 0.0008)) * step(0.018, q.z);
+      c = mix(c, c * 1.3 + 0.03, s);
+    }
+  } else if (m == 10) {
+    // the hat (d: xyz the hat's own coordinates, w on the brim): its
+    // crown in six panels, stitched either side of each seam; rings of
+    // stitching round the brim
+    vec3 q = d.xyz;
+    float rho = length(q.xz);
+    float th = atan(q.x, -q.z);
+    float u = th * 0.9549 + 0.5;
+    float seam = abs(fract(u) - 0.5) * rho * 1.0472;
+    float crown = 1.0 - d.w;
+    float sd = rho > 0.02 ? 1.0 : 0.0;
+    c = mix(c, uPal[N_HAT_DEEP], band(seam, 0.0008) * crown * sd * smoothstep(0.0, 0.03, q.y));
+    c = mix(c, uPal[N_HAT_DEEP], bunStitch(abs(seam) - 0.004, q.y * 140.0, 0.0006) * crown * sd * smoothstep(0.01, 0.03, q.y));
+    float ring = (rho - 0.116) / 0.0115;
+    c = mix(c, uPal[N_HAT_DEEP], bunStitch(abs(fract(ring) - 0.5) * 0.0115 - 0.0, th * rho * 140.0, 0.0006) * step(0.5, ring) * d.w);
+    c = mix(c, c * 0.88, smoothstep(0.55, 0.85, bunNoise(r * 60.0)) * 0.3);
+  } else if (m == 12) {
+    c = mix(c, c * 1.6 + 0.04, 0.0);
+  } else if (m == 13) {
+    // buck teeth: a little shade at their tips
+    c = mix(c, c * 0.88, smoothstep(0.844, 0.837, r.y));
+  }
+  return c;
+}
 #elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
 // brown eyes under relaxed lids (the upper lid sits a little over the iris, so
@@ -3266,6 +3529,12 @@ void main() {
     #endif
     // (his robe and his orange spectacles keep their colour through a drain)
     gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12) ? 1.0 : 0.0;
+  #elif defined(BUNNY) && defined(PROPS)
+    // (what he floats down on keeps its colour through a drain)
+    gKeep = 1.0;
+  #elif defined(BUNNY)
+    // (his yellow hat and his rust trousers keep their colour through a drain)
+    gKeep = (m == 4 || m == 10) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -3292,6 +3561,11 @@ void main() {
     float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
   #elif defined(ELDER)
     float soft = m == 10 ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
+  #elif defined(BUNNY) && defined(PROPS)
+    float soft = 0.1;
+  #elif defined(BUNNY)
+    // (fur takes the light softly; the billowy trousers in soft gradients)
+    float soft = (m == 1 || m == 2 || m == 6 || m == 8 || m == 11) ? 0.1 : m == 4 ? 0.11 : (m == 12 || m == 14) ? 0.04 : 0.07;
   #else
     float soft = m == 10 ? 0.16 : m == 9 ? 0.09 : 0.045;
   #endif
@@ -3337,6 +3611,8 @@ void main() {
   if (m == 2 || m == 10) {
   #elif defined(ELDER)
   if (m == 2 || m == 13) {
+  #elif defined(BUNNY)
+  if (m == 10) {
   #else
   if (m == 2) {
   #endif
@@ -3376,6 +3652,10 @@ void main() {
       if (elderCut(m, vD) > 0.0) discard;
     #endif
     gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12) ? 1.0 : 0.0;
+  #elif defined(BUNNY) && defined(PROPS)
+    gKeep = 1.0;
+  #elif defined(BUNNY)
+    gKeep = (m == 4 || m == 10) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -3897,6 +4177,103 @@ void main() {
   vec3 col = mix(vCol * 1.15, vec3(1.0), clamp(core * core * 0.7, 0.0, 1.0));
   gKeep = 1.0;
   gl_FragColor = vec4(grade(col, uTrip), min(k, 1.0));
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Dandelion seeds off the bunny's giant clock (game/seeds.js): each a tuft of
+// fine white hairs fanning up from the top of a stalk, the seed itself a
+// little brown spindle at its foot, turning as it drifts. Fogged and graded
+// like the world.
+// ---------------------------------------------------------------------------
+const VS_SEED = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute vec4 aSeed; // x size (m), y opacity, z turn (rad), w seed
+varying vec4 vSeed;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 wp = bendPos(position);
+  vPos = wp;
+  vWorld = wp;
+  vec4 mv = viewMatrix * vec4(wp, 1.0);
+  float px = aSeed.x * projectionMatrix[1][1] * uResolution.y * 0.5 / max(-mv.z, 0.5);
+  gl_PointSize = clamp(px, 2.0, 160.0);
+  vSeed = aSeed;
+  // (none drifting right across the lens)
+  vSeed.y *= smoothstep(0.8, 2.0, -mv.z);
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const FS_SEED = FS_HEAD + /* glsl */ `
+varying vec4 vSeed;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  c.y = -c.y;
+  float a = vSeed.z;
+  vec2 q = mat2(cos(a), sin(a), -sin(a), cos(a)) * c;
+  // the tuft: fine hairs fanning up from the top of the stalk
+  vec2 t = q - vec2(0.0, 0.04);
+  float r = length(t);
+  float ang = atan(t.x, t.y);
+  float fan = step(abs(ang), 1.45) * smoothstep(0.47, 0.36, r) * smoothstep(0.015, 0.05, r);
+  float ray = abs(fract(ang * 4.2 + vSeed.w) - 0.5) * 2.0;
+  float hairs = smoothstep(0.72 + 0.2 * r, 1.0, ray) * fan;
+  float haze = fan * 0.22 * (1.0 - r / 0.47);
+  // the stalk and the seed at its foot
+  float stalk = (1.0 - smoothstep(0.006, 0.014, abs(q.x))) * step(-0.26, q.y) * step(q.y, 0.05);
+  float seed = 1.0 - smoothstep(0.85, 1.0, length((q - vec2(0.0, -0.3)) / vec2(0.028, 0.07)));
+  float alpha = max(max(hairs * 0.95, haze), max(stalk * 0.85, seed)) * vSeed.y;
+  if (alpha < 0.02) discard;
+  vec3 col = mix(vec3(0.97, 0.96, 0.92), vec3(0.88, 0.85, 0.78), stalk);
+  col = mix(col, vec3(0.45, 0.33, 0.2), seed);
+  vec3 v = vWorld - uCamPos;
+  col = atmos(col, v, length(v), 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), min(alpha, 1.0));
+}
+`;
+
+// ---------------------------------------------------------------------------
+// The bunny's whiskers: thin ribbons through points on the head, turned to
+// face you and widened in screen space so that they are never under about a
+// pixel across - fainter instead, so they don't shimmer away when he's far.
+// ---------------------------------------------------------------------------
+const VS_WHISKER = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute vec4 aW; // xyz the way the whisker runs here (model space); w side (-1 / +1) x half its width (m)
+varying vec3 vWorld;
+varying vec3 vPos;
+varying float vA;
+void main() {
+  vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+  vec3 wt = normalize(mat3(modelMatrix) * aW.xyz);
+  vec3 a = bendPos(wp);
+  vec3 b = bendPos(wp + wt * 0.01);
+  vPos = a;
+  vWorld = a;
+  vec4 ca = projectionMatrix * viewMatrix * vec4(a, 1.0);
+  vec4 cb = projectionMatrix * viewMatrix * vec4(b, 1.0);
+  vec2 half_ = uResolution * 0.5;
+  vec2 sa = ca.xy / ca.w * half_;
+  vec2 sb = cb.xy / cb.w * half_;
+  vec2 dir = sb - sa;
+  dir = dot(dir, dir) > 1e-8 ? normalize(dir) : vec2(1.0, 0.0);
+  vec2 nrm = vec2(-dir.y, dir.x);
+  float ppm = projectionMatrix[1][1] * half_.y / max(ca.w, 0.05);
+  float hw = abs(aW.w) * ppm;
+  vA = clamp(hw / 0.55, 0.3, 1.0);
+  hw = max(hw, 0.55);
+  ca.xy += nrm * sign(aW.w) * hw / half_ * ca.w;
+  gl_Position = ca;
+}
+`;
+const FS_WHISKER = FS_HEAD + /* glsl */ `
+uniform vec3 uInk;
+varying float vA;
+void main() {
+  vec3 v = vWorld - uCamPos;
+  vec3 col = atmos(uInk, v, length(v), 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), vA);
 }
 `;
 
@@ -4732,8 +5109,8 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON' };
-  const style = STYLES[o.style] ? { [STYLES[o.style]]: '' } : {};
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS' };
+  const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
     const u = Object.assign({}, uniforms, extra);
@@ -4976,6 +5353,28 @@ export function makeSparkMaterial(env) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+  });
+}
+
+// The bunny's dandelion seeds (game/seeds.js), lit by env.
+export function makeSeedMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_SEED,
+    fragmentShader: FS_SEED,
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
+// The bunny's whiskers (game/bunny.js), in ink of colour ink.
+export function makeWhiskerMaterial(env, ink) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, { uInk: { value: new THREE.Color(ink) } }),
+    vertexShader: VS_WHISKER,
+    fragmentShader: FS_WHISKER,
+    transparent: true,
+    side: THREE.DoubleSide,
   });
 }
 
