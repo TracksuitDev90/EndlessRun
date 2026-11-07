@@ -281,7 +281,14 @@ export class Dragon {
     this.lookAt = null;
     this.lookW = 0;
     this.headDir = new THREE.Quaternion();
+    this.rolledHead = new THREE.Quaternion();
     this.headReady = false;
+    this.rollA = 0;
+    this.rollV = 0;
+    this.rollDir = 1;
+    this.rollBase = 0;
+    this.rollLive = false;
+    this.screwW = 0;
     this.velRel = new THREE.Vector3();
     this.acc = new THREE.Vector3();
     this.prevVel = null;
@@ -325,9 +332,10 @@ export class Dragon {
   // vel: how it's moving (world, m/s), frameZ: the runner's z (her path is kept
   // in their frame), wind: the wind her body streams back in (m/s, in that
   // frame), spot / yaw: where she stands and which way she faces (on the
-  // ground), swim: how hard she swims (0..1.5), spin: how fast she's rolling
-  // over (rad/s, a corkscrew), upright: how firmly she rights herself (0 in a
-  // loop), speed: the runner's pace }
+  // ground), swim: how hard she swims (0..1.5), roll: how far round her own
+  // length she's rolled in a corkscrew (radians; null when she isn't in
+  // one), upright: how firmly she rights herself (0 in a loop), speed: the
+  // runner's pace }
   update(dt, ctx) {
     this.time += dt;
     const t = this.time;
@@ -343,11 +351,18 @@ export class Dragon {
     this.snapT += dt;
     this.landT += dt;
     // her head's velocity through the air, and how it's changing
+    // (the acceleration smoothed over a tenth of a second or so - the same
+    // at any frame rate: taken against a lagging velocity and divided by the
+    // frame's time instead, it came out three times as strong at 60 Hz as
+    // at 20, five at 120, and she over-banked and twitched)
     _v.copy(ctx.vel);
     this.velRel.set(_v.x, _v.y, _v.z + ctx.speed - (ctx.wind || 0));
     if (!this.prevVel) this.prevVel = this.velRel.clone();
-    if (dt > 0) this.acc.subVectors(this.velRel, this.prevVel).divideScalar(dt).clampLength(0, 60);
-    this.prevVel.lerp(this.velRel, 1 - Math.exp(-dt * 25));
+    if (dt > 0) {
+      _v2.subVectors(this.velRel, this.prevVel).divideScalar(dt).clampLength(0, 60);
+      this.acc.lerp(_v2, 1 - Math.exp(-dt * 11));
+    }
+    this.prevVel.copy(this.velRel);
     // blinks, now and then; a happy squint
     this.blinkT -= dt;
     if (this.blinkT <= 0) {
@@ -399,21 +414,37 @@ export class Dragon {
     }
     const cur = _v2.set(0, 0, -1).applyQuaternion(this.headDir);
     this.headDir.premultiply(_q.setFromUnitVectors(cur, f));
+    // the corkscrew: how far round her own length she's rolled (see rollStep)
+    // - a turn of its own laid on top, so righting herself never fights it
+    const screw = this.rollStep(dt, ctx.roll);
     // the bank: where her lift would point - up, tipped toward the way she's
-    // turning
-    _v3.copy(this.acc).addScaledVector(f, -this.acc.dot(f)).multiplyScalar(0.07);
-    _v3.y += 1;
-    _v3.addScaledVector(f, -_v3.dot(f));
-    const upr = clamp(ctx.upright ?? 1, 0, 1) * (1 - Math.abs(f.y) * 0.6);
-    if (_v3.lengthSq() > 1e-6 && upr > 0) {
-      _v3.normalize();
+    // turning, by how hard she's turning across her line of flight (never by
+    // climbing or diving: pulling out of a climb - over a wall, say - is a
+    // hard push downward, and taken for a turn it tipped her lift right
+    // over, so she rolled half over toward her back and back again); hardly
+    // at all while she corkscrews (her head swings round a little helix, and
+    // that's no turn to bank into); never further over than about fifty
+    // degrees
+    const bk = 0.19 * (1 - 0.85 * screw);
+    const side = _p.crossVectors(f, _Y);
+    // (climbing or diving steeply there's hardly any 'up' left across her
+    // line of flight to right herself toward - and what there is swings
+    // about wildly: she lets it be)
+    const lift = side.length();
+    const upr = clamp(ctx.upright ?? 1, 0, 1) * (1 - Math.abs(f.y) * 0.6) * smooth(0.06, 0.35, lift);
+    if (lift > 1e-4 && upr > 0) {
+      side.divideScalar(lift);
+      const tip = clamp(bk * this.acc.dot(side), -1.25, 1.25);
+      _v3.copy(_Y).addScaledVector(f, -f.y).divideScalar(lift).addScaledVector(side, tip).normalize();
       const up = _v2.set(0, 1, 0).applyQuaternion(this.headDir);
       let a = Math.atan2(_s.crossVectors(up, _v3).dot(f), up.dot(_v3));
       a = clamp(a, -2.5, 2.5) * (1 - Math.exp(-dt * 3.2 * upr));
       this.headDir.premultiply(_q.setFromAxisAngle(f, a));
     }
-    if (ctx.spin) this.headDir.premultiply(_q.setFromAxisAngle(f, ctx.spin * dt));
     this.headDir.normalize();
+    // her head as it is: as it faces and banks, rolled round by the corkscrew
+    const head = this.rolledHead.copy(this.headDir);
+    if (this.rollA !== 0) head.premultiply(_q.setFromAxisAngle(f, this.rollA));
     // record where her head is, in the runner's frame
     const k = (this.head0 = (this.head0 + 1) % CAP);
     this.n = Math.min(CAP, this.n + 1);
@@ -421,10 +452,10 @@ export class Dragon {
     this.hp[k * 3 + 1] = ctx.head.y;
     this.hp[k * 3 + 2] = ctx.head.z - ctx.frameZ;
     this.hw[k] = this.Wind;
-    this.hq[k * 4] = this.headDir.x;
-    this.hq[k * 4 + 1] = this.headDir.y;
-    this.hq[k * 4 + 2] = this.headDir.z;
-    this.hq[k * 4 + 3] = this.headDir.w;
+    this.hq[k * 4] = head.x;
+    this.hq[k * 4 + 1] = head.y;
+    this.hq[k * 4 + 2] = head.z;
+    this.hq[k * 4 + 3] = head.w;
     // the path, newest first, as it lies now (blown back since)
     const pts = this._pts || (this._pts = []);
     const qs = this._qs || (this._qs = []);
@@ -493,7 +524,36 @@ export class Dragon {
     // laid back to her true length along it
     respace(P, this.seg, 0, this._tmp || (this._tmp = Array.from({ length: this.N }, () => new THREE.Vector3())));
     for (let i = 0; i < this.N; i++) this.frameAt(P, i, F.q[i]);
-    F.head.copy(this.headDir);
+    F.head.copy(head);
+  }
+
+  // The corkscrew's roll. While her mind has her in one (want: how far
+  // round she should be, radians), exactly that; when it's over - or cut
+  // short - she carries on round the way she was going to the next whole
+  // turn, easing into it (never unrolling back the short way, which reads
+  // as a roll given up half way). Returns how much she's in one (0..1).
+  rollStep(dt, want) {
+    const live = typeof want === 'number';
+    if (live) {
+      if (!this.rollLive) this.rollBase = this.rollA - want;
+      const a = this.rollBase + want;
+      if (dt > 0) this.rollV = (a - this.rollA) / dt;
+      if (Math.abs(this.rollV) > 0.5) this.rollDir = Math.sign(this.rollV);
+      this.rollA = a;
+    } else if (this.rollA !== 0) {
+      // (the whole turn ahead of her, the way she was rolling)
+      const n = this.rollA / TAU;
+      const end = TAU * (this.rollDir > 0 ? Math.ceil(n - 0.02) : Math.floor(n + 0.02));
+      const w = 6.5, e = Math.exp(-w * dt);
+      const d = this.rollA - end;
+      const j = (this.rollV + w * d) * dt;
+      this.rollA = end + (d + j) * e;
+      this.rollV = (this.rollV - w * j) * e;
+      if (Math.abs(this.rollA - end) < 0.004 && Math.abs(this.rollV) < 0.05) this.rollA = this.rollV = 0;
+    }
+    this.rollLive = live;
+    this.screwW += ((live || this.rollA !== 0 ? 1 : 0) - this.screwW) * (1 - Math.exp(-dt * 6));
+    return this.screwW;
   }
 
   // Turn q so the bone's +z (toward her tail) lies along the spine at i.
@@ -840,7 +900,7 @@ export class Dragon {
   frillsSim(dt, t) {
     const S = this.springs;
     const wind = smooth(1, 12, this.velRel.length()) * this.w.fly;
-    const jolt = clamp(-this.acc.y * 0.01, -0.35, 0.35);
+    const jolt = clamp(-this.acc.y * 0.028, -0.35, 0.35);
     for (let i = 0; i < 2; i++) {
       const s = i === 0 ? -1 : 1;
       const fr = this.b['frill' + (i ? 'R' : 'L')];

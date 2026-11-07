@@ -7,7 +7,9 @@ import { makeSeedMaterial } from '../render/shaders.js';
 // drifts. Like the sparks and the dust they're thrown from the runner's own
 // space and left behind in the world (track coordinates), so they hang in
 // the air as he runs on out from under them, drifting down slowly, rocking
-// and turning in the air. One draw call while any are aloft, none otherwise.
+// and turning in the air; and the dandelion he's let go of sheds them as it
+// floats away (straight into the world: emitWorld), rising a little on the
+// air. One draw call while any are aloft, none otherwise.
 
 const MAX = 72;
 
@@ -24,8 +26,8 @@ export class Seeds {
     this.points.frustumCulled = false;
     this.points.renderOrder = 5;
     this.points.visible = false;
-    this.p = Array.from({ length: MAX }, () => ({ live: false, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.05, turn: 0, rate: 0, ph: 0 }));
-    this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0 }));
+    this.p = Array.from({ length: MAX }, () => ({ live: false, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.05, turn: 0, rate: 0, ph: 0, drift: -0.35 }));
+    this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, world: false, drift: -0.35 }));
     this.queued = 0;
     this.next = 0;
   }
@@ -37,6 +39,21 @@ export class Seeds {
     q.p.copy(p);
     q.v.copy(v);
     q.size = size;
+    q.world = false;
+    q.drift = -0.35;
+  }
+
+  // A seed straight into the world: at x, y, d (track coordinates), moving
+  // at vx, vy, vd (m/s, vd along the run), size m across, the air carrying
+  // it up at drift m/s once it's taken it (- it sinks).
+  emitWorld(x, y, d, vx, vy, vd, size, drift) {
+    if (this.queued >= MAX) return;
+    const q = this.queue[this.queued++];
+    q.p.set(x, y, d);
+    q.v.set(vx, vy, vd);
+    q.size = size;
+    q.world = true;
+    q.drift = drift;
   }
 
   update(dt, root, z, dist) {
@@ -44,15 +61,25 @@ export class Seeds {
       const q = this.queue[i];
       const it = this.p[this.next];
       this.next = (this.next + 1) % MAX;
-      const w = q.p.applyQuaternion(root.quaternion).add(root.position);
-      const v = q.v.applyQuaternion(root.quaternion);
       it.live = true;
-      it.x = w.x;
-      it.y = w.y;
-      it.d = dist - (w.z - z);
-      it.vx = v.x;
-      it.vy = v.y;
-      it.vd = -v.z;
+      if (q.world) {
+        it.x = q.p.x;
+        it.y = q.p.y;
+        it.d = q.p.z;
+        it.vx = q.v.x;
+        it.vy = q.v.y;
+        it.vd = q.v.z;
+      } else {
+        const w = q.p.applyQuaternion(root.quaternion).add(root.position);
+        const v = q.v.applyQuaternion(root.quaternion);
+        it.x = w.x;
+        it.y = w.y;
+        it.d = dist - (w.z - z);
+        it.vx = v.x;
+        it.vy = v.y;
+        it.vd = -v.z;
+      }
+      it.drift = q.drift;
       it.age = 0;
       it.life = 1.8 + 1.4 * Math.random();
       it.size = q.size * (0.8 + 0.4 * Math.random());
@@ -69,7 +96,7 @@ export class Seeds {
       const k = Math.exp(-4.5 * dt);
       it.vx *= k;
       it.vd *= k;
-      it.vy += (-0.35 - it.vy) * (1 - Math.exp(-3 * dt));
+      it.vy += (it.drift - it.vy) * (1 - Math.exp(-3 * dt));
       it.x += (it.vx + 0.18 * Math.sin(it.age * 2.1 + it.ph)) * dt;
       it.y = Math.max(0.05, it.y + it.vy * dt);
       it.d += it.vd * dt;

@@ -3,9 +3,12 @@
 // the browser runs at):
 //   - slower than ~50 fps on average: a notch (0.25 of device pixels) lower,
 //     two notches if slower than ~28 fps;
+//   - or more than one frame in ten late (dropped: see FramePacer.late) - a
+//     60 Hz phone dropping a frame every half second averages 55 fps and
+//     stutters all the while: a notch lower;
 //   - faster than ~75 fps on average (a 120 Hz screen with room to spare):
 //     a notch higher, once a session.
-// If stepping down doesn't make frames any quicker — after a second notch,
+// If stepping down doesn't make frames any quicker (or drop fewer) — after a second notch,
 // since one may not be enough to make the display's next refresh — the
 // browser itself is holding the rate down (Low Power Mode caps Safari near
 // 30) or the bottleneck isn't pixels: the resolution is put back, and not
@@ -58,10 +61,11 @@ export class Quality {
     this.stable = 0;
     this.frames = 0;
     this.time = 0;
+    this.lates = 0;
     this.clock = 0;
     this.blockedUntil = 0; // no stepping down before this (seconds of clock)
     this.blocks = 0;
-    this.check = null; // { from, avg, tries }: a step down, to see whether it helped
+    this.check = null; // { from, avg, late, tries }: a step down, to see whether it helped
     let dpr = o.fixedDpr || o.deviceDpr;
     const saved = this.fixed ? null : this.load();
     if (saved !== null) dpr = Math.min(this.maxDpr, Math.max(this.minDpr, saved + STEP));
@@ -75,11 +79,13 @@ export class Quality {
     this.cool = Math.max(this.cool, seconds);
     this.frames = 0;
     this.time = 0;
+    this.lates = 0;
   }
 
-  // Once per frame with the real time since the last one (seconds). Returns
-  // true when the resolution changed (the caller resizes).
-  sample(raw) {
+  // Once per frame with the real time since the last one (seconds), and
+  // whether it came late (a dropped frame). Returns true when the resolution
+  // changed (the caller resizes, before it next draws).
+  sample(raw, late = false) {
     if (this.fixed || !(raw > 0) || raw > 0.25) return false;
     this.clock += raw;
     if (this.cool > 0) {
@@ -88,16 +94,22 @@ export class Quality {
     }
     this.frames++;
     this.time += raw;
+    if (late) this.lates++;
     if (this.frames < 90 && this.time < 1.5) return false;
     const avg = this.time / this.frames;
+    const lateShare = this.lates / this.frames;
     this.frames = 0;
     this.time = 0;
+    this.lates = 0;
     const check = this.check;
     this.check = null;
-    if (check && avg > check.avg * 0.92) {
+    // (better: quicker on average, or - if it was dropping frames - dropping
+    // well under as many)
+    const better = check && (avg <= check.avg * 0.92 || (check.late > 0.05 && lateShare <= check.late * 0.6));
+    if (check && !better) {
       if (check.tries < 2 && this.dpr > this.minDpr) {
-        // no quicker yet: one more notch
-        this.check = { from: check.from, avg: check.avg, tries: check.tries + 1 };
+        // no better yet: one more notch
+        this.check = { from: check.from, avg: check.avg, late: check.late, tries: check.tries + 1 };
         return this.set(Math.max(this.minDpr, this.dpr - STEP));
       }
       // stepping down bought nothing: put the resolution back
@@ -105,10 +117,11 @@ export class Quality {
       return this.set(check.from);
     }
     let next = this.dpr;
-    if (avg > 1 / 50 && this.clock >= this.blockedUntil) {
+    const slow = avg > 1 / 50 || lateShare > 0.1;
+    if (slow && this.clock >= this.blockedUntil) {
       next = Math.max(this.minDpr, this.dpr - STEP * (avg > 1 / 28 ? 2 : 1));
-      if (snap(next) !== this.dpr) this.check = { from: this.dpr, avg, tries: 1 };
-    } else if (avg < 1 / 75 && !this.raised && this.dpr < this.maxDpr) {
+      if (snap(next) !== this.dpr) this.check = { from: this.dpr, avg, late: lateShare, tries: 1 };
+    } else if (avg < 1 / 75 && lateShare < 0.03 && !this.raised && this.dpr < this.maxDpr) {
       next = Math.min(this.maxDpr, this.dpr + STEP);
       this.raised = true;
     }

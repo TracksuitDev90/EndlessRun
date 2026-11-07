@@ -60,6 +60,8 @@ export class Game {
     // the one you picked is simulated and drawn
     this.runners = {};
     for (const c of CHARACTERS) this.runners[c.id] = c.make(WORLD_DEFS[0].env, assets[c.id]);
+    // (a runner whose jump can keep them up longer asks first: see roadClear)
+    for (const r of Object.values(this.runners)) r.roomAhead = (sec) => this.roadClear(sec);
     this.runnerId = characterById(params.runner || readString('er.runner')).id;
     this.player = this.runners[this.runnerId];
     // the animal who runs with you: every one you can pick built up front, as
@@ -398,6 +400,18 @@ export class Game {
     this.ui.setBest(this.best);
   }
 
+  // Whether the road's clear from just past whatever's being jumped now to
+  // sec seconds ahead, in every lane (the bunny only floats - longer in the
+  // air than any jump - when it is: so a float never comes down onto a bar
+  // or a wall nobody could have seen it was going to).
+  roadClear(sec) {
+    const v = Math.max(this.speed, CONFIG.speed.start);
+    const from = this.dist + v * 0.42;
+    const to = this.dist + v * (sec + 0.3);
+    for (const o of this.obstacles.records) if (o.d > from && o.d < to) return false;
+    return true;
+  }
+
   // --- hits -----------------------------------------------------------------
   collide() {
     const p = this.player;
@@ -725,6 +739,7 @@ export class Game {
     if (this.dist - this.origin > CONFIG.rebaseStep) {
       this.origin += CONFIG.rebaseStep;
       for (const w of this.worlds) w.markAllDirty();
+      this.companion?.rebase?.(CONFIG.rebaseStep);
     }
 
     this.course.ensure(this.dist, Math.max(this.speed, CONFIG.speed.start));
@@ -877,6 +892,9 @@ export class Game {
       if (this.companion) this.sceneMain.add(...this.companion.objects);
       this.scenePortal.add(this.portal.stencilMesh);
     }
+    // (and the splash's copy of the frame allocated now, not the instant the
+    // first one hits)
+    this.splash.warm(this.renderer);
   }
 }
 

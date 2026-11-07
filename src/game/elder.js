@@ -217,7 +217,8 @@ function skirtBind(rig) {
 // How he runs: a quick, short-stepping hobble - knees bent, feet shuffling
 // low over the road, toes out, bent well over at the waist with his neck
 // craned forward and his head up to see where he's going; his free hand
-// tucked into the small of his back. The stick does the rest (see staffRun).
+// tucked into the small of his back. The stick does the rest (see staffRun),
+// and his bad left leg the limp (see HOBBLE).
 const GAIT = {
   cadence: [2.1, 0.06],
   stride: { reach: 0.48, hipY: 0.96, bob: 0.016, trackX: 0.075, swingX: 0.1, toeOut: 0.15, heelLift: 0.45, ballZ: -0.05, maxDuty: 0.4 },
@@ -252,7 +253,29 @@ const FEEL = {
 
 // The bend at the waist he never straightens out of (added to every pose but
 // the crash): the lower back, the upper back rounded over, the neck craning.
-const STOOP = { sp: 0.32, ch: 0.26, head: 0.5 };
+const STOOP = { sp: 0.42, ch: 0.34, head: 0.66 };
+
+// The limp: his left leg is the bad one (the stick, in his right hand, takes
+// its weight). He's quick off it and lingers on the good one: the stride's
+// clock is warped (warp: f - warp * sin f, unchanged at each mid-stance, so
+// the stick still strikes as the left foot lands) to run fast through the
+// left foot's stance and slow through the right's - so the good leg steps
+// through quickly and the bad one drags through slow, stiff (less lift, the
+// knee bending less) and swung a little wide. Each stance comes down
+// heavily onto the stick: the hips drop (dip, m) and roll toward it, and he
+// ducks forward over it (duck) with a nod of the head; over the good leg he
+// rises up again (rise, m). Carrying his stick he still limps, less.
+const HOBBLE = { warp: 0.28, dip: 0.034, rise: 0.012, roll: 0.075, duck: 0.12, nod: 0.1 };
+const BAD_LEG = {
+  stride: { heelLift: 0.28, toeOut: 0.22, swingX: 0.14 },
+  swing: [
+    [0.16, 0.18, 0.125, 0.018, 0.012],
+    [0.4, 0.065, 0.16, 0.0, 0.025],
+    [0.65, -0.115, 0.145, -0.022, 0.012],
+    [0.84, -0.21, 0.108, -0.013, 0.0],
+  ],
+};
+const LEG_L = ['thLx', 'thLy', 'thLz', 'knL', 'anL', 'toL'].map((n) => C[n]);
 
 // The stick in the run: where it strikes the road (beside his right foot,
 // ahead of him), how much road it can stay planted for, how high it swings.
@@ -782,18 +805,56 @@ export class Elder extends Player {
     m(C.clLy, -0.1);
   }
 
+  // His legs, hobbling (see HOBBLE): the pelvis's drop and roll laid on
+  // before the feet are placed (so a planted foot stays on the road through
+  // them), each leg solved on its own clock - the bad one's stance quick, the
+  // good one's slow - with its planted stretch laid at the pace that clock
+  // runs at there, so neither skids.
+  runLegs(r, f, sp) {
+    const H = HOBBLE;
+    const c = this.carryE || 0;
+    const k = 1 - 0.55 * c;
+    const lurch = Math.pow(Math.max(0, -Math.cos(f)), 1.5);
+    const rise = Math.max(0, Math.cos(f));
+    r[C.hipY] += -H.dip * lurch * k + H.rise * rise * k + (0.01 + 0.012 * lurch) * c;
+    r[C.hipRoll] += H.roll * k * Math.sin(f);
+    r[C.hipYaw] += 0.05 * k * Math.sin(f);
+    const warp = H.warp * k;
+    const fw = f - warp * Math.sin(f);
+    const fr = this.stride;
+    const gait = this.gait;
+    this.badGait = this.badGait || { ...gait, stride: { ...gait.stride, ...BAD_LEG.stride }, swing: BAD_LEG.swing };
+    const keep = this._keepL || (this._keepL = new Float32Array(LEG_L.length));
+    // the bad left leg: its stance comes round at f = pi, where the clock
+    // runs fast
+    this.stride = fr * (1 + warp);
+    this.gait = this.badGait;
+    super.runLegs(r, fw, sp);
+    for (let i = 0; i < LEG_L.length; i++) keep[i] = r[LEG_L[i]];
+    // the good right leg: its stance at f = 0, where the clock runs slow
+    this.stride = fr * (1 - warp);
+    this.gait = gait;
+    super.runLegs(r, fw, sp);
+    for (let i = 0; i < LEG_L.length; i++) r[LEG_L[i]] = keep[i];
+    this.stride = fr;
+  }
+
   poseRun(r, f, sp) {
     super.poseRun(r, f, sp);
     this.stoop(r);
     // the head up, looking ahead over the stoop
-    r[C.hdPitch] -= 0.08;
+    r[C.hdPitch] -= 0.1;
     // a hobble: a lurch onto the stick each stride (it strikes as the left
-    // foot lands), the hips dipping and rolling toward it
-    const lurch = Math.max(0, Math.cos(f - Math.PI));
-    r[C.hipY] -= 0.012 * lurch;
-    r[C.hipRoll] += 0.04 * Math.sin(f);
-    r[C.spSide] -= 0.05 * Math.sin(f);
-    r[C.chLean] += 0.05 * lurch;
+    // foot lands) - ducking forward and over onto it, the head nodding - and
+    // up again over the good leg (the hips' part of it: see runLegs)
+    const H = HOBBLE;
+    const lurch = Math.pow(Math.max(0, -Math.cos(f)), 1.5);
+    const rise = Math.max(0, Math.cos(f));
+    r[C.spSide] -= 0.09 * Math.sin(f);
+    r[C.chSide] -= 0.04 * Math.sin(f);
+    r[C.spLean] += 0.04 * lurch - 0.02 * rise;
+    r[C.chLean] += H.duck * lurch;
+    r[C.hdPitch] += H.nod * lurch - 0.5 * H.duck * lurch;
     // (carrying his stick he walks a little straighter, chin up, his free
     // arm swinging)
     const c = this.carryE || 0;
@@ -806,10 +867,9 @@ export class Elder extends Player {
     r[C.elR] = 0.75 - 0.15 * Math.cos(f);
     if (c > 0) {
       const m = (i, v) => (r[i] += (v - r[i]) * c);
-      r[C.spLean] -= 0.2 * c;
-      r[C.chLean] -= 0.14 * c + 0.05 * lurch * c;
-      r[C.hdPitch] -= 0.3 * c;
-      r[C.hipY] += (0.01 + 0.012 * lurch) * c;
+      r[C.spLean] -= 0.24 * c;
+      r[C.chLean] -= 0.18 * c + 0.6 * H.duck * lurch * c;
+      r[C.hdPitch] -= 0.36 * c;
       // the stick up on his shoulder, his hand on it in front
       m(C.shRx, 0.95);
       m(C.shRz, 0.3);

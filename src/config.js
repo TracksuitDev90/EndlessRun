@@ -138,7 +138,9 @@ export const CONFIG = {
     // body streams back in (m/s: base + a share of your pace; less of it and
     // she coils and ripples more, more and she streams out straighter); how
     // hard she can change her speed (m/s²: across, up and down, along) and
-    // how fast she goes across and up and down (m/s) and along, slower or
+    // how quickly that pull can build or ease off (m/s³: her turns curve in
+    // rather than kinking - three times as quick when there's a wall
+    // coming); how fast she goes across and up and down (m/s) and along, slower or
     // faster than you; the height she glides at (m, her head), how far
     // ahead of you she keeps (m), the height she clears you at when she
     // passes over you, the highest she'll go to sail over a wall or a bar
@@ -153,6 +155,7 @@ export const CONFIG = {
     flyer: {
       wind: [2.6, 0.08],
       acc: [8, 8, 8],
+      jerk: 34,
       vmax: [5.5, 4.5],
       surge: [-6, 9],
       cruise: [1.3, 1.8],
@@ -166,7 +169,7 @@ export const CONFIG = {
       twirl: 2.2,
       twirlHeight: 0.95,
       loop: { dur: 1.9, radius: 1.0, tilt: 0.9, every: 24 },
-      screw: { dur: 1.4, radius: 0.5, turns: 1, every: 12 },
+      screw: { dur: 1.6, radius: 0.5, turns: 1, every: 12 },
       fetch: { every: [8, 15], reach: [9, 28], chance: 0.6 },
     },
   },
