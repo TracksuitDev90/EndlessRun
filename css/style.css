@@ -296,6 +296,38 @@ body:not(.touch) .touch-only {
 .pick-card[data-id='skater'] .pick-fig {
   height: 122%;
 }
+/* a runner still being worked on: their card greyed out, their figure faded
+   to graphite, a 'soon' stamp on its corner, nothing to pick */
+.pick-locked {
+  cursor: default;
+  box-shadow: 3px 4px 0 rgba(42, 29, 20, 0.45);
+  color: rgba(42, 29, 20, 0.6);
+}
+.pick-locked .pick-bg,
+.pick-locked[aria-checked='false'] .pick-bg {
+  filter: saturate(0) brightness(0.9) contrast(0.85);
+}
+.pick-locked .pick-fig,
+.pick-locked[aria-checked='false'] .pick-fig {
+  filter: grayscale(1) brightness(0.92) drop-shadow(2px 0 0 #ebe7e1) drop-shadow(-2px 0 0 #ebe7e1) drop-shadow(0 2px 0 #ebe7e1) drop-shadow(0 -2px 0 #ebe7e1) drop-shadow(3px 4px 0 rgba(42, 29, 20, 0.45));
+  opacity: 0.62;
+}
+.pick-locked .pick-plate {
+  background: #ebe7e1;
+}
+.pick-soon {
+  position: absolute;
+  top: -9px;
+  right: -10px;
+  padding: 2px 7px 3px;
+  border: 2px solid rgba(42, 29, 20, 0.7);
+  border-radius: 999px;
+  background: #d8d4ce;
+  color: rgba(42, 29, 20, 0.75);
+  font: italic 600 12px/1 var(--serif);
+  transform: rotate(8deg);
+}
+
 /* the mystery card: someone's still to come - washed out in greys, a big
    question mark standing up where they will, a dashed edge, nothing to
    pick */

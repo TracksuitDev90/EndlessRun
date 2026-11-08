@@ -32,9 +32,12 @@ import { rgb } from '../render/geo.js';
 //   - he has two jumps: the hop vault, pushing off his stick, and a pole
 //     vault - up onto the top of the stick in a wobbly handstand, over, and
 //     down;
-//   - the skirt of his robe is simulated too, hung from his waist under the
-//     sash and open down the front; the bell sleeves hang and swing on
-//     springs; his wispy hair and bushy brows bounce.
+//   - his robes are simulated too, in two layers: the skirt of his robe,
+//     heavy and full, hung from his waist under the sash, open down the front
+//     and billowing out behind; and under it the under-robe's, round the
+//     front of him to his boots, carried on by his knees (so there's cloth
+//     between his legs as he hobbles, not air); the bell sleeves hang and
+//     swing on springs; his wispy hair and bushy brows bounce.
 
 // Palette slots: 1-13 are the garment ids baked into the mesh, the rest are
 // colours the character shader draws his details with (see CHAR_DETAIL).
@@ -87,20 +90,51 @@ export const BEARD = {
 };
 
 // The skirt of the robe: u runs from the left front edge round the back to
-// the right front edge, v down from the waist to the hem.
+// the right front edge, v down from the waist to the hem. Heavy wool, full:
+// it hangs out over the under-robe from a wide waist, sweeps lower behind
+// than in front, flares well out at the hem in deep folds, and is thick -
+// thicker still along its open edges and its hem, where it's turned back
+// and faced (see VS_CHAR).
 export const SKIRT = {
   cols: 19,
   rows: 11,
-  gap: 0.46, // open down the front (radians round the waist)
-  hem: 0.13, // hem height, hanging (mid-shin)
-  flare: 0.075, // how far the hem stands out round him
-  folds: 5,
-  pleat: 0.012,
+  gap: 0.5, // open down the front (radians round the waist)
+  hem: 0.085, // hem height behind, hanging (low on the shin)...
+  hemFront: 0.17, // ...rising to this at its open edges
+  wide: 1.08, // its waist a share fuller than the sculpt's
+  flare: 0.13, // how far the hem stands out round him
+  folds: 6,
+  pleat: 0.026,
+  thick: 0.009,
+  subU: 3,
+  subV: 2,
+  margin: 0.052, // (kept further off him than the under-robe is: it hangs over it)
+};
+
+// The under-robe's skirt, under it: sea-green, from his waist round the front
+// of him (u from behind his right hip, round the front, to behind his left;
+// open behind, where the robe covers it) down to just over his boots - so
+// between his legs, as he hobbles, there's cloth: the long under-robe of a
+// wizard's robes, his knees pushing it on. Lighter than the robe, and
+// narrower, so it hangs inside it.
+export const UNDER = {
+  cols: 15,
+  rows: 10,
+  gap: 2.3, // open behind (radians round the waist): it's the front and sides
+  hem: 0.115,
+  wide: 0.93,
+  flare: 0.055,
+  folds: 6,
+  pleat: 0.022,
   thick: 0.0065,
   subU: 3,
   subV: 2,
-  margin: 0.012,
+  margin: 0.04, // (well off his legs, so a knee driving on pushes it, not through it)
 };
+
+// the material the under-robe's skirt is drawn as (a slot of its own: see
+// CHAR_DETAIL's elder)
+const UNDER_MAT = 14;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -192,27 +226,32 @@ function beardBind(rig) {
   return settle(cols, rows, pts, rig.beard, BEARD.margin, 0.05);
 }
 
-// The rest drape of the skirt: from round his waist (just under the sash),
-// hanging to mid-shin and flaring a little, in soft folds round the back.
-function skirtBind(rig) {
-  const { cols, rows } = SKIRT;
+// The rest drape of a skirt (S: the robe's or the under-robe's; front: the
+// middle of it is at his front, else at his back): from round his waist
+// (just under the sash), flaring out toward its hem in folds; the robe's
+// hem rises toward its open edges.
+function drapeBind(rig, S, front) {
+  const { cols, rows } = S;
   const K = rig.skirt;
   const pts = new Float32Array(cols * rows * 3);
   for (let i = 0; i < cols; i++) {
     const c = (i / (cols - 1)) * 2 - 1;
-    const th = c * (Math.PI - SKIRT.gap / 2);
+    const th = (front ? Math.PI : 0) + c * (Math.PI - S.gap / 2);
     const s = Math.sin(th), co = Math.cos(th);
+    const hem = S.hem + ((S.hemFront ?? S.hem) - S.hem) * smooth(-0.2, -0.95, co);
     const path = [];
     for (let k = 0; k <= 30; k++) {
       const f = k / 30;
-      const fl = 1 + (SKIRT.flare / 0.13) * Math.pow(f, 1.2) + (SKIRT.pleat / 0.13) * Math.pow(f, 0.8) * Math.cos(c * Math.PI * SKIRT.folds);
-      const y = K.y + (SKIRT.hem - K.y) * f;
+      const fl = S.wide * (1 + (S.flare / 0.13) * Math.pow(f, 1.2) + (S.pleat / 0.13) * Math.pow(f, 0.8) * Math.cos(c * Math.PI * S.folds));
+      const y = K.y + (hem - K.y) * f;
       path.push(new THREE.Vector3(s * K.w * fl, y, K.z + co * (co > 0 ? K.back : K.front) * fl));
     }
     resample(path, rows, pts, i, cols);
   }
-  return settle(cols, rows, pts, K.colliders, SKIRT.margin, 0.1);
+  return settle(cols, rows, pts, K.colliders, S.margin, 0.1);
 }
+const skirtBind = (rig) => drapeBind(rig, SKIRT, false);
+const underBind = (rig) => drapeBind(rig, UNDER, true);
 
 // How he runs: a quick, short-stepping hobble - knees bent, feet shuffling
 // low over the road, toes out, bent well over at the waist with his neck
@@ -298,6 +337,7 @@ export class Elder extends Player {
     };
     this.beardS = sheet(BEARD, 1);
     this.skirtS = sheet(SKIRT, 0);
+    this.underS = sheet(UNDER, 0);
     const mats = makeCharacterMaterials(
       this.u,
       palette(COL),
@@ -306,6 +346,7 @@ export class Elder extends Player {
       [
         { texture: this.beardS.tex, grid: this.beardS.grid },
         { texture: this.skirtS.tex, grid: this.skirtS.grid },
+        { texture: this.underS.tex, grid: this.underS.grid },
       ],
       { style: 'elder' },
     );
@@ -327,6 +368,7 @@ export class Elder extends Player {
     // the beard and the skirt
     this.beardRest = beardBind(R);
     this.skirtRest = skirtBind(R);
+    this.underRest = underBind(R);
     const mk = (S, rest, mat, pair) => {
       const geo = sheetGeometry(S, rest, mat);
       for (const [mm, k] of [[pair[0], 0], [pair[1], 1]]) {
@@ -338,6 +380,8 @@ export class Elder extends Player {
     };
     mk(BEARD, this.beardRest, this.asset.meta.materials.beard, mats.sheets[0]);
     mk(SKIRT, this.skirtRest, this.asset.meta.materials.skirt, mats.sheets[1]);
+    // (the under-robe's skirt is drawn as material 14: see CHAR_DETAIL)
+    mk(UNDER, this.underRest, UNDER_MAT, mats.sheets[2]);
     this.dust = new Dust(this.u);
     this.sparks = new Sparks(this.u);
   }
@@ -385,7 +429,65 @@ export class Elder extends Player {
     this.skirtDefs = all.filter((c) => c.kind !== 'ell').concat(all.filter((c) => c.kind === 'ell')).map((c) => ({ ...c }));
     this.skirt.setColliderCount(this.skirtDefs.length);
     this.skirtFold = new Float32Array(SKIRT.cols * SKIRT.rows);
-    this.skirtWind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.25, draw: 0.6, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.5, floor: 0, lift: 0.22, t: 0 };
+    this.skirtWind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.18, draw: 0.5, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.5, floor: 0, lift: 0.3, t: 0 };
+    // the under-robe's skirt: sewn round the waist under it, kept off his
+    // legs (which push it on as they go), heavier in the wind - it's
+    // sheltered by the robe
+    this.under = new Cloth(UNDER.cols, UNDER.rows, this.underRest);
+    // (leashed all the way down - loosely toward the hem - to where his legs
+    // carry it: see underStep)
+    {
+      const { cols, rows } = UNDER;
+      const r = this.underRest;
+      let len = 0;
+      for (let j = 1; j < rows; j++) {
+        const a = ((j - 1) * cols + (cols >> 1)) * 3, b = (j * cols + (cols >> 1)) * 3;
+        len += Math.hypot(r[a] - r[b], r[a + 1] - r[b + 1], r[a + 2] - r[b + 2]);
+        this.under.leash[j] = 0.004 + 0.26 * Math.pow(Math.max(0, len - 0.05), 1.5);
+      }
+    }
+    // what carries each of its particles: his hips - and, from the waist
+    // down to the knee, more and more of the way his knee on that side has
+    // moved (the middle of the front both knees'), keeping its place out in
+    // front of the leg rather than turning with the thigh: [how far, left,
+    // right]; below the knee it hangs straight down from there (underDrop:
+    // how far), so a knee coming up lifts the robe and it falls from it, as
+    // cloth does
+    this.underW = new Float32Array(UNDER.cols * UNDER.rows * 3);
+    this.underAt = new Float32Array(UNDER.cols * UNDER.rows * 3);
+    this.underDrop = new Float32Array(UNDER.cols * UNDER.rows);
+    const knee = this.rig.kneeY;
+    const top = this.rig.skirt.y;
+    for (let j = 0; j < UNDER.rows; j++) {
+      for (let i = 0; i < UNDER.cols; i++) {
+        const k = j * UNDER.cols + i;
+        const x = this.underRest[k * 3], y = this.underRest[k * 3 + 1], z = this.underRest[k * 3 + 2];
+        const leg = Math.pow(smooth(top - 0.02, knee, Math.max(y, knee)), 0.8);
+        const l = smooth(0.05, -0.05, x);
+        this.underW.set([leg, leg * l, leg * (1 - l)], k * 3);
+        this.underAt.set([x, Math.max(y, knee), z], k * 3);
+        this.underDrop[k] = Math.max(0, knee - y);
+      }
+    }
+    // (the knees as bound, and how far each has moved from where the hips
+    // alone would carry it)
+    const kx = this.rig.hipJoint[0] + 0.004;
+    this.kneeBind = [new THREE.Vector3(-kx, knee, 0.0), new THREE.Vector3(kx, knee, 0.0)];
+    this.kneeD = [new THREE.Vector3(), new THREE.Vector3()];
+    this.under.frontOff = 0.5;
+    this.under.backOff = 0.08;
+    // (kept off the same, but rounder at the knees: they're what push it
+    // on, and a knee is a point the cloth would slip over)
+    this.underDefs = this.skirtDefs.map((c) => {
+      const d = { ...c };
+      if (/^thigh/.test(c.bone)) d.rb = c.rb + 0.03;
+      if (/^shin/.test(c.bone)) d.ra = c.ra + 0.032;
+      return d;
+    });
+    this.under.setColliderCount(this.underDefs.length);
+    this.underFold = new Float32Array(UNDER.cols * UNDER.rows);
+    this.underWind = { gx: 0, gy: 0, gz: 0, ax: 0, ay: 0, az: 0, wake: 0.3, draw: 0.6, gust: 0, gustSpeed: 1, gustLen: 1, curl: 0, kn: 0, kt: 0, damp: 0.55, floor: 0, lift: 0.12, t: 0 };
+    this.underPrev = new THREE.Vector3();
     this.headM = new THREE.Matrix4();
     this.hipsM = new THREE.Matrix4();
     this.headPrev = new THREE.Vector3();
@@ -412,6 +514,7 @@ export class Elder extends Player {
     super.resetSim();
     this.beard.collidersMoved = false;
     this.skirt.collidersMoved = false;
+    this.under.collidersMoved = false;
     for (const c of this.cuffS || []) {
       c.x.reset();
       c.z.reset();
@@ -1315,6 +1418,7 @@ export class Elder extends Player {
     this.cuffStep(dt);
     this.beardStep(dt);
     this.skirtStep(dt);
+    this.underStep(dt);
     this.slideDust(dt);
   }
 
@@ -1429,15 +1533,17 @@ export class Elder extends Player {
     f.ax = clamp(-this.vx * 0.3, -4.5, 4.5) + B.x * (1.1 + 0.03 * W) * still;
     f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.38, -3.5, 2.8) + B.y * still;
     f.az = (W > 0 ? 0.72 * W + 1 : 0) + B.z * still;
-    f.gust = 0.5 * still + 0.14 * W;
+    // (full and billowing: it catches the air and swells with it)
+    f.az = (W > 0 ? 0.8 * W + 1.3 : 0) + B.z * still;
+    f.gust = 0.6 * still + 0.2 * W;
     f.gustSpeed = 1.2 + 0.3 * W;
-    f.gustLen = 0.6 + 0.01 * W;
+    f.gustLen = 0.6 + 0.012 * W;
     f.curl = 0.7 * still + 0.16 * W;
     this.gusty(f, 0);
-    f.kn = 0.45;
+    f.kn = 0.5;
     f.kt = 0.1;
     f.damp = 0.5;
-    f.floor = Math.min(this.groundY || 0, this.y) - this.y + SKIRT.margin;
+    f.floor = Math.min(this.groundY || 0, this.y) - this.y + 0.012;
     f.groundV = W;
     f.t = this.time;
     _v.setFromMatrixPosition(this.b.hips.matrixWorld).applyQuaternion(Q);
@@ -1446,6 +1552,64 @@ export class Elder extends Player {
     this.stepSheet(cl, f, (v) => v.applyMatrix4(Mh).applyQuaternion(Q));
     writeSheet(cl, this.skirtS.data, this.skirtFold, this.invQ);
     this.skirtS.tex.needsUpdate = true;
+  }
+
+  // The under-robe's skirt: under the robe, sheltered by it, heavier in the
+  // wind - and carried on by his legs as he goes (where the body would carry
+  // each of its particles is blended from his hips and his thighs: so a knee
+  // driving forward pushes the cloth before it, and the front of it hangs
+  // between his knees, swinging with them).
+  underStep(dt) {
+    const cl = this.under;
+    const Q = this.root.quaternion;
+    const W = this.speed;
+    const { cols, rows } = UNDER;
+    const Mh = this.hipsM.copy(this.boneM('hips'));
+    for (let side = 0; side < 2; side++) {
+      const K = this.kneeBind[side];
+      this.kneeD[side].copy(K).applyMatrix4(this.boneM(side ? 'thighR' : 'thighL')).sub(_v2.copy(K).applyMatrix4(Mh));
+    }
+    const [DL, DR] = this.kneeD;
+    const At = this.underAt;
+    const Wt = this.underW;
+    const drop = this.underDrop;
+    const gk = this.gk;
+    for (let k = 0; k < cols * rows; k++) {
+      _v.fromArray(At, k * 3).applyMatrix4(Mh);
+      _v.addScaledVector(DL, Wt[k * 3 + 1]).addScaledVector(DR, Wt[k * 3 + 2]);
+      _v.applyQuaternion(Q);
+      // (below the knee, hanging from it)
+      _v.y -= drop[k] * (0.6 + 0.4 * gk);
+      _v.toArray(cl.skin, k * 3);
+    }
+    cl.pinB.set(cl.skin.subarray(0, cols * 3));
+    setColliders(cl, this.underDefs, this.boneM, Q, UNDER.margin);
+    const f = this.underWind;
+    f.gx = -this.frameAcc.x * 0.2;
+    f.gy = Math.min(-6, -9.2 - this.frameAcc.y * 0.16) * this.gk;
+    f.gz = -this.frameAcc.z * 0.3;
+    const B = this.breeze;
+    const still = 1 + 1.4 * (1 - Math.min(1, W / 6));
+    f.ax = clamp(-this.vx * 0.25, -4, 4) + B.x * (0.8 + 0.02 * W) * still;
+    f.ay = clamp(-(this.grounded ? 0 : this.vy) * 0.3, -3, 2.2) + B.y * still;
+    f.az = (W > 0 ? 0.5 * W + 0.8 : 0) + B.z * still;
+    f.gust = 0.35 * still + 0.08 * W;
+    f.gustSpeed = 1.1 + 0.25 * W;
+    f.gustLen = 0.6 + 0.01 * W;
+    f.curl = 0.4 * still + 0.06 * W;
+    this.gusty(f, 0);
+    f.kn = 0.4;
+    f.kt = 0.1;
+    f.damp = 0.55;
+    f.floor = Math.min(this.groundY || 0, this.y) - this.y + UNDER.margin;
+    f.groundV = W;
+    f.t = this.time;
+    _v.setFromMatrixPosition(this.b.hips.matrixWorld).applyQuaternion(Q);
+    if (this.simReady) cl.shift((_v.x - this.underPrev.x) * 0.6, (_v.y - this.underPrev.y) * 0.6, (_v.z - this.underPrev.z) * 0.6);
+    this.underPrev.copy(_v);
+    this.stepSheet(cl, f, (v) => v.applyMatrix4(Mh).applyQuaternion(Q));
+    writeSheet(cl, this.underS.data, this.underFold, this.invQ);
+    this.underS.tex.needsUpdate = true;
   }
 
   // picked on the title screen: a gust swells up and sweeps through him

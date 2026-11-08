@@ -1125,7 +1125,7 @@ Append to the URL:
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
-| `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`), over the one remembered |
+| `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`), over the one remembered — even one locked on the title screen |
 | `?companion=dragon` | who runs with you (`fox`, the default, or `dragon`), over the one remembered; `none` runs alone |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
@@ -1268,7 +1268,9 @@ through it.
 ## The runners
 
 Five runners, chosen on the title screen (and a sixth card held for whoever's
-next). Each is sculpted offline (`tools/runner/`), skinned to the same skeleton
+next) — though for now two of them, Rowan and Hazel, are back in the workshop
+being worked on: they're still in the game, their cards dealt greyed out, but
+they can't be picked (see [Choosing who runs](#choosing-who-runs)). Each is sculpted offline (`tools/runner/`), skinned to the same skeleton
 and driven by the same core — lanes, jumps, slides, the IK running legs, weight
 and follow-through (`src/game/player.js`) — and each dresses it, hangs
 simulated sheets off it and moves in their own way (`wayfarer.js`,
@@ -1279,7 +1281,7 @@ and how to make them live in `characters.js`).
 |---|---|---|---|---|---|
 | Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick | a short, bipedal brown rabbit, a faded cream muzzle, cheeks and chin, buck teeth, big round dark glasses; big ears pink inside, one upright and one bent over, through a yellow bucket hat; a cream short-sleeved shirt, brown suspenders on brass clips, billowy rust trousers gathered at the ankles; big bare rabbit feet, a fluffy tail; an olive satchel slung across him | an oversized neon-lime tee, baggy black skate shorts piped in white, white crew socks with a little badge, chunky white-and-grey skate shoes on platform soles; long box braids up in a high ponytail through a gold cuff, a few left down to frame her face; small gold hoops, thin bracelets; her board — a purple deck, lime chevrons underneath |
 | Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet | slim and athletic, about seven heads tall, ~1.66 m to the crown (her ponytail rises over it), stood a board's height (~10 cm) up off the road |
-| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth) and the skirt of his robe (19×11); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings |
+| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth), the skirt of his robe (19×11) and of the under-robe under it (15×10); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out | spring 38/s: a quick sideways hop, knees tucked, arms out | spring 30/s: a carve, the board leaning hard into it — out over her toes turning right, back on her heels turning left |
 | Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the same airtime but the highest apex of all (2.3 m to the others' 1.6); a rabbit's bound stretched out flat and twisted side-on, a long float down (a whole second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip — each to a side picked at random | the same airtime but higher (1.9 m: her board has to clear things too); an ollie, knees tucked right up and the board stuck to her feet, a kickflip or a heelflip, the board turning a whole flip under her as her feet lift out of its way |
 | Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces | a precision landing on springs: down onto the balls of his big feet, arms swung forward, and straight back up onto his toes, ears bouncing | deep into her knees on the board, arms swung down, and back up; a puff of dust off the wheels |
@@ -1288,7 +1290,7 @@ and how to make them live in `characters.js`).
 
 ### Choosing who runs
 
-![The title screen on a phone and on a wide screen, choosing Hazel: the runners' cards three by two, the last a mystery still to come, the companions' badges under them](docs/runners.jpg)
+![The title screen on a phone and on a wide screen, choosing Wren: the runners' cards three by two - Rowan's and Hazel's greyed out for now, the last a mystery still to come - the companions' badges under them](docs/runners.jpg)
 
 The title screen deals a card for each runner, in a grid three by two: their
 front view, cut out of their reference sheet (`tools/characters/<id>-sheet.jpg`,
@@ -1299,7 +1301,14 @@ paper plate — each popping up a little out of its card into the gap above it.
 The grid is always full: a slot no runner fills yet holds a mystery card —
 washed out in greys, a dashed edge, a big question mark standing up where the
 figure would, "coming soon" on its plate — that can't be picked (and that the
-arrow keys step over). The one you've picked stands taller, bobs and wears an orange seal, and a line
+arrow keys step over). A runner still being worked on (`locked` in
+`characters.js`: Rowan and Hazel, for now) is dealt too, but greyed out — the
+card washed in greys, their figure faded to graphite, a "soon" stamp on its
+corner — and can't be picked either: tapping it does nothing, the arrow keys
+step over it, and if they were the one remembered the title screen opens on
+the first who can be picked (Wren) instead. They're still built, so
+`?runner=wayfarer` (or `skater`) runs as them all the same, for working on
+them. The one you've picked stands taller, bobs and wears an orange seal, and a line
 about them sits under the grid. Picking one swaps the live runner on the road
 behind the cards (every runner is built, and their shaders compiled, at boot,
 so it's instant), and they say hello — a gust catches Rowan's cape, Wren's
@@ -1625,7 +1634,7 @@ needs a skinned mesh whose bones are named like the ones `build.py` writes.
 
 ### The elder
 
-![Alder from the front, hobbling on his stick, walking with it over his shoulder, planting it to pole vault, upside down on top of it, and squatting into a slide](docs/elder.jpg)
+![Alder from the front in his layered robes; hobbling on his stick, the under-robe pushed on by his knee and the robe billowing behind; seen from behind; hopping, the under-robe draped over his raised knee; from the side, the robe hanging over the under-robe; and squatting into a slide, his robes pooling over his knees](docs/elder.jpg)
 
 `tools/runner/elder.py` sculpts him to his reference sheet
 (`tools/characters/elder-sheet.jpg`) with `build.py`'s kit, as `explorer.py`
@@ -1690,11 +1699,35 @@ up over the top of his shoulder, then down onto his upper back, the tip
 furthest — while the body's own volumes route it round him; then it's let
 go, and the wind slides it back off.
 
-**So is the skirt of his robe** — a second sheet, 19×11, sewn round his
-waist under the sash and open down the front like the cape, falling to
-mid-shin in soft folds round the back, its lining sea-green, its hem ragged
-in long uneven points. It's heavier than the beard: it streams back less and
-swings more, kicked about by his legs. The bell sleeves hang from their
+**So are his robes, in two layers.** The skirt of his robe is a second sheet,
+19×11, sewn round his waist under the sash and open down the front like the
+cape: heavy wool and full of it — hung out from a wide waist, kept further
+off him than the under-robe is so it hangs over it, flaring well out at its
+hem in deep folds, sweeping lower behind (low on his shins) than at its open
+edges, its lining sea-green and turned back down those edges in a broad
+facing, its hem ragged in long uneven points. And it's thick: the slab the
+GPU draws through it swells toward its open edges and its hem, where it's
+turned back, so it never reads paper thin as it swings open. It catches the
+air as he goes and billows out behind him, heavier than the beard — it
+streams back less and swings more. Under it hangs the under-robe's skirt
+(`UNDER`), a third sheet, 15×10, sea-green: sewn round his waist under the
+robe's and hanging round the front and sides of him (open behind, where the
+robe covers it) down to just over his boots — so between his legs, as he
+hobbles, there's cloth, not air and thin leggings. It's carried by his legs
+as well as his hips (`underStep`): where the body would carry each of its
+particles moves, from the waist down to the knee, more and more with the way
+his knee on that side has moved (the middle of the front with both knees',
+so it hangs between them), keeping its place out in front of the leg rather
+than turning with the thigh, and from the knee down it hangs straight down
+from there — so a knee driving on pushes the cloth before it, a knee coming
+up in a hop lifts it and it falls from the knee, and in a squat it pools over
+his knees. It's leashed to that, tightly at the waist and more and more
+loosely toward its hem, kept off his legs (rounder at the knees, which a
+cloth would slip over) and sheltered by the robe, so it swings and settles
+but never ends up behind them; its hem is worn in shallow, close points. The
+two layers read as a wizard's robes rather than a dress: the heavy outer robe
+open over the long under-robe, its facing down the opening, the under-robe
+showing as a band down his front. The bell sleeves hang from their
 forearms on springs, toward the ground and lagging every swing; his wisps of
 hair and his brows bounce. (One runner can now have more than one sheet: the
 character materials take a list.)
@@ -1775,9 +1808,10 @@ keep their colour through a drain. A pole vault's handstand and being picked
 on the title screen set off a bigger poof.
 
 Through Hell's drain his robe and his orange spectacles keep their colour.
-His simulation costs about what the wayfarer's does per frame (two sheets
-and a beard larger than Wren's hair; the arms' solves are a handful of vector
-sums); his mesh is about 26k triangles.
+His simulation costs the most of the runners per frame (three sheets - the
+beard larger than Wren's hair, the robe's skirt and the under-robe's; the
+arms' solves are a handful of vector sums), still well under a millisecond;
+his mesh is about 26k triangles.
 
 ### The bunny
 

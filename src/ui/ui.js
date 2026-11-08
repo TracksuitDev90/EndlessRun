@@ -83,9 +83,10 @@ export class UI {
   // The title screen's cards, one per runner (see game/characters.js), in a
   // grid three by two: each their cut-out art standing up out of a card in
   // their colours, and under the grid a line about whoever's picked. Tapping
-  // one picks them (it doesn't start the run). The grid is always full: any
-  // slot no runner fills yet holds a mystery card, greyed out - someone's
-  // still to come.
+  // one picks them (it doesn't start the run). A runner still being worked
+  // on (locked) is dealt greyed out, a 'soon' seal on them, and can't be
+  // picked. The grid is always full: any slot no runner fills yet holds a
+  // mystery card, greyed out - someone's still to come.
   setRunners(list, selected) {
     this.runnerDefs = Object.fromEntries(list.map((c) => [c.id, c]));
     const root = $('pick');
@@ -93,24 +94,26 @@ export class UI {
     this.cards = {};
     for (const c of list) {
       const b = document.createElement('button');
-      b.className = 'pick-card';
+      b.className = c.locked ? 'pick-card pick-locked' : 'pick-card';
       b.type = 'button';
       b.dataset.id = c.id;
       b.setAttribute('role', 'radio');
-      b.setAttribute('aria-label', `${c.name}, ${c.title}`);
+      b.setAttribute('aria-label', c.locked ? `${c.name}, ${c.title}: back soon` : `${c.name}, ${c.title}`);
+      if (c.locked) b.setAttribute('aria-disabled', 'true');
       b.style.setProperty('--c1', c.tint[0]);
       b.style.setProperty('--c2', c.tint[1]);
       b.innerHTML =
         `<span class="pick-bg"></span>` +
         `<img class="pick-fig" src="${c.card}" alt="" draggable="false" />` +
         `<span class="pick-plate"><span class="pick-name"></span><span class="pick-title"></span></span>` +
-        `<span class="pick-seal" aria-hidden="true">✓</span>`;
+        `<span class="pick-seal" aria-hidden="true">✓</span>` +
+        (c.locked ? `<span class="pick-soon" aria-hidden="true">soon</span>` : '');
       b.querySelector('.pick-name').textContent = c.name;
       b.querySelector('.pick-title').textContent = c.title;
-      b.title = c.blurb;
+      b.title = c.locked ? `${c.name} is in the workshop - back soon` : c.blurb;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.handlers.pick?.(c.id);
+        if (!c.locked) this.handlers.pick?.(c.id);
       });
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       root.appendChild(b);
@@ -127,7 +130,8 @@ export class UI {
         `<span class="pick-plate"><span class="pick-name">? ? ?</span><span class="pick-title">coming soon</span></span>`;
       root.appendChild(m);
     }
-    this.runnerOrder = list.map((c) => c.id);
+    // (the arrow keys and swipes step over anyone locked)
+    this.runnerOrder = list.filter((c) => !c.locked).map((c) => c.id);
     this.showRunner(selected, false);
   }
 

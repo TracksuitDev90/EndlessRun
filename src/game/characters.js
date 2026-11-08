@@ -7,7 +7,10 @@ import { Skater } from './skater.js';
 // Who you can run as. Each has their sculpted asset (tools/runner/), the art
 // their card on the title screen is cut from (tools/characters/cards.py), a
 // name and a line about how they run, the colour their card is washed in, and
-// the class that dresses and moves them. The first is the default.
+// the class that dresses and moves them. One that's `locked` is still being
+// worked on: built with the rest, their card dealt greyed out, but not to be
+// picked (only ?runner=<id> runs as them). The first who isn't locked is the
+// default.
 export const CHARACTERS = [
   {
     id: 'wayfarer',
@@ -17,6 +20,7 @@ export const CHARACTERS = [
     asset: 'assets/runner/',
     card: 'assets/characters/wayfarer.webp',
     tint: ['#ffb54a', '#f2702a'],
+    locked: true,
     make: (env, asset) => new Wayfarer(env, asset),
   },
   {
@@ -57,8 +61,15 @@ export const CHARACTERS = [
     asset: 'assets/skater/',
     card: 'assets/characters/skater.webp',
     tint: ['#d9b3ff', '#7046c4'],
+    locked: true,
     make: (env, asset) => new Skater(env, asset),
   },
 ];
 
 export const characterById = (id) => CHARACTERS.find((c) => c.id === id) || CHARACTERS[0];
+
+// The runner by id if they can be picked, else the default.
+export const pickableById = (id) => {
+  const c = CHARACTERS.find((d) => d.id === id);
+  return c && !c.locked ? c : CHARACTERS.find((d) => !d.locked) || CHARACTERS[0];
+};
