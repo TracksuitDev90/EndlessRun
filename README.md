@@ -47,7 +47,7 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | # | World | Light | Inspired by |
 |---|-------|-------|-------------|
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane through a lived-in neighbourhood: now and then a greengrocer's or a bakery café on a ground floor, picket fences round front gardens of raspberry canes, market stalls on the verge (apples, grapefruit and oranges at one; watermelons, grapes and pineapples at the other), benches, post boxes, a bike with a basket of apples, the bus stop's shelter; and the market spilling into the road (see [The breather](#the-breather-the-cypress-lane)) | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
-| II | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, a trodden path through long grass (taller still in among the trunks), ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; the way out is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
+| II | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, a trodden path through long grass (taller still in among the trunks), ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
 | III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights, washing stirring on the lines strung across it | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
 | IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
 | V | **The Glasshouse** — a white-ribbed greenhouse tunnel run wild: beds crowded with zinnias and spilling over their edges, ferns and monstera, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias |
@@ -58,8 +58,36 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | X | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
 
 The first lap always nests inward in that order; after that the order shuffles
-(never the same world twice in a row). Each doorway is painted the colour of
-the world it leads to.
+(never the same world twice in a row).
+
+### The doors
+
+Every doorway belongs to the world behind it: it's built in that world's
+style, so you can see where you're going before you can see through it, and
+it stands at the end of whatever world you're in like the front of the next
+one, lit by the world it stands in. Its leaves are painted that world's
+colour, and each world dresses them its own way:
+
+| Into | The doorway | Its leaves |
+|---|---|---|
+| Cypress Lane | a stone arch draped in ivy, lanterns on its pillars, hedges running off to either side | a cottage door: planks, iron strap hinges, a round window glowing warm with a flower box under it, a brass ring |
+| Deepwood | two ancient trees grown into an arch, moss over it, paper lanterns hung from it, the forest wall either side | a great tree carved in relief, its roots spread over the foot of the door and mossed over, mushrooms glowing in the moss |
+| Night Rooftops | a cream stone gate with a pediment and a lamp, the city's facades either side, their windows lit | the night sky: a crescent moon glowing gold, stars, and a row of little lit windows |
+| Hall of Doors | a cream doorway under a clock, between columns, doors set into the coral walls either side | doors within doors: each leaf framed round a smaller door, and a smaller one in that, each its own colour with its own knob |
+| Glasshouse | an iron arch in a wall of glass, orange trees in pots at its feet, a lamp glowing over it | glazed: panes of pale glass in iron glazing bars, a fan of them under the arch, ivy climbing up from the foot |
+| Sky Road | a sandstone arch with a gold sun over it and pillars either side | a gold sun rising over them, half on each leaf, its rays fanning out, over sandstone panels studded with gold |
+| Hell | basalt, horned with obsidian, runes glowing round the arch, basalt columns either side | charred black plates, the red glowing like lava in the seams between them, banded with iron and spiked |
+| Gallery of Hours | ivory, ringed in brass, a great clock face over it whose hands have come unstuck | half a great clock face on each leaf, meeting in the middle, and a brass gear |
+| Kelp Deep | rock crusted with coral, a scallop shell over it, sea fans and anemones, cliffs either side | a ship's door: weathered planks, a brass porthole glowing sea-green, barnacles, a starfish, kelp streaming up it |
+| Red Drift | red rock banded with strata, violet crystals bursting from its crown, moonlets turning round its top | an airlock hatch: riveted plates, a porthole full of stars with a little ringed planet in it, hazard stripes, a violet strip light |
+
+![The ten doors, each in the world before it: into the Cypress Lane (standing on the Red Drift), the Deepwood, the Night Rooftops, the Hall of Doors and the Glasshouse; into the Sky Road, Hell, the Gallery of Hours (in Hell, its colour drained), the Kelp Deep and the Red Drift](docs/doors.jpg)
+
+All ten are built once into one shared set of batches (each world's
+`door(b)`, its batch names prefixed with its id) that is always drawn in the
+main scene and lit as the world you're in (`Game.doors`); the doorway's
+shape and depth — the stencil you see the next world through — are the
+next world's too (`def.gate`).
 
 In the Hall of Doors, the nine paintings are dealt from a shuffled deck (every
 one hangs before any repeats, never twice side by side, and the order changes
@@ -268,7 +296,10 @@ copied into a texture and one full-screen pass refracts it through the water
 — only while a splash is running, so it costs nothing the rest of the time
 (and the adaptive resolution ignores it). Into the Kelp Deep the splash is the
 doorway's burst; only the swell races ahead, like a wave. Any world can ask
-for it with `env.splash: true`.
+for it with `env.splash: true`. The road past the doorway into the sea is
+kept clear of obstacles for three and a half seconds of running
+(`def.clearAfter`: about 80–100 m, more than twice the usual), so nothing's
+coming while the water's still running off the screen.
 
 **The water.** Overhead, the sky is the underside of the surface: a ceiling
 of light rippling far above, brightest round the sun, shafts of light
@@ -351,16 +382,25 @@ gravity, but not the slow motion low gravity usually is — they're *hurled*:
 - **The jump is a boost.** Swipe up and a burst of a thruster flings them up
   and on — up hard (gravity at 30 m/s² while they're still climbing fast),
   then the burst is spent and they *hang*, low gravity barely tugging them
-  (6.5 m/s²), flying over the top, then down again at 16: 2.3 m up and 1.3 s
-  in the air, against an ordinary jump's 1.6 m and 0.64 s. It's still their
-  own jump — Rowan's leap, Wren's tuck, Alder's vault off his stick,
-  Bramble's flips and floats (with his balloon in space) — but once they're
-  up off the dust the body tips forward into it like a swimmer's, legs
-  trailing, arms swept back and the hands at the hips, where a jet of white
-  vapour drives back from them like a fire extinguisher's in the dark: a
-  dense burst at take-off and little spurts over the top to keep them up.
-  The camera rides higher with them while they fly and its field of view
-  kicks out as the burst fires.
+  (3.2 m/s²), flying over the top, then down again at 15: 2.7 m up and two
+  seconds in the air, against an ordinary jump's 1.6 m and 0.64 s. It's
+  still their own jump — Rowan's leap, Wren's tuck, Alder's vault off his
+  stick, Bramble's flips and floats (with his balloon in space) — but once
+  they're up off the dust the body tips forward into it like a swimmer's,
+  legs trailing, and a jet of white vapour drives back from their hands
+  like a fire extinguisher's in the dark: a dense burst at take-off and
+  little spurts over the top to keep them up. The camera rides higher with
+  them while they fly and its field of view kicks out as the burst fires.
+- **Five ways to fly**, a fresh one dealt for every boost and never the same
+  twice running (`CONFIG.drift.styles`): the **jet** — arms swept back, the
+  hands at the hips on the jet; **reach** — one fist thrust out ahead along
+  the line of flight, the other hand back on the jet; the **starfish** —
+  belly down like a skydiver, arms and legs flung wide, rocking; the
+  **roll** — a barrel roll about the line of flight over the top; and the
+  **flip** — a slow somersault over the top, tucked tight through it and
+  stretching out of it. The roll and the flip turn about the runner's middle
+  (`CONFIG.drift.spin`: when, in the boost), and if they land or drive
+  themselves down partway round, it whips round to finish.
 - **A second burst.** Press up again while they hang and the thruster fires
   once more, from wherever they are, lifting them on over whatever's next.
 - **Down drives them down.** In the air, a swipe down fires the thruster
@@ -375,8 +415,10 @@ gravity, but not the slow motion low gravity usually is — they're *hurled*:
   the ground (it never clears an obstacle by itself, and it never carries
   them into one they wouldn't have hit). Land on top of a rock or an asteroid
   and they bounce straight off it.
-- **Everything is lighter.** Red dust puffs up off every push-off and
-  landing and hangs in the thin air, grit falls back slowly, and capes,
+- **Everything is lighter.** Red dust — properly red, the regolith's own
+  colour (`env.dustPale`), and the jet's vapour takes a warm tinge of it —
+  puffs up off every push-off and landing and hangs in the thin air, grit
+  falls back slowly, and capes,
   hair, beards and robes float: their weight is a third of what it is
   anywhere else (`CONFIG.drift.gk`).
 
@@ -387,9 +429,12 @@ rims strung with lights, spinning and bobbing, a glowing dome on top — and
 great asteroids hanging at head height to stay low under, skimming under
 them (or, if you're flying, driving yourself down out of the air in time);
 red rock pillars and crystal-crowned spires to go round; and a mothership
-right across the road. A boost hangs about twice as long as a jump, so the
-obstacles there come up further apart, and never as close after one you jump
-or duck (`CONFIG.drift.pace`); the gem director hangs its arcs on the boost's
+right across the road. It's a **breather**, gentler still than the Cypress
+Lane — laid at less of the run's difficulty, further apart, only the
+simplest patterns and lone obstacles most of all (its `calm` settings) — so
+there's room to fly; and a boost hangs three times as long as a jump, so the
+obstacles there come up further apart again, and never as close after one
+you jump or duck (`CONFIG.drift.pace`); the gem director hangs its arcs on the boost's
 curve, so a boost taken at the right moment sweeps up every gem in the air,
 the crown at the top.
 
@@ -401,12 +446,15 @@ takes hold, the world behind them smeared toward the centre and sunk in a
 blue tunnel, a white-hot core blazing where they all come from; the runner
 is left out of the smear, so you never lose them. Then you drop out of it:
 the streaks snap back into points, a flash rings out across the screen, and
-you're running on red dust under the planets — a second and a quarter in
-all, with a rush of noise tearing up to a shriek, a deep swell under it and
-a glassy chord gliding up, then a falling whoom as you drop out. Like the
-splash it's one full-screen pass over the finished frame, only while it
-runs; the road is kept clear of obstacles a little further past this
-doorway than past any other (`def.clearAfter`).
+you're running on red dust under the planets — a second and a half in all,
+the streaks racing faster and faster the whole time it holds and the tunnel
+turning round them, with a rush of noise tearing up to a shriek, a deep
+swell under it and a glassy chord gliding up, then a falling whoom as you
+drop out. Like the splash it's one full-screen pass over the finished
+frame, only while it runs; and the road past this doorway is kept clear of
+obstacles for four and a half seconds of running (`def.clearAfter`: about
+110 m at full tilt, three times the usual), so you've found your feet
+before anything's in the way.
 
 **The planets** (`def.planets`, `world/planets.js`) are whole globes, each
 turning on its own axis and lit by the world's sun — its night side sunk in a
@@ -741,6 +789,9 @@ tunnels) unlock as the run goes on — except in the Cypress Lane, the breather
 world (below). All of it is tunable in `CONFIG.obstacles`.
 
 ### The breather: the Cypress Lane
+
+(The Red Drift is a breather too — gentler still, so there's room to fly:
+see [Low gravity](#low-gravity-the-red-drift).)
 
 Every time the Cypress Lane comes round it's a breather, however far the run
 has got: it's laid at only a share of the run's difficulty, every gap is
@@ -2150,15 +2201,22 @@ beat in its `uv.x`, `uv.y` 1 for what moves); `bark: true` barks every part
 whose `mark` is 0.4 (lay its uv out with `asBark` in `forest.js`) and draws
 growth rings on any cylinder cap marked 0.3; and `b.pool(…, {
 color, flicker })` gives a pool of light its own colour, wavering like
-firelight. A world with `calm: true` is a breather (see above),
+firelight. A world with `calm: true` is a breather (see above) — or
+`calm: { diff, space, most, lone }` to lay its own breather settings over
+`CONFIG.obstacles.calm` (the Red Drift's) —
 `env.eclipse` puts a total eclipse in place of the sun, and `grade.edge:
 [start, full]` reshapes the vignette (0 the centre of the screen, 1 the
 corners; Hell pulls it right in).
 `env.drain` makes the world drain of colour once you're in it, `skyFx.smoke`
 lays a ceiling of smoke with dry lightning in it over the sky, and
 `env.particles2` adds a second layer of motes (Hell's falling ash under its
-rising embers). `gateExtras` entries can be `[name, x, y, dz]` to stand
-something on the gate (the Gallery's clock hands).
+rising embers). `gate` and `door(b)` are the doorway INTO the world, built
+in its own style (see [The doors](#the-doors)): `door(b)` registers
+`gateFrame` (the frame and anything round it), `gateLeaf` (one leaf — build
+it with `leafParts(opening, { deco })`, `deco` dressing each face of it) and
+any extras, all with `stencil: false`, in the shared doors; `gateExtras`
+entries can be `[name, x, y, dz]` to stand something on the gate (the
+Gallery's clock hands).
 Under the sea: `env.sea: { surface, rays, caustics, scale }` puts the
 rippling underside of the surface overhead, shafts fanning down from it and
 caustics on everything facing up (scale per metre, a multiple of 1/256);
@@ -2186,7 +2244,11 @@ Out among the stars: `lowGravity: true` makes the world's jump a boost and
 puts the runner on the bound (see [Low gravity](#low-gravity-the-red-drift)
 and `CONFIG.drift`); the obstacles come up further apart there and the gem
 director hangs its arcs on the boost's curve. `clearAfter` keeps more road
-than usual clear of obstacles after the world's doorway in, and `env.warp`
+than usual clear of obstacles after the world's doorway in (seconds of
+running at the pace you'll be at: the Red Drift's for the jump to light
+speed, the Kelp Deep's for the splash), `env.dustPale` sets how far the dust
+kicked up off the ground is paled toward cream (0.62 anywhere else; the
+Red Drift's is red), and `env.warp`
 jumps to light speed through it (`game/warp.js`; like `env.splash`, it's the
 doorway burst). `env.space: { nebula, galaxies, stars, comets, colors: [three
 nebula colours] }` fills the sky with the universe, all round and below the

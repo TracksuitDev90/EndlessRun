@@ -1,6 +1,6 @@
 import {
   P, part, merge,
-  cloudParts, rockParts, roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
+  cloudParts, rockParts, roundTreeParts, lanternPostParts, gateFrameParts, gateTop, leafParts,
 } from './shapes.js';
 import { birdParts, whaleParts } from './whimsy.js';
 import { crystal, crystalPoint, bipyramid, nugget, octahedron } from './gems.js';
@@ -245,6 +245,25 @@ function gateGeo() {
   return merge(parts);
 }
 
+// The door into the Sky Road: a sun rising over it - half a gold sun on
+// each leaf, meeting in the middle, its rays fanning out - over sandstone
+// panels studded with gold.
+function sunLeaf({ W, H, z, f }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  const cy = H + 0.6;
+  out.push(part(P.cyl(1.35, 1.35, 0.1, 18, 1, false, Math.PI, Math.PI), '#ffd36a', { x: W, y: cy, z: at(0.1), rx: Math.PI / 2, emit: 0.85, outline: 0.4 }));
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 2 + ((i + 0.5) / 6) * Math.PI;
+    out.push(part(P.box(0.2, 1.1, 0.08), '#ffd36a', { x: W + Math.cos(a) * 2.05, y: cy + Math.sin(a) * 2.05, z: at(0.08), rz: a - Math.PI / 2, emit: 0.85, outline: 0.4 }));
+  }
+  for (const [y0, y1] of [[0.9, 3.6], [4.0, H - 1.6]]) {
+    out.push(part(P.box(W * 0.62, y1 - y0, 0.1), '#d6d6d6', { x: W * 0.46, y: (y0 + y1) / 2, z: at(0.1), tint: 1, outline: 0.5 }));
+    for (const sx of [0.2, 0.72]) for (const y of [y0 + 0.3, y1 - 0.3]) out.push(part(P.sphere(0.1, 8, 6), '#ffd36a', { x: W * sx, y, z: at(0.18), emit: 0.6 }));
+  }
+  return out;
+}
+
 export default {
   id: 'causeway',
   name: 'The Sky Road',
@@ -324,8 +343,13 @@ export default {
     b.toon('pillar', pillarGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('spire', spireGeo(), { cap: 24, anim: 'popEarly' });
 
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.06 });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: sunLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   obstacles: {

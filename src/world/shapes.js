@@ -168,6 +168,33 @@ export function gateLeafParts(opening, { depth = 0.34, color = '#ffffff', panel 
   return parts;
 }
 
+// A themed door leaf (the door INTO a world, built in its style: see
+// world.door): the slab (left leaf: hinge at local x = 0, spanning to
+// halfW, z centred; tinted per instance with the world's door colour), and
+// whatever the world dresses it with - deco(face) returns the parts for
+// one face, given { W, H, depth, z (that face's surface), f (+1 front, -1
+// back), top(x) (the leaf's top edge at x) }. Both faces are dressed: the
+// right leaf hangs turned about, its back to you.
+export function leafParts(opening, { depth = 0.34, color = '#ffffff', deco } = {}) {
+  const W = opening.halfW - 0.03;
+  const H = opening.rectH;
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.lineTo(W, 0);
+  if (opening.arch) {
+    s.lineTo(W, H + W);
+    s.absarc(W, H, W, Math.PI / 2, Math.PI, false);
+  } else {
+    s.lineTo(W, H);
+    s.lineTo(0, H);
+  }
+  s.closePath();
+  const parts = [part(P.extrude(s, depth, 20), color, { tint: 1 })];
+  const top = (x) => (opening.arch ? H + Math.sqrt(Math.max(0, W * W - (x - W) * (x - W))) : H);
+  if (deco) for (const f of [1, -1]) parts.push(...deco({ W, H, depth, z: (f * depth) / 2, f, top }));
+  return parts;
+}
+
 export function gateTop(opening) {
   return doorTop(opening.halfW, opening.rectH, opening.arch);
 }

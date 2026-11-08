@@ -8,7 +8,8 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 // blue tunnel, a white-hot core blazing where they all come from; then they
 // drop out of it: the streaks snap back into points, a flash rings out
 // across the screen, and there they are, running on the red dust under the
-// planets. About a second and a quarter in all.
+// planets. About a second and a half in all - the streaks racing faster
+// and faster the whole time it holds, the tunnel turning round them.
 //
 // The runner is left out of the smear (and the streaks thin round them):
 // it's the universe that's moving, not them, and the road stays readable.
@@ -16,7 +17,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 // Like the splash, it's drawn over the finished frame (copied into a
 // texture) in one full-screen pass, only while it runs.
 
-export const WARP_TIME = 1.25;
+export const WARP_TIME = 1.5;
 
 const VS = /* glsl */ `
 varying vec2 vUv;
@@ -50,17 +51,18 @@ vec3 streakColor(float h) {
 void main() {
   float aspect = uRes.x / uRes.y;
   float t = uT;
-  // how far in: the jump takes hold fast, holds, and drops out
-  float I = smoothstep(0.0, 0.1, t) * (1.0 - smoothstep(0.74, 0.92, t));
+  // how far in: the jump takes hold at once, holds, and drops out
+  float I = smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(1.0, 1.16, t));
   // how long the streaks are: they stretch as it takes hold and snap back
   // to points as it drops out
-  float S = smoothstep(0.02, 0.2, t) * (1.0 - smoothstep(0.7, 0.82, t));
-  float flash = exp(-pow((t - 0.8) / 0.045, 2.0));
-  float settle = 1.0 - smoothstep(0.85, 1.25, t);
+  float S = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.96, 1.07, t));
+  float flash = exp(-pow((t - 1.05) / 0.045, 2.0));
+  float settle = 1.0 - smoothstep(1.1, 1.5, t);
 
   vec2 q = (vUv - uVP) * vec2(aspect, 1.0);
   float r = length(q);
-  float th = atan(q.y, q.x);
+  // (the tunnel turns as it goes)
+  float th = atan(q.y, q.x) + t * t * 0.5 * I;
 
   // the runner, kept clear of it all
   vec2 rq = (vUv - uRunner.xy) * vec2(aspect, 1.0) / vec2(uRunner.z * 0.34, uRunner.z * 0.56);
@@ -68,7 +70,7 @@ void main() {
 
   // the world, smeared out toward the point it's all pouring from
   vec2 dir = uVP - vUv;
-  float k = 0.24 * I * S * (1.0 - keep);
+  float k = 0.34 * I * S * (1.0 - keep);
   vec3 acc = vec3(0.0);
   for (int i = 0; i < 10; i++) {
     float s = float(i) / 9.0;
@@ -84,23 +86,24 @@ void main() {
   vec3 st = vec3(0.0);
   for (int L = 0; L < 3; L++) {
     float fl = float(L);
-    float N = L == 0 ? 70.0 : L == 1 ? 140.0 : 260.0;
+    float N = L == 0 ? 90.0 : L == 1 ? 180.0 : 340.0;
     float a = (th / 6.2831853 + 0.5) * N;
     float i = floor(a);
     float f = fract(a);
     float hA = h1(i + fl * 1013.0);
     float hB = h1(i * 1.71 + 3.1 + fl * 1013.0);
     float hC = h1(i * 2.37 + 7.3 + fl * 1013.0);
-    if (hA < 0.28) continue;
+    if (hA < 0.16) continue;
     // across: how far this pixel is from the ray (in screen heights)
     float c0 = 0.2 + 0.6 * hA;
     float dAcross = abs(f - c0) / N * 6.2831853 * r;
     // along: its head flies outward, faster the further out (in log space,
-    // like something rushing past), its tail trailing behind it
-    float spd = (0.55 + 1.1 * hB) * (1.2 + 0.45 * fl);
-    float u = fract(hB * 7.31 + hC * 3.7 + t * spd);
-    float head = exp(mix(log(0.025), log(1.7), u));
-    float len = head * (0.04 + 0.92 * S) * (0.35 + 0.65 * hC);
+    // like something rushing past), faster and faster as the jump holds,
+    // its tail trailing behind it
+    float spd = (1.0 + 1.8 * hB) * (1.7 + 0.6 * fl);
+    float u = fract(hB * 7.31 + hC * 3.7 + t * spd * (1.0 + 0.9 * t));
+    float head = exp(mix(log(0.02), log(1.8), u));
+    float len = head * (0.05 + 1.2 * S) * (0.4 + 0.6 * hC);
     float tail = clamp((r - (head - len)) / max(len, 1e-4), 0.0, 1.0);
     float along = step(head - len, r) * (1.0 - smoothstep(head, head + 0.006 + 0.01 * head, r));
     float w = (0.9 + 2.6 * head) / 900.0 * (L == 0 ? 1.7 : 1.0);
@@ -110,16 +113,16 @@ void main() {
     st += streakColor(hC) * (line + glow * 0.25) * along * b;
   }
   st *= max(I, 0.0) * (1.0 - 0.75 * keep);
-  c += st * 1.35;
+  c += st * 1.5;
 
   // the white-hot core they all pour out of
   c += vec3(0.75, 0.88, 1.0) * (exp(-r * 16.0) * 1.6 + exp(-r * 4.0) * 0.28) * I;
   // dropping out: a flash, and a ring of light racing out across the screen
-  float ringR = smoothstep(0.76, 1.0, t) * 1.8;
-  float ring = exp(-pow((r - ringR) / 0.06, 2.0)) * (1.0 - smoothstep(0.86, 1.05, t)) * step(0.76, t);
-  c += vec3(0.8, 0.9, 1.0) * (flash * 0.55 + ring * 0.5);
+  float ringR = smoothstep(1.0, 1.22, t) * 1.8;
+  float ring = exp(-pow((r - ringR) / 0.06, 2.0)) * (1.0 - smoothstep(1.1, 1.28, t)) * step(1.0, t);
+  c += vec3(0.8, 0.9, 1.0) * (flash * 0.38 + ring * 0.5);
   // and a faint blue afterglow that lets go of the picture
-  c = mix(c, c + vec3(0.02, 0.05, 0.12), settle * (1.0 - I) * step(0.8, t) * 0.8);
+  c = mix(c, c + vec3(0.02, 0.05, 0.12), settle * (1.0 - I) * step(1.05, t) * 0.8);
   gl_FragColor = vec4(c, 1.0);
 }
 `;

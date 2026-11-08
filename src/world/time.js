@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, cloudParts, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
+import { P, part, merge, cloudParts, gateFrameParts, gateTop, leafParts } from './shapes.js';
 import { crystal, metal, crystalPoint, nugget, octahedron, blade, FACE } from './gems.js';
 import { CONFIG } from '../config.js';
 
@@ -498,6 +498,43 @@ function gateGeo(opening, depth) {
 const OPENING = { halfW: 4.5, rectH: 7.2, arch: true };
 const GATE_DEPTH = 1.6;
 
+// The door into the Gallery of Hours: half of a great clock face on each
+// leaf, meeting in the middle - ivory, ringed in brass, its hours marked -
+// and a brass gear turning below it.
+function clockLeaf({ W, H, z, f }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  const cy = H * 0.62;
+  const R = 2.1;
+  out.push(part(P.cyl(R, R, 0.08, 24, 1, false, Math.PI, Math.PI), '#fff8e6', { x: W, y: cy, z: at(0.08), rx: Math.PI / 2, outline: 0.4 }));
+  out.push(part(P.torus(R + 0.08, 0.1, 6, 24, Math.PI), '#d8a24a', { x: W, y: cy, z: at(0.18), rz: Math.PI / 2 }));
+  for (let i = 0; i <= 6; i++) {
+    const a = Math.PI / 2 + (i / 6) * Math.PI;
+    const big = i % 3 === 0;
+    const len = big ? 0.5 : 0.28;
+    out.push(part(P.box(big ? 0.14 : 0.08, len, 0.06), '#3a2a1c', { x: W + Math.cos(a) * (R - 0.3 - len / 2), y: cy + Math.sin(a) * (R - 0.3 - len / 2), z: at(0.14), rz: a - Math.PI / 2, outline: 0 }));
+  }
+  const gx = W * 0.36;
+  const gy = 1.5;
+  out.push(part(P.torus(0.62, 0.14, 6, 20), '#d8a24a', { x: gx, y: gy, z: at(0.18) }));
+  out.push(part(P.cyl(0.18, 0.18, 0.16, 10), '#d8a24a', { x: gx, y: gy, z: at(0.16), rx: Math.PI / 2 }));
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    out.push(part(P.box(0.2, 0.26, 0.16), '#d8a24a', { x: gx + Math.cos(a) * 0.82, y: gy + Math.sin(a) * 0.82, z: at(0.16), rz: a - Math.PI / 2, outline: 0.4 }));
+  }
+  return out;
+}
+
+// A batch of a clock's two hands (the minute hand, then the hour hand,
+// marked role 1), turning - wonky as time comes unstuck.
+function handsBatch(b) {
+  return (name, [len, w, z], [hLen, hW, hZ], o) => {
+    const hour = merge(handParts({ len: hLen, w: hW, z: hZ }));
+    hour.setAttribute('role', new THREE.BufferAttribute(new Float32Array(hour.attributes.position.count).fill(1), 1));
+    b.toon(name, merge([...handParts({ len, w, z }), hour]), { ink: 0.03, wonky: true, ...o, turn: [-0.6, 0, 0, 0] });
+  };
+}
+
 export default {
   id: 'time',
   name: 'The Gallery of Hours',
@@ -578,11 +615,7 @@ export default {
     // further you run (wonky: see WONKY in the shaders)
     // (a clock's two hands are one batch: the minute hand, then the hour hand
     // marked with role 1, which turns at its own, slower pace)
-    const hands = (name, [len, w, z], [hLen, hW, hZ], o) => {
-      const hour = merge(handParts({ len: hLen, w: hW, z: hZ }));
-      hour.setAttribute('role', new THREE.BufferAttribute(new Float32Array(hour.attributes.position.count).fill(1), 1));
-      b.toon(name, merge([...handParts({ len, w, z }), hour]), { ink: 0.03, wonky: true, ...o, turn: [-0.6, 0, 0, 0] });
-    };
+    const hands = handsBatch(b);
     const SKY = { anim: 'liftFar', wobble: [0, 0.8, 0.25, 0] };
     const WATCH = { anim: 'liftFar', wobble: [0, 0.6, 0.4, 0] };
     const HG = (z, period) => [period, HG_WAIST, z, HG_WAIST - HG_FLOOR];
@@ -628,13 +661,18 @@ export default {
     b.glass('hourglassGlass', hourglassGlassGeo(), { cap: 24, anim: 'popEarly', sand: HG(-0.8, 6) });
     b.toon('weight', weightGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
 
-    b.toon('gateFrame', gateGeo(OPENING, GATE_DEPTH), { cap: 2, stencil: false, ink: 0.06 });
-    hands('gateHands', [2.4, 0.16, 0.08], [1.6, 0.22, 0.16], { cap: 2, stencil: false });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff', knob: C.brassHi })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   // (the hands of the clock over the doorway out, at its centre)
   gateExtras: [['gateHands', 0, gateTop(OPENING) + 3.3, -(GATE_DEPTH / 2 + 0.25)]],
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
+    b.toon('gateFrame', gateGeo(OPENING, GATE_DEPTH), { cap: 2, stencil: false, ink: 0.06 });
+    handsBatch(b)('gateHands', [2.4, 0.16, 0.08], [1.6, 0.22, 0.16], { cap: 2, stencil: false });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: clockLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+  },
 
   obstacles: {
     L: [{ name: 'fallenHand', len: 0.6 }, { name: 'dialSection', len: 0.45 }],

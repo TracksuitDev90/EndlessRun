@@ -307,7 +307,7 @@ export class GemField {
     const trail = r.chance(C.doorTrail);
     const n = 4;
     const first = door.d - 2.4 - (n - 1) * sp;
-    const far = door.d + door.from.world.def.gate.depth + 2.4;
+    const far = door.d + door.to.world.def.gate.depth + 2.4;
     this.route(this.lane, 1, first, v, diff);
     this.cruise(this.cursor, trail ? first - sp : door.d - v * 1.2, v, diff, sp, trail);
     if (trail) {
@@ -341,7 +341,7 @@ export class GemField {
       }
     }
     const b = this.game.course.boundaryAfter(d - 4);
-    return !(b && d > b.d - 1.4 && d < b.d + b.from.world.def.gate.depth + 1.4);
+    return !(b && d > b.d - 1.4 && d < b.d + b.to.world.def.gate.depth + 1.4);
   }
 
   // Lay one gem, continuing the current run if it's close enough (or join).

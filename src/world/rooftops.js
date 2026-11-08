@@ -1,6 +1,6 @@
 import {
   P, part, merge, mix, scaleColor,
-  roundTreeParts, lanternPostParts, gateFrameParts, gateLeafParts, gateTop,
+  roundTreeParts, lanternPostParts, gateFrameParts, gateTop, leafParts,
 } from './shapes.js';
 import { skyLanternParts, balloonParts, lampConeParts } from './whimsy.js';
 import { crystal, topazPrism, nugget, cube, point } from './gems.js';
@@ -400,6 +400,34 @@ function gateGeo() {
   return merge(parts);
 }
 
+// The door into the Night Rooftops: the night sky on it - a crescent moon
+// glowing gold high up, stars strewn round it, and a row of little lit
+// windows, as if the city were already showing through.
+function nightLeaf({ W, H, z, f }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  const mx = W * 0.55;
+  const my = H - 1.6;
+  out.push(part(P.cyl(0.95, 0.95, 0.06, 24), '#ffe08a', { x: mx, y: my, z: at(0.06), rx: Math.PI / 2, emit: 1, outline: 0.4 }));
+  out.push(part(P.cyl(0.82, 0.82, 0.06, 24), '#bdbdbd', { x: mx + 0.42, y: my + 0.24, z: at(0.12), rx: Math.PI / 2, tint: 1, outline: 0 }));
+  const stars = [[0.25, 0.92], [0.78, 0.86], [0.2, 0.7], [0.62, 0.74], [0.85, 0.62], [0.35, 0.56], [0.7, 0.5]];
+  for (const [sx, sy] of stars) {
+    const s = 0.22 + 0.12 * ((sx * 7) % 1);
+    for (const r of [Math.PI / 4, -Math.PI / 4]) out.push(part(P.box(s * 1.6, 0.07, 0.05), '#fff2b0', { x: W * sx, y: H * sy, z: at(0.05), rz: r, emit: 1, outline: 0 }));
+  }
+  const lit = ['#ffd27a', '#ffb860', '#ffe9a8', '#ffc870'];
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < 3; c++) {
+      const wx = W * (0.24 + 0.27 * c);
+      const wy = 1.7 + r * 1.3;
+      out.push(part(P.box(0.62, 0.86, 0.06), '#20283a', { x: wx, y: wy, z: at(0.06), outline: 0.4 }));
+      out.push(part(P.box(0.48, 0.72, 0.08), lit[(r * 3 + c) % 4], { x: wx, y: wy, z: at(0.08), emit: (r + c) % 3 ? 1 : 0, outline: 0 }));
+    }
+  }
+  out.push(part(P.sphere(0.15, 10, 8), '#e8c35a', { x: W - 0.5, y: 4.6, z: at(0.22) }));
+  return out;
+}
+
 export default {
   id: 'rooftops',
   name: 'The Night Rooftops',
@@ -485,8 +513,13 @@ export default {
     b.toon('waterTank', waterTankGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('shed', shedGeo(), { cap: 24, anim: 'popEarly' });
 
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.06 });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: nightLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   obstacles: {

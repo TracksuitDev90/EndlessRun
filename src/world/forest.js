@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, moved, rod, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
+import { P, part, merge, moved, rod, gateFrameParts, gateTop, leafParts } from './shapes.js';
 import { shaftParts } from './whimsy.js';
 import { crystal, stone, crystalPoint, rough, nugget, octahedron } from './gems.js';
 import { groundStrip } from '../render/geo.js';
@@ -738,6 +738,36 @@ function gateGeo() {
   return merge(parts);
 }
 
+// The door into the Deepwood: a great tree carved in relief, its roots
+// spreading over the foot of the door and moss grown over them, its crown
+// of leaves up under the arch, a mushroom or two glowing in the moss.
+function woodLeaf({ W, H, z, f, top }) {
+  const out = [];
+  const x = W * 0.52;
+  const at = (t) => z + (f * t) / 2;
+  out.push(part(P.cyl(0.26, 0.42, H * 0.82, 7), '#5a3a22', { x, y: H * 0.41, z: at(0.1), sz: 0.35 }));
+  const tips = [];
+  for (let i = 0; i < 5; i++) {
+    const y0 = H * (0.45 + 0.09 * i);
+    const s = i % 2 ? 1 : -1;
+    const x1 = Math.min(W - 0.35, Math.max(0.35, x + s * (0.9 + 0.35 * i)));
+    const y1 = Math.min(top(x1) - 0.6, y0 + 1.1 + 0.25 * i);
+    rod(out, [x, y0, at(0.12)], [x1, y1, at(0.12)], 0.09, '#5a3a22', 0.4);
+    tips.push([x1, y1]);
+  }
+  tips.push([x, Math.min(top(x) - 0.7, H * 0.82 + 1.2)]);
+  for (const [tx, ty] of tips) {
+    for (let k = 0; k < 3; k++) out.push(part(P.sphere(0.36 + 0.08 * k, 8, 6), null, { x: tx + (k - 1) * 0.3, y: ty + (k % 2) * 0.22, z: at(0.18), sz: 0.4, grad: ['#2f6a24', '#8fc23a', ty - 0.4, ty + 0.5], mark: 0.85 }));
+  }
+  for (const s of [-1, 1]) rod(out, [x, 0.9, at(0.1)], [x + s * 1.3, 0.15, at(0.1)], 0.1, '#5a3a22', 0.4);
+  for (let i = 0; i < 7; i++) out.push(part(P.sphere(0.32 + (i % 3) * 0.08, 8, 6), null, { x: 0.35 + i * (W - 0.7) / 6, y: 0.22, z: at(0.2), sy: 0.6, sz: 0.5, grad: ['#3f7a2a', '#a8d83a', 0, 0.5], mark: 0.85 }));
+  for (const [mx, c] of [[W * 0.22, '#ffe7a0'], [W * 0.8, '#b8f0ff']]) {
+    out.push(part(P.cyl(0.04, 0.05, 0.3, 5), '#e8e0cc', { x: mx, y: 0.5, z: at(0.3), outline: 0 }));
+    out.push(part(P.sphere(0.16, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), c, { x: mx, y: 0.64, z: at(0.3), emit: 0.9 }));
+  }
+  return out;
+}
+
 export default {
   id: 'forest',
   name: 'The Deepwood',
@@ -891,8 +921,13 @@ export default {
     b.toon('shrineRock', shrineRockGeo(), { cap: 24, anim: 'popEarly', marks: [1.4, 1.4] });
 
     // threshold
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, marks: [1, 1], ink: 0.06, bark: true });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: woodLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   obstacles: {

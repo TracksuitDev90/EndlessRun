@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, rgb, rockParts, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
+import { P, part, merge, rgb, rockParts, gateFrameParts, gateTop, leafParts } from './shapes.js';
 import { crystal, crystalPoint, nugget, lumps, bipyramid } from './gems.js';
 import { CONFIG } from '../config.js';
 
@@ -453,6 +453,39 @@ function gateGeo() {
   return merge(parts);
 }
 
+// The door into the Red Drift: an airlock hatch - riveted plates, a great
+// round porthole across the two leaves (half on each) full of stars with a
+// little ringed planet in it, hazard stripes
+// along its foot, a violet strip light glowing down its meeting edge.
+function hatchLeaf({ W, H, z, f }) {
+  // (f: the planet's on the front of the left leaf only, so it isn't there
+  // twice once the right leaf hangs turned about)
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  for (const y of [H * 0.33, H * 0.66]) out.push(part(P.box(W - 0.2, 0.08, 0.05), '#8a8a8a', { x: W / 2, y, z: at(0.05), tint: 1, outline: 0 }));
+  out.push(part(P.box(0.08, H - 0.4, 0.05), '#8a8a8a', { x: W * 0.5, y: H / 2, z: at(0.05), tint: 1, outline: 0 }));
+  for (const y of [H * 0.33, H * 0.66]) {
+    for (let i = 0; i < 7; i++) out.push(part(P.sphere(0.06, 6, 5), '#e2e6f0', { x: 0.3 + (i * (W - 0.6)) / 6, y: y + 0.17, z: at(0.06), outline: 0 }));
+  }
+  const px = W;
+  const py = H + 1.2;
+  const R = 1.35;
+  out.push(part(P.torus(R + 0.05, 0.2, 7, 18, Math.PI), '#c3cbe0', { x: px, y: py, z: at(0.24), rz: Math.PI / 2 }));
+  out.push(part(P.cyl(R, R, 0.05, 16, 1, false, Math.PI, Math.PI), '#0c0a2a', { x: px, y: py, z: at(0.05), rx: Math.PI / 2, emit: 1, outline: 0 }));
+  const dots = [[-0.4, 0.3], [-0.95, 0.45], [-0.5, -0.2], [-0.2, -0.75], [-0.15, 0.95], [-1.05, -0.3], [-0.7, -0.75]];
+  for (const [dx, dy] of dots) out.push(part(P.sphere(0.04, 5, 4), '#ffffff', { x: px + dx, y: py + dy, z: at(0.1), emit: 1, outline: 0 }));
+  if (f > 0) {
+    out.push(part(P.sphere(0.3, 10, 8), '#ffb08a', { x: px - 0.62, y: py + 0.1, z: at(0.14), emit: 0.9, outline: 0 }));
+    out.push(part(P.torus(0.52, 0.04, 4, 18), '#f0d8ff', { x: px - 0.62, y: py + 0.1, z: at(0.16), rz: 0.4, sy: 0.35, emit: 0.9, outline: 0 }));
+  }
+  for (let i = 0; i < 7; i++) {
+    out.push(part(P.box(0.3, 0.62, 0.06), i % 2 ? '#26222e' : '#ffcf3a', { x: 0.45 + i * ((W - 0.9) / 6), y: 0.55, z: at(0.06), rz: 0.55, outline: 0 }));
+  }
+  out.push(part(P.box(W - 0.2, 0.08, 0.08), '#26222e', { x: W / 2, y: 0.95, z: at(0.08), outline: 0 }));
+  out.push(part(P.box(0.1, H - 0.6, 0.07), '#b89cff', { x: W - 0.2, y: H / 2, z: at(0.07), emit: 1, outline: 0 }));
+  return out;
+}
+
 export default {
   id: 'space',
   name: 'The Red Drift',
@@ -460,9 +493,14 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   // low gravity (see game/drift.js), and more open road after the doorway
-  // in (the jump to light speed has the screen a second and more)
+  // in (seconds of running: the jump to light speed has the screen a second
+  // and a half, then a moment to find your feet)
   lowGravity: true,
-  clearAfter: 72,
+  clearAfter: 4.5,
+  // and a breather, gentler still than the Cypress Lane: laid at less of
+  // the run's difficulty, further apart, only the simplest patterns, lone
+  // obstacles most of all (see CONFIG.obstacles.calm) - room to fly
+  calm: { diff: 0.42, space: 1.3, most: 0.25, lone: 2.2 },
   gateExtras: [['gateOrbit', 0, gateTop(OPENING) + 1.4, 0]],
   env: {
     // through its doorway: the jump to light speed (see game/warp.js)
@@ -486,6 +524,9 @@ export default {
     fog: [90, 240],
     ground: ['#a8442a', '#d9805a', '#4a1e1e'],
     shadowDecal: [0.42, 0.28, 0.46],
+    // the dust kicked up is red (how much it's paled toward cream: 0.62
+    // anywhere else)
+    dustPale: 0.16,
     cast: [-0.45, -0.5],
     glowGain: 1.1,
     pool: '#9a7aff',
@@ -579,8 +620,13 @@ export default {
     b.toon('pillarB', pillarGeo(12), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
     b.toon('spire', spireGeo(7), { cap: 24, anim: 'popEarly', ink: 0.045 });
 
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.06, marks: [3, 3] });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff', knob: C.gold })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: hatchLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
     b.toon('gateOrbit', gateOrbitGeo(7, 2.2), { cap: 2, stencil: false, ink: 0.04, turn: [0.35, 0, 0, 0] });
   },
 

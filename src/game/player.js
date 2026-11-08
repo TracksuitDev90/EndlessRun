@@ -153,6 +153,9 @@ export function hermite(ts, vs, m0, m1, t) {
   return (2 * u3 - 3 * u2 + 1) * vs[i] + (u3 - 2 * u2 + u) * a + (-2 * u3 + 3 * u2) * vs[i + 1] + (u3 - u2) * b;
 }
 
+// where a flying runner's middle is (root space), to roll and somersault
+// about (see place)
+const SPIN_PIVOT = new THREE.Vector3(0, 0.68, -0.4);
 const _hips = new THREE.Matrix4();
 const _hipsInv = new THREE.Matrix4();
 const _eul = new THREE.Euler();
@@ -417,6 +420,11 @@ export class Player {
     this.jetDown = 0;
     this.boosted = 0;
     this.flyW = 0;
+    this.flyStyle = 'jet';
+    this.spinP = 0;
+    this.spinX = 0;
+    this.spinZ = 0;
+    this.spinDir = 1;
     this.resetSim();
   }
 
@@ -488,6 +496,14 @@ export class Player {
     this.thrust = 1;
     this.spurtT = 0.32;
     this.boosted++;
+    // how they fly this time (never the same way twice running)
+    const S = CONFIG.drift.styles;
+    let k;
+    do k = S[Math.floor(Math.random() * S.length)];
+    while (k === this.flyStyle && S.length > 1);
+    this.flyStyle = k;
+    this.spinP = 0;
+    this.spinDir = Math.random() < 0.5 ? -1 : 1;
   }
 
   // The thruster again, while the boost hangs: a lift from wherever they are.
@@ -598,8 +614,10 @@ export class Player {
         this.spurtT = 0.2 + 0.16 * r();
       }
     }
+    // (reaching ahead with one fist, the jet comes from the other hand)
+    const oneHand = this.flyStyle === 'reach' && this.flyW > 0.5 && !down;
     for (let i = 0; i < n; i++) {
-      const hand = this.b[i % 2 ? 'handR' : 'handL'];
+      const hand = this.b[i % 2 && !oneHand ? 'handR' : 'handL'];
       _v.setFromMatrixPosition(hand.matrixWorld);
       _v.x += (r() - 0.5) * 0.06;
       // (it keeps most of their own speed: a jet cone close behind them, not
@@ -618,14 +636,25 @@ export class Player {
     }
   }
 
-  // Flying: hurled along on the boost, the body tips forward into it, the
-  // legs trail and the arms sweep back, hands at the hips (where the jet
-  // comes from) - laid over their own jump, so it's still theirs.
+  // Flying: hurled along on the boost, the body tips forward into it, legs
+  // trailing - laid over their own jump, so it's still theirs - in one of
+  // a few ways, dealt fresh for every boost (CONFIG.drift.styles):
+  //   - jet: arms swept back, the hands at the hips, where the jet of
+  //     vapour drives back from them;
+  //   - reach: one fist thrust out ahead, the other hand back at the hip
+  //     on the jet;
+  //   - starfish: belly down like a skydiver, arms and legs flung wide,
+  //     rocking gently;
+  //   - roll: the jet, and over the top a barrel roll about the line of
+  //     flight;
+  //   - flip: the jet, and over the top a slow somersault, tucked tight
+  //     through it and stretching out of it.
   flyOverlay(Pz, w, t) {
     const f = this.pFly || (this.pFly = new Float32Array(N));
     f.set(Pz);
     const k = w * 0.85;
     const bob = Math.sin(t * 2.3);
+    const st = this.flyStyle;
     // (tipped about the feet, so the body is set back and lifted to keep
     // the hips over where they were)
     f[C.bodyPitch] = -1.02 + 0.04 * bob;
@@ -652,7 +681,77 @@ export class Player {
     f[C.elR] = 0.3;
     f[C.wrL] = -0.25;
     f[C.wrR] = -0.25;
+    if (st === 'reach') {
+      // one fist out ahead along the line of flight
+      f[C.shRx] = 2.75 + 0.05 * bob;
+      f[C.shRz] = 0.12;
+      f[C.elR] = 0.08;
+      f[C.wrR] = 0;
+      f[C.clR] = 0.25;
+      f[C.chTwist] = -0.12;
+      f[C.knR] = 0.7;
+      f[C.hdPitch] = 1.02;
+    } else if (st === 'starfish') {
+      // spread-eagled, belly to the dust, rocking
+      const rock = Math.sin(t * 1.6);
+      f[C.bodyPitch] = -1.28 + 0.04 * bob;
+      f[C.bodyZ] = 0.72;
+      f[C.bodyRoll] = 0.14 * rock;
+      f[C.hipY] = this.HIP_Y + 0.42;
+      f[C.hdPitch] = 1.15;
+      f[C.shLx] = 0.55 + 0.1 * rock;
+      f[C.shRx] = 0.55 - 0.1 * rock;
+      f[C.shLz] = 1.35;
+      f[C.shRz] = 1.35;
+      f[C.elL] = 0.35;
+      f[C.elR] = 0.35;
+      f[C.wrL] = 0.1;
+      f[C.wrR] = 0.1;
+      f[C.thLx] = -0.05;
+      f[C.thRx] = -0.05;
+      f[C.thLz] = 0.42 + 0.05 * rock;
+      f[C.thRz] = 0.42 - 0.05 * rock;
+      f[C.knL] = 0.45;
+      f[C.knR] = 0.45;
+    } else if (st === 'flip') {
+      // tucked tight through the somersault
+      const tuck = Math.sin(Math.PI * this.spinP);
+      const g = this.pTuck || (this.pTuck = new Float32Array(N));
+      g.set(f);
+      g[C.thLx] = 1.5;
+      g[C.thRx] = 1.5;
+      g[C.knL] = 2.0;
+      g[C.knR] = 2.0;
+      g[C.shLx] = 0.9;
+      g[C.shRx] = 0.9;
+      g[C.shLz] = 0.25;
+      g[C.shRz] = 0.25;
+      g[C.elL] = 1.7;
+      g[C.elR] = 1.7;
+      g[C.spLean] = 0.5;
+      g[C.hdPitch] = 0.6;
+      for (let i = 0; i < N; i++) f[i] += (g[i] - f[i]) * tuck;
+    }
     for (let i = 0; i < N; i++) Pz[i] += (f[i] - Pz[i]) * k;
+  }
+
+  // The spinning styles (roll, flip): over the top of the boost the whole
+  // runner turns once round - about the line of flight, or head over heels
+  // - eased in and out; cut short (they land, or drive themselves down),
+  // it whips round to finish. Turned about their middle (see place).
+  spinStep(dt) {
+    const sp = this.flyStyle === 'roll' || this.flyStyle === 'flip';
+    const [a, b] = CONFIG.drift.spin;
+    if (sp && this.spinP < 1) {
+      const flying = this.drift && !this.grounded && !this.crashed;
+      if (this.spinP > 0 && (!flying || this.vy < -CONFIG.drift.boost.hover * 1.5)) this.spinP = Math.min(1, this.spinP + dt / 0.22);
+      else if (flying && this.boostT >= a) this.spinP = Math.min(1, this.spinP + dt / (b - a));
+    }
+    const u = this.spinP;
+    const e = u * u * (3 - 2 * u);
+    const turn = u > 0 && u < 1 ? e * Math.PI * 2 : 0;
+    this.spinX = this.flyStyle === 'flip' ? -turn : 0;
+    this.spinZ = this.flyStyle === 'roll' ? turn * this.spinDir : 0;
   }
 
   // hooks for a character's flourishes
@@ -1053,6 +1152,10 @@ export class Player {
     const lean = clamp(-this.vx * L[0], -L[1], L[1]);
     this.root.rotation.z = D.rootRoll.step(this.crashed ? 0 : lean, 2.4, 0.45, dt);
     this.root.rotation.y = D.rootYaw.step(this.crashed ? 0 : clamp(-this.vx * T[0], -T[1], T[1]), 2.8, 0.5, dt);
+    // (a flying style's roll or somersault)
+    this.spinStep(dt);
+    this.root.rotation.x = this.spinX;
+    this.root.rotation.z += this.spinZ;
 
     this.secondary(dt, sp);
     if (this.lowG || this.thrust > 0 || this.drift) this.jet(dt);
@@ -1490,6 +1593,12 @@ export class Player {
   // (the track coordinate behind the floating origin).
   place(z) {
     this.root.position.set(this.x, this.y, z);
+    if (this.spinX !== 0 || this.spinZ !== 0) {
+      // a roll or a somersault turns about their middle, not their feet
+      _q.setFromEuler(_eul.set(this.spinX, 0, this.spinZ));
+      _v2.copy(SPIN_PIVOT).applyQuaternion(_q);
+      this.root.position.add(_v.copy(SPIN_PIVOT).sub(_v2));
+    }
     const h = Math.max(0, this.y - (this.groundY || 0));
     const s = Math.max(0.35, 1 - h * 0.25);
     this.shadow.position.set(this.x, 0.04 + (this.groundY || 0), z + 0.05);

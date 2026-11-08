@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, rockParts, gateFrameParts, gateLeafParts, gateTop } from './shapes.js';
+import { P, part, merge, rockParts, gateFrameParts, gateTop, leafParts } from './shapes.js';
 import { crystal, stone, crystalPoint, nugget, lumps, point, hexPrism, rough } from './gems.js';
 import { CONFIG } from '../config.js';
 
@@ -557,6 +557,29 @@ const GATE_DEPTH = 1.8;
 const ROCK = [0.75, 0.55, 0.5];
 const FINE = [1, 0.65, 1];
 
+// The door into Hell: charred black plates, the red showing through
+// between them glowing like the seams of a lava crust, banded with iron
+// and spiked.
+function hellLeaf({ W, H, z, f }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  const cols = [0.25, W / 2 + 0.06];
+  const cw = W / 2 - 0.36;
+  const rowsY = [0.3, H * 0.36, H * 0.7];
+  const rh = H * 0.32;
+  for (const x of cols) for (const y of rowsY) out.push(part(P.box(cw, rh, 0.08), '#221a18', { x: x + cw / 2, y: y + rh / 2, z: at(0.08), outline: 0.4 }));
+  out.push(part(P.box(0.06, H - 0.4, 0.05), '#ff8a2a', { x: W / 2, y: H / 2, z: at(0.05), emit: 1, outline: 0 }));
+  for (const y of [H * 0.35, H * 0.69]) out.push(part(P.box(W - 0.3, 0.06, 0.05), '#ff8a2a', { x: W / 2, y, z: at(0.05), emit: 1, outline: 0 }));
+  for (const y of [1.2, H * 0.52, H - 0.3]) {
+    out.push(part(P.box(W - 0.1, 0.34, 0.14), '#3a2e2a', { x: W / 2, y, z: at(0.14) }));
+    for (let i = 0; i < 6; i++) {
+      const x = 0.4 + (i * (W - 0.8)) / 5;
+      out.push(part(P.cone(0.1, 0.36, 5), '#4a3c36', { x, y, z: at(0.14) + f * 0.2, rx: (f * Math.PI) / 2 }));
+    }
+  }
+  return out;
+}
+
 export default {
   id: 'hell',
   name: 'Hell',
@@ -658,8 +681,13 @@ export default {
     b.toon('basalt', columnsGeo({ n: 5, r: 0.36, hMin: 2.2, hMax: 3.8, spread: 0.55, seed: 2 }).translate(0, 0, -0.75), { cap: 24, anim: 'popEarly', ink: 0.045, crust: FINE });
     b.toon('obsidian', obsidianGeo(5), { cap: 24, anim: 'popEarly', ink: 0.04, crust: FINE });
 
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(OPENING, GATE_DEPTH), { cap: 2, stencil: false, ink: 0.06, crust: ROCK });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff', knob: '#c8361a' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: hellLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   obstacles: {

@@ -57,11 +57,17 @@ export const CONFIG = {
   // of their weight the runner's cape, hair and beard keep. Obstacles in
   // that world come up `pace.space` times further apart, and never closer
   // than `pace.air` times the usual gap after one you have to jump or duck.
+  // So about 2 s in the air and 2.7 m up at the top. While they hang they
+  // fly in one of the `styles` (see Player.flyOverlay), dealt so the same
+  // one never comes twice running; a spinning one turns over `spin` [from,
+  // to] seconds into the boost.
   drift: {
-    boost: { v0: 11, up: 30, hover: 2.0, hang: 6.5, down: 16, rethrust: 1, again: 5.5 },
+    boost: { v0: 11, up: 30, hover: 2.2, hang: 3.2, down: 15, rethrust: 1, again: 6.5 },
     bound: { v0: 3.2, g: 13, steps: [2, 4] },
     gk: 0.32,
-    pace: { space: 1.12, air: 1.4 },
+    pace: { space: 1.12, air: 1.95 },
+    styles: ['jet', 'reach', 'starfish', 'roll', 'flip'],
+    spin: [0.62, 1.5],
   },
   slide: { time: 0.72 },
   // Rendered figure for the obstacle kinds (see obstacles.js): H obstacles hang

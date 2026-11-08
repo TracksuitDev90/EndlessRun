@@ -1,6 +1,6 @@
 import {
   P, part, merge, mix,
-  cypressParts, roundTreeParts, bushParts, lanternPostParts, potParts, gateFrameParts, gateLeafParts, gateTop,
+  cypressParts, roundTreeParts, bushParts, lanternPostParts, potParts, gateFrameParts, gateTop, leafParts,
 } from './shapes.js';
 import { shaftParts, giantFlowerParts } from './whimsy.js';
 import { crystal, stone, barrel, nugget, blade, lumps, rough } from './gems.js';
@@ -243,6 +243,36 @@ function gateGeo() {
   return merge(parts);
 }
 
+// The door into the Cypress Lane: a cottage door - planks, iron strap
+// hinges, a round window glowing warm high up across the two leaves (half
+// on each) with a flower box under it, and a brass ring to pull.
+function laneLeaf({ W, H, z, f, top }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  for (let x = 0.76; x < W - 0.2; x += 0.76) {
+    const h = top(x) - 0.2;
+    out.push(part(P.box(0.07, h, 0.04), '#9a9a9a', { x, y: h / 2, z: at(0.04), tint: 1, outline: 0 }));
+  }
+  for (const y of [1.5, H - 0.5]) {
+    out.push(part(P.box(W * 0.72, 0.22, 0.06), '#2e2a26', { x: W * 0.36, y, z: at(0.06), outline: 0.5 }));
+    out.push(part(P.cyl(0.2, 0.2, 0.06, 12), '#2e2a26', { x: W * 0.72, y, z: at(0.06), rx: Math.PI / 2, outline: 0.5 }));
+  }
+  const wy = H + 1.7;
+  const R = 1.25;
+  out.push(part(P.torus(R + 0.06, 0.14, 6, 18, Math.PI), '#f4ead2', { x: W, y: wy, z: at(0.18), rz: Math.PI / 2 }));
+  out.push(part(P.cyl(R, R, 0.05, 16, 1, false, Math.PI, Math.PI), '#ffd98a', { x: W, y: wy, z: at(0.05), rx: Math.PI / 2, emit: 0.85, outline: 0 }));
+  out.push(part(P.box(R, 0.09, 0.08), '#f4ead2', { x: W - R / 2, y: wy, z: at(0.12), outline: 0 }));
+  for (const a of [Math.PI * 0.75, Math.PI * 1.25]) out.push(part(P.box(0.09, R, 0.08), '#f4ead2', { x: W + Math.cos(a) * R * 0.5, y: wy + Math.sin(a) * R * 0.5, z: at(0.12), rz: a - Math.PI / 2, outline: 0 }));
+  out.push(part(P.box(1.4, 0.36, 0.34), '#7a4a2a', { x: W - 0.7, y: wy - R - 0.3, z: at(0.34) }));
+  const bloom = ['#e8455a', '#f6f2e8', '#f08ac0', '#e8455a'];
+  for (let i = 0; i < 4; i++) {
+    out.push(part(P.sphere(0.2, 7, 5), '#4f9a2e', { x: W - 1.25 + i * 0.36, y: wy - R - 0.05, z: at(0.3), sz: 0.7 }));
+    out.push(part(P.sphere(0.13, 7, 5), bloom[i], { x: W - 1.2 + i * 0.36, y: wy - R + 0.12, z: at(0.42), outline: 0.5 }));
+  }
+  out.push(part(P.torus(0.24, 0.05, 6, 14), '#e8b84a', { x: W - 0.55, y: 4.0, z: at(0.12) }));
+  return out;
+}
+
 export default {
   id: 'village',
   name: 'The Cypress Lane',
@@ -378,13 +408,18 @@ export default {
     b.toon('topiary', topiaryGeo(), { cap: 16, anim: 'popEarly', marks: [3, 2.6] });
 
     // threshold
-    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, marks: [1, 1], ink: 0.06 });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   // The market in the road: low crates, baskets and raspberry beds to jump,
   // the bus stop's timetable hung over a lane to slide under, and fruit carts,
   // a fruit stand and potted cypresses to go round.
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
+    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, marks: [1, 1], ink: 0.06 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: laneLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+  },
+
   obstacles: {
     L: [
       { name: 'hedge', len: 0.9 }, { name: 'crates', len: 0.9 }, { name: 'raspberries', len: 0.8 }, { name: 'baskets', len: 0.85 },
