@@ -1,3 +1,4 @@
+import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   P, part, merge, mix, scaleColor,
   roundTreeParts, lanternPostParts, gateFrameParts, gateTop, leafParts,
@@ -7,12 +8,19 @@ import { crystal, topazPrism, nugget, cube, point } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// IV · The Night Rooftops — a slate walkway across the roofs of a sleeping
-// city: navy houses with warm windows, chimney pots, a crescent moon, stars
-// and strings of little lights. High-contrast night: hard moonlight from
-// ahead rims every silhouette, lamps pour warm cones onto the slates, and fog
-// pools in the streets below. Returns bring sky lanterns, a huge moon, and a
-// purple night of drifting balloons.
+// IV · The Night Rooftops — New York, over the roofs at night: a tar-paper
+// roof walkway behind a brick parapet with stone coping, string lights over
+// it and gooseneck lamps along it; either side the roofs of tenements and
+// lofts at every height, brick and limestone, cornices, windows lit warm
+// (and the odd one blue with a television), air conditioners in them, iron
+// fire escapes zigzagging down their fronts; water towers on stilts, stair
+// bulkheads, antennas, vents, rooftop gardens, now and then a lit sign; and
+// out past them, the towers of the city, every window a light, and far off
+// a great art-deco spire lit up at its crown. High-contrast night: hard
+// moonlight from ahead rims every silhouette, lamps pour warm cones and
+// pools onto the tar, fog pools in the streets below and a warm glow of
+// city light hangs along the horizon. Returns bring sky lanterns, a huge
+// moon, and a purple night of drifting balloons.
 
 const C = {
   roofLo: '#2a3f70',
@@ -30,7 +38,28 @@ const C = {
   cream: '#d8cfa8',
   wood: '#5a4a6a',
 };
-const BODY_TINTS = ['#26386c', '#2d4279', '#1f2f5f', '#35487f', '#3b4f8a', '#2a3d74', '#40548f'];
+// New York: brick and limestone, iron and tar (the buildings take their
+// brick or stone as a tint)
+const NY = {
+  stone: '#b8ab92',
+  cornice: '#7c7266',
+  iron: '#15161d',
+  escape: '#2c2e3a',
+  tar: '#25272f',
+  frame: '#1d1b22',
+  tank: '#7a5e44',
+  tankDark: '#4c3a2c',
+  tankRoof: '#3a3036',
+  ac: '#a9afb8',
+  acDark: '#5e646e',
+  door: '#2a2228',
+  parapet: '#7a4436',
+};
+const BRICKS = ['#8c4a3a', '#7c3e32', '#985440', '#6e382e', '#8a5242', '#7e4a3e', '#a0604a'];
+const STONES = ['#aa9c86', '#9c907e', '#b6a88e', '#8e8678'];
+const TOWER_TINTS = ['#5a6078', '#4a5068', '#6a6a78', '#585a6e', '#707488'];
+// lit signs on the roofs (no words, just light)
+const SIGNS = [[1, 0.42, 0.5], [0.45, 0.85, 1], [1, 0.78, 0.35], [0.7, 1, 0.6]];
 const CLOTHES = ['#f4efe2', '#f2a7a0', '#9fd3e6', '#f7d36b', '#b8e0a6', '#e9b8f0', '#ffffff'];
 
 // The golds — honey, brass and amber, the warm colours that sing against the
@@ -115,103 +144,268 @@ function seeded(seed) {
   };
 }
 
-// Tall building whose roofline sits at local y = 0 (body hangs down 40m),
-// so instances can be raised/lowered without stretching the windows.
-function buildingGeo({ w, d, roof, seed, litChance = 0.45, chimney = true, tank = false }) {
-  const rnd = seeded(seed);
-  const parts = [part(P.box(w, 40, d), '#ffffff', { y: -20, tint: 1 })];
-  parts.push(part(P.box(w + 0.2, 0.3, d + 0.2), scaleColor(C.coping, 0.8), { y: -0.15 }));
-  if (roof === 'gable') {
-    parts.push(part(P.prism(w + 0.5, w * 0.5, d + 0.4), null, { y: 0, grad: [C.roofLo, C.roof, 0, w * 0.5] }));
-  } else if (roof === 'mansard') {
-    parts.push(part(P.box(w - 0.6, 2.2, d - 0.6), C.roof, { y: 1.1 }));
-    parts.push(part(P.prism(w + 0.3, 1.2, d + 0.3), C.roofLo, { y: 2.2 }));
-    for (const x of [-w / 4, w / 4]) {
-      parts.push(part(P.box(0.9, 1.0, 0.5), C.roofLo, { x, y: 1.3, z: d / 2 - 0.15 }));
-      const lit = rnd() < litChance;
-      parts.push(part(P.box(0.55, 0.65, 0.12), lit ? C.lit[0] : C.unlit, { x, y: 1.3, z: d / 2 + 0.12, emit: lit ? 1 : 0, outline: 0.4 }));
-    }
-  } else {
-    parts.push(part(P.box(w, 0.6, d), C.parapet, { y: 0.3 }));
-    if (tank) {
-      parts.push(part(P.cyl(0.8, 0.8, 1.5, 10), C.wood, { x: w * 0.2, y: 1.6, z: -d * 0.1 }));
-      parts.push(part(P.cone(0.95, 0.6, 10), C.roofLo, { x: w * 0.2, y: 2.65, z: -d * 0.1 }));
-      for (const [lx, lz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
-        parts.push(part(P.box(0.08, 0.9, 0.08), C.pole, { x: w * 0.2 + lx, y: 0.45, z: -d * 0.1 + lz }));
-      }
-    }
-  }
-  if (chimney) {
-    const cx = (rnd() - 0.5) * w * 0.5;
-    parts.push(part(P.box(0.7, 2.6, 0.7), C.brick, { x: cx, y: 1.3, z: -d * 0.2 }));
-    parts.push(part(P.box(0.82, 0.18, 0.82), C.brickHi, { x: cx, y: 2.6, z: -d * 0.2 }));
-    parts.push(part(P.cyl(0.13, 0.15, 0.4, 8), C.pot, { x: cx - 0.15, y: 2.9, z: -d * 0.2 }));
-    parts.push(part(P.cyl(0.13, 0.15, 0.32, 8), C.pot, { x: cx + 0.17, y: 2.86, z: -d * 0.2 }));
-  }
-  // window grid on the three faces you can see
-  const floors = 4;
-  const cols = Math.max(2, Math.round(w / 1.6));
-  const colsSide = Math.max(2, Math.round(d / 1.7));
+// A bar of iron from a to b (thickness t), no ink.
+const _q = new THREE.Quaternion();
+const _UP = new THREE.Vector3(0, 1, 0);
+function bar(a, b, t, color) {
+  const v = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  const len = v.length();
+  const g = part(P.box(t, len, t), color, { y: len / 2, outline: 0 });
+  _q.setFromUnitVectors(_UP, v.normalize());
+  g.applyQuaternion(_q);
+  g.translate(a[0], a[1], a[2]);
+  return g;
+}
+
+// An iron fire escape on a facade (built on a facade facing +z at z = 0,
+// centred on x = 0): a landing under each floor's windows, railed, with a
+// ladder slanting down from each to the one below.
+function fireEscape(floors, floorH, y0, width = 2.6) {
+  const parts = [];
+  const dep = 0.8;
   for (let f = 0; f < floors; f++) {
-    const y = -1.6 - f * 2.6;
-    const fade = f >= 3 ? 0.5 : 1;
-    const win = (x, z, ry) => {
-      const lit = rnd() < litChance * fade;
-      const col = lit ? C.lit[Math.floor(rnd() * C.lit.length)] : C.unlit;
-      parts.push(part(P.box(0.7, 1.15, 0.12), col, { x, y, z, ry, emit: lit ? 1 : 0, outline: 0.45 }));
-    };
-    for (let c = 0; c < cols; c++) win((c - (cols - 1) / 2) * (w / cols), d / 2 + 0.03, 0);
-    for (let c = 0; c < colsSide; c++) {
-      const z = (c - (colsSide - 1) / 2) * (d / colsSide);
-      win(w / 2 + 0.03, z, Math.PI / 2);
-      win(-w / 2 - 0.03, z, Math.PI / 2);
+    const y = y0 - f * floorH;
+    parts.push(part(P.box(width, 0.06, dep), NY.escape, { y, z: dep / 2, outline: 0 }));
+    // the rail round its open sides, and its balusters
+    parts.push(bar([-width / 2, y + 0.95, dep], [width / 2, y + 0.95, dep], 0.05, NY.escape));
+    for (const sx of [-1, 1]) parts.push(bar([sx * width / 2, y, dep], [sx * width / 2, y + 0.95, dep], 0.04, NY.escape));
+    for (let k = 1; k <= 2; k++) parts.push(bar([-width / 2 + (k / 3) * width, y, dep], [-width / 2 + (k / 3) * width, y + 0.95, dep], 0.03, NY.escape));
+    // the ladder down to the next landing
+    if (f < floors - 1) {
+      const z = dep * 0.55;
+      const a = [-width / 2 + 0.25, y, z], b = [width / 2 - 0.35, y - floorH, z];
+      for (const off of [-0.2, 0.2]) parts.push(bar([a[0], a[1], z + off], [b[0], b[1], z + off], 0.04, NY.escape));
+      for (let k = 1; k <= 3; k++) {
+        const t = k / 4;
+        parts.push(part(P.box(0.03, 0.03, 0.44), NY.escape, { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, z, outline: 0 }));
+      }
     }
   }
   return merge(parts);
 }
 
-function skylineGeo(seed) {
+// A New York building whose roofline sits at local y = 0 (its body hangs
+// down 40 m, so instances can be raised or lowered without stretching the
+// windows): brick (a tenement, a walk-up) or limestone (a loft), its brick
+// or stone the instance's tint; a tar roof inside a parapet with stone
+// coping; a cornice; windows floor by floor on the faces you can see - its
+// front (+z) and its side toward the path (path: -1 the path is off to its
+// -x, +1 its +x) - a share lit, lintels over the front ones and air
+// conditioners in some (near); and iron fire escapes down its front and that
+// side (near brick ones).
+function nyBuildingGeo({ w, d, seed, style = 'brick', path = -1, near = true, litChance = 0.42 }) {
+  const rnd = seeded(seed);
+  const brick = style === 'brick';
+  const mk = brick ? 0.55 : 0.25;
+  const floorH = brick ? 2.9 : 3.4;
+  const parts = [part(P.box(w, 40, d), '#ffffff', { y: -20, tint: 1, mark: mk })];
+  parts.push(part(P.box(w - 0.3, 0.06, d - 0.3), NY.tar, { y: 0.03, outline: 0 }));
+  for (const [x, z, pw, pd] of [[0, d / 2 - 0.12, w, 0.24], [0, -d / 2 + 0.12, w, 0.24], [w / 2 - 0.12, 0, 0.24, d], [-w / 2 + 0.12, 0, 0.24, d]]) {
+    parts.push(part(P.box(pw, 0.8, pd), '#ffffff', { x, y: 0.4, z, tint: 1, mark: mk }));
+    parts.push(part(P.box(pw + 0.14, 0.1, pd + 0.14), NY.stone, { x, y: 0.85, z, outline: 0.4 }));
+  }
+  const cornice = brick ? NY.cornice : NY.stone;
+  parts.push(part(P.box(w + 0.6, 0.34, d + 0.6), cornice, { y: -0.4 }));
+  if (near) parts.push(part(P.box(w + 0.3, 0.2, d + 0.3), cornice, { y: -0.68, outline: 0.4 }));
+  const ww = brick ? 0.78 : 1.2;
+  const wh = brick ? 1.4 : 1.9;
+  const pitch = brick ? 1.6 : 2.2;
+  const floors = near ? 4 : 3;
+  const faces = [
+    { n: [0, 1], len: w, at: d / 2 },
+    { n: [path, 0], len: d, at: w / 2 },
+  ];
+  for (const F of faces) {
+    const cols = Math.max(2, Math.round(F.len / pitch));
+    const ry = F.n[0] !== 0 ? Math.PI / 2 : 0;
+    for (let f = 0; f < floors; f++) {
+      const y = -2.0 - f * floorH;
+      const fade = f >= 3 ? 0.6 : 1;
+      for (let c = 0; c < cols; c++) {
+        const u = (c - (cols - 1) / 2) * (F.len / cols);
+        const px = F.n[0] !== 0 ? F.n[0] * (F.at + 0.03) : u;
+        const pz = F.n[0] !== 0 ? u : F.at + 0.03;
+        const on = rnd() < litChance * fade;
+        const tv = on && rnd() < 0.12;
+        const col = tv ? '#9cc4ff' : on ? C.lit[Math.floor(rnd() * C.lit.length)] : C.unlit;
+        parts.push(part(P.box(ww, wh, 0.12), col, { x: px, y, z: pz, ry, emit: on ? 1 : 0, outline: 0.5 }));
+        if (!near) continue;
+        if (F.n[1] !== 0) parts.push(part(P.box(ww + 0.26, 0.15, 0.2), NY.stone, { x: px, y: y + wh / 2 + 0.13, z: pz, outline: 0 }));
+        // an air conditioner in the window, sticking out over the street
+        if (rnd() < 0.16) {
+          const ox = F.n[0] * 0.26, oz = F.n[1] * 0.26;
+          parts.push(part(P.box(ww * 0.78, 0.42, 0.5), NY.ac, { x: px + ox, y: y - wh / 2 + 0.24, z: pz + oz, ry, outline: 0.4 }));
+        }
+      }
+    }
+  }
+  if (near && brick) {
+    const y0 = -2.0 - wh / 2 - 0.08;
+    // down the front, and down the side toward the path
+    parts.push(fireEscape(3, floorH, y0, Math.min(2.8, w * 0.42)).translate(w * 0.18, 0, d / 2));
+    const g = fireEscape(3, floorH, y0, Math.min(2.8, d * 0.4));
+    g.rotateY(path > 0 ? Math.PI / 2 : -Math.PI / 2);
+    g.translate(path * w / 2, 0, -d * 0.12);
+    parts.push(g);
+  }
+  return merge(parts);
+}
+
+// A water tower on its steel stand: a tank of cedar staves bound with iron
+// hoops under a conical roof, a ladder up its side.
+function waterTowerGeo() {
+  const parts = [];
+  const legH = 2.3;
+  const r = 1.25;
+  for (const [x, z] of [[-0.85, -0.85], [0.85, -0.85], [-0.85, 0.85], [0.85, 0.85]]) parts.push(part(P.box(0.14, legH, 0.14), NY.iron, { x, y: legH / 2, z, outline: 0.4 }));
+  for (const [a, b] of [[[-0.85, 0, 0.85], [0.85, legH, 0.85]], [[0.85, 0, 0.85], [-0.85, legH, 0.85]], [[-0.85, 0, -0.85], [-0.85, legH, 0.85]], [[0.85, 0, -0.85], [0.85, legH, 0.85]]]) parts.push(bar(a, b, 0.06, NY.iron));
+  parts.push(part(P.box(2.3, 0.12, 2.3), NY.iron, { y: legH }));
+  const tankH = 2.8;
+  parts.push(part(P.cyl(r, r * 1.04, tankH, 12, 1, true), null, { y: legH + tankH / 2 + 0.06, grad: [NY.tankDark, NY.tank, legH, legH + tankH], mark: 0.9, uvScale: [6, 1] }));
+  for (const t of [0.15, 0.5, 0.85]) parts.push(part(P.cyl(r * 1.05, r * 1.05, 0.06, 12, 1, true), NY.iron, { y: legH + 0.06 + tankH * t, outline: 0 }));
+  parts.push(part(P.cone(r + 0.18, 1.1, 12), NY.tankRoof, { y: legH + tankH + 0.6 }));
+  parts.push(part(P.sphere(0.1, 5, 3), NY.iron, { y: legH + tankH + 1.2, outline: 0 }));
+  for (const off of [-0.18, 0.18]) parts.push(bar([off, 0, r + 0.12], [off, legH + tankH, r + 0.12], 0.04, NY.iron));
+  return merge(parts);
+}
+
+// A stair bulkhead: a little brick house on the roof, its door toward +z, a
+// lamp lit over it.
+function bulkheadGeo() {
+  return merge([
+    part(P.box(2.2, 2.6, 2.4), '#ffffff', { y: 1.3, tint: 1, mark: 0.55 }),
+    part(P.box(2.4, 0.14, 2.6), NY.stone, { y: 2.66 }),
+    part(P.box(0.85, 1.9, 0.08), NY.door, { x: 0.35, y: 0.95, z: 1.22, outline: 0.4 }),
+    part(P.sphere(0.07, 6, 4), C.lit[2], { x: 0.35, y: 2.15, z: 1.28, emit: 1, outline: 0 }),
+  ]);
+}
+
+// A TV antenna on its mast.
+function antennaGeo() {
+  const parts = [bar([0, 0, 0], [0, 3.4, 0], 0.05, NY.iron)];
+  for (const [y, l] of [[2.4, 1.4], [2.85, 1.1], [3.25, 0.8]]) parts.push(bar([-l / 2, y, 0], [l / 2, y, 0], 0.03, NY.iron));
+  for (let k = -2; k <= 2; k++) parts.push(bar([k * 0.14, 2.4, 0], [k * 0.14, 2.4, 0.4], 0.02, NY.iron));
+  return merge(parts);
+}
+
+// Roof kit: air-conditioning condensers with their fans, mushroom vents, a
+// satellite dish.
+function roofKitGeo() {
+  const parts = [];
+  for (const [x, z] of [[0, 0], [1.25, 0.1]]) {
+    parts.push(part(P.box(1.1, 0.9, 1.0), NY.ac, { x, y: 0.45, z }));
+    parts.push(part(P.cyl(0.38, 0.38, 0.04, 14), NY.acDark, { x, y: 0.92, z, outline: 0 }));
+    parts.push(part(P.box(0.06, 0.05, 0.7), NY.iron, { x, y: 0.95, z, ry: 0.6, outline: 0 }));
+  }
+  for (const [x, z] of [[-1.0, -0.6], [-1.3, 0.4]]) {
+    parts.push(part(P.cyl(0.08, 0.08, 0.7, 8), NY.acDark, { x, y: 0.35, z }));
+    parts.push(part(P.sphere(0.18, 8, 4), NY.acDark, { x, y: 0.72, z, sy: 0.5 }));
+  }
+  parts.push(part(P.cyl(0.05, 0.05, 0.6, 6), NY.iron, { x: 0.6, y: 0.3, z: -0.9 }));
+  parts.push(part(P.sphere(0.42, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#d8dce2', { x: 0.6, y: 0.75, z: -0.9, sy: 0.4, rx: -1.0 }));
+  return merge(parts);
+}
+
+// A lit sign up on a roof: a steel frame on legs and a glowing face, the
+// instance's colour, in bands (no words, just light), facing +z.
+function signGeo() {
+  const parts = [];
+  const W = 5, H = 2.2, y0 = 1.4;
+  for (const x of [-2, 2]) parts.push(part(P.box(0.12, y0 + H, 0.12), NY.iron, { x, y: (y0 + H) / 2, z: -0.3, outline: 0.3 }));
+  parts.push(bar([-2, 0, -1.2], [-2, y0, -0.3], 0.08, NY.iron));
+  parts.push(bar([2, 0, -1.2], [2, y0, -0.3], 0.08, NY.iron));
+  parts.push(part(P.box(W + 0.2, H + 0.2, 0.15), NY.iron, { y: y0 + H / 2, z: -0.1 }));
+  parts.push(part(P.box(W, H, 0.06), '#ffffff', { y: y0 + H / 2, z: 0.0, emit: 1, tint: 1, outline: 0 }));
+  for (let k = 0; k < 3; k++) parts.push(part(P.box(W * (0.8 - k * 0.18), 0.22, 0.04), '#1a1620', { x: -W * 0.06 * k, y: y0 + H * (0.28 + k * 0.24), z: 0.05, outline: 0 }));
+  return merge(parts);
+}
+
+// A gooseneck lamp on a pipe post at the parapet, its arm reaching in over
+// the walkway (to -x), a caged bulb under its shade.
+function roofLampGeo() {
+  const h = 2.7;
+  return merge([
+    part(P.cyl(0.05, 0.065, h, 6), NY.iron, { y: h / 2 }),
+    part(P.torus(0.3, 0.035, 4, 10, Math.PI), NY.iron, { x: -0.3, y: h }),
+    part(P.cone(0.24, 0.2, 12), NY.iron, { x: -0.6, y: h - 0.12 }),
+    part(P.sphere(0.1, 8, 6), C.glassLamp, { x: -0.6, y: h - 0.26, emit: 1, outline: 0 }),
+    part(P.torus(0.12, 0.012, 3, 10), NY.iron, { x: -0.6, y: h - 0.28, rx: Math.PI / 2, outline: 0 }),
+  ]);
+}
+
+// The towers of the city out past the roofs: setbacks, flat tops with their
+// machinery, the odd mast with a red light, every wall a grid of windows a
+// share of them lit (parts marked 0.45: see towerWindows). Tinted per
+// instance.
+function towersGeo(seed) {
   const rnd = seeded(seed);
   const parts = [];
-  let x = -14;
-  while (x < 14) {
-    const w = 3 + rnd() * 4;
-    const h = 6 + rnd() * 12;
-    parts.push(part(P.box(w, h + 30, 4), '#ffffff', { x: x + w / 2, y: (h - 30) / 2, tint: 1 }));
-    if (rnd() < 0.6) parts.push(part(P.prism(w + 0.3, w * 0.45, 4.2), '#ffffff', { x: x + w / 2, y: h, tint: 1 }));
-    for (let i = 0; i < 4; i++) {
-      if (rnd() < 0.55) {
-        parts.push(part(P.box(0.7, 1.0, 0.1), C.lit[Math.floor(rnd() * 4)], { x: x + 0.8 + rnd() * (w - 1.6), y: h - 2 - rnd() * (h - 2), z: 2.05, emit: 1, outline: 0 }));
-      }
+  let x = -16;
+  while (x < 16) {
+    const w = 4 + rnd() * 5;
+    const d = 4 + rnd() * 4;
+    let h = 14 + rnd() * 34;
+    let y = -30;
+    let tw = w, td = d;
+    const tiers = 1 + Math.floor(rnd() * 3);
+    for (let t = 0; t < tiers; t++) {
+      const th = (h + 30) * (t === 0 ? 0.7 : 0.3 / (tiers - 1 || 1));
+      parts.push(part(P.box(tw, th, td), '#ffffff', { x: x + w / 2, y: y + th / 2, tint: 1, mark: 0.45 }));
+      y += th;
+      tw *= 0.72;
+      td *= 0.72;
     }
-    x += w + rnd() * 1.5;
+    parts.push(part(P.box(tw * 0.5, 1.6, td * 0.5), '#3a3c48', { x: x + w / 2, y: y + 0.8 }));
+    if (rnd() < 0.4) {
+      parts.push(part(P.cyl(0.08, 0.2, 7, 5), '#3a3c48', { x: x + w / 2, y: y + 1.6 + 3.5, outline: 0 }));
+      parts.push(part(P.sphere(0.3, 6, 4), '#ff3a2a', { x: x + w / 2, y: y + 1.6 + 7, emit: 1, outline: 0 }));
+    }
+    x += w + 0.5 + rnd() * 2.5;
   }
   return merge(parts);
 }
 
-function domeGeo() {
-  const parts = [
-    part(P.box(20, 40, 20), '#2d4279', { y: -6 }),
-    part(P.cyl(7.5, 7.5, 6, 20), '#3b4f8a', { y: 17 }),
-    part(P.sphere(8, 20, 12, 0), null, { y: 20, grad: ['#2a3f70', '#5a72b0', 20, 28] }),
-    part(P.cyl(1.2, 1.4, 3, 10), '#3b4f8a', { y: 28.8 }),
-    part(P.cone(1.3, 2.2, 10), '#5a72b0', { y: 31.4 }),
-  ];
-  for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2;
-    parts.push(part(P.box(0.9, 2.2, 0.2), C.lit[i % 4], { x: Math.sin(a) * 7.55, y: 17, z: Math.cos(a) * 7.55, ry: a, emit: 1, outline: 0.4 }));
+// The spire: an art-deco tower climbing in setbacks, ribbed up its shaft,
+// its crown stepped and lit warm, a lantern and a long mast over it with a
+// red light at the top.
+function spireGeo() {
+  const parts = [];
+  let y = -40;
+  for (const [w, h] of [[22, 46], [16, 20], [12, 18], [9, 26]]) {
+    parts.push(part(P.box(w, h, w), '#ffffff', { y: y + h / 2, tint: 1, mark: 0.45 }));
+    parts.push(part(P.box(w + 0.6, 0.6, w + 0.6), '#b0a898', { y: y + h, outline: 0.4 }));
+    y += h;
   }
+  // ribs up the shaft
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * Math.PI * 2;
+    for (const o of [-2.2, 0, 2.2]) {
+      const px = Math.cos(a) * 4.6 - Math.sin(a) * o, pz = Math.sin(a) * 4.6 + Math.cos(a) * o;
+      parts.push(part(P.box(0.4, 26, 0.4), '#c8c0b0', { x: px, y: y - 13, z: pz, outline: 0 }));
+    }
+  }
+  // the crown: stepped, banded with light
+  for (const [w, h, lit] of [[7, 3, '#ffd8a0'], [5.6, 3, '#ffb878'], [4.4, 3, '#ff9a68']]) {
+    parts.push(part(P.box(w, h, w), '#d8d0c0', { y: y + h / 2 }));
+    parts.push(part(P.box(w + 0.1, 0.5, w + 0.1), lit, { y: y + h - 0.6, emit: 1, outline: 0 }));
+    y += h;
+  }
+  parts.push(part(P.cyl(1.6, 1.9, 4.5, 12), '#ffe2b8', { y: y + 2.25, emit: 0.85 }));
+  y += 4.5;
+  parts.push(part(P.cyl(0.25, 0.9, 3, 10), '#c8c0b0', { y: y + 1.5 }));
+  parts.push(part(P.cyl(0.08, 0.25, 14, 6), '#c8c0b0', { y: y + 10, outline: 0 }));
+  parts.push(part(P.sphere(0.45, 8, 6), '#ff3a2a', { y: y + 17.2, emit: 1, outline: 0 }));
   return merge(parts);
 }
 
 function walkwayWallsGeo() {
-  // The walkway sits on a long building: side walls drop into the dark,
-  // a low parapet with coping runs along the edge.
+  // The walkway sits on a long building: brick side walls dropping into the
+  // dark, a brick parapet with limestone coping along the edge.
   const parts = [];
   for (const s of [-1, 1]) {
-    parts.push(part(P.box(0.5, 30, 16, 1, 1, 8), '#24366a', { x: s * 4.65, y: -15, z: -8 }));
-    parts.push(part(P.box(0.45, 0.62, 16, 1, 1, 8), C.parapet, { x: s * 4.62, y: 0.31, z: -8 }));
-    parts.push(part(P.box(0.6, 0.14, 16, 1, 1, 8), C.coping, { x: s * 4.62, y: 0.68, z: -8 }));
+    parts.push(part(P.box(0.5, 30, 16, 1, 1, 8), NY.parapet, { x: s * 4.65, y: -15, z: -8, mark: 0.55 }));
+    parts.push(part(P.box(0.45, 0.62, 16, 1, 1, 8), NY.parapet, { x: s * 4.62, y: 0.31, z: -8, mark: 0.55 }));
+    parts.push(part(P.box(0.6, 0.14, 16, 1, 1, 8), NY.stone, { x: s * 4.62, y: 0.68, z: -8 }));
   }
   return merge(parts);
 }
@@ -385,8 +579,9 @@ function gateGeo() {
   for (const s of [-1, 1]) {
     const w = 60;
     const x = s * (OPENING.halfW + 1.1 + w / 2 - 0.1);
-    parts.push(part(P.box(w, 56, 2.2), '#22346a', { x, y: -2 }));
-    parts.push(part(P.box(w, 0.8, 2.8), C.coping, { x, y: 26.2 }));
+    parts.push(part(P.box(w, 56, 2.2), NY.parapet, { x, y: -2, mark: 0.55 }));
+    parts.push(part(P.box(w, 0.8, 2.8), NY.stone, { x, y: 26.2 }));
+    parts.push(part(P.box(w, 0.5, 2.6), NY.cornice, { x, y: 25.6 }));
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 11; c++) {
         const wx = s * (OPENING.halfW + 3.4 + c * 2.7);
@@ -436,7 +631,8 @@ export default {
   gem: GEM,
   continuation: false, // the facade hides everything behind the door
   env: {
-    sky: ['#060e2a', '#26407a', '#0a1430'],
+    // (a warm glow of city light along the horizon)
+    sky: ['#070c28', '#4a3e6c', '#0c1230'],
     bloom: ['#4a6ae8', '#ffc45a', '#ff7a6a'], // the colours its doorway bloom is made of
     sun: { dir: [0.5, 0.42, -1], glow: '#3c4c94' },
     moon: { dir: [0.5, 0.42, -1], color: '#fbe9b0', size: 0.05 },
@@ -445,13 +641,14 @@ export default {
     // harsh moonlight from ahead: faces toward you fall into deep blue
     light: { dir: [0.45, 0.62, -0.65], shadow: [0.44, 0.5, 0.82], hi: [1.2, 1.2, 1.35], soft: 0.01, wrap: 0, hiAmt: 0.75, lift: 0.8 },
     rim: [0.55, 0.68, 1.0, 0.34],
-    mist: { color: '#16285a', amount: 0.8, top: -1.5, fade: 9, near: 14, far: 70 },
+    mist: { color: '#221f46', amount: 0.8, top: -1.5, fade: 9, near: 14, far: 70 },
     grade: { sat: 1.12, contrast: 1.1, vignette: 0.5, exposure: 1.04, tint: '#030820' },
     beam: { color: '#ffc870', amount: 0.34 },
     pool: '#ffa040',
     ink: '#060b22',
-    fog: [36, 185],
-    ground: ['#2e3c68', '#27345c', '#151d3c'],
+    fog: [44, 230],
+    // tar paper (ground pattern 14)
+    ground: ['#2e313e', '#393c4a', '#17181f'],
     shadowDecal: [0.46, 0.5, 0.72],
     cast: [-0.7, 1.0],
     glowGain: 1.0,
@@ -486,20 +683,38 @@ export default {
   ],
 
   build(b) {
-    b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 2);
+    // the roof underfoot: tar paper, its seams, its patches, its puddles
+    // (ground pattern 14)
+    b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 14);
     b.toon('void', groundStrip(420, 16, '#0c1636', 8, { y: -28 }), { ink: 0, cap: 40 });
-    b.toon('walls', walkwayWallsGeo(), { cap: 40, ink: 0.035, anim: 'rise' });
-    b.toon('bldgGable', buildingGeo({ w: 5, d: 6, roof: 'gable', seed: 3 }), { cap: 120, anim: 'lift' });
-    b.toon('bldgMansard', buildingGeo({ w: 7.5, d: 7, roof: 'mansard', seed: 9 }), { cap: 120, anim: 'lift' });
-    b.toon('bldgFlat', buildingGeo({ w: 6.2, d: 6.5, roof: 'flat', seed: 17, tank: true, chimney: false }), { cap: 120, anim: 'lift' });
-    b.toon('skyline', skylineGeo(5), { cap: 120, anim: 'liftFar', ink: 0 });
-    b.toon('dome', domeGeo(), { cap: 12, anim: 'liftFar', ink: 0.08 });
-    b.toon('tree', merge(roundTreeParts({ r: 1.6, trunkH: 1.4, lo: '#173c52', hi: '#3c7a8a', trunk: '#1a2440' })), { cap: 80, anim: 'lift', marks: [2.2, 2], wobble: [0.004, 0, 1.1, 0] });
-    b.toon('lamp', merge(lanternPostParts({ h: 3.4, pole: C.pole, glass: C.glassLamp, cap: C.pole })), { cap: 40, anim: 'pop' });
+    b.toon('walls', walkwayWallsGeo(), { cap: 40, ink: 0.035, anim: 'rise', brick: true });
+    // the roofs either side: tenements, walk-ups and lofts, near ones with a
+    // fire escape down the side toward the path too (L: on the right of the
+    // path, its escape on its -x side; R: on the left), the far row plainer
+    // (only the faces you can see are drawn: the front, and the side toward
+    // the path - L is on the right of the path, its path side at -x; R on
+    // the left)
+    const KINDS = { tenement: { w: 6.2, d: 7, style: 'brick', seed: 3 }, walkup: { w: 5, d: 6, style: 'brick', seed: 9, litChance: 0.5 }, loft: { w: 7.6, d: 7.4, style: 'stone', seed: 17 } };
+    for (const [k, o] of Object.entries(KINDS)) {
+      b.toon(k + 'L', nyBuildingGeo({ ...o, path: -1 }), { cap: 60, anim: 'lift', brick: true });
+      b.toon(k + 'R', nyBuildingGeo({ ...o, path: 1 }), { cap: 60, anim: 'lift', brick: true });
+      b.toon(k + 'FarL', nyBuildingGeo({ ...o, path: -1, near: false, seed: o.seed + 20 }), { cap: 60, anim: 'lift', brick: true, ink: 0 });
+      b.toon(k + 'FarR', nyBuildingGeo({ ...o, path: 1, near: false, seed: o.seed + 20 }), { cap: 60, anim: 'lift', brick: true, ink: 0 });
+    }
+    b.toon('waterTower', waterTowerGeo(), { cap: 90, anim: 'lift', marks: [1, 1] });
+    b.toon('bulkhead', bulkheadGeo(), { cap: 60, anim: 'lift', brick: true });
+    b.toon('antenna', antennaGeo(), { cap: 60, anim: 'lift', ink: 0 });
+    b.toon('roofKit', roofKitGeo(), { cap: 60, anim: 'lift' });
+    b.toon('sign', signGeo(), { cap: 12, anim: 'lift' });
+    b.toon('towers', towersGeo(5), { cap: 60, anim: 'liftFar', ink: 0, brick: true });
+    b.toon('towersB', towersGeo(12), { cap: 60, anim: 'liftFar', ink: 0, brick: true });
+    b.toon('spire', spireGeo(), { cap: 4, anim: 'liftFar', ink: 0.08, brick: true });
+    b.toon('tree', merge(roundTreeParts({ r: 1.6, trunkH: 1.4, lo: '#1a3a2c', hi: '#3e6e4a', trunk: '#2a2226' })), { cap: 80, anim: 'lift', marks: [2.2, 2], wobble: [0.004, 0, 1.1, 0] });
+    b.toon('lamp', roofLampGeo(), { cap: 40, anim: 'pop' });
     b.toon('lights', lightsGeo(), { cap: 24, anim: 'popLate', ink: 0.02 });
     b.glow('glow', { cap: 120, anim: 'pop' });
     b.shadow('shadow', { cap: 200, anim: 'pop' });
-    b.beam('lampCone', merge(lampConeParts({ top: 4.2, r0: 0.16, r1: 1.9 })), { cap: 40, anim: 'pop' });
+    b.beam('lampCone', merge(lampConeParts({ top: 3.3, r0: 0.16, r1: 1.7 })), { cap: 40, anim: 'pop' });
     b.pool('pool', { cap: 40, anim: 'pop' });
     b.toon('skyLantern', merge(skyLanternParts()), { cap: 200, anim: 'lift', fly: [0, 0, 1.4, 0.22], ink: 0.03 });
     b.toon('balloon', merge(balloonParts()), { cap: 30, anim: 'liftFar', fly: [0, 0, 2.5, 0.12] });
@@ -518,7 +733,7 @@ export default {
   // The door INTO this world, in its own style (built into the shared
   // doors, see world.js: it stands in the world before it).
   door(b) {
-    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.06 });
+    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.06, brick: true });
     b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: nightLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
@@ -540,12 +755,14 @@ export default {
       ctx.put('glow', -4.75, 5.8, 6, { s: 1.4, c: [1, 0.75, 0.4] });
       ctx.put('glow', 4.75, 5.8, 6, { s: 1.4, c: [1, 0.75, 0.4] });
     }
+    const DIM = { tenement: [6.2, 7], walkup: [5, 6], loft: [7.6, 7.4] };
     for (const s of [-1, 1]) {
+      // gooseneck lamps on the parapet, their arms reaching in over the roof
       if ((ctx.index + (s > 0 ? 1 : 0)) % 2 === 0) {
-        ctx.put('lamp', s * 4.62, 0.75, 12);
-        ctx.put('glow', s * 4.62, 4.4, 12, { s: 3.2, c: [1, 0.72, 0.38] });
-        ctx.put('lampCone', s * 4.62, 0.05, 12, { c: [0.9, 0.9, 0.9] });
-        ctx.put('pool', s * 3.5, 0.03, 12, { sx: 5.0, sz: 6.0, c: [0.85, 1, 1] });
+        ctx.put('lamp', s * 4.62, 0.75, 12, { ry: s > 0 ? 0 : Math.PI });
+        ctx.put('glow', s * 4.02, 3.2, 12, { s: 2.6, c: [1, 0.72, 0.38] });
+        ctx.put('lampCone', s * 4.02, 0.05, 12, { c: [0.9, 0.9, 0.9] });
+        ctx.put('pool', s * 3.4, 0.03, 12, { sx: 4.6, sz: 5.4, c: [0.85, 1, 1] });
       }
       // later laps: paper lanterns drift up over the city, then balloons
       if (ctx.visit >= 1) {
@@ -557,33 +774,58 @@ export default {
       if (ctx.visit >= 3 && rng.chance(0.25)) {
         ctx.put('balloon', s * rng.float(24, 60), rng.float(4, 18), rng.float(0, 16), { c: rng.pick(['#f2a7a0', '#9fd3e6', '#f7d36b', '#b8e0a6', '#e9b8f0']), s: rng.float(1.2, 2.2) });
       }
-      // near row of houses
+      // the near roofs, every one its own height: some down below you, their
+      // roofs and water towers in view, some rising over you, their fronts
+      // and fire escapes
       let dz = rng.float(0, 3);
       while (dz < 16) {
-        const kind = rng.weighted([['bldgGable', 3], ['bldgMansard', 2], ['bldgFlat', 2]]);
-        const depth = kind === 'bldgMansard' ? 7 : kind === 'bldgFlat' ? 6.5 : 6;
-        const width = kind === 'bldgMansard' ? 7.5 : kind === 'bldgFlat' ? 6.2 : 5;
-        const top = rng.float(-5.5, 4.5);
-        const x = s * (5.2 + width / 2 + rng.float(0.2, 2.2));
-        ctx.put(kind, x, top, dz + depth / 2, { c: mix(rng.pick(BODY_TINTS), '#ffffff', rng.float(0, 0.08)) });
-        if (kind === 'bldgFlat' && rng.chance(0.6)) ctx.put('tree', x - 1.4, top + 0.3, dz + depth / 2 + 1.2, { s: rng.float(0.6, 0.85) });
-        dz += depth + rng.float(0.4, 2.6);
+        const kind = rng.weighted([['tenement', 3], ['walkup', 2], ['loft', 2]]);
+        const [w, d] = DIM[kind];
+        // (some rising well over you, their windows and fire escapes beside
+        // the path; the rest down around you, their roofs in view)
+        const top = rng.chance(0.4) ? rng.float(4.5, 11) : rng.float(-5.5, 3);
+        const x = s * (5.2 + w / 2 + rng.float(0.2, 2.2));
+        const zc = dz + d / 2;
+        ctx.put(kind + (s > 0 ? 'L' : 'R'), x, top, zc, { c: mix(rng.pick(kind === 'loft' ? STONES : BRICKS), '#ffffff', rng.float(0, 0.06)) });
+        roof(ctx, rng, s, x, top, zc, w, d);
+        dz += d + rng.float(0.4, 2.6);
       }
-      // second row, taller
+      // a second row, taller, further off
       dz = rng.float(0, 4);
       while (dz < 16) {
-        const kind = rng.weighted([['bldgGable', 2], ['bldgMansard', 3], ['bldgFlat', 1]]);
+        const kind = rng.weighted([['tenement', 2], ['walkup', 1], ['loft', 3]]);
+        const [w, d] = DIM[kind];
         const x = s * rng.float(17, 26);
-        ctx.put(kind, x, rng.float(0, 9), dz + 3, { c: scaleColor(rng.pick(BODY_TINTS), rng.float(0.8, 0.95)), s: rng.float(1, 1.25) });
+        const top = rng.float(0, 9);
+        const k = rng.float(1, 1.25);
+        ctx.put(kind + (s > 0 ? 'FarL' : 'FarR'), x, top, dz + 3, { c: scaleColor(rng.pick(kind === 'loft' ? STONES : BRICKS), rng.float(0.8, 0.95)), s: k });
+        if (rng.chance(0.35)) ctx.put('waterTower', x + rng.float(-1, 1) * w * 0.2 * k, top + 0.06, dz + 3 + rng.float(-1, 1), { ry: rng.float(0, 6.28), s: k });
         dz += rng.float(6.5, 10);
       }
-      // far skyline (no ink)
-      ctx.put('skyline', s * rng.float(42, 60), rng.float(-6, 2), rng.float(0, 16), { c: scaleColor(rng.pick(BODY_TINTS), 0.75), ry: rng.float(-0.3, 0.3) });
-      if (rng.chance(0.4)) ctx.put('skyline', s * rng.float(70, 100), rng.float(-2, 8), rng.float(0, 16), { c: scaleColor(rng.pick(BODY_TINTS), 0.6), s: 1.4 });
+      // out past them, the towers of the city
+      ctx.put(rng.chance(0.5) ? 'towers' : 'towersB', s * rng.float(40, 58), rng.float(-6, 4), rng.float(0, 16), { c: scaleColor(rng.pick(TOWER_TINTS), rng.float(0.75, 0.95)), ry: rng.float(-0.25, 0.25) });
+      if (rng.chance(0.45)) ctx.put(rng.chance(0.5) ? 'towers' : 'towersB', s * rng.float(68, 100), rng.float(0, 14), rng.float(0, 16), { c: scaleColor(rng.pick(TOWER_TINTS), 0.65), s: rng.float(1.2, 1.6) });
     }
-    if (ctx.index % 7 === 3) {
+    // and now and then, far off over the roofs ahead, the spire
+    if (ctx.index % 9 === 4) {
       const s = rng.sign();
-      ctx.put('dome', s * rng.float(70, 110), rng.float(-8, -2), 8, {});
+      ctx.put('spire', s * rng.float(34, 48), rng.float(-14, -8), 8, { c: '#b8b0a2' });
     }
   },
 };
+
+// What's on a roof (one whose top is at height top, centred at x, zc, w
+// across and d along; s which side of the path it's on): a water tower on
+// its stand or a stair bulkhead, air conditioners and vents, an antenna, a
+// little garden, and now and then a sign lit up toward the path.
+function roof(ctx, rng, s, x, top, zc, w, d) {
+  const y = top + 0.06;
+  const r = rng.float(0, 1);
+  if (r < 0.5) ctx.put('waterTower', x + s * rng.float(0, w * 0.22), y, zc + rng.float(-d, d) * 0.18, { ry: rng.float(0, 6.28), s: rng.float(0.85, 1.1) });
+  else if (r < 0.8) ctx.put('bulkhead', x + s * w * 0.18, y, zc - d * 0.2, { c: mix(rng.pick(BRICKS), '#ffffff', 0.05) });
+  if (rng.chance(0.5)) ctx.put('roofKit', x - s * w * 0.2, y, zc + d * 0.22, { ry: rng.float(0, 6.28) });
+  if (rng.chance(0.35)) ctx.put('antenna', x + s * w * 0.32, y, zc + rng.float(-d, d) * 0.3, { ry: rng.float(0, 6.28) });
+  if (rng.chance(0.25)) ctx.put('tree', x - s * w * 0.25, y + 0.3, zc - d * 0.25, { s: rng.float(0.55, 0.8) });
+  if (top < 1 && rng.chance(0.09)) ctx.put('sign', x - s * w * 0.1, y, zc, { ry: s > 0 ? -1.1 : 1.1, c: rng.pick(SIGNS) });
+}
+

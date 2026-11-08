@@ -9,7 +9,7 @@ import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { paintingsGeo, Deck, PAINTING_COUNT } from './hall-art.js';
 
-// V · The Hall of Doors — a coral corridor with a checkerboard floor, lined
+// V · The Hall of Doors — a mustard-yellow corridor with a checkerboard floor, lined
 // with doors of every color, running through the heart of a library that
 // goes on for ever: over its walls a gallery of books rises on either side,
 // railed and lamplit, rolling ladders on its shelves; behind those, rows and
@@ -33,8 +33,9 @@ import { paintingsGeo, Deck, PAINTING_COUNT } from './hall-art.js';
 // nothing in the lanes).
 
 const C = {
-  wall: '#e27b5e',
-  wainscot: '#c95a40',
+  // mustard walls, a deeper ochre below the dado rail, cream mouldings
+  wall: '#c6a64e',
+  wainscot: '#a47e34',
   cream: '#f6ecd4',
   creamDark: '#e2d3b0',
   wood: '#8a5232',
@@ -45,7 +46,8 @@ const C = {
   coral: '#e2694a',
   lit: '#ffdf8a',
 };
-const DOOR_TINTS = ['#2fa59a', '#e8b13a', '#3456b8', '#8fd6b6', '#8a4a8a', '#c8402e', '#7fb8e0', '#f08a5d', '#4a8a5a', '#f2d06b'];
+// (no yellows: they'd vanish into the walls)
+const DOOR_TINTS = ['#2fa59a', '#7a2a36', '#3456b8', '#8fd6b6', '#8a4a8a', '#c8402e', '#7fb8e0', '#f08a5d', '#4a8a5a', '#f4ecd8'];
 const BOOKS = ['#c8402e', '#3456b8', '#e8b13a', '#2fa59a', '#f6ecd4', '#8a4a8a', '#4a8a5a', '#f08a5d'];
 // the light spilling from a door left ajar: a colour for each world it
 // might open on — sea teal, forest green, night blue, ember red, sunlit gold,
@@ -73,7 +75,7 @@ function bookFlight(lo, hi) {
 }
 
 // The greens, as if a cabinet of curiosities had spilled down the hall — the
-// complement of the coral walls. Heirloom pendants: emerald-cut stones (with
+// foil to the mustard walls. Heirloom pendants: emerald-cut stones (with
 // the little inclusions real emeralds have) in gold bezels, the same brass as
 // the hall's doorknobs and teacup rims, hung from little loops; square
 // asscher cuts. And the specimens beside them: rough olivine, bright and

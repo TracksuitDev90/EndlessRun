@@ -15,9 +15,9 @@ import { CONFIG } from '../config.js';
 // cypress and orange trees - and here and there a Venus flytrap that's been
 // left to grow far too big - and gone to jungle: banana plants arching into
 // the roof, elephant ears, calatheas, ferns, dark ficus, Spanish moss in
-// curtains from the purlins, a path of mossy old stone pavers. Hot and
-// humid: the low sun pouring in through glass fogged with condensation, a
-// warm golden haze, sunbeams slanting down through the leaves, motes in them,
+// curtains from the purlins, a path of mossy old stone pavers. Warm, humid
+// and soft: sunlight through glass fogged with condensation, a gentle golden
+// haze far down the tunnel, soft sunbeams over the beds, motes in them,
 // leaf-dappled pavers, deep green shade at the edges. Returns bring
 // butterflies, then giant blooms at dusk, then a bioluminescent night.
 
@@ -898,26 +898,26 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   env: {
-    // hot and humid: the low sun pouring in through glass fogged with
-    // condensation, the air thick with a warm haze it lights up, shafts of
-    // it slanting down through the leaves, motes and droplets hanging in
-    // them; the green deep and lush, dark in the shade of the big leaves and
-    // glowing where the light comes through them
-    sky: ['#86bf98', '#fff0c0', '#4f8458'],
+    // warm and humid: soft sunlight through glass fogged with condensation,
+    // a gentle haze that gathers only far down the tunnel (never over what's
+    // coming at you), soft shafts of light slanting down over the beds, a few
+    // motes drifting in them; the green deep and lush, dark in the shade of
+    // the big leaves and glowing where the light comes through them
+    sky: ['#86bf98', '#fbeec6', '#4f8458'],
     bloom: ['#2fc0a8', '#ff9ac8', '#ffa83a'], // the colours its doorway bloom is made of
-    sun: { dir: [0.25, 0.26, -1], glow: '#ffe6a8', disc: '#fffbe6', size: 0.05 },
+    sun: { dir: [0.3, 0.5, -1], glow: '#f6dea4', disc: '#fff8e0', size: 0.04 },
     stars: 0,
-    skyFx: { rays: 0.95, clouds: 0.1 },
+    skyFx: { rays: 0.45, clouds: 0.1 },
     // soft, wrapped light; shade the deep green of being under the leaves;
     // everything back-lit, leaves glowing gold at their edges
     light: { dir: SUN, shadow: [0.54, 0.66, 0.54], hi: [1.12, 1.08, 0.88], soft: 0.4, wrap: 0.45, hiAmt: 0.4, lift: 1 },
     rim: [1.0, 0.9, 0.55, 0.58],
-    mist: { color: '#f7e8b4', amount: 0.52, top: 4.6, fade: 4.5, near: 6, far: 56 },
-    dapple: [0.45, 0.11, 0.015],
-    grade: { sat: 1.08, contrast: 1.03, vignette: 0.56, exposure: 1.04, tint: '#0c2a16' },
-    beam: { color: '#fff0c0', amount: 0.78 },
+    mist: { color: '#f2e6bc', amount: 0.28, top: 3.4, fade: 3.5, near: 16, far: 90 },
+    dapple: [0.38, 0.11, 0.015],
+    grade: { sat: 1.06, contrast: 1.02, vignette: 0.5, exposure: 1.0, tint: '#0c2a16' },
+    beam: { color: '#fff2cc', amount: 0.3 },
     ink: '#0b2a20',
-    fog: [34, 165],
+    fog: [44, 180],
     // old stone pavers, moss in the joints (ground pattern 13)
     ground: ['#d9d2b6', '#b5b29a', '#4f7a3a'],
     shadowDecal: [0.5, 0.64, 0.5],
@@ -926,11 +926,11 @@ export default {
     glass: ['#d4eecb', 0.32],
     glowGain: 0.7,
     // motes and droplets hanging in the light, drifting slowly up
-    particles: { color: '#fff2c4', size: 2.2, drift: [0.05, 0.12, 0], opacity: 0.85 },
+    particles: { color: '#fff2c4', size: 1.8, drift: [0.05, 0.12, 0], opacity: 0.55 },
   },
 
   visits: [
-    { env: { particles: { color: '#ffd6e8', size: 2.4, drift: [0.4, -0.2, 0], opacity: 0.85 }, beam: { amount: 0.62 } } },
+    { env: { particles: { color: '#ffd6e8', size: 2.4, drift: [0.4, -0.2, 0], opacity: 0.85 }, beam: { amount: 0.28 } } },
     {
       env: {
         sky: ['#4a5aa8', '#ffb890', '#2f5f5a'],
@@ -996,7 +996,7 @@ export default {
     const GROW = [2, 36, 72, 0];
     b.toon('zinniaBedA', zinniaBedGeo(3), { cap: 96, anim: GROW, marks: [2, 1.4], wobble: [0.006, 0, 1.5, 0] });
     b.toon('zinniaBedB', zinniaBedGeo(8), { cap: 96, anim: GROW, marks: [2, 1.4], wobble: [0.006, 0, 1.3, 0] });
-    b.toon('ivyRib', ivyRibGeo(4), { cap: 90, anim: GROW, ink: 0.03, wobble: [0.004, 0, 1.1, 0] });
+    b.toon('ivyRib', ivyRibGeo(4), { cap: 140, anim: GROW, ink: 0.03, wobble: [0.004, 0, 1.1, 0] });
     b.toon('bracketBasket', bracketBasketGeo(6), { cap: 60, anim: GROW, wobble: [0.01, 0, 0.9, 0] });
     b.toon('basketHigh', merge(hungBasketParts(3.2, 12)), { cap: 70, anim: [2, 50, 92, 0], wobble: [0.004, 0, 0.7, 0] });
     b.toon('plantShelf', plantShelfGeo(2), { cap: 40, anim: GROW });
@@ -1118,10 +1118,9 @@ export default {
             ctx.put(rng.chance(long) ? 'mossLong' : 'mossShort', s * x, y - 0.05, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.85, 1.25), c: [rng.float(0.9, 1.08), rng.float(0.95, 1.05), rng.float(0.9, 1.05)] });
           }
         }
-        // sunbeams through the glass, slanting down through the haze - over
-        // the beds, and now and then right across the path
-        if (rng.chance(0.85)) ctx.put('shaft', s * rng.float(2.5, 5.4), 5.4, rng.float(1, 15), { c: [rng.float(0.65, 1), 1, 1], s: rng.float(1.15, 1.6) });
-        if (rng.chance(0.4)) ctx.put('shaft', s * rng.float(0.3, 2.2), 6.2, rng.float(1, 15), { c: [rng.float(0.45, 0.7), 1, 1], s: rng.float(1.3, 1.7) });
+        // soft sunbeams through the glass, slanting down over the beds (laid
+        // so the whole shaft stays out over them, never across the path)
+        if (rng.chance(0.75)) ctx.put('shaft', s * rng.float(5.6, 6.1), 5.4, rng.float(1, 15), { c: [rng.float(0.6, 1), 1, 1], s: rng.float(0.9, 1.15) });
         // later laps: butterflies, then giant blooms in the beds
         if (ctx.visit >= 1) {
           for (let i = 0; i < rng.int(1, 3); i++) {

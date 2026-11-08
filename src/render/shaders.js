@@ -1162,6 +1162,10 @@ float caustic(vec3 p, vec3 n, float dist) {
 // the runner's footprints, and the surf lapping up the beach before a
 // doorway into the sea (see game/sands.js for what drives them).
 const SANDS_FS = /* glsl */ `
+#if GROUND == 14
+// how much a puddle on the roof gives back the sky (see pattern 14)
+float gSheen = 0.0;
+#endif
 #if GROUND == 10
 #define PRINTS ${PRINTS}
 uniform vec4 uShore;
@@ -1526,6 +1530,55 @@ float pleats(vec2 uv) {
   return k * (1.0 + scar * 0.45);
 }
 #endif
+#ifdef BRICK
+// Brick (toon option brick, on parts whose mark flag is 0.55): laid in
+// running bond in world space on whichever wall it's on, each brick its own
+// shade, pale mortar between; nothing on the faces that look up or down.
+// Where the courses would shimmer (far off) it settles into the wall's tone.
+vec3 brickBond(vec3 n) {
+  vec3 an = abs(n);
+  if (an.y > max(an.x, an.z)) return vec3(1.0);
+  vec2 q = an.x > an.z ? vPos.zy : vPos.xy;
+  vec2 bs = vec2(0.4, 0.125);
+  vec2 g = q / bs;
+  g.x += mod(floor(g.y), 2.0) * 0.5;
+  vec2 cell = floor(g);
+  vec2 f = fract(g);
+  float h = hash12(cell + 5.0);
+  vec2 e = min(f, 1.0 - f) * bs;
+  float aa = max(fwidth(q.x), fwidth(q.y));
+  float w = 0.011;
+  float mortar = 1.0 - smoothstep(w - aa, w + aa, min(e.x, e.y));
+  float far = smoothstep(0.025, 0.07, aa);
+  vec3 c = vec3(0.84 + 0.26 * h, 0.85 + 0.22 * h, 0.86 + 0.18 * h);
+  c = mix(c, vec3(1.32, 1.26, 1.18), mortar * 0.75);
+  return mix(c, vec3(1.0), far);
+}
+// A tower's windows (parts marked 0.45): a grid of them on every wall, in
+// world space, a share lit warm (and the odd one the blue of a television),
+// lighting themselves (gEmit); the rest dark glass. Far off, the grid
+// settles into a twinkle of lit and dark.
+vec3 towerWindows(vec3 n, vec3 base) {
+  vec3 an = abs(n);
+  if (an.y > max(an.x, an.z)) return base;
+  vec2 q = an.x > an.z ? vPos.zy : vPos.xy;
+  vec2 ws = vec2(1.6, 3.2);
+  vec2 g = q / ws;
+  vec2 cell = floor(g);
+  vec2 f = fract(g);
+  float aa = max(fwidth(g.x), fwidth(g.y));
+  vec2 e = min(f - vec2(0.2, 0.22), vec2(0.8, 0.82) - f);
+  float pane = smoothstep(-aa, aa, min(e.x, e.y));
+  pane = mix(pane, 0.36, smoothstep(0.12, 0.35, aa));
+  float h = hash12(cell + 11.0);
+  float lit = step(0.6, h);
+  vec3 warm = mix(vec3(1.0, 0.74, 0.38), vec3(1.0, 0.9, 0.62), fract(h * 7.0));
+  if (fract(h * 13.0) > 0.92) warm = vec3(0.6, 0.78, 1.0);
+  vec3 glass = mix(base * 0.4, warm * 1.1, lit);
+  gEmit = max(gEmit, pane * lit);
+  return mix(base, glass, pane);
+}
+#endif
 #ifdef SHELVES
 #ifndef GROUND
 uniform float uMotion;
@@ -1675,6 +1728,36 @@ vec3 groundColor(vec2 p, float dist) {
     c = mix(uGroundC, c, mix(edgeMask(fract(r), vec2(0.85), 0.03), 1.0, far * 0.8));
     c = mix(c, avg, far * 0.6);
     float border = smoothstep(3.75, 3.85, abs(p.x));
+    return mix(c, uGroundC, border);
+  #elif GROUND == 14
+    // a New York roof: tar paper rolled out in strips across the run, their
+    // lapped seams, patches of fresher tar, grit, and here and there a
+    // puddle left by the rain giving back the sky (gSheen). (p.y runs on from
+    // chunk to chunk: every period divides the 4096 m it wraps at.)
+    float soften = max(smoothstep(0.25, 0.9, fwidth(p.x) * 9.0), smoothstep(0.2, 0.6, uMotion / 0.42));
+    float sw = 1.0;
+    float row = floor(p.y / sw);
+    float h = hash12(vec2(row, 13.0));
+    float wash = texture2D(uNoise, p * 0.25).g;
+    vec3 c = mix(uGroundA, uGroundB, h * 0.55 + wash * 0.45);
+    float fy = fract(p.y / sw);
+    float aa = fwidth(p.y) * 1.2;
+    // the lap: a thin dark line, a pale lip just past it
+    float seam = runLine(fy * sw, 0.018, aa) + runLine((1.0 - fy) * sw, 0.008, aa);
+    c = mix(c, uGroundC, min(seam, 1.0) * 0.75 * (1.0 - far));
+    c = mix(c, c * 1.12, runLine(abs(fy * sw - 0.05), 0.02, aa) * 0.6 * (1.0 - far));
+    float patchy = texture2D(uNoise, p * 0.0625 + 0.31).g;
+    c = mix(c, uGroundC * 1.4, smoothstep(0.64, 0.67, patchy) * 0.4);
+    // grit
+    float grit = hash12(floor(p * 16.0));
+    c *= mix(0.9 + 0.2 * grit, 1.0, soften);
+    // puddles
+    float pud = texture2D(uNoise, p * 0.125 + 0.73).g;
+    float wet = smoothstep(0.7, 0.73, pud) * (1.0 - smoothstep(3.6, 4.0, abs(p.x)));
+    c = mix(c, uGroundC, wet * 0.45);
+    gSheen = wet * 1.7;
+    c = mix(c, avg, far * 0.5);
+    float border = smoothstep(3.95, 4.3, abs(p.x));
     return mix(c, uGroundC, border);
   #elif GROUND == 13
     // the Glasshouse's path: old square stone pavers laid in staggered
@@ -2122,6 +2205,15 @@ void main() {
       #ifdef SHELVES
         if (vFx.x > 0.68 && vFx.x < 0.77) m = 0.0;
       #endif
+      #ifdef BRICK
+        if (abs(vFx.x - 0.55) < 0.02) {
+          m = 0.0;
+          base *= brickBond(n);
+        } else if (abs(vFx.x - 0.45) < 0.02) {
+          m = 0.0;
+          base = towerWindows(n, base);
+        }
+      #endif
       base = mix(base, base * 0.64, m);
     #endif
   #endif
@@ -2157,8 +2249,9 @@ void main() {
   vec3 col = mix(base * shade, base, max(vFx.y, gEmit));
   gKeep = max(gKeep, vFx.y);
   #ifdef GROUND
-    #if GROUND == 10
-      // wet sand just bared by the backwash shines with the sky
+    #if GROUND == 10 || GROUND == 14
+      // wet sand just bared by the backwash (a puddle on a roof) shines
+      // with the sky
       if (gSheen > 0.0) col = mix(col, skyColor(reflect(V, vec3(0.0, 1.0, 0.0))) * 1.1 + 0.05, gSheen * 0.28);
     #endif
   #endif
@@ -5886,6 +5979,8 @@ export function makeToonMaterial(env, o = {}) {
   if (o.bark) defines.BARK = '';
   // shelves of books on parts marked 0.7 (along the run) or 0.75 (across it)
   if (o.shelves) defines.SHELVES = '';
+  // brick in running bond on parts marked 0.55 (see brickBond)
+  if (o.brick) defines.BRICK = '';
   if (o.cloth) {
     defines.CLOTH = '';
     uniforms.uCloth = { value: new THREE.Vector4(...o.cloth) };
