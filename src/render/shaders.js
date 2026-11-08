@@ -2518,7 +2518,13 @@ void main() {
         float th = uCapeGrid.z * mix(2.7, 0.35, pow(smoothstep(0.0, 1.0, gv), 0.65)) * (0.8 + 0.2 * cos(gu * 38.0 + gv * 9.0)) * (0.55 + 0.45 * sin(3.1416 * clamp(gu, 0.0, 1.0)));
         lp = P + nC * (th * (side + 1.0));
       } else {
-        lp = P + nC * (side * uCapeGrid.z);
+        // the robe's skirts: heavy wool, thicker still along their free
+        // edges and their hems, where they're turned back and faced (so they
+        // never read paper thin as they swing open)
+        float gv = aCape.y / (uCapeGrid.y - 1.0);
+        float gu = aCape.x / (uCapeGrid.x - 1.0);
+        float rim = max(smoothstep(0.78, 1.0, abs(2.0 * gu - 1.0)), smoothstep(0.74, 1.0, gv));
+        lp = P + nC * (side * uCapeGrid.z * (1.0 + 1.5 * rim));
       }
     #else
       lp = P + nC * (side * uCapeGrid.z);
@@ -3271,13 +3277,27 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     c = mix(c, c * 0.7, band(d.y - 0.005, 0.0015));
   } else if (m == 10) {
     // the skirt (d: x across, y down, w the lining side): worn teal,
-    // deepening toward the hem; the lining sea-green
+    // deepening toward the hem; the lining sea-green, turned back down its
+    // open edges in a broad facing, a stitched line along it
     float v = smoothstep(0.1, 1.0, d.y);
     vec3 q = vec3(d.x * 1.6, d.y * 0.9, 0.0);
     c = elderWorn(c, uPal[L_ROBE_DEEP], q);
     c = mix(c, uPal[L_ROBE_DEEP], v * 0.45);
     vec3 lin = elderWorn(uPal[4], uPal[L_ROBE_IN], q + 5.0);
+    float edge = abs(2.0 * d.x - 1.0);
+    float facing = smoothstep(0.935, 0.95, edge) * step(0.04, d.y);
+    c = mix(c, mix(lin, uPal[L_ROBE_IN], 0.3 + v * 0.3), facing);
+    c = mix(c, uPal[L_ROBE_DEEP] * 0.8, band(edge - 0.93, 0.0035) * step(0.04, d.y) * 0.8);
     c = mix(c, mix(lin, uPal[L_ROBE_IN], v * 0.5), step(0.5, d.w));
+  } else if (m == 14) {
+    // the under-robe's skirt (d as the skirt's): sea-green, worn, deepening
+    // toward its hem, in long soft folds; a deeper shade inside
+    float v = smoothstep(0.05, 1.0, d.y);
+    vec3 q = vec3(d.x * 1.3, d.y * 0.8, 3.0);
+    c = elderWorn(uPal[4], uPal[L_ROBE_IN], q);
+    c = mix(c, uPal[L_ROBE_IN], v * 0.4);
+    c = mix(c, uPal[L_ROBE_IN] * 0.85, step(0.5, d.w) * 0.7);
+    c = mix(c, uPal[L_ROBE_IN] * 0.8, band(d.y - 0.93, 0.006) * 0.7);
   } else if (m == 13) {
     // the long beard (d: x across, y down, w the inside): wavy clumps down
     // its length, strands in them, a cool grey in its depths and on the inside
@@ -3322,6 +3342,12 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
 // (d.x across the sheet, d.y down it).
 float elderCut(int m, vec4 d) {
   bool beard = m == 13;
+  // (the under-robe's hem is worn, but only a little: shallow, close points)
+  if (m == 14) {
+    float k = d.x * 19.0;
+    float h = fract(sin(floor(k) * 12.9898 + 3.1) * 43758.5453);
+    return d.y - (0.995 - 0.03 * h - (0.035 + 0.025 * fract(h * 5.17)) * pow(abs(fract(k) - 0.5) * 2.0, 1.4));
+  }
   float n = beard ? 7.0 : 13.0;
   float k = d.x * n + (beard ? 0.25 * sin(d.y * 14.0) : 0.0);
   float i = floor(k);
@@ -4232,7 +4258,7 @@ void main() {
       if (cut > 0.0) discard;
     #endif
     // (his robe and his orange spectacles keep their colour through a drain)
-    gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12) ? 1.0 : 0.0;
+    gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12 || m == 14) ? 1.0 : 0.0;
   #elif defined(BUNNY) && defined(PROPS)
     // (what he floats down on keeps its colour through a drain)
     gKeep = 1.0;
@@ -4249,7 +4275,7 @@ void main() {
   #if defined(EXPLORER) && defined(CAPE)
     base = mix(base, uPal[m] * 0.32, smoothstep(-0.016, -0.003, cut) * 0.85);
   #elif defined(ELDER) && defined(CAPE)
-    base = mix(base, uPal[m] * (m == 13 ? 0.6 : 0.4), smoothstep(-0.014, -0.002, cut) * 0.7);
+    base = mix(base, uPal[m == 14 ? 4 : m] * (m == 13 ? 0.6 : 0.4), smoothstep(-0.014, -0.002, cut) * 0.7);
   #endif
   vec3 n = normalize(vNormal);
   n = gl_FrontFacing ? n : -n;
@@ -4267,7 +4293,7 @@ void main() {
   #elif defined(EXPLORER)
     float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
   #elif defined(ELDER)
-    float soft = m == 10 ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
+    float soft = (m == 10 || m == 14) ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
   #elif defined(BUNNY) && defined(PROPS)
     float soft = 0.1;
   #elif defined(SKATER)
@@ -4283,7 +4309,7 @@ void main() {
   vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
   vec3 col = base * mix(sh, vec3(1.0), max(lit, unlit));
   #if defined(ELDER)
-  if (m == 10 || m == 13) {
+  if (m == 10 || m == 13 || m == 14) {
   #else
   if (m == 10) {
   #endif
@@ -4363,7 +4389,7 @@ void main() {
     #ifdef CAPE
       if (elderCut(m, vD) > 0.0) discard;
     #endif
-    gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12) ? 1.0 : 0.0;
+    gKeep = (m == 3 || m == 4 || m == 9 || m == 10 || m == 12 || m == 14) ? 1.0 : 0.0;
   #elif defined(BUNNY) && defined(PROPS)
     gKeep = 1.0;
   #elif defined(BUNNY)

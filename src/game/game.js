@@ -10,7 +10,7 @@ import { ChunkStreamer } from './chunks.js';
 import { ObstacleField } from './obstacles.js';
 import { GemField } from './gems.js';
 import { Sparkles } from '../render/sparkles.js';
-import { CHARACTERS, characterById } from './characters.js';
+import { CHARACTERS, characterById, pickableById } from './characters.js';
 import { ChaseCamera } from './camera.js';
 import { Portal } from './portal.js';
 import { Dream } from './dream.js';
@@ -75,7 +75,9 @@ export class Game {
     for (const c of CHARACTERS) this.runners[c.id] = c.make(WORLD_DEFS[0].env, assets[c.id]);
     // (a runner whose jump can keep them up longer asks first: see roadClear)
     for (const r of Object.values(this.runners)) r.roomAhead = (sec) => this.roadClear(sec);
-    this.runnerId = characterById(params.runner || readString('er.runner')).id;
+    // (?runner= runs as anyone, even one still locked; the one remembered
+    // only if they can still be picked)
+    this.runnerId = (params.runner ? characterById(params.runner) : pickableById(readString('er.runner'))).id;
     this.player = this.runners[this.runnerId];
     // the animal who runs with you: every one you can pick built up front, as
     // the runners are (?companion=none to run alone)
@@ -241,7 +243,8 @@ export class Game {
   // Pick who runs (title screen only): the new runner steps in where the old
   // one stood, lit by the same world, and says hello.
   selectRunner(id) {
-    const next = this.runners[characterById(id).id];
+    const def = characterById(id);
+    const next = def.id === id && !def.locked ? this.runners[def.id] : null;
     if (this.state !== 'title' || !next) return false;
     if (next !== this.player) {
       this.sceneMain.remove(...this.player.objects);
