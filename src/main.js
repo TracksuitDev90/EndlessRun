@@ -15,8 +15,8 @@ import { Quality, gpuClass } from './core/quality.js';
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
 // ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
 // 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god,
-// ?runner=<id> (who runs: wayfarer, explorer, elder), ?companion=<id> (who
-// runs with you: fox, dragon, or none)
+// ?runner=<id> (who runs: wayfarer, explorer, elder, bunny), ?companion=<id>
+// (who runs with you: fox, dragon, or none)
 function parseParams() {
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) && q.get(k) !== '' ? Number(q.get(k)) : undefined);
@@ -218,7 +218,7 @@ async function boot() {
     const js = performance.now() - t0;
     // (a splash is a second and a half of an extra pass: not a reason to
     // lower the resolution for good)
-    if (game.splash.active) quality.hold(0.3);
+    if (game.splash.active || game.warp.active) quality.hold(0.3);
     // (a new resolution is taken up at the top of the next frame)
     if (quality.sample(pacer.raw, pacer.late)) resizePending = true;
     if (stats) stats(dt, js);

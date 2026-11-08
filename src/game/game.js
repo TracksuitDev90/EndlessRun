@@ -16,6 +16,7 @@ import { Portal } from './portal.js';
 import { Dream } from './dream.js';
 import { WaterFx } from './bubbles.js';
 import { Splash } from './splash.js';
+import { Warp } from './warp.js';
 import { Sands } from './sands.js';
 import { COMPANIONS, companionById } from './companions.js';
 
@@ -86,6 +87,8 @@ export class Game {
     this.water = new WaterFx(this.waterU);
     // coming into a world with env.splash, the screen is splashed with water
     this.splash = new Splash();
+    // through a doorway into a world with env.warp, the jump to light speed
+    this.warp = new Warp();
     // a world with env.sands: the runner's footprints in it, and the surf
     // before a doorway into the sea (see sands.js)
     this.sands = new Sands();
@@ -148,6 +151,7 @@ export class Game {
     this.sparkles.reset();
     this.water.reset();
     this.splash.stop();
+    this.warp.stop();
     this.sands.reset(seed);
 
     this.course.ensure(0, CONFIG.speed.start);
@@ -629,6 +633,12 @@ export class Game {
         door.drained = true;
         this.startDrain(this.next, 'in');
       }
+      // and into one with env.warp, the jump to light speed: the moment the
+      // runner is through
+      if (!door.warped && this.next.def.env.warp && this.dist >= door.d) {
+        door.warped = true;
+        this.startWarp();
+      }
       if (this.camDist() >= door.quadD - 0.45) this.crossDoor();
     }
   }
@@ -660,7 +670,13 @@ export class Game {
       this.splash.start();
       this.audio.splash();
     }
+    if (this.current.def.env.warp && !this.door.warped) this.startWarp();
     this.door = null;
+  }
+
+  startWarp() {
+    this.warp.start();
+    this.audio.warp();
   }
 
   // Jump straight to a distance (debug / tests).
@@ -692,6 +708,7 @@ export class Game {
     this.setParticles(this.current.env, this.current.env, 0);
     this.water.reset();
     this.splash.stop();
+    this.warp.stop();
     this.sands.reset(this.seed ^ Math.floor(d));
   }
 
@@ -706,6 +723,7 @@ export class Game {
     this.time += dt;
     shared.uTime.value = this.time;
     this.splash.update(dt);
+    this.warp.update(dt);
     const st = this.state;
 
     if (st === 'running') {
@@ -755,7 +773,15 @@ export class Game {
     this.player.wet = this.obstacles.wetAt(this.player.x, this.dist) || this.sands.wetAt(this.player.x, this.dist);
     // (this world's stones: the elder's sparks come in their colours)
     this.player.gemSpec = this.current.def.gem;
+    // low gravity from the moment the runner is through the doorway into it
+    // until they're through the one out (see Player)
+    this.player.lowG = st !== 'title' && !!this.course.segAt(this.dist).world.def.lowGravity;
+    const boosts = this.player.boosted;
     this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
+    if (this.player.boosted !== boosts) {
+      this.cam.boost(this.player.thrust);
+      this.audio.thrust(this.player.thrust);
+    }
     if (this.state === 'running') this.collide();
     if (this.state === 'running') this.collectGems();
     if (this.state === 'running') this.updateScore(dt);
@@ -772,6 +798,7 @@ export class Game {
     this.updateDrain(dt);
     this.cam.sway = this.dream.sway;
     this.cam.update(dt, this.player, pz, this.speed, this.time);
+    if (this.warp.active) this.warp.aim(this.cam.camera, this.player.root.position);
     shared.uCamPos.value.copy(this.cam.camera.position);
     this.updateDoor();
     this.updateWonk();
@@ -785,6 +812,10 @@ export class Game {
     this.particles.update(this.dist);
     this.particles2.update(this.dist);
     for (const w of this.worlds) w.sky.position.copy(this.cam.camera.position);
+    // (the planets hang in the sky round the camera, drifting nearer and
+    // further: see world/planets.js)
+    this.current.planets?.update(this.cam.camera, this.time);
+    if (this.next) this.next.planets?.update(this.cam.camera, this.time);
     // the companion is lit as the runner is, carried between worlds with them
     if (this.companion) copyEnvUniforms(this.companion.body.u, this.player.u);
 
@@ -823,6 +854,7 @@ export class Game {
     }
     r.render(this.sceneMain, camera);
     this.splash.render(r);
+    this.warp.render(r);
   }
 
   resize(w, h) {
@@ -895,6 +927,7 @@ export class Game {
     // (and the splash's copy of the frame allocated now, not the instant the
     // first one hits)
     this.splash.warm(this.renderer);
+    this.warp.warm(this.renderer);
   }
 }
 

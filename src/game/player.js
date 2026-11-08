@@ -3,6 +3,7 @@ import { CONFIG } from '../config.js';
 import { makeEnvUniforms } from '../render/shaders.js';
 import { TAU, damp, clamp, smooth, Spring } from './rig.js';
 import { bodyGeometry } from './kit.js';
+import { boostStep } from './drift.js';
 
 // A runner: what every character shares, whoever they are. The body and
 // clothes are sculpted offline (tools/runner/, loaded by runner-asset.js) as
@@ -398,6 +399,24 @@ export class Player {
       h.z.reset();
     }
     this.root.visible = true;
+    // low gravity (see lowGravity below)
+    this.lowG = false;
+    this.gk = 1;
+    this.drift = false;
+    this.bounding = false;
+    this.boundT = 0;
+    this.boundDur = 1;
+    this.boundPh0 = 0;
+    this.boundPhD = 0;
+    this.stepMark = null;
+    this.stepsWanted = 3;
+    this.rethrusts = 0;
+    this.boostT = 9;
+    this.thrust = 0;
+    this.spurtT = 0;
+    this.jetDown = 0;
+    this.boosted = 0;
+    this.flyW = 0;
     this.resetSim();
   }
 
@@ -419,7 +438,11 @@ export class Player {
         this.onDodge(a === 'left' ? -1 : 1);
       }
     } else if (a === 'up') {
-      if (this.grounded) this.jump();
+      // (in low gravity a bound is no more than a lope: the thruster fires
+      // from it as from the ground; and while a boost hangs, it can fire
+      // again)
+      if (this.grounded || this.bounding) this.takeOff();
+      else if (this.drift && this.rethrusts > 0 && this.vy <= CONFIG.drift.boost.hover) this.rethrust();
       else this.jumpBuffer = CONFIG.inputBuffer;
     } else if (a === 'down') {
       if (this.grounded) {
@@ -431,9 +454,205 @@ export class Player {
         this.vyOff += was - this.vy;
         this.slideQueued = true;
         this.jumpBuffer = 0;
+        // (in low gravity it's the thruster that drives them down: a burst
+        // upward off it)
+        if (this.lowG) this.jetDown = 1;
         this.onFastFall();
       }
     }
+  }
+
+  // --- low gravity ------------------------------------------------------------------
+  // In a world with def.lowGravity (the Red Drift; the game sets lowG while
+  // the runner is in it) the runner's jump is a boost - their own jump, with
+  // all its flourish, but flung up on a burst of a thruster and hanging
+  // over the top on the drift's arc (see drift.js) - and on the ground they
+  // take a few steps and bound off in a long low lope, the stride stretched
+  // out over it. Out of it, a jump is a jump. Whatever's in the air when
+  // they cross keeps its arc until it lands.
+  takeOff() {
+    this.bounding = false;
+    this.jump();
+    if (this.lowG) this.boost();
+  }
+
+  boost() {
+    const B = CONFIG.drift.boost;
+    this.vy = B.v0;
+    this.vyPose = B.v0;
+    this.vyOff = 0;
+    this.grounded = false;
+    this.drift = true;
+    this.rethrusts = B.rethrust;
+    this.boostT = 0;
+    this.thrust = 1;
+    this.spurtT = 0.32;
+    this.boosted++;
+  }
+
+  // The thruster again, while the boost hangs: a lift from wherever they are.
+  rethrust() {
+    const B = CONFIG.drift.boost;
+    this.rethrusts--;
+    const was = this.vy;
+    this.vy = Math.max(this.vy, B.again);
+    this.vyOff += was - this.vy;
+    this.jumpBuffer = 0;
+    this.thrust = 0.8;
+    this.spurtT = 0.28;
+    this.boosted++;
+  }
+
+  // A bound: off the toe that has just pushed off, the stride's phase
+  // stretched so the other foot comes down just as they land.
+  bound(duty) {
+    const D = CONFIG.drift.bound;
+    this.vy = D.v0;
+    this.vyPose = 0;
+    this.vyOff = 0;
+    this.grounded = false;
+    this.bounding = true;
+    this.drift = false;
+    this.boundT = 0;
+    this.boundDur = (2 * D.v0) / D.g;
+    const over = (((this.phase - Math.PI - Math.PI * duty) % Math.PI) + Math.PI) % Math.PI;
+    this.boundPh0 = this.phase;
+    this.boundPhD = Math.max(0.25, Math.PI * (1 - 2 * duty) - over);
+    this.regolith(0.7, false);
+  }
+
+  // A few steps after every landing (more, or fewer), then off again; off
+  // straight away from the top of a rock or an asteroid.
+  boundStep() {
+    const D = CONFIG.drift.bound;
+    const free = this.lowG && this.grounded && this.mode === 'run' && !this.crashed && !this.sliding && this.speed > 4 && this.w.run > 0.5;
+    if (!free) {
+      this.stepMark = null;
+      return;
+    }
+    const duty = this.duty ?? 0.2;
+    const k = Math.floor((this.phase - Math.PI - Math.PI * duty) / Math.PI);
+    if (this.stepMark === null) this.stepMark = k;
+    else if (k - this.stepMark >= this.stepsWanted) this.bound(duty);
+  }
+
+  landLow(ground, wasBound, hit) {
+    const D = CONFIG.drift.bound;
+    this.stepMark = null;
+    this.stepsWanted = ground > 0.3 ? 0 : D.steps[0] + Math.floor(Math.random() * (D.steps[1] - D.steps[0] + 1));
+    this.regolith(wasBound ? 0.8 : 1 + 0.6 * hit, true);
+  }
+
+  // Red dust kicked up off the regolith - on a bound's push-off and every
+  // landing, more for a harder one - hanging in the thin air, and grit that
+  // falls back slowly.
+  regolith(k, land) {
+    const D = this.dust;
+    if (!D || this.wet || this.crashed) return;
+    const r = Math.random;
+    const run = _v3.set(this.vx, 0, -this.speed).applyQuaternion(_q.copy(this.root.quaternion).invert());
+    const n = Math.round((land ? 4 : 2) * k + r());
+    for (let i = 0; i < n; i++) {
+      const a = r() * TAU;
+      _v.set((i % 2 ? 0.12 : -0.12) + Math.sin(a) * 0.1, 0.05, Math.cos(a) * 0.12);
+      _v2.copy(run).multiplyScalar(0.4 + 0.2 * r());
+      _v2.x += Math.sin(a) * (0.8 + 1.4 * r()) * k;
+      _v2.y += 0.5 + 0.9 * r() * k;
+      _v2.z += Math.cos(a) * (0.6 + 0.8 * r()) * k + 0.5;
+      D.emit(_v, _v2, 0.2 + 0.12 * r() * k, false, 0.7 + 0.2 * r(), 1.5, 1.1);
+    }
+    for (let i = 0; i < Math.round(2 * k); i++) {
+      _v.set((r() - 0.5) * 0.3, 0.05, (r() - 0.5) * 0.2);
+      _v2.copy(run).multiplyScalar(0.55);
+      _v2.x += (r() - 0.5) * 2.4;
+      _v2.y += 1.4 + 1.6 * r();
+      _v2.z += 0.4 + r();
+      D.emit(_v, _v2, 0.05 + 0.03 * r(), true);
+    }
+  }
+
+  // The thruster's plume: a jet of white vapour driven back from their hands
+  // (the burst, and the little spurts that keep them up over the top), or
+  // up off them as they drive themselves down. Emitted once the pose is on
+  // the bones (root space), so it comes from where the hands really are.
+  jet(dt) {
+    const D = this.dust;
+    if (!D) return;
+    const r = Math.random;
+    const run = _v3.set(this.vx, 0, -this.speed).applyQuaternion(_q.copy(this.root.quaternion).invert());
+    let n = 0;
+    let down = false;
+    if (this.jetDown > 0) {
+      n = 7;
+      down = true;
+      this.jetDown = 0;
+    } else if (this.thrust > 0.05) {
+      this.jetAcc = (this.jetAcc || 0) + dt * 70 * this.thrust;
+      n = Math.floor(this.jetAcc);
+      this.jetAcc -= n;
+    } else if (this.drift && !this.grounded && this.vy < CONFIG.drift.boost.hover && this.vy > -CONFIG.drift.boost.hover) {
+      // over the top: a little spurt now and then
+      this.spurtT -= dt;
+      if (this.spurtT <= 0) {
+        n = 2 + (r() < 0.5 ? 1 : 0);
+        this.spurtT = 0.2 + 0.16 * r();
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const hand = this.b[i % 2 ? 'handR' : 'handL'];
+      _v.setFromMatrixPosition(hand.matrixWorld);
+      _v.x += (r() - 0.5) * 0.06;
+      // (it keeps most of their own speed: a jet cone close behind them, not
+      // a trail of puffs left on the road)
+      _v2.copy(run).multiplyScalar(down ? 0.75 : 0.78 + 0.08 * r());
+      if (down) {
+        _v2.x += (r() - 0.5) * 1.6;
+        _v2.y += 4 + 2.5 * r();
+        _v2.z += 0.6 + 0.8 * r();
+      } else {
+        _v2.x += (i % 2 ? 0.25 : -0.25) + (r() - 0.5) * 0.7;
+        _v2.y += -1.6 - 1.2 * r();
+        _v2.z += 3.5 + 2.5 * r();
+      }
+      D.emit(_v, _v2, (down ? 0.18 : 0.11) + 0.07 * r() * Math.max(this.thrust, 0.5), 4, 0.9, down ? 0.6 : 0.42, 2.2);
+    }
+  }
+
+  // Flying: hurled along on the boost, the body tips forward into it, the
+  // legs trail and the arms sweep back, hands at the hips (where the jet
+  // comes from) - laid over their own jump, so it's still theirs.
+  flyOverlay(Pz, w, t) {
+    const f = this.pFly || (this.pFly = new Float32Array(N));
+    f.set(Pz);
+    const k = w * 0.85;
+    const bob = Math.sin(t * 2.3);
+    // (tipped about the feet, so the body is set back and lifted to keep
+    // the hips over where they were)
+    f[C.bodyPitch] = -1.02 + 0.04 * bob;
+    f[C.bodyZ] = 0.62;
+    f[C.hipY] = this.HIP_Y + 0.3;
+    f[C.hipPitch] = 0.05;
+    f[C.spLean] = 0.04;
+    f[C.chLean] = 0.02;
+    f[C.hdPitch] = 0.95 + 0.03 * bob;
+    f[C.hdYaw] = Pz[C.hdYaw] * 0.5;
+    f[C.thLx] = -0.12 + 0.07 * bob;
+    f[C.thRx] = 0.22 - 0.07 * bob;
+    f[C.thLz] = 0.06;
+    f[C.thRz] = 0.09;
+    f[C.knL] = 0.3;
+    f[C.knR] = 0.95;
+    f[C.anL] = 0.55;
+    f[C.anR] = 0.4;
+    f[C.shLx] = -0.42 + 0.05 * bob;
+    f[C.shRx] = -0.42 - 0.05 * bob;
+    f[C.shLz] = 0.3;
+    f[C.shRz] = 0.3;
+    f[C.elL] = 0.3;
+    f[C.elR] = 0.3;
+    f[C.wrL] = -0.25;
+    f[C.wrR] = -0.25;
+    for (let i = 0; i < N; i++) Pz[i] += (f[i] - Pz[i]) * k;
   }
 
   // hooks for a character's flourishes
@@ -531,6 +750,9 @@ export class Player {
     this.y = 0;
     this.vx = 0;
     this.grounded = true;
+    this.drift = false;
+    this.bounding = false;
+    this.stepMark = null;
     this.slideT = 0;
     this.lane = Math.round((this.x - CONFIG.laneX[0]) / 2.4);
     this.prevLane = this.lane;
@@ -567,32 +789,52 @@ export class Player {
     const ground = groundAt ? groundAt(this.x) : 0;
     this.groundY = ground;
     if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
+    // (the cape, hair and beard grow light along with them)
+    this.gk = damp(this.gk, this.lowG ? CONFIG.drift.gk : 1, 3, dt);
+    if (this.dust) this.dust.g = this.lowG ? 6 : 16;
+    this.boundStep();
+    this.boostT += dt;
+    this.thrust = Math.max(0, this.thrust - dt / 0.34);
     if (!this.grounded) {
       const prevY = this.y;
-      this.fall(dt);
+      if (this.drift) boostStep(this, dt);
+      else if (this.bounding) {
+        const g = CONFIG.drift.bound.g;
+        this.y += this.vy * dt - 0.5 * g * dt * dt;
+        this.vy -= g * dt;
+        this.boundT += dt;
+      } else this.fall(dt);
       // land only when arriving from above; running into a ledge is a hit, not a mantle
       if (this.y <= ground && this.vy <= 0 && prevY >= ground - 0.3) {
         this.y = ground;
-        // (how hard: a plain jump lands at 1, a fast-fall slams in harder)
-        this.landHit = clamp(-this.vy / this.V0, 0.35, 1.7);
+        // (how hard: a plain jump lands at 1, a fast-fall slams in harder;
+        // in low gravity they come down softer, a bound softest)
+        const wasBound = this.bounding;
+        const low = this.drift || wasBound;
+        this.landHit = clamp(-this.vy / this.V0, 0.35, 1.7) * (wasBound ? 0.45 : this.drift ? 0.8 : 1);
         this.landClock = 0;
         this.vy = 0;
         this.grounded = true;
+        this.drift = false;
+        this.bounding = false;
         this.onLand(this.landHit);
+        if (low || this.lowG) this.landLow(ground, wasBound, this.landHit);
         if (this.crashed) {
           // stay down
         } else if (this.jumpBuffer > 0) {
-          this.jump();
+          this.takeOff();
         } else if (this.slideQueued) {
           this.slideQueued = false;
           this.startSlide();
         }
       }
     } else if (this.y > ground + 0.02) {
-      // walked off the top of something
+      // walked off the top of something (in low gravity, drifting down)
       this.grounded = false;
       this.vy = 0;
       this.vyOff = this.vyPose;
+      this.drift = this.lowG;
+      this.rethrusts = 0;
     } else if (ground - this.y < 0.3) {
       this.y = ground;
     }
@@ -600,6 +842,8 @@ export class Player {
       this.y = 0;
       this.vy = 0;
       this.grounded = true;
+      this.drift = false;
+      this.bounding = false;
     }
     // The airborne poses are shaped by the climb and fall (vyPose): it rides
     // on vy, but a fast-fall's sudden plunge eases in over a few frames, and
@@ -627,14 +871,16 @@ export class Player {
     const running = this.mode === 'run' && speed > 0.5;
     const freq = running ? this.gait.cadence[0] + speed * this.gait.cadence[1] : 0;
     this.stride = freq;
-    this.phase += dt * TAU * freq;
+    // (a bound stretches the stride's flight over the whole of it)
+    if (this.bounding) this.phase = this.boundPh0 + this.boundPhD * Math.min(1, this.boundT / this.boundDur);
+    else this.phase += dt * TAU * freq;
     const f = this.phase;
     const t = this.time;
 
     // target weights
     let tRun = 0, tJump = 0, tSlide = 0, tIdle = 0;
     if (this.mode !== 'run') tIdle = 1;
-    else if (!this.grounded) tJump = 1;
+    else if (!this.grounded && !this.bounding) tJump = 1;
     else if (this.sliding) tSlide = 1;
     else tRun = 1;
     // weights ease in and out (second order, no overshoot) rather than
@@ -668,6 +914,17 @@ export class Player {
     Pz[C.knR] = Math.max(0, Pz[C.knR]);
     // take-off stretch
     if (this.jumpT < 0.25) Pz[C.sq] += 0.06 * Math.sin((this.jumpT / 0.25) * Math.PI);
+    // low gravity: flying, once a boost has them up off the ground (and a
+    // bound's arms out a little for balance)
+    const flyT = this.drift && !this.grounded && !this.crashed ? smooth(0.45, 1.3, this.y - (this.groundY || 0)) : 0;
+    this.flyW = damp(this.flyW, flyT, flyT > this.flyW ? 7 : 5, dt);
+    if (this.flyW > 0.002) this.flyOverlay(Pz, this.flyW, t);
+    if (this.bounding) {
+      const b = Math.sin(Math.PI * Math.min(1, this.boundT / this.boundDur));
+      Pz[C.shLz] += 0.22 * b;
+      Pz[C.shRz] += 0.22 * b;
+      Pz[C.spLean] += 0.06 * b;
+    }
 
     // lane changes: lean in, look where you're going, fling the outside arm
     const lc = this.springs.lane.step(clamp(this.vx / 9, -1, 1), 3.2, 0.55, dt);
@@ -798,6 +1055,7 @@ export class Player {
     this.root.rotation.y = D.rootYaw.step(this.crashed ? 0 : clamp(-this.vx * T[0], -T[1], T[1]), 2.8, 0.5, dt);
 
     this.secondary(dt, sp);
+    if (this.lowG || this.thrust > 0 || this.drift) this.jet(dt);
 
     // invulnerability blink
     this.root.visible = this.invulnT > 0 && !this.crashed ? Math.floor(this.invulnT * 12) % 2 === 0 : true;
@@ -1152,7 +1410,7 @@ export class Player {
     this.frameVel.lerp(vel, 1 - Math.exp(-dt * 30));
     this.frameAcc.subVectors(this.frameVel, _v2).divideScalar(dt).clampLength(0, 60);
     this.invQ.copy(this.root.quaternion).invert();
-    this.gravity.set(0, -9.8, 0).applyQuaternion(this.invQ);
+    this.gravity.set(0, -9.8 * this.gk, 0).applyQuaternion(this.invQ);
     // A soft breeze: slow swells from a wandering direction, now and then a
     // gust. It is what moves them when they stand still, and it keeps working
     // on the cloth on top of the headwind while they run.

@@ -209,13 +209,25 @@ export class ObstacleField {
       this.nextD = b.d + CONFIG.doorClearAfter;
       return;
     }
+    // a world can ask for more open road after its doorway than usual
+    // (def.clearAfter: the Red Drift's, for the jump to light speed)
+    const here = course.segAt(d);
+    const after = here.world.def.clearAfter;
+    if (after && here.ordinal > 1 && d < here.start + after) {
+      this.nextD = here.start + after;
+      return;
+    }
     const eta = runTime + (d - dist) / Math.max(game.speed, 6);
     const v = game.speedAt(eta);
     const calm = this.calmAt(d);
     const diff = this.difficultyFor(d, eta);
     const tutorial = this.tutorial.length > 0;
     const rows = tutorial ? [this.tutorial.shift()] : this.pick(diff, calm);
-    const space = calm ? calm.space : 1;
+    // (low gravity: a jump hangs longer, so the rows come further apart,
+    // and never as close after one you jump or duck - see CONFIG.drift.pace)
+    const low = here.world.def.lowGravity ? CONFIG.drift.pace : null;
+    const space = (calm ? calm.space : 1) * (low ? low.space : 1);
+    const airMul = low ? low.air : 1;
     const rowGap = lerp(o.rowGapEasy, o.rowGapHard, diff) * space;
     let last = null;
     for (let i = 0; i < rows.length; i++) {
@@ -230,7 +242,7 @@ export class ObstacleField {
       d += len;
       last = row;
       if (i < rows.length - 1) {
-        const min = needsVertical(row) ? o.minAfterVertical : o.minAfterLane;
+        const min = needsVertical(row) ? o.minAfterVertical * airMul : o.minAfterLane;
         d += Math.max(11, v * Math.max(min, rowGap * (rows[i + 1].gap ?? 1)));
       }
     }
@@ -240,7 +252,7 @@ export class ObstacleField {
       gap *= o.breatherMul;
       this.untilBreather = r.int(o.breatherEvery[0], o.breatherEvery[1]);
     }
-    if (last) gap = Math.max(gap, needsVertical(last) ? o.minAfterVertical : o.minAfterLane);
+    if (last) gap = Math.max(gap, needsVertical(last) ? o.minAfterVertical * airMul : o.minAfterLane);
     this.nextD = d + Math.max(12, v * gap);
   }
 

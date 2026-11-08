@@ -227,6 +227,88 @@ export class Ambient {
     }, 1500);
   }
 
+  // The jump to light speed (into the Red Drift): a rush of noise tearing up
+  // from a rumble to a shriek as the stars stretch, a deep swell under it and
+  // a glassy chord gliding up; then, as it drops out, a falling whoom and a
+  // soft boom, and a chime as the stars come back.
+  warp() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise();
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 1.4;
+    band.frequency.setValueAtTime(180, t);
+    band.frequency.exponentialRampToValueAtTime(5200, t + 0.75);
+    band.frequency.exponentialRampToValueAtTime(260, t + 1.1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.26, t + 0.12);
+    g.gain.setValueAtTime(0.26, t + 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+    src.connect(band).connect(g).connect(this.bus);
+    src.start(t);
+    src.stop(t + 1.2);
+    // the swell under it, and the drop out of it
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(48, t);
+    o.frequency.exponentialRampToValueAtTime(96, t + 0.75);
+    o.frequency.exponentialRampToValueAtTime(34, t + 1.1);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.22, t + 0.15);
+    og.gain.setValueAtTime(0.22, t + 0.78);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    o.connect(og).connect(this.master);
+    o.start(t);
+    o.stop(t + 1.35);
+    // a glassy chord gliding up as it takes hold
+    [62, 69, 74, 81].forEach((m, i) => {
+      const s = ctx.createOscillator();
+      s.type = 'triangle';
+      s.frequency.setValueAtTime(hz(m - 12), t);
+      s.frequency.exponentialRampToValueAtTime(hz(m), t + 0.8);
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(0.0001, t);
+      sg.gain.exponentialRampToValueAtTime(0.025, t + 0.2 + i * 0.04);
+      sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+      s.connect(sg).connect(this.bus);
+      s.start(t);
+      s.stop(t + 1);
+    });
+    [86, 93, 98].forEach((m, i) => this.chime(hz(m), t + 0.95 + i * 0.08, 0.04));
+    setTimeout(() => {
+      g.disconnect();
+      og.disconnect();
+    }, 1600);
+  }
+
+  // A thruster's burst (the boost, in low gravity): a short hiss of
+  // vapour, brighter for a full burst than a top-up.
+  thrust(k = 1) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise();
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(1400 + 900 * k, t);
+    hp.frequency.exponentialRampToValueAtTime(700, t + 0.32);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09 * k, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
+    src.connect(hp).connect(g).connect(this.bus);
+    const off = Math.random() * 0.6;
+    src.start(t, off);
+    src.stop(t + 0.4);
+    setTimeout(() => g.disconnect(), 600);
+  }
+
   // A sunken chest's lid popping open somewhere ahead (big: 1 flung wide,
   // less a burp; ahead: how far off, metres): a muffled wooden clunk and a
   // glug of bubbles rising in pitch, all of it quieter the further off.

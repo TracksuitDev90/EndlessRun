@@ -168,12 +168,13 @@ export class Dream {
   // only the swell runs; out of one (fromDrain), the colour has just welled
   // back, and a lighter burst rides out over it. Into a world that splashes
   // (env.splash, the Kelp Deep) the splash is the burst, and only the swell
-  // runs, like a wave racing ahead.
+  // runs, like a wave racing ahead; into one with env.warp (the Red Drift),
+  // the jump to light speed is.
   doorway(def, env, fromDrain = false) {
     this.rush = 1;
     const R = CONFIG.dream;
     const amt = R.rushBase + (1 - R.rushBase) * Math.min(1, this.now.level);
-    const quiet = env.drain || env.splash;
+    const quiet = env.drain || env.splash || env.warp;
     this.rushAmt = quiet ? 0 : fromDrain ? amt * 0.7 : amt;
     this.swellAmt = Math.max(amt, 0.8);
     this.rushTrip = quiet ? 0 : this.now.trip;

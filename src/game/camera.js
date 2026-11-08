@@ -20,6 +20,14 @@ export class ChaseCamera {
     this.roll = 0;
     this.sway = 0; // dream depth: a slow drunken roll and breathing FOV
     this.look = new THREE.Vector3();
+    // low gravity: a boost hurls the runner on (a kick of the FOV that eases
+    // off), and the camera rides higher with them while they fly
+    this.surge = 0;
+    this.low = 0;
+  }
+
+  boost(k) {
+    this.surge = Math.max(this.surge, 0.55 + 0.45 * Math.min(1, k));
   }
 
   resize(w, h) {
@@ -54,7 +62,10 @@ export class ChaseCamera {
 
     this.x = damp(this.x, player.x * 0.72, 7, dt);
     const slide = player.w ? player.w.slide : 0;
-    const ty = c.height * boom + Math.max(0, player.y) * 0.45 - slide * 0.35;
+    this.low = damp(this.low, player.lowG ? 1 : 0, 2, dt);
+    this.surge = Math.max(0, this.surge - dt * 1.4);
+    const lift = 0.45 + 0.15 * this.low;
+    const ty = c.height * boom + Math.max(0, player.y) * lift - slide * 0.35;
     this.y = damp(this.y, ty, 5, dt);
 
     // run framing
@@ -62,7 +73,7 @@ export class ChaseCamera {
     let py = this.y;
     let pz = playerZ + c.back * boom;
     let lx = player.x * 0.55 + this.x * 0.45;
-    let ly = c.lookHeight + Math.max(0, player.y) * 0.3;
+    let ly = c.lookHeight + Math.max(0, player.y) * (0.3 + 0.12 * this.low);
     let lz = playerZ - c.lookAhead;
 
     // title framing: low, close, a little to the side, looking past the
@@ -101,7 +112,8 @@ export class ChaseCamera {
     const sw = Math.min(1, this.sway) * (1 - i);
     this.camera.rotateZ(this.roll * (1 - i) + sw * (0.045 * Math.sin(time * 0.31) + 0.02 * Math.sin(time * 0.83 + 1.2)));
 
-    const fov = this.baseFov + sp * 7 + i * 4 + sw * 2.4 * Math.sin(time * 0.47);
+    const sg = this.surge * this.surge * (3 - 2 * this.surge);
+    const fov = this.baseFov + sp * 7 + i * 4 + sw * 2.4 * Math.sin(time * 0.47) + sg * 6 * (1 - i);
     if (Math.abs(this.camera.fov - fov) > 0.01) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
