@@ -870,6 +870,10 @@ export class Game {
   render() {
     const r = this.renderer;
     const camera = this.cam.camera;
+    // the runner's and the companion's shadows: their silhouettes this frame
+    // (see render/caster.js)
+    this.player.renderShadow(r);
+    this.companion?.body.renderShadow(r);
     r.clear(true, true, true);
     this.portal.depthMesh.visible = this.portal.active;
     if (this.portal.active) {
@@ -927,6 +931,9 @@ export class Game {
       r.setScissor(0, 0, 1, 1);
       r.render(scene, this.cam.camera);
       r.setScissorTest(false);
+      // (and every shadow's silhouette target allocated now)
+      for (const x of Object.values(this.runners)) x.renderShadow(r);
+      for (const c of Object.values(this.companions)) c.body.renderShadow(r);
       r.clear(true, true, true);
     } finally {
       for (const w of [...this.worlds, this.doors]) w.setAllVisibleForCompile(false);

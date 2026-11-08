@@ -47,18 +47,27 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | # | World | Light | Inspired by |
 |---|-------|-------|-------------|
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane through a lived-in neighbourhood: now and then a greengrocer's or a bakery café on a ground floor, picket fences round front gardens of raspberry canes, market stalls on the verge (apples, grapefruit and oranges at one; watermelons, grapes and pineapples at the other), benches, post boxes, a bike with a basket of apples, the bus stop's shelter; and the market spilling into the road (see [The breather](#the-breather-the-cypress-lane)) | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
-| II | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, a trodden path through long grass (taller still in among the trunks), ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
-| III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights, washing stirring on the lines strung across it | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
-| IV | **The Hall of Doors** — a coral corridor through the heart of a library that goes on for ever, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, books fluttering up off the shelves and stacks in the way; over its walls the library rises on either side in four tiers of books, each a gallery railed and lamplit with rolling ladders on its shelves, and behind them rows and rows and rows of book stacks run off into a warm haze, lamps glowing on their ends; great timber arches span the hall under a beamed and plastered roof, green-shaded lamps hanging from them, shafts of sunlight slant down from high windows, a ladder leans now and then on the hall's wall up to the gallery, and doors and armchairs drift down the aisles between the stacks (see [The endless library](#the-endless-library)) | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration; old reading rooms — timber galleries under hammerbeam roofs, alcoves of shelves, rolling ladders, a domed reading room |
-| V | **The Glasshouse** — a white-ribbed greenhouse tunnel run wild: beds crowded with zinnias and spilling over their edges, ferns and monstera, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias |
+| II | **The Glasshouse** — a white-ribbed greenhouse tunnel gone to jungle: a path of mossy old stone pavers between beds crowded with zinnias and spilling over their edges, banana plants arching up into the roof, elephant ears, barred calatheas, ferns, monstera and dark ficus, Spanish moss hanging in curtains from the purlins, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | hot and humid: the low sun through glass fogged with condensation, a warm golden haze swallowing the far end, sunbeams slanting down through the leaves, motes drifting in them, leaf-dappled pavers, deep green shade closing in at the edges | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias; old palm houses in the morning sun — Spanish moss, banana leaves, elephant ears and calatheas along a winding paved path |
+| III | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, a trodden path through long grass (taller still in among the trunks), ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
+| IV | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights, washing stirring on the lines strung across it | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
+| V | **The Hall of Doors** — a coral corridor through the heart of a library that goes on for ever, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, books fluttering up off the shelves and stacks in the way; over its walls the library rises on either side in four tiers of books, each a gallery railed and lamplit with rolling ladders on its shelves, and behind them rows and rows and rows of book stacks run off into a warm haze, lamps glowing on their ends; great timber arches span the hall under a beamed and plastered roof, green-shaded lamps hanging from them, shafts of sunlight slant down from high windows, a ladder leans now and then on the hall's wall up to the gallery, and doors and armchairs drift down the aisles between the stacks (see [The endless library](#the-endless-library)) | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration; old reading rooms — timber galleries under hammerbeam roofs, alcoves of shelves, rolling ladders, a domed reading room |
 | VI | **The Sky Road** — the processional way of the sun, high over a sea of golden cloud: a road of painted limestone with a band of lapis down its middle strewn with gold stars like a tomb's ceiling, colonnades of painted papyrus columns either side (shafts banded in red, gold, lapis and green, figures striding round them, capitals opening like papyrus heads, a striped cornice over them), now and then an avenue of sphinxes with braziers burning between them, great temple pylons painted with figures spanning the road with obelisks before them, golden pyramids and palms on floating islands, the three great pyramids far off on a plateau of their own, and Ra's disc low over the end of the road with its wings spread across the sky (see [The Sky Road of the sun](#the-sky-road-of-the-sun)) | a low sun ahead and to the right: warm light on the painted faces, the shade still showing their colours, golden rims, lapis overhead fading to gold | Sky Dancer; Egyptian temple painting — the winged sun, the eye of Horus, the scarab, the ankh — the pyramids of Giza at sunset, the painted columns of Philae |
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump (see [The sands of time](#the-sands-of-time)), your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 | IX | **The Kelp Deep** — under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
 | X | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
 
-The first lap always nests inward in that order; after that the order shuffles
-(never the same world twice in a row).
+The worlds always nest inward in that order, and every lap comes back round
+the same way, so you always know what's through the next door. They run in
+groups, each leading into the next: green and growing first — the Cypress
+Lane (the breather, so every lap starts easy), its gardens giving onto the
+Glasshouse, and out of that into the wild Deepwood, day sinking into ever
+deeper shade; then after dark, by lamplight — the Night Rooftops, and down
+off them into the endless library of the Hall of Doors; then the sun and its
+eclipse — the Sky Road of the sun, and Hell, where the sun has gone out; and
+last, out past the world — the heavenly Gallery of Hours, the sea lapping in
+through its doorway to the Kelp Deep, and out past the sea, the stars of the
+Red Drift. Then back round to the Cypress Lane.
 
 ### The endless library
 
@@ -417,6 +426,23 @@ ruffled arms and long tentacles trail and ripple a beat behind, and it lifts
 on every beat (toon option `jelly`). Mantas and turtles beat their wings and
 flippers, and now and then a whale swims by far off, its tail beating.
 
+**The critters.** And all over the reef, little ones zooming about, cute,
+with big round eyes and a glint in each: sea lions, sleek and caramel, in
+pairs racing big figures of eight alongside you (now and then one high over
+the road), banking hard into their turns and flinging themselves into a
+barrel roll once round every loop, a wave rippling down them to their hind
+flippers while their fore flippers sweep; octopuses — coral, tangerine or
+violet — jetting over the coral in spurts, arms drawn in on each push and
+flung out streaming behind them; and little herds of seahorses, gold, coral
+and lilac, bobbing and darting about over the seagrass, upright, their fins
+a blur and their tails curling and uncurling. None of it costs the CPU
+anything: each critter is an ordinary instance, and the vertex shader swims
+it round its spot (toon option `swim`: the loop's size and pace, how hard it
+puts on speed and eases off, how far it banks, how often it rolls, its beat,
+and its kind; its limbs carry their `role`). Their loops never reach in over
+the road below head height, so nothing zooming about is ever mistaken for
+something in your way.
+
 **The whale.** The marquee obstacle: a humpback crossing the path, the one
 you dive under. It's built tail to snout across the road — long pale-bellied
 flippers out past the road on its head's side, its flukes out past it on the
@@ -566,10 +592,10 @@ rolls in slow waves:
 | | 2nd visit | 3rd visit | 4th visit |
 |---|---|---|---|
 | Cypress Lane | golden hour, blossom trees, flower beds, petals on the wind | lilac dusk, moon, fireflies, giant flowers over the lane | teal-and-pink dream, aurora, cypresses changing colour |
+| Glasshouse | butterflies over the beds, pink petals | dusk, rose glass, giant blooms in the beds | bioluminescent night, glowing spores, aurora |
 | Deepwood | firefly night: moonbeams, little white forest spirits watching from the roots, their heads rattling | the toadstool dusk: violet haze, giant glowing toadstools among the trunks, spores drifting up | the dreaming wood: rainbow bark, jellyfish drifting between the trees, aurora through the leaves |
 | Night Rooftops | paper sky lanterns drift up, faint aurora | a huge moon, strong aurora | purple night, hot-air balloons |
 | Hall of Doors | the books take flight | a tea party at dusk: teal-and-cream floor, teacups and teapots adrift | violet night, the shadows swap sides, clocks float past |
-| Glasshouse | butterflies over the beds, pink petals | dusk, rose glass, giant blooms in the beds | bioluminescent night, glowing spores, aurora |
 | Sky Road | ibises wheeling over the clouds | the night of Nut: the stars out over the lapis, a crescent moon, the winged sun sunk low and red | the boats of the sun sailing through the clouds |
 | Hell | an ember storm: more fire on the wind, the plain alight | the eclipse swells, its ring of fire burning hotter, ash falling thick | the colours begin to drift |
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
@@ -591,8 +617,8 @@ movements:
 2. **The morph.** From the fourth, the far distance quietly starts to misbehave:
    props far off breathe, slow swells roll through the far road, and a world
    or two later tall things far away go soft like jelly. Easy to miss at first.
-3. **The trip.** Only from the eighth world (about four minutes in, early in
-   the second lap) does the dream start to colour things — first a stir in
+3. **The trip.** Only from the eighth world (about four minutes in, the Gallery
+   of Hours on the first lap) does the dream start to colour things — first a stir in
    the sky, then rings of hue, a turned palette, neon ink and finally a
    corkscrewing road — each effect joining at its own depth and growing over
    several worlds; everything is in by about the eighteenth.
@@ -972,6 +998,25 @@ wine-dark mouth fringed with pale teeth, a few clamped shut, white blossom on
 tall stalks over it all. (No true reds in any of it: those belong to the
 rubies, so they still stand out against all the green.)
 
+And it has gone to jungle. Banana plants stand in the beds, their great
+ribbed paddle leaves arching up into the roof and drooping at the tips (the
+ones that would reach out over the path held up high); dark ficus trees grow
+up against the glass; elephant ears hold out heart-shaped leaves, dark and
+glossy with pale veins, along the front of every bed, between calatheas barred
+pale in a herringbone, and ferns spill long arching fronds over the bed's edge
+onto the path. Spanish moss hangs from the purlins in long grey-green
+curtains, lowest at the sides, over the beds and the shelves, glowing where
+the light comes through it, and swaying. Underfoot the path is old square
+stone pavers in staggered courses, worn and damp, moss in every joint and
+creeping in over the edges from the beds (ground pattern 13). And it's hot
+and humid in here: the low sun pours in through glazing fogged milky with
+condensation, lighting up a warm golden haze that thickens down the tunnel
+till its far end is lost in it; shafts of it slant down through the leaves
+onto the beds and now and then right across the path, motes and droplets
+drift slowly up through them, sunlight dapples the pavers through the leaves,
+and the deep green shade of the big leaves closes in at the edges of the
+picture.
+
 The obstacles grow too. The pot rows, planters and hanging baskets come into
 flower each its own way (a cluster of zinnias, of a colour of its own, on
 some of the pots and none on others: `extras` on the obstacle's spec), and
@@ -984,6 +1029,35 @@ of triangles, and all the small greenery grows up out of the beds as you come
 (and the baskets and vines let down from the roof) — toon anim mode 2, which
 also means the far stretch, lost in the haze anyway, isn't drawn at all. It
 costs about what the Cypress Lane does.
+
+## Shadows
+
+Every runner and companion casts a shadow of their own shape, as it is this
+frame: arms pumping, legs mid-stride, the cape streaming, the beard and the
+stick, the satchel and whatever he's floating down on, the fox's ears and
+the brush of her tail, the ribbon of the dragon's body. It falls along the
+world's light, the same way every obstacle's shadow does (`env.cast`, carried
+with the runner through doorways so it swings round as the light changes) —
+long and slanting under the Sky Road's low sun, straight down under the sea —
+in the world's own shadow colour, softer the softer the world's light (the
+Cypress Lane's wrapped glow against the Hall of Doors' razor sun), lighter
+and softer the higher they leap, with a little contact shade round the feet
+when they're on the ground.
+
+How (`src/render/caster.js`): each frame, before the picture itself, the
+figure's own meshes are drawn once more, with their own materials (so the
+skinning, the simulated cloth and hair and the props in hand all come out
+exactly as they look), into a small render target through a camera whose
+projection flattens the world onto the ground along the light — a point at
+height h lands at (x + cast.x·h, z + cast.y·h) — framed tight round where
+the shadow will fall. Only its alpha matters: where anything of them was
+drawn. A plane laid on the ground under that frame samples it, softened by a
+few taps, and multiplies the shadow colour over whatever it falls on. The
+ink hull and the fur are left out (they'd add nothing a shadow would show),
+and the render target has no depth buffer. (The renderer's output colour
+space is set to linear — nothing is converted on the way out anyway — so the
+materials drawn into the target share their programs with the screen's and
+nothing more has to compile.)
 
 ## Run it locally
 
@@ -1050,8 +1124,9 @@ Append to the URL:
   doors swinging, foliage swaying, wings and book covers flapping, drifting
   props and the curved-world bend are all done in the vertex shader from
   distance and time — no per-object CPU updates.
-- **A fox for four draw calls.** Sorrel is one skinned mesh (~15k
-  triangles), its ink hull, a layer of fur and a shadow decal: the fur is
+- **A fox for five draw calls.** Sorrel is one skinned mesh (~15k
+  triangles), its ink hull, a layer of fur, and her shadow (the mesh drawn
+  once more into it, and the plane it's laid on): the fur is
   four copies of the furred part of her surface in one buffer (~49k
   triangles), so it costs one draw call however many layers there are. Her
   gallop, legs, tail, ears and mind take about 0.05 ms a frame; nothing she
@@ -1078,8 +1153,13 @@ Append to the URL:
   lighting model: terminator softness and wrap (harsh vs soft worlds), rim /
   back light, low-lying mist, leaf dapple, an analytic wall shadow, colour
   grade and a tinted vignette — no shadow maps, no post-processing passes.
-  Light shafts and lamp cones are soft additive volumes; cast shadows are
-  decals. Ink lines use the inverted-hull trick.
+  Light shafts and lamp cones are soft additive volumes; the scenery's cast
+  shadows are decals. Ink lines use the inverted-hull trick.
+- **Real shadows, cheaply.** The runner's and the companion's shadows are
+  their own shapes (see [Shadows](#shadows)): each a small render target the
+  figure is drawn into once more a frame, flattened onto the ground along
+  the light — no depth, no ink hull, no fur — about three extra draw calls,
+  and a few texture taps where it falls.
 - **No hitches.** All shaders are compiled during the loading screen, and
   then everything is drawn once under it, so every world's buffers and
   textures are on the GPU and every program has been used before the run
@@ -2086,8 +2166,9 @@ frills are on springs (laid back by the wind, flattened when she's startled,
 flaring when she's pleased); her mane's fur is combed back by the air; the
 end of her tail flutters; she looks at what interests her, her neck taking a
 share of the turn; her jaw opens to snap at a gem, or a little in a grin. Her
-shadow is a long soft stroke laid along her body on the ground, fading as
-she climbs.
+shadow is her own shape, the ribbon of her body, her legs, antlers and mane,
+thrown along the light onto the ground below her, fainter and softer the
+higher she flies (see [Shadows](#shadows)).
 
 **Her mind** (`src/game/flyer.js`). The runner and the road just ahead of
 them are yours. Her place is the lane beside you (never yours; on her own
@@ -2155,7 +2236,7 @@ index.html, css/style.css     page shell, overlay UI
 src/config.js                 every gameplay / feel / camera tunable
 src/main.js                   boot, render loop, adaptive resolution, input wiring
 src/core/                     input (swipes + keys), ambient audio, seeded RNG
-src/render/                   shaders, geometry kit, instanced batches, textures, particles
+src/render/                   shaders, geometry kit, instanced batches, textures, particles, the figures' shadows
 src/world/                    world runtime + one file per world (art, lighting, lap
                               variations, layout, obstacles, gem, doorway); whimsy.js holds
                               the shared later-lap props and light volumes, gems.js the

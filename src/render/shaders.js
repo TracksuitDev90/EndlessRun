@@ -401,7 +401,7 @@ attribute vec4 aInst;
 // clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
 uniform float uWonk;
 #endif
-#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID)
+#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID) || defined(SWIM)
 attribute float role;
 #endif
 #if defined(SCHOOL) || defined(LID)
@@ -433,6 +433,24 @@ uniform vec4 uCurrent;
 // stream flowing along +x, 1 a ball milling round the y axis, 2 a column
 // rising up y.
 uniform vec4 uSchool;
+#endif
+#ifdef SWIM
+// A critter zooming round its spot (the Kelp Deep's sea lions, octopuses
+// and seahorses), built nose to +x round the origin. It swims a figure of
+// eight - uSwim.y either way along its own x, uSwim.w either way across (z),
+// bobbing uSwim.z up and down - going round uSwim.x radians a second,
+// putting on speed and easing off as it goes (uSwim3.x), turned the way it's
+// heading, nosing up and down with its path (uSwim3.y: 0 it stays upright),
+// banked into its turns (uSwim2.x) and now and then, once round each loop,
+// flinging itself into a barrel roll (uSwim2.y rolls). Its beat: uSwim2.z
+// a second, uSwim2.w how hard, the way of its kind (uSwim3.z): 0 a sea lion
+// - a wave down its body to the hind flippers, the fore flippers (role 1)
+// sweeping; 1 an octopus - a jet, its arms (role 1) drawn in and flung out
+// behind it, rippling; 2 a seahorse - upright, its fin (role 1) a blur, its
+// tail (role 2) curling and uncurling.
+uniform vec4 uSwim;
+uniform vec4 uSwim2;
+uniform vec4 uSwim3;
 #endif
 #ifdef JELLY
 // A jellyfish: the bell (role 0) squeezes and relaxes, a quick beat and a
@@ -494,6 +512,14 @@ vec3 rotY(vec3 v, float a) {
 vec3 rotXcs(vec3 v, float c, float s) {
   return vec3(v.x, v.y * c + v.z * s, -v.y * s + v.z * c);
 }
+#ifdef SWIM
+// rolled about x, pitched about z, then yawed about y (see SWIM)
+vec3 swimTurn(vec3 v, vec2 r, vec2 p, float yaw) {
+  v = vec3(v.x, v.y * r.x - v.z * r.y, v.y * r.y + v.z * r.x);
+  v = vec3(v.x * p.x - v.y * p.y, v.x * p.y + v.y * p.x, v.z);
+  return rotY(v, yaw);
+}
+#endif
 float easeOutBack(float t) {
   float u = t - 1.0;
   return 1.0 + 2.5 * u * u * u + 1.5 * u * u;
@@ -562,6 +588,52 @@ void main() {
         lo = rotY(lo, yaw) * fade;
       #endif
       lp += c;
+    }
+  #endif
+  #ifdef SWIM
+    {
+      float u = uTime * uSwim.x + phase;
+      float th = u + uSwim3.x * sin(u);
+      // where it is round its figure of eight, which way it's going, and
+      // how its heading is turning
+      vec3 c = vec3(uSwim.y * sin(th), uSwim.z * sin(3.0 * th + 0.7), uSwim.w * sin(2.0 * th));
+      vec3 d = vec3(uSwim.y * cos(th), 3.0 * uSwim.z * cos(3.0 * th + 0.7), 2.0 * uSwim.w * cos(2.0 * th));
+      vec2 dd = vec2(-uSwim.y * sin(th), -4.0 * uSwim.w * sin(2.0 * th));
+      float hl = max(length(d.xz), 1e-3);
+      float yaw = atan(-d.z, d.x);
+      float pitch = atan(d.y, hl) * uSwim3.y;
+      float turn = clamp((d.x * dd.y - d.z * dd.x) / (hl * hl), -2.5, 2.5);
+      float roll = turn * uSwim2.x;
+      float lap = fract(th / 6.2831853 + phase * 0.1591549);
+      roll += 6.2831853 * uSwim2.y * smoothstep(0.55, 0.8, lap);
+      float bt = uTime * uSwim2.z * 6.2831853 + phase * 9.0;
+      float w = uSwim2.w;
+      if (uSwim3.z < 0.5) {
+        float back = max(0.15 - lp.x, 0.0);
+        lp.y += sin(bt - lp.x * 3.0) * w * back * back;
+        if (role > 0.5) lp.y += sin(bt + 1.2) * w * 2.2 * abs(lp.z);
+      } else if (uSwim3.z < 1.5) {
+        float pulse = 0.5 + 0.5 * sin(bt);
+        if (role > 0.5) {
+          float k = max(0.05 - lp.x, 0.0);
+          lp.yz *= 1.0 - 0.4 * pulse * min(k * 1.6, 1.0);
+          lp.z += sin(bt * 1.5 - lp.x * 7.0 + lp.y * 4.0) * w * k;
+          lp.y += cos(bt * 1.3 - lp.x * 6.0 + lp.z * 4.0) * w * k;
+        } else {
+          lp.yz *= 1.0 + 0.07 * (1.0 - pulse);
+        }
+      } else {
+        if (role > 0.5 && role < 1.5) lp.z += sin(uTime * 40.0 + lp.y * 30.0 + phase) * 0.014;
+        if (role > 1.5) lp.x += sin(bt) * w * max(-lp.y, 0.0);
+        lp.y += sin(bt * 0.5) * 0.03;
+      }
+      vec2 rr = vec2(cos(roll), sin(roll));
+      vec2 pp = vec2(cos(pitch), sin(pitch));
+      lp = swimTurn(lp, rr, pp, yaw) + c;
+      ln = swimTurn(ln, rr, pp, yaw);
+      #ifdef OUTLINE
+        lo = swimTurn(lo, rr, pp, yaw);
+      #endif
     }
   #endif
   #ifdef JELLY
@@ -1604,6 +1676,28 @@ vec3 groundColor(vec2 p, float dist) {
     c = mix(c, avg, far * 0.6);
     float border = smoothstep(3.75, 3.85, abs(p.x));
     return mix(c, uGroundC, border);
+  #elif GROUND == 13
+    // the Glasshouse's path: old square stone pavers laid in staggered
+    // courses, worn and damp, moss grown into every joint and creeping in
+    // over the edges from the beds in patches. (p.y runs on from chunk to
+    // chunk, so every period here divides the 4096 m it wraps at.)
+    vec2 cs = vec2(0.62, 0.5);
+    vec2 q = p / cs;
+    q.x += mod(floor(q.y), 2.0) * 0.5;
+    vec2 cell = floor(q);
+    float h = hash12(cell + 29.0);
+    float wear = texture2D(uNoise, p * 0.25).g;
+    vec3 c = mix(uGroundA, uGroundB, h * 0.65 + wear * 0.35);
+    // (now and then a paver gone green all over)
+    c = mix(c, mix(c, uGroundC, 0.3), step(0.93, h));
+    float joint = mix(edgeMaskRun(fract(q), cs, 0.024), 1.0, far * 0.8);
+    c = mix(mix(uGroundC * 0.85, c, 0.3), c, joint);
+    float patchy = texture2D(uNoise, p * 0.125).g;
+    float creep = smoothstep(2.9, 4.2, abs(p.x) + (patchy - 0.5) * 1.8);
+    c = mix(c, uGroundC * (0.8 + wear * 0.4), creep * (1.0 - far * 0.5));
+    c = mix(c, avg, far * 0.55);
+    float border = smoothstep(3.95, 4.35, abs(p.x));
+    return mix(c, uGroundC * 0.75, border);
   #elif GROUND == 6
     // forest floor: long grass laid down in painterly strokes (two staggered
     // layers of tapering blades, dark at the root, catching light at the tip),
@@ -4017,6 +4111,46 @@ void main() {
 }
 `;
 
+// --- A figure's own shadow (render/caster.js) --------------------------------
+// The runner's (or the companion's) silhouette, rendered flat along the
+// world's light into uCastMap, laid on the ground: softened by a few taps
+// (more the softer the light and the higher they are off the ground), with
+// a little contact shade round the feet, multiplied over whatever it falls on
+// in the world's own shadow colour.
+const VS_CAST = COMMON + /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  vec3 wp = bendPos((modelMatrix * vec4(position, 1.0)).xyz);
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_CAST = /* glsl */ `
+uniform sampler2D uCastMap;
+uniform vec3 uShadowColor;
+uniform vec4 uCastK; // xy the blur (uv), z how dark, w the contact shade
+uniform vec4 uFoot; // xy the feet (uv), zw 1 / the contact shade's radius (uv)
+varying vec2 vUv;
+float cov(vec2 o) {
+  return texture2D(uCastMap, vUv + o).a;
+}
+void main() {
+  vec2 r = uCastK.xy;
+  vec2 q = r * 0.7071;
+  float a = cov(vec2(0.0)) * 0.2;
+  a += (cov(vec2(r.x, 0.0)) + cov(vec2(-r.x, 0.0)) + cov(vec2(0.0, r.y)) + cov(vec2(0.0, -r.y))) * 0.12;
+  a += (cov(q) + cov(-q) + cov(vec2(q.x, -q.y)) + cov(vec2(-q.x, q.y))) * 0.08;
+  a *= uCastK.z;
+  vec2 f = (vUv - uFoot.xy) * uFoot.zw;
+  float ao = (1.0 - smoothstep(0.0, 1.0, dot(f, f))) * uCastK.w;
+  a += ao * (1.0 - a);
+  // (never a hard edge where the frame it was drawn in ends)
+  vec2 e = abs(vUv - 0.5) * 2.0;
+  a *= 1.0 - smoothstep(0.92, 1.0, max(e.x, e.y));
+  gl_FragColor = vec4(mix(vec3(1.0), uShadowColor, clamp(a, 0.0, 1.0)), 1.0);
+}
+`;
+
 // --- Light shafts and lamp cones (additive, soft-edged volumes) -------------
 const FS_BEAM = FS_HEAD + /* glsl */ `
 uniform vec4 uBeam; // rgb, intensity
@@ -5576,6 +5710,10 @@ export function makeEnvUniforms(env) {
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
     uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(), uVigShape: v4(),
+    // which way shadows fall (env.cast: m of shadow per m of height, x
+    // sideways, y toward the camera) - the runner's and the companion's
+    // silhouettes are laid on the ground along it (see render/caster.js)
+    uCast: v40(),
     // how pale the dust kicked up off the ground is (env.dustPale)
     uDustPale: { value: 0.62 },
     uSea: v4(), uDeep: v4(), uDeepTint: c(),
@@ -5645,6 +5783,8 @@ export function writeEnvUniforms(u, env) {
   setColor(u.uGroundB.value, env.ground[1]);
   setColor(u.uGroundC.value, env.ground[2]);
   setColor(u.uShadowColor.value, env.shadowDecal);
+  const cast = env.cast || [0, 0];
+  u.uCast.value.set(cast[0], cast[1], 0, 0);
   const gc = color(env.glass ? env.glass[0] : '#ffffff');
   u.uGlass.value.set(gc.r, gc.g, gc.b, env.glass ? env.glass[1] : 0.2);
   u.uGlowGain.value = env.glowGain ?? 1;
@@ -5781,6 +5921,16 @@ export function makeToonMaterial(env, o = {}) {
     defines.SCHOOL = '';
     uniforms.uSchool = { value: new THREE.Vector4(...o.school) };
   }
+  // a critter zooming round its spot (see SWIM): [loop rate, along,
+  // up, across]; [bank, barrel rolls a loop, beats a second, beat]; [surge,
+  // pitch, kind (0 sea lion, 1 octopus, 2 seahorse)]
+  if (o.swim) {
+    defines.SWIM = '';
+    uniforms.uSwim = { value: new THREE.Vector4(...o.swim) };
+    uniforms.uSwim2 = { value: new THREE.Vector4(...(o.swim2 || [0, 0, 1, 0])) };
+    const s3 = o.swim3 || [];
+    uniforms.uSwim3 = { value: new THREE.Vector4(s3[0] ?? 0, s3[1] ?? 1, s3[2] ?? 0, 0) };
+  }
   if (o.jelly) {
     defines.JELLY = '';
     uniforms.uJelly = { value: new THREE.Vector4(...o.jelly) };
@@ -5818,7 +5968,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'JELLY', 'CROSS', 'LID']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -5949,6 +6099,27 @@ export function makeShadowMaterial(env, o = {}) {
     defines,
     vertexShader: VS_SHADOW,
     fragmentShader: FS_SHADOW,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.ZeroFactor,
+    blendDst: THREE.SrcColorFactor,
+  });
+}
+
+// A figure's own shadow (see FS_CAST): map, its silhouette render target's
+// texture; env, the uniforms the figure is lit by.
+export function makeCastShadowMaterial(env, map) {
+  const uniforms = withShared(env, {
+    uCastMap: { value: map },
+    uCastK: { value: new THREE.Vector4(0.01, 0.01, 1, 0) },
+    uFoot: { value: new THREE.Vector4(0.5, 0.5, 1, 1) },
+  });
+  return new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: VS_CAST,
+    fragmentShader: FS_CAST,
     transparent: true,
     depthWrite: false,
     blending: THREE.CustomBlending,

@@ -9,7 +9,7 @@ import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { paintingsGeo, Deck, PAINTING_COUNT } from './hall-art.js';
 
-// IV · The Hall of Doors — a coral corridor with a checkerboard floor, lined
+// V · The Hall of Doors — a coral corridor with a checkerboard floor, lined
 // with doors of every color, running through the heart of a library that
 // goes on for ever: over its walls a gallery of books rises on either side,
 // railed and lamplit, rolling ladders on its shelves; behind those, rows and

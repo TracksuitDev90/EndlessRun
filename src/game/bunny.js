@@ -298,6 +298,8 @@ export class Bunny extends Player {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
     // (too small for the fox to ride on, or to shoot through his legs)
     this.small = true;
+    // (his shadow's frame reaches up over what he floats down on)
+    this.castTop = 2.3;
   }
 
   configure() {
@@ -400,6 +402,7 @@ export class Bunny extends Player {
     this.whiskers = new THREE.Mesh(geo, makeWhiskerMaterial(this.u, COL[24]));
     this.whiskers.frustumCulled = false;
     this.whiskers.renderOrder = -18;
+    this.whiskers.userData.noCast = true;
     this.b.head.add(this.whiskers);
   }
 

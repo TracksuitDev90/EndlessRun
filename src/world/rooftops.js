@@ -7,7 +7,7 @@ import { crystal, topazPrism, nugget, cube, point } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// III · The Night Rooftops — a slate walkway across the roofs of a sleeping
+// IV · The Night Rooftops — a slate walkway across the roofs of a sleeping
 // city: navy houses with warm windows, chimney pots, a crescent moon, stars
 // and strings of little lights. High-contrast night: hard moonlight from
 // ahead rims every silhouette, lamps pour warm cones onto the slates, and fog

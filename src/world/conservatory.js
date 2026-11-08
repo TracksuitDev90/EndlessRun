@@ -8,19 +8,22 @@ import { crystal, nugget, tabular, dodecahedron, tetragonal } from './gems.js';
 import { groundStrip, doorShape } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// V · The Glasshouse — a white-ribbed greenhouse tunnel run wild: beds
+// II · The Glasshouse — a white-ribbed greenhouse tunnel run wild: beds
 // crowded with zinnias, ferns and monstera spilling over their edges, ivy
 // climbing the ribs, baskets hung from brackets and from the roof on long
 // chains trailing vines, shelves of potted plants against the glass, potted
 // cypress and orange trees - and here and there a Venus flytrap that's been
-// left to grow far too big. Glowing in warm late light, the softest world:
-// backlit, humid haze, sunbeams slanting through the glazing and
-// leaf-dappled floors. Returns bring butterflies, then giant blooms at dusk,
-// then a bioluminescent night.
+// left to grow far too big - and gone to jungle: banana plants arching into
+// the roof, elephant ears, calatheas, ferns, dark ficus, Spanish moss in
+// curtains from the purlins, a path of mossy old stone pavers. Hot and
+// humid: the low sun pouring in through glass fogged with condensation, a
+// warm golden haze, sunbeams slanting down through the leaves, motes in them,
+// leaf-dappled pavers, deep green shade at the edges. Returns bring
+// butterflies, then giant blooms at dusk, then a bioluminescent night.
 
 const C = {
-  iron: '#eef6f0',
-  ironShade: '#cfe0d8',
+  iron: '#e4efe2',
+  ironShade: '#c2d6c6',
   leafDeep: '#1d6a48',
   leaf: '#3f9a63',
   leafHi: '#8fd27a',
@@ -29,7 +32,7 @@ const C = {
   terracotta: '#c8693a',
   rim: '#a9532a',
   soil: '#4a3426',
-  planter: '#e9efe6',
+  planter: '#bcc4aa',
   orange: '#f28a2a',
   blossom: '#ffffff',
   blossomCore: '#ffd36a',
@@ -47,6 +50,25 @@ const C = {
   stalk: '#4a8a32',
   stalkHi: '#9cc84e',
   chain: '#2a3a34',
+  // the jungle: Spanish moss, grey-green and sunlit paler at its tips; the
+  // banana's broad leaves; elephant ears, dark and glossy with pale veins;
+  // the calathea's dark leaves barred pale; ferns; the ficus, darkest of all
+  moss: '#5f7a62',
+  mossTip: '#c4d4a8',
+  banana: '#2a6a2e',
+  bananaHi: '#93cc5c',
+  bananaStem: '#5f7f34',
+  ear: '#173f26',
+  earHi: '#3f8a44',
+  vein: '#c8e2a8',
+  calathea: '#1d4429',
+  calatheaHi: '#2f6a3a',
+  calatheaBar: '#9cc77e',
+  frond: '#245e30',
+  frondHi: '#7cbf52',
+  ficus: '#143a22',
+  ficusHi: '#3d7c3c',
+  bark: '#5a4a36',
 };
 
 // Zinnias (and the odd marigold): pinks, corals, peach, gold and cream - no
@@ -474,6 +496,226 @@ function plantShelfGeo(seed) {
   return merge(parts);
 }
 
+// --- the jungle ---------------------------------------------------------------
+// The Glasshouse grown lush: the beds overrun with big tropical leaves -
+// banana plants arching up into the roof, elephant ears, calatheas barred
+// pale, ferns spilling fronds over the path's edge, dark ficus trees against
+// the glass - and Spanish moss hanging in long grey-green curtains from the
+// purlins, glowing where the sun comes through it.
+
+const _bx = new THREE.Vector3();
+const _by = new THREE.Vector3();
+const _bz = new THREE.Vector3();
+const _mb = new THREE.Matrix4();
+const _m3 = new THREE.Matrix3();
+
+// A part built along +y from the origin (its width along x, its face toward
+// +z), set to run from a toward b lying as flat as it can: its width kept
+// level, its face up (a leaf held out from its stalk).
+function flatAlong(g, a, b) {
+  _by.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]).normalize();
+  _bx.crossVectors(_by, _Y);
+  if (_bx.lengthSq() < 1e-6) _bx.set(1, 0, 0);
+  _bx.normalize();
+  _bz.crossVectors(_bx, _by);
+  _mb.makeBasis(_bx, _by, _bz).setPosition(a[0], a[1], a[2]);
+  g.applyMatrix4(_mb);
+  _m3.setFromMatrix4(_mb);
+  const o = g.attributes.onrm;
+  for (let i = 0; i < o.count; i++) {
+    _v3.set(o.getX(i), o.getY(i), o.getZ(i)).applyMatrix3(_m3);
+    o.setXYZ(i, _v3.x, _v3.y, _v3.z);
+  }
+  return g;
+}
+
+// A leaf along +y from its foot at the origin, len long and w wide, its face
+// toward +z, shaded lo at the foot to hi at the tip. o: thin (its thickness,
+// a share of its width), bend (how far its tip droops, a share of its
+// length), heart (lobes at its foot), rib (a pale midrib and veins: their
+// colour), bars (the calathea's herringbone of pale bars: their colour),
+// tint (takes the instance's colour).
+function leafGeo(len, w, lo, hi, o = {}) {
+  const t = o.thin ?? 0.06;
+  const tint = o.tint ?? 1;
+  const parts = [part(P.sphere(0.5, 8, 6), null, { y: len / 2, sx: w, sy: len, sz: w * t, grad: [lo, hi, 0, len], outline: o.outline ?? 0.35, tint })];
+  if (o.heart) {
+    for (const s of [-1, 1]) parts.push(part(P.sphere(0.5, 6, 4), null, { x: s * w * 0.24, y: len * 0.06, sx: w * 0.52, sy: len * 0.34, sz: w * t * 0.9, rz: s * 0.55, grad: [lo, hi, -len * 0.1, len], outline: 0.3, tint }));
+  }
+  // half the leaf's width at y along it
+  const half = (y) => (w / 2) * Math.sqrt(Math.max(0, 1 - ((2 * y - len) / len) ** 2));
+  const bar = (y0, side, ang, frac, wide, color) => {
+    const l = half(y0) * frac / Math.cos(ang);
+    if (l < 0.01) return;
+    parts.push(part(P.box(l, wide, w * t * 1.15), color, { x: side * Math.cos(ang) * l / 2, y: y0 + Math.sin(ang) * l / 2, rz: side * ang, outline: 0 }));
+  };
+  if (o.rib) {
+    parts.push(part(P.box(0.012 + len * 0.012, len * 0.9, w * t * 1.2), o.rib, { y: len * 0.47, outline: 0 }));
+    for (let k = 1; k <= 4; k++) for (const sd of [-1, 1]) bar(len * (0.1 + k * 0.16), sd, 0.6, 0.85, 0.008 + len * 0.004, o.rib);
+  }
+  if (o.bars) {
+    parts.push(part(P.box(0.014, len * 0.86, w * t * 1.2), o.bars, { y: len * 0.47, outline: 0 }));
+    for (let k = 0; k < 6; k++) {
+      const y0 = len * (0.12 + k * 0.13);
+      for (const sd of [-1, 1]) bar(y0, sd, 0.7, k % 2 ? 0.55 : 0.9, len * (k % 2 ? 0.022 : 0.036), o.bars);
+    }
+  }
+  const g = merge(parts);
+  if (o.bend) {
+    // (drooping toward the tip, away from its face)
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const f = Math.max(0, pos.getY(i)) / len;
+      pos.setZ(i, pos.getZ(i) - o.bend * len * f * f);
+    }
+  }
+  return g;
+}
+
+// A leaf on the end of its stalk: the stalk from foot to at, the leaf from
+// there out toward to.
+function leafOn(parts, foot, at, to, len, w, lo, hi, o = {}) {
+  if (foot) parts.push(stem(foot, at, o.stalk ?? 0.02, o.stalkColor ?? lo));
+  parts.push(flatAlong(leafGeo(len, w, lo, hi, o), at, to));
+}
+
+// Spanish moss hung from a purlin (the origin): a tuft and long shaggy
+// locks, each in two lengths with a kink between, down to about len below.
+function mossGeo(len, seed) {
+  const rnd = seeded(seed);
+  const parts = [part(P.sphere(0.24, 7, 4), null, { y: -0.1, sy: 0.55, grad: [C.moss, C.mossTip, -0.4, 0.3], outline: 0.3, tint: 1 })];
+  const locks = 14;
+  for (let i = 0; i < locks; i++) {
+    const a = rnd() * 6.28;
+    const r = 0.04 + rnd() * 0.24;
+    const L = len * (0.4 + rnd() * 0.6);
+    const top = [Math.cos(a) * r, -0.05, Math.sin(a) * r];
+    const kink = [top[0] + (rnd() - 0.5) * 0.18, -L * (0.45 + rnd() * 0.15), top[2] + (rnd() - 0.5) * 0.18];
+    const tip = [kink[0] + (rnd() - 0.5) * 0.2, -L, kink[2] + (rnd() - 0.5) * 0.2];
+    const thick = 0.04 + rnd() * 0.035;
+    const l1 = dist3(top, kink);
+    const l2 = dist3(kink, tip);
+    // (paler toward the tips, where the light comes through it)
+    const mid = rnd() < 0.5 ? C.moss : '#748f72';
+    parts.push(aimed(part(P.cyl(thick * 0.75, thick, l1, 3), null, { y: l1 / 2, grad: [C.moss, mid, l1, 0], outline: 0.2, tint: 1 }), top, kink));
+    parts.push(aimed(part(P.cone(thick * 0.78, l2, 3), null, { y: l2 / 2, grad: [mid, C.mossTip, 0, l2], outline: 0.2, tint: 1 }), kink, tip));
+    // a wisp off the side
+    if (rnd() < 0.45) {
+      const w0 = [kink[0], kink[1] * 0.85, kink[2]];
+      const w1 = [w0[0] + (rnd() - 0.5) * 0.3, w0[1] - L * 0.3, w0[2] + (rnd() - 0.5) * 0.3];
+      parts.push(spike(w0, w1, thick * 0.5, C.mossTip, 0.15));
+    }
+  }
+  return merge(parts);
+}
+
+// A banana plant (for the bed at +x; the path to -x): a stout pseudo-stem
+// and a crown of great paddle leaves arching up and out and drooping at
+// their tips - the ones that would reach out over the path held up high.
+function bananaGeo(seed, h = 2.3) {
+  const rnd = seeded(seed);
+  const parts = [part(P.cyl(0.1, 0.17, h, 7), null, { y: h / 2, grad: [C.bananaStem, '#9ab85a', 0, h], mark: 0.6 })];
+  parts.push(part(P.sphere(0.2, 6, 4), C.bananaStem, { y: 0.1, sy: 0.6 }));
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.28 + rnd() * 0.5;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    const toPath = Math.max(0, -dx);
+    const len = 2.5 + rnd() * 0.9 - toPath * 0.6;
+    const up = 0.55 + rnd() * 0.35 + toPath * 0.8;
+    const foot = [dx * 0.06, h - 0.15 - rnd() * 0.3, dz * 0.06];
+    const at = [dx * 0.25, foot[1] + 0.3, dz * 0.25];
+    const to = [at[0] + dx, at[1] + up, at[2] + dz];
+    leafOn(parts, foot, at, to, len, 0.7 + rnd() * 0.18, C.banana, C.bananaHi, { rib: '#d6ecb0', bend: 0.42 - toPath * 0.25, stalk: 0.035, stalkColor: C.bananaStem, thin: 0.05 });
+  }
+  // (one leaf still furled, a spike up the middle)
+  parts.push(spike([0, h, 0], [0.05, h + 1.1, 0.02], 0.07, C.bananaHi));
+  return merge(parts);
+}
+
+// Elephant ears (the bed's front at the origin, the path to -x): great
+// heart-shaped leaves held out on long stalks, nodding at their tips.
+function elephantEarGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const n = 5;
+  for (let i = 0; i < n; i++) {
+    // (fanned out over the bed and toward the path, none of them reaching
+    // over it)
+    const a = Math.PI + (rnd() - 0.5) * 2.6;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    const hgt = 0.9 + rnd() * 1.1;
+    const out = 0.25 + rnd() * 0.3;
+    const at = [dx * out * (dx < 0 ? 0.6 : 1), hgt, dz * out];
+    const len = 0.95 + rnd() * 0.55;
+    const to = [at[0] + dx * 0.9, at[1] - 0.25 - rnd() * 0.35, at[2] + dz * 0.9];
+    leafOn(parts, [0, 0, 0], at, to, len, len * 0.78, C.ear, C.earHi, { heart: true, rib: C.vein, bend: 0.12, stalk: 0.022, stalkColor: '#3f6a34', thin: 0.045 });
+  }
+  return merge(parts);
+}
+
+// A calathea: a low clump of oval leaves held up and out on short stalks,
+// dark green barred pale in a herringbone.
+function calatheaGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.28 + rnd() * 0.6;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    const at = [dx * 0.1, 0.18 + rnd() * 0.22, dz * 0.1];
+    const tilt = 0.7 + rnd() * 0.6;
+    const to = [at[0] + dx, at[1] + tilt, at[2] + dz];
+    const len = 0.42 + rnd() * 0.18;
+    leafOn(parts, [dx * 0.02, 0, dz * 0.02], at, to, len, len * 0.46, C.calathea, C.calatheaHi, { bars: C.calatheaBar, bend: 0.1, stalk: 0.012, stalkColor: '#3a5a2a', thin: 0.05, tint: 0 });
+  }
+  return merge(parts);
+}
+
+// A fern of long arching fronds, their leaflets picked out in a lighter green,
+// spilling every way (over the bed's edge onto the path's mossy border too).
+function frondFernGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [part(P.sphere(0.22, 7, 4), null, { y: 0.08, sy: 0.5, grad: [C.frond, C.frondHi, 0, 0.2], tint: 1 })];
+  const n = 13;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.28 + rnd() * 0.4;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    const rise = 0.35 + rnd() * 0.9;
+    const at = [dx * 0.05, 0.12, dz * 0.05];
+    const to = [at[0] + dx, at[1] + rise, at[2] + dz];
+    const len = 0.75 + rnd() * 0.45;
+    parts.push(flatAlong(leafGeo(len, 0.2, C.frond, C.frondHi, { bars: '#5fa244', bend: 0.75, thin: 0.08, tint: 1 }), at, to));
+  }
+  return merge(parts);
+}
+
+// A ficus grown up against the glass: a grey trunk forking into boughs, each
+// ending in a cloud of dark glossy leaves.
+function ficusGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const trunkH = 2.0;
+  parts.push(part(P.cyl(0.1, 0.16, trunkH, 6), C.bark, { y: trunkH / 2 }));
+  const boughs = 5;
+  for (let b = 0; b < boughs; b++) {
+    const a = (b / boughs) * 6.28 + rnd() * 0.7;
+    // (leaning back toward the glass, at +x, more than over the path)
+    const dx = Math.cos(a) * (Math.cos(a) < 0 ? 0.5 : 1), dz = Math.sin(a);
+    const from = [0, trunkH * (0.7 + rnd() * 0.3), 0];
+    const end = [dx * (0.9 + rnd() * 0.5), from[1] + 1.2 + rnd() * 1.4, dz * (0.9 + rnd() * 0.5)];
+    parts.push(stem(from, end, 0.06, C.bark));
+    parts.push(part(P.sphere(0.6, 8, 6), null, { x: end[0], y: end[1] + 0.2, z: end[2], sy: 0.75, grad: [C.ficus, C.ficusHi, end[1] - 0.4, end[1] + 0.8], mark: 0.75, tint: 1 }));
+    for (let k = 0; k < 9; k++) {
+      const u = rnd() * 6.28, e = (rnd() - 0.3) * 1.3;
+      const at = [end[0] + Math.cos(u) * Math.cos(e) * 0.55, end[1] + 0.2 + Math.sin(e) * 0.45, end[2] + Math.sin(u) * Math.cos(e) * 0.55];
+      const to = [at[0] + Math.cos(u), at[1] - 0.3 + rnd() * 0.5, at[2] + Math.sin(u)];
+      leafOn(parts, null, at, to, 0.32 + rnd() * 0.12, 0.17, C.ficus, C.ficusHi, { bend: 0.15, thin: 0.08 });
+    }
+  }
+  return merge(parts);
+}
+
 // --- obstacles --------------------------------------------------------------
 // A small cluster of zinnias, their colour the instance's, set on top of an
 // obstacle's plants (so no two pots or planters bloom quite alike).
@@ -656,30 +898,39 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   env: {
-    sky: ['#2f7f88', '#ffe6a8', '#4f8f74'],
+    // hot and humid: the low sun pouring in through glass fogged with
+    // condensation, the air thick with a warm haze it lights up, shafts of
+    // it slanting down through the leaves, motes and droplets hanging in
+    // them; the green deep and lush, dark in the shade of the big leaves and
+    // glowing where the light comes through them
+    sky: ['#86bf98', '#fff0c0', '#4f8458'],
     bloom: ['#2fc0a8', '#ff9ac8', '#ffa83a'], // the colours its doorway bloom is made of
-    sun: { dir: [0.25, 0.22, -1], glow: '#ffe2a0', disc: '#fff6d8', size: 0.045 },
+    sun: { dir: [0.25, 0.26, -1], glow: '#ffe6a8', disc: '#fffbe6', size: 0.05 },
     stars: 0,
-    skyFx: { rays: 0.5, clouds: 0.22 },
-    // the softest light: deep wrap, pale shadows, glowing back-light
-    light: { dir: SUN, shadow: [0.74, 0.86, 0.8], hi: [1.08, 1.05, 0.95], soft: 0.45, wrap: 0.5, hiAmt: 0.3, lift: 1 },
-    rim: [1.0, 0.9, 0.62, 0.42],
-    mist: { color: '#fff0c8', amount: 0.42, top: 2.5, fade: 4, near: 10, far: 70 },
-    dapple: [0.32, 0.09, 0.02],
-    grade: { sat: 0.98, contrast: 0.92, vignette: 0.3, exposure: 1.05, tint: '#2a5a3a' },
-    beam: { color: '#fff2c8', amount: 0.22 },
-    ink: '#0d3532',
-    fog: [40, 185],
-    ground: ['#dde8dc', '#c2dccf', '#86ad9c'],
-    shadowDecal: [0.55, 0.7, 0.64],
+    skyFx: { rays: 0.95, clouds: 0.1 },
+    // soft, wrapped light; shade the deep green of being under the leaves;
+    // everything back-lit, leaves glowing gold at their edges
+    light: { dir: SUN, shadow: [0.54, 0.66, 0.54], hi: [1.12, 1.08, 0.88], soft: 0.4, wrap: 0.45, hiAmt: 0.4, lift: 1 },
+    rim: [1.0, 0.9, 0.55, 0.58],
+    mist: { color: '#f7e8b4', amount: 0.52, top: 4.6, fade: 4.5, near: 6, far: 56 },
+    dapple: [0.45, 0.11, 0.015],
+    grade: { sat: 1.08, contrast: 1.03, vignette: 0.56, exposure: 1.04, tint: '#0c2a16' },
+    beam: { color: '#fff0c0', amount: 0.78 },
+    ink: '#0b2a20',
+    fog: [34, 165],
+    // old stone pavers, moss in the joints (ground pattern 13)
+    ground: ['#d9d2b6', '#b5b29a', '#4f7a3a'],
+    shadowDecal: [0.5, 0.64, 0.5],
     cast: [-0.27, 0.8],
-    glass: ['#a8eadf', 0.12],
+    // (fogged with condensation: milky, the garden outside a blur)
+    glass: ['#d4eecb', 0.32],
     glowGain: 0.7,
-    particles: { color: '#ffffff', size: 2.0, drift: [0.12, -0.15, 0], opacity: 0.75 },
+    // motes and droplets hanging in the light, drifting slowly up
+    particles: { color: '#fff2c4', size: 2.2, drift: [0.05, 0.12, 0], opacity: 0.85 },
   },
 
   visits: [
-    { env: { particles: { color: '#ffd6e8', size: 2.4, drift: [0.4, -0.2, 0], opacity: 0.85 }, beam: { amount: 0.2 } } },
+    { env: { particles: { color: '#ffd6e8', size: 2.4, drift: [0.4, -0.2, 0], opacity: 0.85 }, beam: { amount: 0.62 } } },
     {
       env: {
         sky: ['#4a5aa8', '#ffb890', '#2f5f5a'],
@@ -715,7 +966,7 @@ export default {
   ],
 
   build(b) {
-    b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 4);
+    b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 13);
     b.toon('lawn', groundStrip(420, 16, C.lawn, 8, { y: -0.04, mark: 0.4 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
     b.toon('rib', ribGeo(), { cap: 120, anim: 'rise', ink: 0.035 });
     b.toon('frameLong', frameLongGeo(), { cap: 40, anim: 'rise', ink: 0.035 });
@@ -734,7 +985,7 @@ export default {
     b.toon('lantern', merge(lanternPostParts({ h: 2.6, pole: '#24453c', glass: C.lantern, cap: '#24453c' })), { cap: 40, anim: 'pop' });
     b.glow('glow', { cap: 80, anim: 'pop' });
     b.shadow('shadow', { cap: 220, anim: 'pop' });
-    b.beam('shaft', merge(shaftParts({ len: 13, r0: 0.5, r1: 1.2, dir: SUN })), { cap: 60, anim: 'pop' });
+    b.beam('shaft', merge(shaftParts({ len: 13, r0: 0.5, r1: 1.2, dir: SUN })), { cap: 90, anim: 'pop' });
     b.toon('butterfly', merge(butterflyParts()), { cap: 120, anim: 'pop', fly: [1.1, 16, 0.7, 0.9], ink: 0.02 });
     b.toon('giantBloom', merge(giantFlowerParts({ h: 4.2, kind: 'daisy', stem: '#2f7a4a' })), { cap: 60, anim: 'popEarly', wobble: [0.003, 0, 0.9, 0] });
     b.toon('giantTulip', merge(giantFlowerParts({ h: 3.4, kind: 'tulip', stem: '#2f7a4a' })), { cap: 60, anim: 'popEarly', wobble: [0.004, 0, 1.0, 0] });
@@ -750,6 +1001,17 @@ export default {
     b.toon('basketHigh', merge(hungBasketParts(3.2, 12)), { cap: 70, anim: [2, 50, 92, 0], wobble: [0.004, 0, 0.7, 0] });
     b.toon('plantShelf', plantShelfGeo(2), { cap: 40, anim: GROW });
     b.toon('flytrapBed', merge(flytrapParts({ traps: 8, size: 1.55, seed: 17, flowers: 2, closed: 0.2, tint: 1 })), { cap: 40, anim: [2, 46, 90, 0], wobble: [0.004, 0, 1.2, 0] });
+    // the jungle (see bananaGeo and on): it grows up as you come too, and
+    // the moss lets down from the purlins
+    b.toon('banana', bananaGeo(5, 2.9), { cap: 40, anim: [2, 44, 86, 0], wobble: [0.008, 0, 0.8, 0] });
+    b.toon('bananaB', bananaGeo(11, 2.5), { cap: 40, anim: [2, 44, 86, 0], wobble: [0.009, 0, 0.9, 0] });
+    b.toon('elephantEar', elephantEarGeo(4), { cap: 60, anim: GROW, wobble: [0.012, 0, 1.0, 0] });
+    b.toon('elephantEarB', elephantEarGeo(9), { cap: 60, anim: GROW, wobble: [0.012, 0, 1.1, 0] });
+    b.toon('calathea', calatheaGeo(3), { cap: 90, anim: GROW, wobble: [0.01, 0, 1.4, 0] });
+    b.toon('frondFern', frondFernGeo(6), { cap: 90, anim: GROW, wobble: [0.014, 0, 1.2, 0] });
+    b.toon('ficus', ficusGeo(8), { cap: 30, anim: [2, 46, 90, 0], marks: [2.4, 2], wobble: [0.004, 0, 0.7, 0] });
+    b.toon('mossLong', mossGeo(3.6, 3), { cap: 220, anim: [2, 50, 96, 0], ink: 0.02, wobble: [0.035, 0, 0.6, 0] });
+    b.toon('mossShort', mossGeo(2.2, 8), { cap: 220, anim: [2, 50, 96, 0], ink: 0.02, wobble: [0.04, 0, 0.7, 0] });
 
     b.toon('potRow', potRowGeo(), { cap: 24, anim: 'popEarly', marks: [2, 1.6] });
     b.toon('planterBox', planterBoxGeo(1.9), { cap: 24, anim: 'popEarly' });
@@ -825,8 +1087,8 @@ export default {
         for (let i = 0; i < 4; i++) {
           const z = i * 4 + 0.5;
           const r = rng.float(0, 1);
-          if (r < 0.45) ctx.put('ivyRib', s * R, 0, z, { ry: turn, c: [rng.float(0.88, 1.06), 1, rng.float(0.9, 1.05)] });
-          else if (r < 0.75) ctx.put('bracketBasket', s * (R - 0.12), 3.7, z, { ry: turn, c: rng.pick(ZINNIAS) });
+          if (r < 0.65) ctx.put('ivyRib', s * R, 0, z, { ry: turn, c: [rng.float(0.88, 1.06), 1, rng.float(0.9, 1.05)] });
+          else if (r < 0.88) ctx.put('bracketBasket', s * (R - 0.12), 3.7, z, { ry: turn, c: rng.pick(ZINNIAS) });
         }
         // and baskets hung from the purlins on long chains, high over the beds
         for (let i = 0; i < 2; i++) {
@@ -837,8 +1099,29 @@ export default {
         if ((ctx.index + (s > 0 ? 2 : 0)) % 4 === 1) {
           ctx.put('orangeTree', s * 5.4, 0.72, 8, { s: 0.9 });
         }
-        // sunbeams through the glass
-        if (rng.chance(0.6)) ctx.put('shaft', s * rng.float(1.5, 5.2), 5.4, rng.float(1, 15), { c: [rng.float(0.6, 1), 1, 1], s: rng.float(0.85, 1.2) });
+        // the jungle: banana plants arching up into the roof, a dark ficus
+        // against the glass, elephant ears and calatheas along the bed's
+        // front and ferns spilling over its edge
+        if (rng.chance(0.85)) ctx.put(rng.chance(0.5) ? 'banana' : 'bananaB', s * rng.float(5.5, 5.95), 0.72, rng.float(1, 15), { ry: turn + rng.float(-0.3, 0.3), s: rng.float(0.95, 1.25), c: [rng.float(0.88, 1.05), 1, rng.float(0.85, 1.0)] });
+        if (rng.chance(0.5)) ctx.put('ficus', s * 6.0, 0.72, rng.float(2, 14), { ry: turn, s: rng.float(1.1, 1.4), c: [rng.float(0.9, 1.05), 1, 1] });
+        for (let i = 0; i < 3; i++) {
+          if (rng.chance(0.2)) continue;
+          ctx.put(rng.chance(0.5) ? 'elephantEar' : 'elephantEarB', s * rng.float(4.95, 5.35), 0.72, rng.float(0, 16), { ry: turn + rng.float(-0.35, 0.35), s: rng.float(0.85, 1.2), c: [rng.float(0.85, 1.05), 1, rng.float(0.85, 1.05)] });
+        }
+        for (let i = 0; i < 2; i++) ctx.put('calathea', s * rng.float(4.75, 4.95), 0.72, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.9, 1.25) });
+        for (let i = 0; i < 2; i++) ctx.put('frondFern', s * rng.float(4.7, 5.0), 0.72, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.85, 1.2), c: [rng.float(0.9, 1.08), 1, rng.float(0.9, 1.05)] });
+        // Spanish moss in long curtains from the purlins: lowest at the
+        // sides, over the beds and the shelves; high over the path
+        for (const [x, y, n, long] of [[6.66, 6.16, 3, 0.7], [5.8, 7.9, 3, 0.6], [4.3, 9.5, 2, 0.5], [2.16, 10.66, 1, 0.3]]) {
+          for (let i = 0; i < n; i++) {
+            if (rng.chance(0.25)) continue;
+            ctx.put(rng.chance(long) ? 'mossLong' : 'mossShort', s * x, y - 0.05, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.85, 1.25), c: [rng.float(0.9, 1.08), rng.float(0.95, 1.05), rng.float(0.9, 1.05)] });
+          }
+        }
+        // sunbeams through the glass, slanting down through the haze - over
+        // the beds, and now and then right across the path
+        if (rng.chance(0.85)) ctx.put('shaft', s * rng.float(2.5, 5.4), 5.4, rng.float(1, 15), { c: [rng.float(0.65, 1), 1, 1], s: rng.float(1.15, 1.6) });
+        if (rng.chance(0.4)) ctx.put('shaft', s * rng.float(0.3, 2.2), 6.2, rng.float(1, 15), { c: [rng.float(0.45, 0.7), 1, 1], s: rng.float(1.3, 1.7) });
         // later laps: butterflies, then giant blooms in the beds
         if (ctx.visit >= 1) {
           for (let i = 0; i < rng.int(1, 3); i++) {

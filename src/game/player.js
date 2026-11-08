@@ -4,6 +4,7 @@ import { makeEnvUniforms } from '../render/shaders.js';
 import { TAU, damp, clamp, smooth, Spring } from './rig.js';
 import { bodyGeometry } from './kit.js';
 import { boostStep } from './drift.js';
+import { CastShadow } from '../render/caster.js';
 
 // A runner: what every character shares, whoever they are. The body and
 // clothes are sculpted offline (tools/runner/, loaded by runner-asset.js) as
@@ -320,19 +321,27 @@ export class Player {
     this.boneM = (bone) => _m.multiplyMatrices(this.b[bone].matrixWorld, this.boneInv[bone]);
   }
 
+  // Their shadow: the shape of them as they are this frame, thrown along the
+  // world's light (see render/caster.js). castR: how far round their feet
+  // they reach (arms flung, the cape or beard streaming); castTop: how high
+  // anything of them goes (the head, hair and hat, arms thrown up).
   buildShadow() {
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uAlpha: { value: 0.35 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform float uAlpha; varying vec2 vUv; void main(){ float r = length(vUv - 0.5) * 2.0; float a = (1.0 - smoothstep(0.25, 1.0, r)) * uAlpha; gl_FragColor = vec4(0.06, 0.03, 0.1, a); }',
-      transparent: true,
-      depthWrite: false,
-    });
-    const geo = new THREE.PlaneGeometry(1, 1);
-    geo.rotateX(-Math.PI / 2);
-    this.shadow = new THREE.Mesh(geo, mat);
-    this.shadow.renderOrder = -19;
-    this.shadow.frustumCulled = false;
+    this.cast = new CastShadow(this.u);
+    this.shadow = this.cast.mesh;
+    const head = this.rig.headY ?? 1.5;
+    this.castR = 0.9;
+    this.castTop = head + 0.55;
+  }
+
+  // What throws their shadow (a character with props of its own adds them).
+  get casters() {
+    return [this.root];
+  }
+
+  // Draw their shadow's silhouette for this frame (before the frame itself).
+  renderShadow(renderer) {
+    if (this.cast.casters.length === 0) this.cast.setCasters(this.casters);
+    this.cast.render(renderer);
   }
 
   // --- secondary-motion state ------------------------------------------------------
@@ -1599,11 +1608,18 @@ export class Player {
       _v2.copy(SPIN_PIVOT).applyQuaternion(_q);
       this.root.position.add(_v.copy(SPIN_PIVOT).sub(_v2));
     }
-    const h = Math.max(0, this.y - (this.groundY || 0));
-    const s = Math.max(0.35, 1 - h * 0.25);
-    this.shadow.position.set(this.x, 0.04 + (this.groundY || 0), z + 0.05);
-    this.shadow.scale.set(0.95 * s * (this.sliding ? 1.3 : 1), 1, 1.25 * s * (this.sliding ? 1.6 : 1));
-    this.shadow.material.uniforms.uAlpha.value = 0.38 * s;
+    // their shadow: crisp and dark on the ground, a little lighter and
+    // softer the higher they leap, with a shade of contact round the feet
+    const g = this.groundY || 0;
+    const h = Math.max(0, this.y - g);
+    const r = this.castR;
+    const spin = this.spinX !== 0 || this.spinZ !== 0;
+    const y0 = Math.max(g - 0.2, this.y - (spin ? 0.6 : 0.05));
+    this.cast.aim(this.x - r, this.x + r, y0, this.y + this.castTop, z - r, z + r, g, this.x, z, {
+      alpha: 0.95 * clamp(1 - h * 0.16, 0.5, 1),
+      contact: 0.42 * clamp(1 - h * 2.5, 0, 1),
+      reach: 0.3,
+    });
   }
 
   // What the game adds to its scenes for this runner.

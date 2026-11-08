@@ -54,6 +54,12 @@ async function boot() {
     throw e;
   }
   renderer.autoClear = false;
+  // (nothing here converts colour on the way out - every colour is authored
+  // as it's meant to show, see shaders.js - so this changes nothing on
+  // screen; but drawn into a render target a material otherwise needs a
+  // program of its own, and the runners' are drawn into their shadows' every
+  // frame: see render/caster.js)
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   // (checking every program's compile log is a blocking round trip to the GPU
   // process on Android; only worth it when debugging)
   renderer.debug.checkShaderErrors = params.debug;
