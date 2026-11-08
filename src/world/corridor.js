@@ -1,20 +1,26 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   P, part, merge, mix, moved,
-  cloudParts, wallDoorParts, gateFrameParts, gateTop, leafParts,
+  wallDoorParts, gateFrameParts, gateTop, leafParts,
 } from './shapes.js';
-import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.js';
+import { flyingBookParts, teacupParts, teapotParts, clockParts, shaftParts } from './whimsy.js';
 import { crystal, stepCut, octagon, bezelParts, nugget, hexPrism, FACE } from './gems.js';
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { paintingsGeo, Deck, PAINTING_COUNT } from './hall-art.js';
 
-// IV · The Hall of Doors — a coral corridor with a checkerboard floor,
-// open to the sky, lined with doors of every color. Nested door frames
-// recede ahead; doors and armchairs float among the clouds outside.
-// Lit like a de Chirico piazza: hard, low, raking sun and razor-edged
-// shadows. Each return gets stranger — books take flight, a tea party drifts
-// past at dusk, then clocks float through a violet night.
+// IV · The Hall of Doors — a coral corridor with a checkerboard floor, lined
+// with doors of every color, running through the heart of a library that
+// goes on for ever: over its walls a gallery of books rises on either side,
+// railed and lamplit, rolling ladders on its shelves; behind those, rows and
+// rows and rows of book stacks stand off into a warm haze, as far as you can
+// see; great timber arches span the hall overhead under a beamed roof, lamps
+// hanging from them, and slanting shafts of sunlight from high windows fall
+// across it. Nested door frames recede ahead; doors and armchairs drift in
+// the dark above the stacks; now and then a ladder leans on the hall's wall
+// up to the gallery. Lit like a de Chirico piazza: hard, low, raking sun and
+// razor-edged shadows. Each return gets stranger — books take flight, a tea
+// party drifts past at dusk, then clocks float through a violet night.
 //
 // Nine different paintings hang between the doors, dealt from a shuffled
 // deck so no two neighbours match and no run of them repeats. Now and then a
@@ -153,6 +159,190 @@ function seeded(seed) {
     k = (k * 16807) % 2147483647;
     return k / 2147483647;
   };
+}
+
+// --- the endless library -------------------------------------------------------
+// Every shelf's books are drawn in the shader (toon option shelves: see
+// bookSpines), so the library can go on for ever for the price of a few
+// planes: the faces marked 0.7 run along the hall (their pattern runs on from
+// chunk to chunk), those marked 0.75 stand across it.
+const LIB = {
+  wood: '#5e3820',
+  woodHi: '#8e5c34',
+  woodDark: '#3a2014',
+  brass: '#d8a24a',
+  lamp: '#ffdf9a',
+  shade: '#2f6a4a',
+  floor: '#3a2416',
+  plaster: '#e6d6b8',
+};
+const TIER_X = 7.0; // the gallery's wall of books, behind each wall of the hall
+const TIER_H = 12.2;
+const GALLERY_Y = 6.85; // its walkway, just over the top of the hall's walls
+const GALLERY_IN = 5.8; // how far it juts out toward the hall
+const STACK_X = [19.8, 60]; // the stacks behind, standing across the run
+const ROOF_Y = 19.6;
+const STACK_LAMP_Y = 36.4; // the lamps on the stacks' ends, above the top tier
+const ARCH_R = 6.9;
+
+// A face of books (w along, h up), turned to face the hall or the run.
+function bookFace(w, h, { x = 0, y = 0, z = 0, ry = 0, flipU = false, across = false, tiltUp = 0 }) {
+  const g = new THREE.PlaneGeometry(w, h);
+  if (flipU) {
+    const uv = g.attributes.uv.array;
+    for (let i = 0; i < uv.length; i += 2) uv[i] = 1 - uv[i];
+  }
+  if (tiltUp) {
+    // (the faces turned toward you lean their light up a little, so they
+    // catch the sun rather than standing in their own shade)
+    const n = g.attributes.normal.array;
+    for (let i = 0; i < n.length; i += 3) {
+      n[i + 1] = tiltUp;
+      n[i + 2] = Math.sqrt(1 - tiltUp * tiltUp);
+    }
+  }
+  return part(g, '#ffffff', { x, y, z, ry, uvScale: [w, h], mark: across ? 0.75 : 0.7, outline: 0 });
+}
+
+// The library rises in tiers on either side of the hall, each set further
+// back and higher than the one before it: the first a gallery over the
+// hall's own walls, then three more stepping up and away - each a wall of
+// books (from its walkway up), timber pilasters dividing it into bays, its
+// walkway jutting out on a carved fascia, a balustrade along it, a brass
+// rail for the ladders, a cornice crowning it.
+const TIERS = [
+  { x: TIER_X, y0: GALLERY_Y, top: TIER_H, posts: 0.64 },
+  { x: 10.2, y0: TIER_H + 0.62, top: 19.6, posts: 2 },
+  { x: 13.4, y0: 20.22, top: 27.2, posts: 2 },
+  { x: 16.6, y0: 27.82, top: 34.6, posts: 2 },
+];
+function tiersGeo() {
+  const parts = [];
+  for (const s of [-1, 1]) {
+    TIERS.forEach((T, n) => {
+      const x = s * T.x;
+      const inner = n === 0 ? GALLERY_IN : TIERS[n - 1].x;
+      const bh = T.top - T.y0;
+      parts.push(bookFace(16, bh, { x: x - s * 0.02, y: T.y0 + bh / 2, z: -8, ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, flipU: s > 0 }));
+      parts.push(part(P.box(0.4, bh + 0.6, 16), LIB.woodDark, { x: x + s * 0.2, y: T.y0 + bh / 2, z: -8, outline: 0 }));
+      for (let i = 0; i < 4; i++) {
+        parts.push(part(P.box(0.46, bh, 0.5), null, { x: x - s * 0.12, y: T.y0 + bh / 2, z: -2 - i * 4, grad: [LIB.woodDark, LIB.woodHi, T.y0, T.top] }));
+      }
+      const w = T.x - inner;
+      parts.push(part(P.box(w + 0.3, 0.2, 16), LIB.wood, { x: s * (inner + w / 2 - 0.15), y: T.y0, z: -8 }));
+      parts.push(part(P.box(0.14, 0.5, 16), LIB.woodDark, { x: s * inner, y: T.y0 - 0.15, z: -8 }));
+      parts.push(part(P.box(0.1, 0.1, 16), LIB.woodHi, { x: s * (inner + 0.05), y: T.y0 + 1.02, z: -8, outline: 0.5 }));
+      parts.push(part(P.box(0.08, 0.06, 16), LIB.woodHi, { x: s * (inner + 0.05), y: T.y0 + 0.22, z: -8, outline: 0 }));
+      const nb = Math.round(16 / T.posts);
+      for (let i = 0; i < nb; i++) {
+        parts.push(part(P.box(0.07, 0.78, 0.07), LIB.wood, { x: s * (inner + 0.05), y: T.y0 + 0.6, z: -T.posts / 2 - i * T.posts, outline: 0.4 }));
+      }
+      parts.push(part(P.cyl(0.035, 0.035, 16, 6), LIB.brass, { x: x - s * 0.32, y: T.top - 0.7, z: -8, rx: Math.PI / 2, outline: 0.4 }));
+      parts.push(part(P.box(1.0, 0.55, 16), LIB.woodDark, { x: x - s * 0.15, y: T.top + 0.27, z: -8 }));
+      parts.push(part(P.box(1.2, 0.16, 16), LIB.woodHi, { x: x - s * 0.2, y: T.top + 0.62, z: -8, outline: 0.5 }));
+    });
+  }
+  return merge(parts);
+}
+
+// Behind the top tier, the stacks: standing across the run four to a chunk
+// on either side and running off sideways for forty metres - rows and rows
+// of them, every one a different height, books on both faces, a carved end
+// toward the hall with a brass label and a lamp, a cornice on top.
+function stacksGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const len = STACK_X[1] - STACK_X[0];
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const z = -2 - i * 4;
+      const h = 38 + rnd() * 12;
+      const t = 1.25;
+      const cx = s * (STACK_X[0] + len / 2);
+      parts.push(part(P.box(len, h, t), LIB.woodDark, { x: cx, y: h / 2, z, outline: 0 }));
+      parts.push(bookFace(len - 0.6, h - 0.8, { x: cx, y: (h - 0.8) / 2 + 0.2, z: z + t / 2 + 0.01, across: true, tiltUp: 0.5 }));
+      parts.push(bookFace(len - 0.6, h - 0.8, { x: cx, y: (h - 0.8) / 2 + 0.2, z: z - t / 2 - 0.01, ry: Math.PI, across: true }));
+      const ex = s * (STACK_X[0] - 0.15);
+      parts.push(part(P.box(0.4, h + 0.3, t + 0.4), null, { x: ex, y: (h + 0.3) / 2, z, grad: [LIB.woodDark, LIB.woodHi, 0, h] }));
+      // a lamp on its end, lighting the aisle's way, and its label
+      parts.push(part(P.box(0.08, 0.5, 0.8), '#f2e4c0', { x: ex - s * 0.22, y: STACK_LAMP_Y - 1.2, z, outline: 0.5 }));
+      parts.push(part(P.cyl(0.1, 0.24, 0.22, 10), LIB.shade, { x: ex - s * 0.4, y: STACK_LAMP_Y + 0.12, z }));
+      parts.push(part(P.sphere(0.1, 8, 6), LIB.lamp, { x: ex - s * 0.4, y: STACK_LAMP_Y, z, emit: 1, outline: 0 }));
+      parts.push(part(P.box(0.24, 0.04, 0.04), LIB.brass, { x: ex - s * 0.28, y: STACK_LAMP_Y + 0.28, z, outline: 0 }));
+      parts.push(part(P.box(len + 0.4, 0.45, t + 0.5), LIB.woodDark, { x: cx, y: h + 0.2, z }));
+    }
+  }
+  return merge(parts);
+}
+
+// The roof over the hall: a great timber arch springing from the gallery
+// cornices, a collar beam and a king post, braces at its feet; the ridge and
+// purlins running on along the hall, and the boards of the roof above.
+function roofGeo(withArch) {
+  const parts = [];
+  const top = ROOF_Y;
+  // (pale plaster between the timbers, as in an old reading room)
+  parts.push(part(P.box(TIER_X * 2 + 1, 0.22, 16), LIB.plaster, { y: top, z: -8, emit: 0.45, outline: 0 }));
+  for (let k = -3; k <= 3; k++) {
+    if (k === 0) continue;
+    parts.push(part(P.box(0.3, 0.3, 16), LIB.wood, { x: k * 2.2, y: top - 0.25, z: -8, outline: 0.5 }));
+  }
+  parts.push(part(P.box(0.5, 0.55, 16), LIB.wood, { y: top - 0.35, z: -8 }));
+  if (withArch) {
+    const z = -8;
+    parts.push(part(P.torus(ARCH_R, 0.32, 6, 24, Math.PI), null, { y: TIER_H + 0.6, z, sz: 1.7, grad: [LIB.woodDark, LIB.woodHi, TIER_H, top] }));
+    const cy = TIER_H + 0.6 + ARCH_R * 0.62;
+    const cw = 2 * Math.sqrt(ARCH_R * ARCH_R - (ARCH_R * 0.62) ** 2);
+    parts.push(part(P.box(cw, 0.42, 0.5), LIB.wood, { y: cy, z }));
+    parts.push(part(P.box(0.4, top - cy, 0.5), LIB.wood, { y: (top + cy) / 2, z }));
+    for (const s of [-1, 1]) {
+      parts.push(part(P.box(0.3, 2.6, 0.45), LIB.wood, { x: s * 2.6, y: cy + 1.3, z, rz: s * 0.55 }));
+      parts.push(part(P.box(1.6, 0.4, 0.55), LIB.woodDark, { x: s * (TIER_X - 0.4), y: TIER_H + 0.75, z }));
+      // carved pendant bosses where the arch meets the collar
+      parts.push(part(P.cone(0.22, 0.6, 6), LIB.woodHi, { x: s * cw * 0.5, y: cy - 0.45, z, rx: Math.PI }));
+    }
+  }
+  return merge(parts);
+}
+
+// A lamp hanging from the arch on a chain: a green glass shade over a warm
+// bulb.
+function hangingLampGeo(drop) {
+  return merge([
+    part(P.cyl(0.02, 0.02, drop, 4), '#2a1a10', { y: -drop / 2, outline: 0 }),
+    part(P.cone(0.42, 0.38, 12), LIB.shade, { y: -drop - 0.1 }),
+    part(P.sphere(0.16, 8, 6), LIB.lamp, { y: -drop - 0.28, emit: 1 }),
+    part(P.cyl(0.08, 0.08, 0.12, 8), LIB.brass, { y: -drop + 0.12 }),
+  ]);
+}
+
+// A reading lamp on the gallery's balustrade.
+function railLampGeo() {
+  return merge([
+    part(P.cyl(0.03, 0.03, 0.5, 5), LIB.brass, { y: 0.25, outline: 0.4 }),
+    part(P.cyl(0.08, 0.26, 0.2, 10), LIB.shade, { y: 0.55 }),
+    part(P.sphere(0.09, 8, 6), LIB.lamp, { y: 0.47, emit: 1, outline: 0 }),
+  ]);
+}
+
+// A library ladder, h tall, leaning in toward -z by lean (turn it so -z
+// faces the shelves): two rails, rungs, hooks over a rail at the top and a
+// pair of wheels at its foot.
+function ladderGeo(h, lean) {
+  const parts = [];
+  const a = Math.atan2(lean, h);
+  const L = Math.hypot(h, lean);
+  const rail = (x) => part(P.box(0.07, L, 0.07), LIB.woodHi, { x, y: h / 2, z: lean / 2, rx: -a, outline: 0.5 });
+  parts.push(rail(-0.28), rail(0.28));
+  for (let y = 0.3; y < h - 0.2; y += 0.32) {
+    const z = lean * (1 - y / h);
+    parts.push(part(P.box(0.56, 0.045, 0.06), LIB.wood, { y, z, outline: 0.4 }));
+  }
+  for (const x of [-0.28, 0.28]) {
+    parts.push(part(P.torus(0.07, 0.02, 4, 8, Math.PI), LIB.brass, { x, y: h - 0.02, z: 0.02, ry: Math.PI / 2, outline: 0 }));
+    parts.push(part(P.cyl(0.07, 0.07, 0.05, 10), LIB.brass, { x, y: 0.07, z: lean + 0.04, rz: Math.PI / 2, outline: 0.4 }));
+  }
+  return merge(parts);
 }
 
 function hallWallsGeo() {
@@ -476,17 +666,19 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   env: {
-    sky: ['#2e6cc4', '#f6e9c8', '#f4f8fb'],
+    // no sky: the dark of the roof and the stacks, and a warm haze of dust
+    // and lamplight where the library runs on out of sight
+    sky: ['#140c08', '#a06a40', '#2a1a10'],
     bloom: ['#ff6a4a', '#ffd23a', '#3ab0e0'], // the colours its doorway bloom is made of
-    sun: { dir: [0.45, 0.55, -0.7], glow: '#fff1c8' },
+    sun: { dir: [0.45, 0.55, -0.7], glow: '#ffd9a0' },
     stars: 0,
-    skyFx: { clouds: 0.45 },
+    skyFx: {},
     // harsh: razor terminator, no wrap, deep cool shadows
     light: { dir: [0.5, 0.8, -0.3], shadow: [0.5, 0.44, 0.66], hi: [1.06, 1.04, 1.0], soft: 0.006, wrap: 0, hiAmt: 0.5, lift: 0.3 },
     // the sunlit wall's shadow falls across the right of the hall
     wallShadow: [WALL_X, WALL_H, 0.5 / 0.8, 1],
     ink: '#3a1410',
-    fog: [52, 210],
+    fog: [46, 200],
     grade: { sat: 1.12, contrast: 1.14, vignette: 0.3, exposure: 1.04, tint: '#6a3a70' },
     ground: ['#efe7d6', '#2a2530', '#7a2e22'],
     shadowDecal: [0.5, 0.43, 0.58],
@@ -499,25 +691,24 @@ export default {
 
   // Each return to the hall, layered on the last.
   visits: [
-    { env: { skyFx: { clouds: 0.6 }, particles: { color: '#fff6dc', size: 2.0, drift: [0.4, 0.3, 0], opacity: 0.8 } } },
+    { env: { particles: { color: '#fff6dc', size: 2.0, drift: [0.4, 0.3, 0], opacity: 0.8 } } },
     {
       env: {
-        sky: ['#6a4aa8', '#ffc49a', '#f6e0d6'],
+        // dusk: the haze gone rose and amber
+        sky: ['#1e0e18', '#d0886a', '#3a1c24'],
         sun: { dir: [0.45, 0.32, -0.8], glow: '#ffb070' },
         light: { shadow: [0.56, 0.4, 0.62], hi: [1.12, 1.0, 0.9] },
         ground: ['#f4e6d2', '#1f6f78', '#7a2e22'],
         grade: { sat: 1.18, exposure: 1.02, tint: '#5a2a60' },
         glowGain: 1.0,
-        skyFx: { clouds: 0.7, rays: 0.25 },
         trip: [0.12, 0, 0.05],
       },
     },
     {
       env: {
-        sky: ['#160c3a', '#6a4aa0', '#2a1a4a'],
+        // night: only the lamps, the stacks gone violet
+        sky: ['#0a0618', '#4a3a7a', '#140c26'],
         sun: { dir: [-0.4, 0.5, -1], glow: '#6a5ac0' },
-        moon: { dir: [-0.4, 0.5, -1], color: '#fff2c8', size: 0.07 },
-        stars: 1,
         light: { dir: [-0.5, 0.8, -0.3], shadow: [0.36, 0.34, 0.62], hi: [1.15, 1.15, 1.3] },
         wallShadow: [-WALL_X, WALL_H, 0.5 / 0.8, 1],
         rim: [0.5, 0.55, 1.0, 0.3],
@@ -526,7 +717,6 @@ export default {
         cast: [0.62, 0.37],
         grade: { sat: 1.1, contrast: 1.1, exposure: 1.05, tint: '#1a0a40', vignette: 0.45 },
         glowGain: 1.6,
-        skyFx: { clouds: 0.25, aurora: 0.35 },
         particles: { color: '#ffe6a0', size: 2.4, drift: [0.05, 0.3, 0], opacity: 0.9 },
         trip: [0, 0.25, 0.12],
       },
@@ -535,7 +725,20 @@ export default {
 
   build(b) {
     b.ground('ground', groundStrip(11.2, 16, '#ffffff', 8), 3);
-    b.toon('cloudSea', groundStrip(420, 16, '#f3f7fb', 8, { y: -16 }), { ink: 0, cap: 40 });
+    // the library: its floor running out under the stacks, the galleries,
+    // the stacks, the roof, lamps, ladders and shafts of sunlight
+    b.toon('libFloor', groundStrip(110, 16, LIB.floor, 8, { y: -0.02 }), { ink: 0, cap: 40 });
+    b.toon('gallery', tiersGeo(), { cap: 40, ink: 0.035, anim: 'rise', shelves: true });
+    b.toon('stacksA', stacksGeo(3), { cap: 40, ink: 0.04, anim: 'rise', shelves: true });
+    b.toon('stacksB', stacksGeo(11), { cap: 40, ink: 0.04, anim: 'rise', shelves: true });
+    b.toon('roof', roofGeo(false), { cap: 40, ink: 0.03 });
+    b.toon('roofArch', roofGeo(true), { cap: 40, ink: 0.04 });
+    b.toon('hangLamp', hangingLampGeo(2.2), { cap: 60, anim: 'pop', ink: 0.03, wobble: [0.006, 0, 0.8, 0] });
+    b.toon('railLamp', railLampGeo(), { cap: 220, anim: 'pop', ink: 0.025 });
+    b.toon('wallLadder', ladderGeo(GALLERY_Y + 0.3, 1.25), { cap: 20, anim: 'pop', ink: 0.03 });
+    b.toon('shelfLadder', ladderGeo(TIER_H - GALLERY_Y - 0.6, 0.8), { cap: 30, anim: 'pop', ink: 0.03 });
+    b.toon('tierLadder', ladderGeo(6.0, 0.9), { cap: 90, anim: 'pop', ink: 0.035 });
+    b.beam('sunShaft', merge(shaftParts({ len: 26, r0: 0.7, r1: 1.7, dir: [0.5, 0.8, -0.3] })), { cap: 24, anim: 'pop', wobble: [0, 0, 0.6, 0] });
     b.toon('walls', hallWallsGeo(), { cap: 40, ink: 0.04, anim: 'rise' });
     b.toon('door', merge(wallDoorParts({ w: 1.5, h: 3.1, depth: 0.2 })), { cap: 200, anim: 'pop' });
     b.toon('openDoor', openDoorGeo(1), { cap: 40, anim: 'pop' });
@@ -547,9 +750,8 @@ export default {
     b.toon('shelfBook', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [1.1, 11, 0.45, 0.95], ink: 0.035 });
     b.toon('shelfBookB', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [0.65, 5.5, 1.1, 0.42], ink: 0.035 });
     b.toon('sconce', sconceGeo(), { cap: 120, anim: 'pop', ink: 0.025 });
-    b.glow('glow', { cap: 160, anim: 'pop' });
+    b.glow('glow', { cap: 560, anim: 'pop' });
     b.toon('hallFrame', hallFrameGeo(), { cap: 24, anim: 'popLate' });
-    b.toon('cloud', merge(cloudParts({ r: 3, lo: '#bcd6ee', hi: '#ffffff' })), { cap: 220, anim: 'lift', wobble: [0, 0.6, 0.5, 0], ink: 0.06 });
     b.toon('floatDoor', floatingDoorGeo(), { cap: 60, anim: 'liftFar', wobble: [0, 0.4, 0.6, 0] });
     b.toon('floatChair', armchairGeo(1.6), { cap: 30, anim: 'liftFar', wobble: [0, 0.5, 0.45, 0] });
     b.shadow('shadow', { cap: 120, anim: 'pop' });
@@ -590,15 +792,49 @@ export default {
 
   chunk(ctx) {
     const { rng } = ctx;
+    // (a spot in one of the aisles between the stacks, either side: where
+    // things can drift without passing through the shelves)
+    const aisle = () => rng.pick([4, 8, 12]) + rng.float(-0.7, 0.7);
+    // the library goes on all round, the hall or not
+    ctx.put('libFloor', 0, 0, 0);
+    ctx.put(rng.chance(0.5) ? 'stacksA' : 'stacksB', 0, 0, 0);
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) ctx.put('glow', s * (STACK_X[0] - 0.6), STACK_LAMP_Y - 0.05, 2 + i * 4, { s: 2.4, c: [1, 0.76, 0.42] });
     if (!ctx.continuation) {
       ctx.put('ground', 0, 0, 0);
       ctx.put('walls', 0, 0, 0);
+      ctx.put('gallery', 0, 0, 0, { p0: ctx.d0 % 4096 });
       const nearGate = ctx.toEnd <= 16;
+      // the roof (not over the doorway out: the next world's door stands
+      // there), a great arch every other chunk with lamps hung from it
+      if (!nearGate) {
+        const arch = ctx.index % 2 === 0;
+        ctx.put(arch ? 'roofArch' : 'roof', 0, 0, 0);
+        if (arch) {
+          const cy = TIER_H + 0.6 + ARCH_R * 0.62 - 0.2;
+          for (const s of [-1, 1]) {
+            ctx.put('hangLamp', s * 2.6, cy, 8, { p0: rng.float(0, 6.28) });
+            ctx.put('glow', s * 2.6, cy - 2.6, 8, { s: 2.6, c: [1, 0.78, 0.45] });
+          }
+        }
+      }
       if (ctx.index % 2 === 0 && !nearGate && ctx.index > 0) {
         ctx.put('hallFrame', 0, 0, 1, { c: rng.chance(0.3) ? mix(rng.pick(DOOR_TINTS), '#ffffff', 0.25) : [0.97, 0.93, 0.83] });
       }
       for (const s of [-1, 1]) {
         const ry = s < 0 ? Math.PI / 2 : -Math.PI / 2;
+        // reading lamps along the gallery's rail, ladders on its shelves
+        const lz = s < 0 ? 4 : 12;
+        ctx.put('railLamp', s * (GALLERY_IN + 0.05), GALLERY_Y + 1.07, lz);
+        ctx.put('glow', s * (GALLERY_IN + 0.05), GALLERY_Y + 1.55, lz, { s: 1.5, c: [1, 0.85, 0.55] });
+        if (rng.chance(0.4)) ctx.put('shelfLadder', s * (TIER_X - 0.34), GALLERY_Y + 0.1, rng.pick([2, 6, 10, 14]) + rng.float(-0.8, 0.8), { ry });
+        // and up the tiers above: a ladder here and there, a lamp on each rail
+        for (let n = 1; n < TIERS.length; n++) {
+          const T = TIERS[n];
+          if (rng.chance(0.3)) ctx.put('tierLadder', s * (T.x - 0.34), T.y0 + 0.1, rng.pick([2, 6, 10, 14]) + rng.float(-0.8, 0.8), { ry });
+          const tz = (n % 2 ? 8 : 0) + (s < 0 ? 4 : 0) + 2;
+          ctx.put('railLamp', s * (TIERS[n - 1].x + 0.05), T.y0 + 1.07, tz);
+          ctx.put('glow', s * (TIERS[n - 1].x + 0.05), T.y0 + 1.55, tz, { s: 1.8, c: [1, 0.85, 0.55] });
+        }
         for (let i = 0; i < 4; i++) {
           const dz = 2 + i * 4 + (s > 0 ? 2 : 0);
           if (dz > 15.5) continue;
@@ -617,10 +853,13 @@ export default {
           } else {
             ctx.put('door', x, 0, dz, { ry, c: tint });
           }
-          // between doors: a picture or a sconce
+          // between doors: a picture or a sconce - or, now and then, a ladder
+          // leaning on the wall up to the gallery
           const mid = dz + 2;
           if (mid < 16) {
-            if (rng.chance(0.5)) {
+            if (rng.chance(0.09)) {
+              ctx.put('wallLadder', s * (GALLERY_IN - 0.18), 0, mid, { ry });
+            } else if (rng.chance(0.5)) {
               ctx.put('sconce', s * (WALL_X - 0.04), 3.4, mid, { ry });
               ctx.put('glow', s * (WALL_X - 0.4), 3.7, mid, { s: 1.6, c: [1, 0.8, 0.5] });
             } else {
@@ -628,6 +867,12 @@ export default {
             }
           }
         }
+      }
+      // shafts of sunlight slanting down from the high windows
+      if (!nearGate && rng.chance(0.32)) {
+        const fx = rng.float(-3.2, 0.5);
+        const fz = rng.float(3, 13);
+        ctx.put('sunShaft', fx + 5.6, 9, fz + 3.4, { c: [1, 0.84, 0.58], s: rng.float(0.8, 1.1) });
       }
       // raking sun: the wall shadow itself is analytic (env.wallShadow); each
       // frame's lintel throws a crisp bar across the sunlit part of the floor
@@ -643,38 +888,32 @@ export default {
     } else {
       ctx.put('ground', 0, 0, 0);
     }
-    ctx.put('cloudSea', 0, 0, 0);
     // later laps: books take wing, then a tea party, then clocks adrift
     if (ctx.visit >= 1) {
       const n = rng.int(2, 5);
       for (let i = 0; i < n; i++) {
         const out = rng.chance(0.55);
-        const x = out ? rng.sign() * rng.float(7, 22) : rng.float(-4, 4);
-        const y = out ? rng.float(3, 14) : rng.float(9, 13);
-        ctx.put('book', x, y, rng.float(0, 16), { ry: rng.float(-0.6, 0.6) + (rng.chance(0.3) ? Math.PI : 0), c: rng.pick(BOOKS), s: rng.float(1.0, 1.7), p0: rng.float(0, 6.28) });
+        const x = out ? rng.sign() * rng.float(10, 26) : rng.float(-4, 4);
+        const y = out ? rng.float(4, 16) : rng.float(9, 13);
+        ctx.put('book', x, y, out ? aisle() : rng.float(0, 16), { ry: rng.float(-0.6, 0.6) + (rng.chance(0.3) ? Math.PI : 0), c: rng.pick(BOOKS), s: rng.float(1.0, 1.7), p0: rng.float(0, 6.28) });
       }
     }
     if (ctx.visit >= 2) {
       for (const s of [-1, 1]) {
-        if (rng.chance(0.5)) ctx.put('teacup', s * rng.float(9, 26), rng.float(3, 12), rng.float(0, 16), { c: rng.pick(['#ffffff', '#f6d0e0', '#bfe7e0', '#f6e6a8']), s: rng.float(2.2, 3.6), ry: rng.float(0, 6.28) });
-        if (rng.chance(0.15)) ctx.put('teapot', s * rng.float(12, 30), rng.float(5, 14), rng.float(0, 16), { c: rng.pick(['#ffffff', '#f6d0e0', '#bfe7e0']), s: rng.float(2.4, 3.6), ry: rng.float(0, 6.28) });
+        if (rng.chance(0.5)) ctx.put('teacup', s * rng.float(10, 26), rng.float(4, 14), aisle(), { c: rng.pick(['#ffffff', '#f6d0e0', '#bfe7e0', '#f6e6a8']), s: rng.float(1.6, 2.4), ry: rng.float(0, 6.28) });
+        if (rng.chance(0.15)) ctx.put('teapot', s * rng.float(12, 30), rng.float(5, 15), aisle(), { c: rng.pick(['#ffffff', '#f6d0e0', '#bfe7e0']), s: rng.float(1.6, 2.4), ry: rng.float(0, 6.28) });
       }
     }
     if (ctx.visit >= 3 && rng.chance(0.6)) {
-      ctx.put('clock', rng.sign() * rng.float(9, 28), rng.float(4, 14), rng.float(0, 16), { s: rng.float(1.4, 2.6), ry: rng.float(-0.8, 0.8) });
+      ctx.put('clock', rng.sign() * rng.float(10, 28), rng.float(5, 15), aisle(), { s: rng.float(1.2, 1.8), ry: rng.float(-0.8, 0.8) });
     }
-    // Outside: clouds, floating doors and the odd floating armchair.
+    // Down the aisles between the stacks: doors adrift, and the odd armchair.
     for (const s of [-1, 1]) {
-      for (let i = 0; i < 3; i++) {
-        const x = s * rng.float(10, 70);
-        const y = rng.chance(0.4) ? rng.float(-12, -4) : rng.float(-3, 16);
-        ctx.put('cloud', x, y, rng.float(0, 16), { s: rng.float(0.7, 1.8), ry: rng.float(0, 6.28) });
-      }
-      if (rng.chance(0.45)) {
-        ctx.put('floatDoor', s * rng.float(16, 60), rng.float(2, 22), rng.float(0, 16), { ry: rng.float(-1.2, 1.2), c: rng.pick(DOOR_TINTS), s: rng.float(1, 2.2) });
+      if (rng.chance(0.4)) {
+        ctx.put('floatDoor', s * rng.float(13, 40), rng.float(5, 20), aisle(), { ry: s * Math.PI / 2 + rng.float(-0.5, 0.5), c: rng.pick(DOOR_TINTS), s: rng.float(0.8, 1.3) });
       }
       if (rng.chance(0.08)) {
-        ctx.put('floatChair', s * rng.float(18, 40), rng.float(4, 14), rng.float(0, 16), { ry: rng.float(0, 6.28), s: 1.4 });
+        ctx.put('floatChair', s * rng.float(14, 34), rng.float(5, 16), aisle(), { ry: rng.float(0, 6.28), s: 1.1 });
       }
     }
   },
