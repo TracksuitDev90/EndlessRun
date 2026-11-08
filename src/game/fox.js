@@ -2,6 +2,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeCharacterMaterials, makeEnvUniforms } from '../render/shaders.js';
 import { palette, bodyGeometry } from './kit.js';
 import { TAU, clamp, smooth, Spring } from './rig.js';
+import { CastShadow } from '../render/caster.js';
 
 // Sorrel, the red fox who runs with you: the body and how it moves. Sculpted
 // offline (tools/runner/fox.py) as one continuous coat with its jaw, ears and
@@ -194,19 +195,16 @@ export class Fox {
     this.furMesh.bind(this.skeleton, this.mesh.bindMatrix);
   }
 
+  // Her shadow: the shape of her as she is this frame - legs, ears, the
+  // brush of her tail - thrown along the world's light (render/caster.js).
   buildShadow() {
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uAlpha: { value: 0.3 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform float uAlpha; varying vec2 vUv; void main(){ float r = length(vUv - 0.5) * 2.0; float a = (1.0 - smoothstep(0.25, 1.0, r)) * uAlpha; gl_FragColor = vec4(0.06, 0.03, 0.1, a); }',
-      transparent: true,
-      depthWrite: false,
-    });
-    const geo = new THREE.PlaneGeometry(1, 1);
-    geo.rotateX(-Math.PI / 2);
-    this.shadow = new THREE.Mesh(geo, mat);
-    this.shadow.renderOrder = -19;
-    this.shadow.frustumCulled = false;
+    this.cast = new CastShadow(this.u, { res: 160 });
+    this.shadow = this.cast.mesh;
+  }
+
+  renderShadow(renderer) {
+    if (this.cast.casters.length === 0) this.cast.setCasters([this.root]);
+    this.cast.render(renderer);
   }
 
   get objects() {
@@ -1001,13 +999,12 @@ export class Fox {
     this.root.position.copy(pos);
     this.root.quaternion.copy(q);
     const h = Math.max(0, pos.y - ground);
-    const s = Math.max(0.3, 1 - h * 0.35);
-    const fw = _v.set(0, 0, -1).applyQuaternion(q);
-    this.shadow.position.set(pos.x, ground + 0.035, pos.z);
-    this.shadow.rotation.set(0, Math.atan2(-fw.x, -fw.z), 0);
-    this.shadow.scale.set(0.42 * s, 1, 1.05 * s);
-    this.shadow.material.uniforms.uAlpha.value = 0.3 * s * shadow;
-    this.shadow.visible = shadow > 0.01;
+    const r = 0.85;
+    this.cast.aim(pos.x - r, pos.x + r, pos.y - 0.05, pos.y + 0.8, pos.z - r, pos.z + r, ground, pos.x, pos.z, {
+      alpha: 0.95 * clamp(1 - h * 0.2, 0.5, 1) * shadow,
+      contact: 0.32 * clamp(1 - h * 3, 0, 1) * shadow,
+      reach: 0.2,
+    });
     // the fur combed back by the air streaming past, and down by its weight
     const sp = this.vel.length();
     _v.copy(this.vel).multiplyScalar(-Math.min(1, sp / 25) * 0.9 / Math.max(sp, 1e-3));

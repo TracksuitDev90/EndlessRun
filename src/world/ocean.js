@@ -72,6 +72,16 @@ const C = {
   iron: '#3a3a38',
   gold: '#ffcf4a',
   barnacle: '#ece6d6',
+  // the critters zooming round the reef
+  seal: '#6a4228',
+  sealBelly: '#d8a86c',
+  sealNose: '#2a1a14',
+  octo: '#f2788a',
+  octoHi: '#ffb2a2',
+  horse: '#f2a23a',
+  horseHi: '#ffe066',
+  eye: '#1a1418',
+  eyeWhite: '#fffaf0',
 };
 
 function seeded(seed) {
@@ -489,6 +499,119 @@ function jellyParts({ r = 0.9, seed = 1 } = {}) {
     parts.push(role(part(g, C.jellyTent, { x: Math.cos(a) * r * 0.9, z: Math.sin(a) * r * 0.9, emit: 0.7, outline: 0 }), 1));
   }
   return parts;
+}
+
+// --- the critters ----------------------------------------------------------
+// Sea lions, octopuses and seahorses zooming round the reef (see SWIM in the
+// object shader), each built nose to +x round the origin, cute: big round
+// eyes, each with its glint.
+function eyeParts(parts, x, y, z, r, side, o = {}) {
+  if (o.white) parts.push(part(P.sphere(r * 1.45, 8, 6), C.eyeWhite, { x: x - r * 0.35, y, z: z - side * r * 0.25, outline: 0.4 }));
+  parts.push(part(P.sphere(r, 8, 6), C.eye, { x, y, z, outline: o.white ? 0 : 0.5 }));
+  parts.push(part(P.sphere(r * 0.38, 6, 4), '#ffffff', { x: x + r * 0.45, y: y + r * 0.42, z: z + side * r * 0.62, emit: 0.8, outline: 0 }));
+}
+
+// A sea lion: sleek and caramel, darker on its back; its fore flippers
+// (role 1) sweep, a wave runs down it to the hind flippers.
+function seaLionParts() {
+  const grad = (lo, hi) => ({ grad: [C.sealBelly, C.seal, lo, hi] });
+  const parts = [
+    part(P.sphere(1, 14, 8), null, { x: 0.05, sx: 0.64, sy: 0.27, sz: 0.28, ...grad(-0.16, 0.14) }),
+    part(P.sphere(1, 10, 6), null, { x: -0.56, y: 0.01, sx: 0.38, sy: 0.16, sz: 0.19, ...grad(-0.1, 0.1) }),
+    part(P.sphere(0.21, 12, 8), null, { x: 0.74, y: 0.07, sx: 1.12, ...grad(-0.08, 0.2) }),
+    part(P.sphere(0.1, 10, 6), C.sealBelly, { x: 0.93, y: 0.03, sx: 1.25, sy: 0.82, sz: 0.95 }),
+    part(P.sphere(0.03, 6, 4), C.sealNose, { x: 1.05, y: 0.06, sx: 0.7, sz: 1.6, outline: 0 }),
+  ];
+  for (const sd of [-1, 1]) {
+    eyeParts(parts, 0.86, 0.13, sd * 0.11, 0.042, sd);
+    // whiskers
+    for (let k = 0; k < 3; k++) parts.push(aimedSpike([1.0, 0.0 + k * 0.025, sd * 0.06], [1.06, -0.03 + k * 0.035, sd * 0.22], 0.006, '#f6ead8'));
+    // fore flippers, swept back
+    parts.push(role(part(P.sphere(1, 8, 4), null, { x: 0.3, y: -0.14, z: sd * 0.3, sx: 0.24, sy: 0.03, sz: 0.12, ry: sd * 0.55, rx: sd * 0.25, ...grad(-0.2, 0.0) }), 1));
+    // hind flippers, spread
+    parts.push(part(P.sphere(1, 8, 4), null, { x: -0.92, y: -0.01, z: sd * 0.09, sx: 0.2, sy: 0.022, sz: 0.1, ry: sd * 0.45, ...grad(-0.1, 0.05) }));
+  }
+  return parts;
+}
+
+// An octopus jetting along: a round mantle out in front, eyes behind it, and
+// its arms (role 1) trailing out behind, flaring and curling at the tips.
+function octopusParts(seed = 1) {
+  const rnd = seeded(seed);
+  const parts = [
+    part(P.sphere(0.34, 14, 10), null, { x: 0.3, y: 0.03, sx: 1.3, sy: 1.0, sz: 1.0, grad: [C.octo, C.octoHi, -0.3, 0.35], tint: 1, mark: 0.2 }),
+    part(P.sphere(0.24, 12, 8), null, { x: -0.02, sx: 0.9, grad: [C.octo, C.octoHi, -0.2, 0.25], tint: 1 }),
+  ];
+  // a few pale spots on the mantle
+  for (let k = 0; k < 6; k++) {
+    const a = rnd() * TAU, e = (rnd() - 0.3) * 1.2;
+    parts.push(part(P.sphere(0.04, 6, 4), C.octoHi, { x: 0.32 + Math.cos(e) * Math.cos(a) * 0.4, y: 0.03 + Math.sin(e) * 0.33, z: Math.cos(e) * Math.sin(a) * 0.33, sy: 0.5, outline: 0, tint: 1 }));
+  }
+  for (const sd of [-1, 1]) eyeParts(parts, 0.06, 0.12, sd * 0.2, 0.05, sd, { white: true });
+  const arms = 8;
+  for (let i = 0; i < arms; i++) {
+    const a = (i / arms) * TAU + 0.2;
+    const len = 0.9 + rnd() * 0.35;
+    const g = P.cyl(0.012, 0.06, len, 5, 10);
+    g.translate(0, len / 2, 0);
+    g.rotateZ(Math.PI / 2);
+    // flaring out toward the tips, and curling
+    const cs = Math.cos(a), sn = Math.sin(a);
+    const curl = (rnd() - 0.5) * 0.5;
+    const pos = g.attributes.position;
+    for (let k = 0; k < pos.count; k++) {
+      const d = Math.max(0, -pos.getX(k)) / len;
+      const out = 0.35 * d + 0.15 * d * d;
+      pos.setY(k, pos.getY(k) + cs * out + curl * d * d * d * -sn);
+      pos.setZ(k, pos.getZ(k) + sn * out + curl * d * d * d * cs);
+    }
+    g.computeVertexNormals();
+    parts.push(role(part(g, null, { x: -0.08, y: cs * 0.12, z: sn * 0.12, grad: [C.octoHi, C.octo, -0.6, 0.1], tint: 1, outline: 0.45 }), 1));
+  }
+  return parts;
+}
+
+// A seahorse: upright, its snout out to +x, its belly round, its tail (role
+// 2) curled under, a crown on its head and a fin (role 1) on its back.
+function seahorseParts() {
+  const parts = [];
+  const body = [
+    [0.02, 0.62, 0.085], [-0.02, 0.5, 0.07], [0.02, 0.37, 0.11], [0.01, 0.23, 0.105], [-0.03, 0.11, 0.075],
+  ];
+  for (const [x, y, r] of body) parts.push(part(P.sphere(r, 10, 7), null, { x, y, sz: 0.85, grad: [C.horse, C.horseHi, y - r, y + r * 0.6], tint: 1, mark: 0.2 }));
+  // ridges round its belly
+  for (let k = 0; k < 4; k++) {
+    const y = 0.16 + k * 0.07;
+    parts.push(part(P.torus(0.098 - Math.abs(k - 1.5) * 0.008, 0.012, 3, 12), C.horseHi, { x: 0.012, y, rx: Math.PI / 2, sz: 1, sy: 0.85, outline: 0, tint: 1 }));
+  }
+  const tail = [[-0.04, 0.0, 0.055], [-0.02, -0.1, 0.045], [0.03, -0.18, 0.035], [0.08, -0.2, 0.028], [0.11, -0.15, 0.022], [0.09, -0.11, 0.017]];
+  for (const [x, y, r] of tail) parts.push(role(part(P.sphere(r, 8, 5), null, { x, y, sz: 0.85, grad: [C.horse, C.horseHi, y - r, y + r], tint: 1 }), 2));
+  parts.push(aimedCyl([0.06, 0.625, 0], [0.23, 0.6, 0], 0.024, 0.032, C.horse));
+  parts.push(part(P.sphere(0.03, 6, 4), C.horse, { x: 0.235, y: 0.6, sx: 0.6, tint: 1 }));
+  parts.push(aimedSpike([-0.01, 0.68, 0], [-0.02, 0.77, 0], 0.03, C.horseHi));
+  parts.push(role(part(P.sphere(1, 8, 4), '#ffd7a8', { x: -0.1, y: 0.28, sx: 0.07, sy: 0.1, sz: 0.012, rz: 0.3, emit: 0.3, outline: 0.3 }), 1));
+  for (const sd of [-1, 1]) eyeParts(parts, 0.05, 0.645, sd * 0.06, 0.024, sd, { white: true });
+  return parts;
+}
+
+// (a spike / a tapering rod from a to b)
+function aimedSpike(a, b, r, color) {
+  return aimedCyl(a, b, r * 0.15, r, color);
+}
+function aimedCyl(a, b, r0, r1, color) {
+  const v = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  const len = v.length();
+  const g = part(P.cyl(r0, r1, len, 5), color, { y: len / 2, outline: 0.3 });
+  const q = new THREE.Quaternion().setFromUnitVectors(UP, v.normalize());
+  g.applyQuaternion(q);
+  g.translate(a[0], a[1], a[2]);
+  const o = g.attributes.onrm;
+  const t = new THREE.Vector3();
+  for (let i = 0; i < o.count; i++) {
+    t.set(o.getX(i), o.getY(i), o.getZ(i)).applyQuaternion(q);
+    o.setXYZ(i, t.x, t.y, t.z);
+  }
+  return g;
 }
 
 // A manta ray gliding overhead, its wings beating (fly), nose to -z: dark
@@ -1088,6 +1211,9 @@ const GEM = {
 const RAY = [-0.16, 1, 0.24];
 const WHALE_CROSS = [0.14, 1.6, 0.85, 0.6];
 const JELLY_TINTS = [[1, 1, 1], [1, 0.82, 0.92], [0.9, 1, 1]];
+// octopuses coral, tangerine and violet; seahorses gold, coral and lilac
+const OCTO_TINTS = [[1, 1, 1], [1.08, 0.9, 0.6], [0.78, 0.68, 1.12]];
+const HORSE_TINTS = [[1, 1, 1], [1.05, 0.72, 0.78], [0.86, 0.78, 1.15]];
 
 // The door into the Kelp Deep: a ship's door, its planks weathered teal,
 // a great brass porthole across the two leaves (half on each) glowing
@@ -1232,6 +1358,12 @@ export default {
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', ink: 0.018, side: THREE.DoubleSide, jelly: [0.5, 0.16, 1.0, 0.35], fly: [0, 0, 1.0, 0.1] });
     b.toon('manta', merge(mantaParts()), { cap: 6, anim: 'liftFar', ink: 0.035, fly: [0.75, 1.3, 2.0, 0.07] });
     b.toon('turtle', merge(turtleParts()), { cap: 8, anim: 'lift', ink: 0.035, fly: [0.5, 1.6, 1.4, 0.1] });
+    // the critters, zooming round (see SWIM): sea lions racing big figures
+    // of eight, flinging themselves into barrel rolls; octopuses jetting in
+    // spurts; seahorses bobbing and darting about the seagrass
+    b.toon('seaLion', merge(seaLionParts()), { cap: 16, anim: 'lift', ink: 0.03, swim: [0.95, 5, 0.8, 2.4], swim2: [0.5, 1, 1.7, 0.35], swim3: [0.45, 1, 0] });
+    b.toon('octopus', merge(octopusParts(3)), { cap: 16, anim: 'lift', ink: 0.028, swim: [0.9, 2.3, 0.6, 1.2], swim2: [0.3, 0, 1.2, 0.13], swim3: [0.7, 1, 1] });
+    b.toon('seahorse', merge(seahorseParts()), { cap: 40, anim: 'lift', ink: 0.022, swim: [1.0, 1.2, 0.35, 0.6], swim2: [0.12, 0, 1.0, 0.18], swim3: [0.55, 0, 2] });
     b.toon('whaleFar', merge(whaleParts()), { cap: 4, anim: 'liftFar', ink: 0.04, pleats: true, cross: [0, 1.3, 0.9, 0], fly: [0, 0, 3, 0.04] });
     b.beam('ray', merge(shaftParts({ len: 44, r0: 0.5, r1: 2.4, dir: RAY })), { cap: 60, anim: 'pop', wobble: [0.0011, 0, 0.3, 0] });
     b.glow('glow', { cap: 90, anim: 'pop' });
@@ -1334,6 +1466,20 @@ export default {
         ctx.put('pool', x + 3.0, 0.06, zz + 4.5, { sx: 7, sz: 7, c: [k * 0.35, k * 0.35, k * 0.35] });
       }
       if (rng.chance(0.03)) ctx.put('turtle', s * rng.float(7, 16), rng.float(3.5, 8), z(), { ry: along() + Math.PI / 2, s: rng.float(1, 1.4), p0: rng.float(0, 6.28) });
+      // the critters: a pair of sea lions racing along beside you, an
+      // octopus jetting over the reef, a little herd of seahorses bobbing
+      // over the seagrass (always off the road: their loops never reach in
+      // over it)
+      if (rng.chance(0.07)) {
+        const x = s * rng.float(9, 13), y = rng.float(2.6, 5), zz = z(), ry = (rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2) + rng.float(-0.2, 0.2);
+        ctx.put('seaLion', x, y, zz, { ry, s: rng.float(0.9, 1.15), p0: rng.float(0, 6.28) });
+        if (rng.chance(0.6)) ctx.put('seaLion', x + s * rng.float(0.5, 1.5), y + rng.float(-0.6, 0.6), zz + rng.float(-2, 2), { ry, s: rng.float(0.8, 1.05), p0: rng.float(0, 6.28) });
+      }
+      if (rng.chance(0.09)) ctx.put('octopus', s * rng.float(7, 10.5), rng.float(1.3, 3.4), z(), { ry: along(), s: rng.float(0.85, 1.2), c: rng.pick(OCTO_TINTS), p0: rng.float(0, 6.28) });
+      if (rng.chance(0.12)) {
+        const x = s * rng.float(6, 8.5), y = rng.float(1.3, 3), zz = z();
+        for (let i = rng.int(2, 3); i > 0; i--) ctx.put('seahorse', x + rng.float(-0.6, 0.6), y + rng.float(-0.5, 0.5), zz + rng.float(-1.5, 1.5), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.15), c: rng.pick(HORSE_TINTS), p0: rng.float(0, 6.28) });
+      }
     }
     // over the road: a shaft of light, a manta gliding overhead, and far off,
     // a whale
@@ -1341,6 +1487,8 @@ export default {
       const k = rng.float(0.5, 0.85);
       ctx.put('ray', rng.float(-3, 3), 19, rng.float(0, 16), { c: [k, k, k], s: rng.float(0.8, 1.2), p0: rng.float(0, 6.28) });
     }
+    // now and then a sea lion zooming in loops high over the road
+    if (rng.chance(0.05)) ctx.put('seaLion', rng.float(-3, 3), rng.float(6.8, 9), rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.95, 1.2), p0: rng.float(0, 6.28) });
     if (rng.chance(0.045)) ctx.put('manta', rng.float(-9, 9), rng.float(9, 13), rng.float(0, 16), { ry: rng.float(-0.7, 0.7) + (rng.chance(0.5) ? 0 : Math.PI), s: rng.float(1, 1.5), p0: rng.float(0, 6.28) });
     if (ctx.index % 11 === 6 && rng.chance(0.5)) {
       const s = rng.chance(0.5) ? -1 : 1;

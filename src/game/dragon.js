@@ -2,6 +2,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeCharacterMaterials, makeEnvUniforms } from '../render/shaders.js';
 import { palette, bodyGeometry } from './kit.js';
 import { TAU, clamp, smooth, Spring } from './rig.js';
+import { CastShadow } from '../render/caster.js';
 
 // Iris, the wind dragon who flies with you: the body and how it moves.
 // Sculpted offline (tools/runner/dragon.py) laid out straight, nose to tail,
@@ -227,21 +228,17 @@ export class Dragon {
     this.furMesh.bind(this.skeleton, this.mesh.bindMatrix);
   }
 
-  // Her shadow: a long soft stroke on the ground under her, laid along her
-  // body as it falls there, fading as she climbs.
+  // Her shadow: the shape of her as she is this frame - the ribbon of her
+  // body, her legs, antlers and mane - thrown along the world's light
+  // (render/caster.js), fainter and softer the higher she flies.
   buildShadow() {
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uAlpha: { value: 0.3 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform float uAlpha; varying vec2 vUv; void main(){ vec2 q = (vUv - 0.5) * 2.0; float r = length(q * vec2(1.0, 1.0 + 0.6 * q.y)); float a = (1.0 - smoothstep(0.3, 1.0, r)) * uAlpha; gl_FragColor = vec4(0.05, 0.04, 0.12, a); }',
-      transparent: true,
-      depthWrite: false,
-    });
-    const geo = new THREE.PlaneGeometry(1, 1);
-    geo.rotateX(-Math.PI / 2);
-    this.shadow = new THREE.Mesh(geo, mat);
-    this.shadow.renderOrder = -19;
-    this.shadow.frustumCulled = false;
+    this.cast = new CastShadow(this.u, { res: 224 });
+    this.shadow = this.cast.mesh;
+  }
+
+  renderShadow(renderer) {
+    if (this.cast.casters.length === 0) this.cast.setCasters([this.root]);
+    this.cast.render(renderer);
   }
 
   get objects() {
@@ -913,26 +910,28 @@ export class Dragon {
   }
 
   placeShadow() {
-    // along her body as it falls on the ground, fading with height
-    let x0 = 0, z0 = 0, y = 0, n = 0;
-    for (let i = 3; i < 22; i++) {
-      x0 += this.P[i].x;
-      z0 += this.P[i].z;
-      y += this.P[i].y;
-      n++;
+    // the frame round her whole body (the spine's points are in the scene)
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity, y = 0;
+    for (let i = 0; i < this.N; i++) {
+      const p = this.P[i];
+      if (p.x < x0) x0 = p.x;
+      if (p.x > x1) x1 = p.x;
+      if (p.y < y0) y0 = p.y;
+      if (p.y > y1) y1 = p.y;
+      if (p.z < z0) z0 = p.z;
+      if (p.z > z1) z1 = p.z;
+      y += p.y;
     }
-    x0 /= n;
-    z0 /= n;
-    y /= n;
-    const a = this.P[4], b = this.P[20];
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const L = Math.hypot(dx, dz);
-    const k = clamp(1 - (y - 0.4) / 3.2, 0, 1);
-    this.shadow.position.set(x0, 0.035, z0);
-    this.shadow.rotation.set(0, Math.atan2(dx, dz), 0);
-    this.shadow.scale.set(0.34 * (0.6 + 0.4 * k), 1, Math.max(0.5, L * 1.1 + 0.3));
-    this.shadow.material.uniforms.uAlpha.value = 0.28 * k;
-    this.shadow.visible = k > 0.02;
+    y /= this.N;
+    const m = 0.5; // (her legs, antlers and mane round the spine)
+    const k = 1 - 0.6 * smooth(0.6, 4.5, y);
+    const near = clamp(1 - (y0 - 0.25) * 2.2, 0, 1);
+    this.cast.aim(x0 - m, x1 + m, Math.max(0, y0 - m), y1 + m, z0 - m, z1 + m, 0, this.P[Math.round(this.N * 0.35)].x, this.P[Math.round(this.N * 0.35)].z, {
+      alpha: 0.9 * k,
+      contact: 0.25 * near,
+      reach: 0.5,
+      blur: 0.02 * y,
+    });
   }
 
   forCompile(on) {

@@ -21,8 +21,6 @@ export class Course {
     this.visits = new Map();
     const ids = this.worlds.map((w) => w.id);
     const startIdx = Math.max(0, ids.indexOf(startId || ids[0]));
-    // First lap: the authored order, beginning at the start world.
-    this.queue = ids.slice(startIdx).concat(ids.slice(0, startIdx)).slice(1);
     this.lastId = ids[startIdx];
     const L = CONFIG.chunkLength;
     this.segments.push({ world: this.byId.get(this.lastId), start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1, visit: this.nextVisit(this.lastId), dream: makeDream(rng, 1, dream) });
@@ -35,12 +33,11 @@ export class Course {
     return v;
   }
 
+  // The worlds always come in their authored order (world/index.js), lap
+  // after lap: from the last one back round to the first.
   nextWorldId() {
-    if (this.queue.length === 0) {
-      const ids = this.worlds.map((w) => w.id).filter((id) => id !== this.lastId);
-      this.queue = this.rng.shuffle(ids);
-    }
-    const id = this.queue.shift();
+    const i = this.worlds.findIndex((w) => w.id === this.lastId);
+    const id = this.worlds[(i + 1) % this.worlds.length].id;
     this.lastId = id;
     return id;
   }

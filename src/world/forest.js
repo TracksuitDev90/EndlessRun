@@ -5,7 +5,7 @@ import { crystal, stone, crystalPoint, rough, nugget, octahedron } from './gems.
 import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
-// II · The Deepwood — an old forest of colossal trunks under a canopy so thick
+// III · The Deepwood — an old forest of colossal trunks under a canopy so thick
 // that only shafts of light get through. The path is a trodden line through
 // long grass; creeks cut across it (jump them), fallen trees lie over it on
 // rocks and stumps (slide under), and giant mossy boulders, one of them
