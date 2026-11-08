@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   P, part, merge, mix, moved,
-  cloudParts, wallDoorParts, gateFrameParts, gateLeafParts, gateTop,
+  cloudParts, wallDoorParts, gateFrameParts, gateTop, leafParts,
 } from './shapes.js';
 import { flyingBookParts, teacupParts, teapotParts, clockParts } from './whimsy.js';
 import { crystal, stepCut, octagon, bezelParts, nugget, hexPrism, FACE } from './gems.js';
@@ -444,6 +444,31 @@ function gateGeo() {
   return merge(parts);
 }
 
+// The door into the Hall of Doors: doors within doors - each leaf framed
+// with a smaller door, and a smaller one in that, each its own colour with
+// its own knob, down to a little one you could hardly get a hand through.
+function nestedLeaf({ W, H, z, f }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  const tints = ['#5ab0c8', '#f2c94c', '#7ac46a', '#e8e0f4'];
+  let x0 = 0.45, x1 = W - 0.45, y0 = 0.45, y1 = H - 0.6;
+  for (let i = 0; i < 4; i++) {
+    const w = x1 - x0, h = y1 - y0;
+    const t = 0.05 + i * 0.05;
+    out.push(part(P.box(w, h, t), tints[i], { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: at(t), outline: 0.5 }));
+    for (const [bx, by, bw, bh] of [[x0, (y0 + y1) / 2, 0.12, h], [x1, (y0 + y1) / 2, 0.12, h], [(x0 + x1) / 2, y1, w + 0.12, 0.12], [(x0 + x1) / 2, y0, w + 0.12, 0.12]]) {
+      out.push(part(P.box(bw, bh, t + 0.04), '#f4ead2', { x: bx, y: by, z: at(t + 0.04), outline: 0.4 }));
+    }
+    out.push(part(P.sphere(0.07 + 0.03 * (3 - i), 8, 6), '#e8b84a', { x: x1 - 0.22, y: y0 + h * 0.48, z: at(t + 0.14) }));
+    const inset = Math.min(w, h) * 0.17;
+    x0 += inset;
+    x1 -= inset * 0.6;
+    y0 += inset * 0.4;
+    y1 -= inset * 1.4;
+  }
+  return out;
+}
+
 export default {
   id: 'corridor',
   name: 'The Hall of Doors',
@@ -544,8 +569,13 @@ export default {
     b.toon('swingDoor', swingDoorGeo(), { cap: 16, anim: [3, 42, 88, Math.PI / 2] });
     b.toon('doorway', doorwayGeo(), { cap: 16, anim: 'none', ink: 0.03 });
 
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.06 });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: nestedLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   obstacles: {

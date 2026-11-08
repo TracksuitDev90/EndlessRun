@@ -36,15 +36,21 @@ export class ChunkStreamer {
   }
 
   clear() {
-    for (const c of this.live) c.world.removeOwner(c);
+    for (const c of this.live) this.remove(c);
     this.live.length = 0;
+  }
+
+  // (a chunk with a doorway in it owns that door too, in the shared doors)
+  remove(c) {
+    c.world.removeOwner(c);
+    if (c.gate) this.game.doors.removeOwner(c);
   }
 
   // Drop everything belonging to one world (after running through its door).
   dropWorld(world) {
     let w = 0;
     for (const c of this.live) {
-      if (c.world === world) world.removeOwner(c);
+      if (c.world === world) this.remove(c);
       else this.live[w++] = c;
     }
     this.live.length = w;
@@ -59,7 +65,7 @@ export class ChunkStreamer {
     const limit = dist - CONFIG.despawnBehind;
     let w = 0;
     for (const c of this.live) {
-      if (c.d0 + L < limit) c.world.removeOwner(c);
+      if (c.d0 + L < limit) this.remove(c);
       else this.live[w++] = c;
     }
     this.live.length = w;
@@ -101,18 +107,24 @@ export class ChunkStreamer {
     return chunk;
   }
 
+  // The doorway into `to`, standing at the end of `from`: built in the style
+  // of the world it leads into (its def.gate and door(), in the shared
+  // doors - see Game), its leaves painted in that world's colour.
   placeGate(from, to, doorD, owner) {
-    const g = from.def.gate;
+    const doors = this.game.doors;
+    const g = to.def.gate;
+    const id = `${to.id}.`;
     const quadD = doorD + g.depth / 2;
     const leafD = quadD - 0.28;
     const tint = rgb(to.def.doorColor);
-    from.put(owner, 'gateFrame', 0, 0, doorD);
-    from.put(owner, 'gateLeaf', -g.opening.halfW, 0, leafD, { ry: 0, c: tint, p1: 1, p0: 0 });
-    from.put(owner, 'gateLeaf', g.opening.halfW, 0, leafD, { ry: Math.PI, c: tint, p1: -1, p0: 0 });
+    owner.gate = true;
+    doors.put(owner, id + 'gateFrame', 0, 0, doorD);
+    doors.put(owner, id + 'gateLeaf', -g.opening.halfW, 0, leafD, { ry: 0, c: tint, p1: 1, p0: 0 });
+    doors.put(owner, id + 'gateLeaf', g.opening.halfW, 0, leafD, { ry: Math.PI, c: tint, p1: -1, p0: 0 });
     // (each extra a batch name, or [name, x, y, dz] to stand it somewhere on the gate)
-    for (const extra of from.def.gateExtras || []) {
+    for (const extra of to.def.gateExtras || []) {
       const [name, x = 0, y = 0, dz = 0] = Array.isArray(extra) ? extra : [extra];
-      from.put(owner, name, x, y, doorD + dz, { p0: 0.37 });
+      doors.put(owner, id + name, x, y, doorD + dz, { p0: 0.37 });
     }
   }
 }

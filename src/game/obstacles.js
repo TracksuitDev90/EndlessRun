@@ -145,9 +145,13 @@ export class ObstacleField {
     return this.difficultyAt(t) * (calm ? calm.diff : 1);
   }
 
-  // The breather settings (CONFIG.obstacles.calm) if the world at d is one.
+  // The breather settings (CONFIG.obstacles.calm, or the world's own laid
+  // over them: def.calm as an object) if the world at d is one.
   calmAt(d) {
-    return this.game.course.segAt(d).world.def.calm ? CONFIG.obstacles.calm : null;
+    const def = this.game.course.segAt(d).world.def;
+    if (!def.calm) return null;
+    if (def.calm === true) return CONFIG.obstacles.calm;
+    return def.calmSet || (def.calmSet = { ...CONFIG.obstacles.calm, ...def.calm });
   }
 
   clear() {
@@ -209,16 +213,18 @@ export class ObstacleField {
       this.nextD = b.d + CONFIG.doorClearAfter;
       return;
     }
+    const eta = runTime + (d - dist) / Math.max(game.speed, 6);
+    const v = game.speedAt(eta);
     // a world can ask for more open road after its doorway than usual
-    // (def.clearAfter: the Red Drift's, for the jump to light speed)
+    // (def.clearAfter, in seconds of running at the pace you'll be at: the
+    // Red Drift's, for the jump to light speed; the Kelp Deep's, for the
+    // splash)
     const here = course.segAt(d);
-    const after = here.world.def.clearAfter;
+    const after = here.world.def.clearAfter ? Math.max(CONFIG.doorClearAfter, v * here.world.def.clearAfter) : 0;
     if (after && here.ordinal > 1 && d < here.start + after) {
       this.nextD = here.start + after;
       return;
     }
-    const eta = runTime + (d - dist) / Math.max(game.speed, 6);
-    const v = game.speedAt(eta);
     const calm = this.calmAt(d);
     const diff = this.difficultyFor(d, eta);
     const tutorial = this.tutorial.length > 0;

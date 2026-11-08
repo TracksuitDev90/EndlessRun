@@ -4339,6 +4339,7 @@ const FS_DUST = FS_HEAD + /* glsl */ `
 uniform vec3 uGroundA;
 uniform vec3 uGroundB;
 uniform vec3 uShadowTint;
+uniform float uDustPale;
 varying vec4 vDust;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
@@ -4353,7 +4354,7 @@ void main() {
   float alpha = edge * vDust.y;
   if (alpha < 0.01) discard;
   // the road's own colour, paled with dust; lit from above, a shade beneath
-  vec3 dust = mix(mix(uGroundA, uGroundB, 0.5), vec3(0.98, 0.95, 0.88), 0.62);
+  vec3 dust = mix(mix(uGroundA, uGroundB, 0.5), vec3(0.98, 0.95, 0.88), uDustPale);
   float lit = smoothstep(0.2, -0.25, c.y + 0.06 * sin(a * 3.0 + vDust.w));
   vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
   vec3 col = dust * mix(sh, vec3(1.0), 0.35 + 0.65 * lit);
@@ -4362,7 +4363,10 @@ void main() {
   col = mix(col, mix(vec3(0.62, 0.84, 0.86), vec3(1.0), 0.4 + 0.6 * lit), wet);
   // vapour (a thruster's plume): bright white, a cold lilac shade beneath
   float vap = step(3.5, vDust.z);
-  col = mix(col, mix(vec3(0.7, 0.72, 0.95), vec3(1.0, 0.99, 0.97), 0.35 + 0.65 * lit), vap);
+  // (taking a little of the ground's colour where the dust is red)
+  vec3 vapC = mix(vec3(0.7, 0.72, 0.95), vec3(1.0, 0.99, 0.97), 0.35 + 0.65 * lit);
+  vapC = mix(vapC, dust * (0.75 + 0.35 * lit), clamp((0.62 - uDustPale) * 0.45, 0.0, 0.3));
+  col = mix(col, vapC, vap);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
@@ -5373,6 +5377,8 @@ export function makeEnvUniforms(env) {
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
     uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(), uVigShape: v4(),
+    // how pale the dust kicked up off the ground is (env.dustPale)
+    uDustPale: { value: 0.62 },
     uSea: v4(), uDeep: v4(), uDeepTint: c(),
     // The Gallery's sands (env.sands, see the sand ground): its dunes, and
     // what game/sands.js writes each frame — the surf before a doorway into
@@ -5445,6 +5451,7 @@ export function writeEnvUniforms(u, env) {
   const bc = color(bm.color);
   u.uBeam.value.set(bc.r, bc.g, bc.b, bm.amount);
   setColor(u.uPool.value, env.pool || '#000000');
+  u.uDustPale.value = env.dustPale ?? 0.62;
   // under the sea: the surface overhead, its shafts of light, the caustics
   // (scale: a multiple of 1/256 per metre)
   const sea = env.sea || {};

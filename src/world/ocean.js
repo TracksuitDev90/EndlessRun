@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, rgb, gateFrameParts, gateLeafParts, gateTop, moved, rod } from './shapes.js';
+import { P, part, merge, rgb, gateFrameParts, gateTop, moved, rod, leafParts } from './shapes.js';
 import { metal } from './gems.js';
 import { shaftParts } from './whimsy.js';
 import { CONFIG } from '../config.js';
@@ -1089,10 +1089,47 @@ const RAY = [-0.16, 1, 0.24];
 const WHALE_CROSS = [0.14, 1.6, 0.85, 0.6];
 const JELLY_TINTS = [[1, 1, 1], [1, 0.82, 0.92], [0.9, 1, 1]];
 
+// The door into the Kelp Deep: a ship's door, its planks weathered teal,
+// a great brass porthole across the two leaves (half on each) glowing
+// sea-green with the sea behind it, barnacles
+// crusting its foot, a starfish clinging to it and kelp streaming up it.
+function shipLeaf({ W, H, z, f }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  for (let y = 0.7; y < H - 0.2; y += 0.7) out.push(part(P.box(W - 0.2, 0.06, 0.04), '#9a9a9a', { x: W / 2, y, z: at(0.04), tint: 1, outline: 0 }));
+  const py = H + 1.0;
+  const R = 1.15;
+  out.push(part(P.torus(R + 0.05, 0.2, 7, 18, Math.PI), '#d8a24a', { x: W, y: py, z: at(0.24), rz: Math.PI / 2 }));
+  out.push(part(P.cyl(R, R, 0.06, 16, 1, false, Math.PI, Math.PI), '#7ff2e0', { x: W, y: py, z: at(0.06), rx: Math.PI / 2, emit: 0.75, outline: 0 }));
+  for (let i = 0; i < 5; i++) {
+    const a = Math.PI / 2 + ((i + 0.5) / 5) * Math.PI;
+    out.push(part(P.sphere(0.08, 6, 5), '#b07a2a', { x: W + Math.cos(a) * (R + 0.42), y: py + Math.sin(a) * (R + 0.42), z: at(0.12), outline: 0 }));
+  }
+  for (let i = 0; i < 9; i++) {
+    const bx = 0.4 + ((i * 0.37) % 1) * (W - 0.8);
+    const by = 0.2 + ((i * 0.61) % 1) * 0.9;
+    out.push(part(P.cone(0.13 + (i % 3) * 0.04, 0.2, 6), '#e8e4dc', { x: bx, y: by, z: at(0.1) + f * 0.08, rx: (f * Math.PI) / 2 }));
+  }
+  const star = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + Math.PI / 2;
+    const r = i % 2 ? 0.16 : 0.48;
+    if (i === 0) star.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else star.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  star.closePath();
+  out.push(part(P.extrude(star, 0.1, 1), '#ff7a3a', { x: W * 0.3, y: 2.6, z: at(0.12), rz: 0.3 }));
+  for (let i = 0; i < 9; i++) out.push(part(P.box(0.16, 0.62, 0.05), i % 2 ? '#4f9a3a' : '#8ac04a', { x: W - 0.5 + Math.sin(i * 0.9) * 0.18, y: 0.3 + i * 0.55, z: at(0.1), rz: Math.sin(i * 0.9 + 0.5) * 0.25, outline: 0.4 }));
+  return out;
+}
+
 export default {
   id: 'ocean',
   name: 'The Kelp Deep',
   doorColor: '#2fc4b2',
+  // more open road after the doorway in (seconds of running), while the
+  // splash runs off the screen
+  clearAfter: 3.5,
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   env: {
@@ -1214,8 +1251,13 @@ export default {
     b.toon('tower', towerGeo(), { cap: 24, anim: 'popEarly', ink: 0.045 });
     b.toon('fanW', fanWallGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
 
+  },
+
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
     b.toon('gateFrame', gateGeo(OPENING, GATE_DEPTH), { cap: 2, stencil: false, ink: 0.06 });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff', knob: '#f2a24b' })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: shipLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   obstacles: {

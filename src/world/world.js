@@ -333,6 +333,19 @@ class WorldBuilder {
     }
   }
 
+  // The same builder, every batch's name prefixed (the doorways: every
+  // world's door built into the one shared set, see Game).
+  prefixed(prefix) {
+    const named = new Set(['toon', 'ground', 'glass', 'glow', 'shadow', 'beam', 'pool']);
+    return new Proxy(this, {
+      get(t, k) {
+        const v = t[k];
+        if (named.has(k)) return (name, ...a) => v.call(t, prefix + name, ...a);
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
+  }
+
   // Whole planets hung in the sky round the camera, ebbing nearer and
   // further (see world/planets.js); the game moves them every frame.
   planets(spec) {

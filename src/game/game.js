@@ -52,6 +52,18 @@ export class Game {
     this.params = params;
 
     this.worlds = WORLD_DEFS.map((d) => new World(d));
+    // The doorways: every world's door - the way INTO it, built in its own
+    // style (def.gate, def.door) - in one shared set that always stands in
+    // the world you're running through, lit by it (see updateDoors).
+    this.doors = new World({
+      id: 'doors',
+      name: 'doors',
+      env: WORLD_DEFS[0].env,
+      build: (b) => {
+        for (const d of WORLD_DEFS) d.door(b.prefixed(`${d.id}.`));
+      },
+    });
+    this.doors.root.remove(this.doors.sky);
     this.course = new Course(this.worlds);
     this.chunks = new ChunkStreamer(this);
     this.obstacles = new ObstacleField(this);
@@ -97,6 +109,7 @@ export class Game {
     this.scenePortal = new THREE.Scene();
     this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
     if (this.companion) this.sceneMain.add(...this.companion.objects);
+    this.sceneMain.add(this.doors.root);
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
@@ -127,6 +140,7 @@ export class Game {
       w.setStencil(false);
       w.root.removeFromParent();
     }
+    this.doors.clearAll();
     this.portal.active = false;
     this.next = null;
     this.door = null;
@@ -176,6 +190,7 @@ export class Game {
     this.obstacles.update(0, 0);
     this.gems.update(0, 0);
     for (const w of this.worlds) w.flush(this.origin);
+    this.doors.flush(this.origin);
 
     this.state = title ? 'title' : 'running';
     this.player.mode = title ? 'idle' : 'run';
@@ -611,8 +626,10 @@ export class Game {
         this.next = b.to.world;
         this.next.applyVisit(b.to.visit);
         this.next.u.uDrain.value.set(this.next.def.env.drain ? 1 : 0, DRAIN_NONE, 0, 0);
-        this.door = { d: b.d, quadD: b.d + this.current.def.gate.depth / 2, seg: b.to };
-        this.portal.setShape(this.current.def.gate);
+        // (the doorway is the world it leads into's: its shape and depth)
+        const gate = b.to.world.def.gate;
+        this.door = { d: b.d, quadD: b.d + gate.depth / 2, seg: b.to };
+        this.portal.setShape(gate);
         this.portal.setTrip(this.current.u.uTrip.value);
         this.portal.active = true;
         this.next.setStencil(true);
@@ -687,6 +704,8 @@ export class Game {
       w.root.removeFromParent();
       w.flush(0);
     }
+    this.doors.clearAll();
+    this.doors.flush(0);
     this.portal.active = false;
     this.next = null;
     this.door = null;
@@ -757,6 +776,7 @@ export class Game {
     if (this.dist - this.origin > CONFIG.rebaseStep) {
       this.origin += CONFIG.rebaseStep;
       for (const w of this.worlds) w.markAllDirty();
+      this.doors.markAllDirty();
       this.companion?.rebase?.(CONFIG.rebaseStep);
     }
 
@@ -821,10 +841,14 @@ export class Game {
 
     this.current.flush(this.origin);
     if (this.next) this.next.flush(this.origin);
+    // (the doors stand in the world you're in, lit by it)
+    copyEnvUniforms(this.doors.u, this.current.u);
+    this.doors.flush(this.origin);
     const camDist = this.camDist();
     const twisting = shared.uDream.value.x !== 0;
     this.current.cull(camDist, twisting);
     if (this.next) this.next.cull(camDist, twisting);
+    this.doors.cull(camDist, twisting);
 
     // tutorial hints
     if (st === 'running' && !this.tutorialDone) {
@@ -870,7 +894,7 @@ export class Game {
   async precompile() {
     const scene = new THREE.Scene();
     const roots = [];
-    for (const w of this.worlds) {
+    for (const w of [...this.worlds, this.doors]) {
       roots.push([w.root, w.root.parent]);
       w.setAllVisibleForCompile(true);
       scene.add(w.root);
@@ -889,7 +913,7 @@ export class Game {
     try {
       const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
       let t = performance.now();
-      for (const w of this.worlds) {
+      for (const w of [...this.worlds, this.doors]) {
         for (const _ of w.weldAll()) {
           if (performance.now() - t > 12) {
             await new Promise((r) => setTimeout(r, 0));
@@ -905,7 +929,7 @@ export class Game {
       r.setScissorTest(false);
       r.clear(true, true, true);
     } finally {
-      for (const w of this.worlds) w.setAllVisibleForCompile(false);
+      for (const w of [...this.worlds, this.doors]) w.setAllVisibleForCompile(false);
       this.water.forCompile(false);
       this.splash.scene.add(this.splash.mesh);
       for (const [root, parent] of roots) {

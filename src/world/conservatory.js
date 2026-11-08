@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   P, part, merge, mix, moved,
-  cypressParts, roundTreeParts, bushParts, potParts, lanternPostParts, gateFrameParts, gateLeafParts,
+  cypressParts, roundTreeParts, bushParts, potParts, lanternPostParts, gateFrameParts, leafParts,
 } from './shapes.js';
 import { shaftParts, butterflyParts, giantFlowerParts } from './whimsy.js';
 import { crystal, nugget, tabular, dodecahedron, tetragonal } from './gems.js';
@@ -619,6 +619,36 @@ function gateGlassGeo() {
   return merge([part(P.extrude(s, 0.05, 24), '#ffffff', { outline: 0 })]);
 }
 
+// The door into the Glasshouse: glazed - panes of pale glass in a grid of
+// iron glazing bars - and ivy climbing up it from the foot.
+function glazedLeaf({ W, H, z, f, top }) {
+  const out = [];
+  const at = (t) => z + (f * t) / 2;
+  const cols = 2;
+  const rows = 4;
+  const pw = (W - 0.6) / cols;
+  const ph = (H - 0.9) / rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      out.push(part(P.box(pw - 0.16, ph - 0.16, 0.05), '#d8f4ea', { x: 0.3 + pw * (c + 0.5), y: 0.6 + ph * (r + 0.5), z: at(0.05), emit: 0.4, outline: 0 }));
+    }
+  }
+  for (let c = 0; c <= cols; c++) out.push(part(P.box(0.12, H - 0.6, 0.1), '#2e3a36', { x: 0.3 + pw * c, y: 0.3 + (H - 0.6) / 2, z: at(0.1), outline: 0.4 }));
+  for (let r = 0; r <= rows; r++) out.push(part(P.box(W - 0.48, 0.12, 0.1), '#2e3a36', { x: W / 2, y: 0.6 + ph * r, z: at(0.1), outline: 0.4 }));
+  // a fan of glazing under the arch
+  for (let k = 1; k < 4; k++) {
+    const a = Math.PI / 2 + (k / 4) * (Math.PI / 2);
+    const len = W - 0.3;
+    out.push(part(P.box(0.08, len, 0.1), '#2e3a36', { x: W + Math.cos(a) * len * 0.5, y: H + Math.sin(a) * len * 0.5, z: at(0.1), rz: a - Math.PI / 2, outline: 0.4 }));
+  }
+  for (let i = 0; i < 16; i++) {
+    const y = 0.2 + i * 0.32;
+    const x = 0.45 + Math.sin(i * 0.9) * 0.3 + i * 0.03;
+    out.push(part(P.sphere(0.2, 7, 5), i % 2 ? '#3f8f2c' : '#7fc236', { x, y, z: at(0.22), sz: 0.45, mark: 0.85 }));
+  }
+  return out;
+}
+
 export default {
   id: 'conservatory',
   name: 'The Glasshouse',
@@ -733,15 +763,20 @@ export default {
     b.toon('giantFlytrap', giantFlytrapGeo(), { cap: 24, anim: 'popEarly', wobble: [0.003, 0, 1.1, 0] });
     b.toon('bloom', bloomGeo(), { cap: 120, anim: 'popEarly' });
 
-    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.05, marks: [2.2, 2] });
-    b.glass('gateGlass', gateGlassGeo(), { cap: 2 });
-    b.toon('gateLeaf', merge(gateLeafParts(OPENING, { color: '#ffffff', depth: 0.28 })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
   },
 
   gateExtras: ['gateGlass'],
 
   // (every obstacle's leaves take a tint - one a little yellower, one bluer
   // - and the pots, planters and baskets come into flower, each its own way)
+  // The door INTO this world, in its own style (built into the shared
+  // doors, see world.js: it stands in the world before it).
+  door(b) {
+    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, ink: 0.05, marks: [2.2, 2] });
+    b.glass('gateGlass', gateGlassGeo(), { cap: 2 });
+    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', depth: 0.28, deco: glazedLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05 });
+  },
+
   obstacles: {
     L: [
       { name: 'potRow', len: 0.7, tints: LEAVES, extras: blooms([[-0.62, 0.92, 0.35], [0, 0.92, 0.35], [0.62, 0.92, 0.35]], 0) },
