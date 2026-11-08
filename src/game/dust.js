@@ -8,9 +8,11 @@ import { makeDustMaterial } from '../render/shaders.js';
 // coordinates: x, y and how far along the run), so a slide leaves a trail of
 // them streaming back past the camera. One draw call, and none at all while
 // the air is clear. (The same points can be water instead: drops flung up
-// and spray, splashing through the surf in the Gallery's sands.)
+// and spray, splashing through the surf in the Gallery's sands; or, in low
+// gravity, the white vapour of a thruster's plume - kind 4 - driven back in
+// a jet that the thin air barely slows.)
 
-const MAX = 40;
+const MAX = 64;
 
 export class Dust {
   constructor(env) {
@@ -31,6 +33,8 @@ export class Dust {
     this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, kind: 0, alpha: -1, life: 1, grow: 1 }));
     this.queued = 0;
     this.next = 0;
+    // how hard grit falls back (m/s²: less in low gravity)
+    this.g = 16;
   }
 
   // A puff (grit: false) or a speck of grit (true) at p, moving at v, both
@@ -70,7 +74,7 @@ export class Dust {
       it.age = 0;
       it.seed = Math.random();
       it.size = q.size * (0.8 + 0.4 * it.seed);
-      it.life = (it.falls ? 0.45 + 0.3 * it.seed : 0.55 + 0.45 * it.seed) * q.life;
+      it.life = (it.falls ? (0.45 + 0.3 * it.seed) * (this.g < 16 ? 1.8 : 1) : 0.55 + 0.45 * it.seed) * q.life;
       it.grow = it.falls ? 1 : 1 + (1.6 + 1.2 * it.seed) * q.grow;
       it.alpha = it.falls ? 1 : q.alpha >= 0 ? q.alpha : 0.75 + 0.2 * it.seed;
     }
@@ -81,11 +85,17 @@ export class Dust {
       it.age += dt;
       if (it.falls) {
         // grit (or a drop): flung up, falls back under gravity, gone when it lands
-        it.vy -= 16 * dt;
+        it.vy -= this.g * dt;
         const k = Math.exp(-1.2 * dt);
         it.vx *= k;
         it.vd *= k;
         if (it.y < 0.02 && it.vy < 0) it.age = it.life;
+      } else if (it.kind === 4) {
+        // vapour: driven back in a jet, slowing only a little as it spreads
+        const k = Math.exp(-2.2 * dt);
+        it.vx *= k;
+        it.vd *= k;
+        it.vy *= k;
       } else {
         // a puff: the still air stops it fast; it rises a little as it spreads
         const k = Math.exp(-4.5 * dt);

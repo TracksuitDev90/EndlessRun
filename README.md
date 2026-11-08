@@ -19,7 +19,11 @@ once you're deep enough they stop holding their shape: slowly at first, then
 roads corkscrew, forests melt, skies swirl like wet paint. Every doorway you
 come through is counted on a little orange door by your score, and makes the
 road, and every obstacle you clear, worth more — so the strangest stretches
-are the ones worth the most. And every world has its own gemstone to collect
+are the ones worth the most. Deepest of all, out past the sea, the door
+opens onto the stars: you jump to light speed and drop out of it onto a
+little red world where gravity barely holds you down — every jump a burst
+of a thruster that hurls you flying, every few steps a bound (see [Low
+gravity: the Red Drift](#low-gravity-the-red-drift)). And every world has its own gemstone to collect
 (the Kelp Deep's are pearls), laid in runs that swerve round its walls, arc
 over its hurdles and lead you through its doorways — and at the end of the
 run, you can exchange your haul for a big bonus (see [Score](#score)). And you never
@@ -50,7 +54,8 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump (see [The sands of time](#the-sands-of-time)), your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
-| IX | **The Kelp Deep** — the last world, under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
+| IX | **The Kelp Deep** — under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
+| X | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
 
 The first lap always nests inward in that order; after that the order shuffles
 (never the same world twice in a row). Each doorway is painted the colour of
@@ -336,6 +341,113 @@ long low moan a few seconds before it reaches the road (an obstacle's `call`).
 
 ![The Kelp Deep: kelp, coral and light shafts over the sand; a whale gliding across the path; the splash coming in — the sheet sliding off with its bright lip, then drops streaking down the lens; and the twilight reef on the second visit, a jellyfish glowing](docs/ocean.jpg)
 
+### Low gravity: the Red Drift
+
+The Red Drift is the one world where the runner doesn't run the way they do
+everywhere else (`def.lowGravity`; the arcs are in `game/drift.js`, the
+runner's side of it in `Player`, the tunables in `CONFIG.drift`). Low
+gravity, but not the slow motion low gravity usually is — they're *hurled*:
+
+- **The jump is a boost.** Swipe up and a burst of a thruster flings them up
+  and on — up hard (gravity at 30 m/s² while they're still climbing fast),
+  then the burst is spent and they *hang*, low gravity barely tugging them
+  (6.5 m/s²), flying over the top, then down again at 16: 2.3 m up and 1.3 s
+  in the air, against an ordinary jump's 1.6 m and 0.64 s. It's still their
+  own jump — Rowan's leap, Wren's tuck, Alder's vault off his stick,
+  Bramble's flips and floats (with his balloon in space) — but once they're
+  up off the dust the body tips forward into it like a swimmer's, legs
+  trailing, arms swept back and the hands at the hips, where a jet of white
+  vapour drives back from them like a fire extinguisher's in the dark: a
+  dense burst at take-off and little spurts over the top to keep them up.
+  The camera rides higher with them while they fly and its field of view
+  kicks out as the burst fires.
+- **A second burst.** Press up again while they hang and the thruster fires
+  once more, from wherever they are, lifting them on over whatever's next.
+- **Down drives them down.** In the air, a swipe down fires the thruster
+  the other way — a puff up off their hands — and drops them straight to the
+  dust into a slide, under whatever's hanging there.
+- **The bound.** On the ground they take a few steps (two to four) and
+  bounce off in a long low lope (0.4 m up, half a second in the air), the
+  stride's flight stretched over the whole of it so the other foot comes
+  down just as they land, arms out a little for balance — then a few more
+  steps, and off again: the lunar lope. A bound is no more than a lope:
+  swipe up during one and the thruster fires straight away, as it would off
+  the ground (it never clears an obstacle by itself, and it never carries
+  them into one they wouldn't have hit). Land on top of a rock or an asteroid
+  and they bounce straight off it.
+- **Everything is lighter.** Red dust puffs up off every push-off and
+  landing and hangs in the thin air, grit falls back slowly, and capes,
+  hair, beards and robes float: their weight is a third of what it is
+  anywhere else (`CONFIG.drift.gk`).
+
+**What's in the way** keeps the game's grammar, in the world's own shapes:
+asteroids tumbling low over the dust and heaps of red boulders to boost over
+(a belt of asteroids right across the road); UFOs — silver saucers, their
+rims strung with lights, spinning and bobbing, a glowing dome on top — and
+great asteroids hanging at head height to stay low under, skimming under
+them (or, if you're flying, driving yourself down out of the air in time);
+red rock pillars and crystal-crowned spires to go round; and a mothership
+right across the road. A boost hangs about twice as long as a jump, so the
+obstacles there come up further apart, and never as close after one you jump
+or duck (`CONFIG.drift.pace`); the gem director hangs its arcs on the boost's
+curve, so a boost taken at the right moment sweeps up every gem in the air,
+the crown at the top.
+
+**The jump to light speed.** Run through the doorway into it and you jump to
+light speed (`env.warp`, `game/warp.js`): the instant you're through, the
+stars stretch into streaks pouring out of the point the road runs to —
+white, ice blue, cyan, violet, a few hot magenta — longer and faster as it
+takes hold, the world behind them smeared toward the centre and sunk in a
+blue tunnel, a white-hot core blazing where they all come from; the runner
+is left out of the smear, so you never lose them. Then you drop out of it:
+the streaks snap back into points, a flash rings out across the screen, and
+you're running on red dust under the planets — a second and a quarter in
+all, with a rush of noise tearing up to a shriek, a deep swell under it and
+a glassy chord gliding up, then a falling whoom as you drop out. Like the
+splash it's one full-screen pass over the finished frame, only while it
+runs; the road is kept clear of obstacles a little further past this
+doorway than past any other (`def.clearAfter`).
+
+**The planets** (`def.planets`, `world/planets.js`) are whole globes, each
+turning on its own axis and lit by the world's sun — its night side sunk in a
+crescent of violet, crisp at the terminator, air glowing at its limb, the
+print's grain over it, hazed over where it hangs low on the horizon: a gas
+giant in banded flat colour with a great storm in the south, an ice giant
+pale cyan and blazing magenta round its rim, a cratered moon, an ocean world
+of continents under drifting cloud, a candy-striped one in pastel bands like
+an illustration, a rust-red one with a white polar cap; rings banded and
+gapped, dark where the planet shades them. They hang round the camera, like
+the sky, so however far you run they keep their place over the road — but
+each ebbs and flows on its own slow tide, swelling in closer until a giant
+fills half the sky, then falling back as a little moon sails out in front of
+it, wandering a little across the sky as it goes. All of them are one
+instanced draw (and one for their rings, one for the glow of their air).
+Smaller moons sail by on either side as you run, drifting in and out.
+
+**The sky** (`env.space`): stars all the way round and below the horizon,
+where the little world falls away — three layers of them, white, ice blue,
+gold and rose, twinkling, the brightest throwing four-pointed sparkles, and a
+milky way of fainter ones in a dusty band; a nebula flowing across it in
+ribbons of flat colour like cut paper, stippled like a print, pink into
+orange into blue, wisps of glow round them; two spiral galaxies turning
+slowly, pink arms streaked with gold round a white-hot core; and, from the
+second time round, comets.
+
+**The ground** is pattern 11: rust-red sand drifted in soft mottles, flats of
+grey-violet basalt showing through it, craters great and small (each bowl
+shaded away from the sun, its far wall and its raised rim catching the light,
+a splash of pale ejecta round the big ones), rocks and pebbles with sunlit
+caps, ripples blown into the sand off the road, and down the middle the dust
+trodden fine and pale.
+
+**Its gems** are green — the only green under all that red: moldavite, the
+glass flung up and fused when a meteorite struck, wrinkled and bottle-green;
+peridot, the gem that falls to earth in meteorites; pallasite, iron from the
+heart of a broken world studded with olivine; tektite beads. The crown is a
+fallen star.
+
+![The Red Drift: the planets over the red dust; a boost, the jet of vapour driving back from the runner's hands; flying, cape afloat, the fox below; the jump to light speed through the doorway; a mothership across the road under the ringed giant](docs/space.jpg)
+
 ### Coming back around
 
 Every time you return to a world it has changed — the changes layer up, and
@@ -353,6 +465,7 @@ rolls in slow waves:
 | Hell | an ember storm: more fire on the wind, the plain alight | the eclipse swells, its ring of fire burning hotter, ash falling thick | the colours begin to drift |
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
 | Kelp Deep | the twilight reef: blue dusk, the light from above fading, jellyfish glowing everywhere, plankton lit up in the water | the deep at midnight: almost no light from above, the anemones, jellyfish and plankton glowing | the colours begin to drift |
+| Red Drift | a comet shower: comets crossing the sky, the nebula burning hotter, UFOs zipping about far off | the violet night: the nebula gone to violet and teal, a paler sun, the dust pinker, astronauts adrift overhead | the colours begin to drift |
 
 ![The Hall of Doors on four visits](docs/laps.jpg)
 
@@ -442,6 +555,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Sky Road | **Aquamarine** turquoise | the complement of all that amber — a splinter of clear sky | a long leaning double-terminated aquamarine shard · a squat sky diamond · turquoise, sky blue in a web of dark matrix · fluorite, pale sea-green octahedra zoned in rings | a fan of three splinters |
 | Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
+| Red Drift | **Moldavite** green | the only green under all that red, and every stone of it fell from the sky | moldavite, wrinkled bottle-green glass flung up by a meteorite strike · peridot, an eight-sided bipyramid · pallasite, meteorite iron studded with olivine · tektite, green glass beads grown together | a fallen star: five points of moldavite |
 | Kelp Deep | **Pearls**, iridescent, in every shade | lustrous and soft against all that teal and green, and the one gem the sea makes itself; the counter wears a pearl here | Akoya, white with a rosé glow · golden South Sea · pink freshwater, a button pearl with a blue-lavender sheen · Tahitian, peacock black shot with green and blue · a silver-grey drop · a cream baroque · a circled champagne pearl (see [Pearls](#pearls)) | a great pearl in an open scallop shell |
 
 ### Pearls
@@ -606,7 +720,9 @@ chimes. The crash card tallies the run against your best. Tunables live in
 
 Swipes fire the moment your finger has travelled far enough — you don't have
 to lift it — which is what makes the controls feel instant. A jump pressed just
-before landing is buffered.
+before landing is buffered. In the Red Drift the jump is a boost, which you
+can fire a second time while it hangs, and down in the air drives you down
+(see [Low gravity](#low-gravity-the-red-drift)).
 
 On the title screen, tap a runner's card to pick them (← → / A D, or a
 sideways swipe, steps between them); tap anywhere else, swipe up or press
@@ -786,7 +902,7 @@ Append to the URL:
 | Flag | Effect |
 |---|---|
 | `?debug` | FPS, how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
-| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`, `ocean`) |
+| `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`, `ocean`, `space`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
@@ -1933,7 +2049,8 @@ src/world/                    world runtime + one file per world (art, lighting,
                               the shared later-lap props and light volumes, gems.js the
                               gem kit (cleaved crystal habits, lofts, settings),
                               lane-art.js the Cypress Lane's fruit, market obstacles,
-                              timetable and street furniture
+                              timetable and street furniture, planets.js the
+                              planets hung in the Red Drift's sky
 src/game/                     game loop, player (the runners' shared core:
                               animation, IK legs, secondary motion, movement),
                               characters (who you can pick), wayfarer and
@@ -1955,6 +2072,8 @@ src/game/                     game loop, player (the runners' shared core:
                               (depth recipes and the shared warp uniforms), bubbles
                               (the runner's bubbles, swirl and sand under the sea)
                               and splash (the screen splashed coming into it);
+                              drift (low gravity's arcs: the boost and the
+                              bound) and warp (the jump to light speed);
                               sands (the footprints in the Gallery's sand and
                               the surf lapping up it before a doorway into the
                               sea); the companion who runs with you
@@ -2062,6 +2181,25 @@ shadow that glides with it); and `pleats: true` draws a whale's throat
 pleats on parts marked 0.6 (uv.x along the body, uv.y round it). `b.beam`
 takes `wobble` to sway a shaft of light. An obstacle spec with `call:
 'whale'` sings a few seconds before the runner reaches it.
+
+Out among the stars: `lowGravity: true` makes the world's jump a boost and
+puts the runner on the bound (see [Low gravity](#low-gravity-the-red-drift)
+and `CONFIG.drift`); the obstacles come up further apart there and the gem
+director hangs its arcs on the boost's curve. `clearAfter` keeps more road
+than usual clear of obstacles after the world's doorway in, and `env.warp`
+jumps to light speed through it (`game/warp.js`; like `env.splash`, it's the
+doorway burst). `env.space: { nebula, galaxies, stars, comets, colors: [three
+nebula colours] }` fills the sky with the universe, all round and below the
+horizon (the moon and sun still work over it); ground pattern 11 is the
+regolith (pass the chunk distance as `p0`); and `def.planets: { shade, list:
+[...] }` hangs whole planets in the sky round the camera, each `{ style
+('gas', 'ice', 'moon', 'ocean', 'candy' or 'rust'), radius, dist, az, el
+(degrees), ebb: [share, seconds, phase], wander: [az, el, seconds], spin,
+bands, tilt: [x, z], colors: [a, b, c], atmo: [colour, strength], ring: {
+inner, outer, colors, opacity } }` (build them with `b.planets(spec)`).
+`b.toon(…, { tumble: [x turns/s, z turns/s, height of its middle] })`
+tumbles a prop about its own middle rather than its base (an asteroid
+hanging over the road).
 
 `gem` is the world's collectible: a `name`, a `color` (the HUD's little gem),
 its `stones` — each `{ name, weight, tints, parts(), texture }`, `weight`

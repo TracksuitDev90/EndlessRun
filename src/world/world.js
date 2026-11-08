@@ -16,6 +16,7 @@ import {
 } from '../render/shaders.js';
 import { P, part, merge, rgb } from '../render/geo.js';
 import { CONFIG } from '../config.js';
+import { Planets } from './planets.js';
 
 // A World owns its palette/lighting uniforms, its sky dome and every prop
 // batch it can place. World *definitions* (village.js etc.) describe the art;
@@ -330,6 +331,12 @@ class WorldBuilder {
       b.renderOrder = pool ? 1 : 7;
       this.world.addBatch(name, b);
     }
+  }
+
+  // Whole planets hung in the sky round the camera, ebbing nearer and
+  // further (see world/planets.js); the game moves them every frame.
+  planets(spec) {
+    this.world.planets = new Planets(this.world, spec);
   }
 
   merge(parts) {

@@ -497,7 +497,7 @@ export class Wayfarer extends Player {
     // half of it however a jump falls — the cape rises behind on the way
     // down, but it still hangs.)
     f.gx = -this.frameAcc.x * 0.22;
-    f.gy = Math.min(-5, -8 - this.frameAcc.y * 0.14);
+    f.gy = Math.min(-5, -8 - this.frameAcc.y * 0.14) * this.gk;
     f.gz = -this.frameAcc.z * 0.3;
     // The headwind the cape feels grows slower than the run speed: it streams
     // back further as the pace rises; gusts roll down it in broad, irregular

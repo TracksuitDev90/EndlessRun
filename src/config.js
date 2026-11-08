@@ -45,6 +45,24 @@ export const CONFIG = {
   },
 
   jump: { height: 1.6, time: 0.64 }, // apex height (m), total airtime (s)
+  // Low gravity (a world with def.lowGravity: the Red Drift; see
+  // game/drift.js). The boost - the jump, there - leaves the ground at v0
+  // (m/s) under `up` gravity (m/s²) until it's climbing slower than `hover`,
+  // hangs under `hang` until it's sinking faster than that, then comes down
+  // under `down`: about 1.3 s in the air and 2.3 m up at the top. A
+  // second press while it hangs (`rethrust`: up to that many) fires the
+  // thruster again, from wherever they are, at `again` m/s. The bound:
+  // after a few steps on the ground (`steps`: at least, at most) the runner
+  // bounces off at v0 under g - a long, low lope - and so on. gk: how much
+  // of their weight the runner's cape, hair and beard keep. Obstacles in
+  // that world come up `pace.space` times further apart, and never closer
+  // than `pace.air` times the usual gap after one you have to jump or duck.
+  drift: {
+    boost: { v0: 11, up: 30, hover: 2.0, hang: 6.5, down: 16, rethrust: 1, again: 5.5 },
+    bound: { v0: 3.2, g: 13, steps: [2, 4] },
+    gk: 0.32,
+    pace: { space: 1.12, air: 1.4 },
+  },
   slide: { time: 0.72 },
   // Rendered figure for the obstacle kinds (see obstacles.js): H obstacles hang
   // no lower than duckLine so the gap under them always reads as passable.

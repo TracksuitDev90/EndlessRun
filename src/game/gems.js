@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { rgb } from '../render/geo.js';
+import { boostArc, plainArc } from './drift.js';
 
 // Gem director. Gems are laid in runs along a "ghost" route: the line a good
 // runner would take through the obstacles ahead, planned row by row as the
@@ -26,10 +27,6 @@ import { rgb } from '../render/geo.js';
 // get the world's crown stone, worth more.
 
 const X = CONFIG.laneX;
-const T = CONFIG.jump.time;
-const V0 = (4 * CONFIG.jump.height) / T;
-const G = (8 * CONFIG.jump.height) / (T * T);
-const feet = (t) => V0 * t - 0.5 * G * t * t; // height of a jump t seconds after take-off
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const R = 0.4; // room a gem takes up round its centre
@@ -113,6 +110,12 @@ export class GemField {
     return [game.speedAt(eta), game.obstacles.difficultyFor(d, eta)];
   }
 
+  // The jump at d: its airtime, when it's best over a hurdle, and the height
+  // of the feet through it (in low gravity, the boost's arc: see drift.js).
+  arcAt(d) {
+    return this.game.course.segAt(d).world.def.lowGravity ? boostArc() : plainArc();
+  }
+
   spacing(v) {
     return Math.min(3.9, Math.max(2.3, v * CONFIG.gems.spacing));
   }
@@ -128,7 +131,9 @@ export class GemField {
     const to = this.chooseLane(row, this.lane, diff);
     const rec = row.lanes[to];
     const kind = rec ? rec.kind : null;
-    const takeoff = rec ? rec.d + rec.len / 2 - (v * T) / 2 : row.d;
+    const A = this.arcAt(row.d);
+    const T = A.T;
+    const takeoff = rec ? rec.d + rec.len / 2 - v * A.mid : row.d;
 
     // what the run does at the row — only if the route is settled in its lane
     // by then (a row hard on the heels of the last can leave the swerve late)
@@ -231,6 +236,7 @@ export class GemField {
     const start = Math.max(g0, this.restUntil);
     const room = g1 - start;
     if (room < sp * 2 || !r.chance(lerp(C.often[0], C.often[1], diff))) return;
+    const T = this.arcAt(start).T;
     if (diff >= C.unlock.hop && room > v * T + sp * 4 && r.chance(0.28)) {
       const takeoff = start + sp * 2 + r.float(0, room - v * T - sp * 4);
       if (this.steady(takeoff - sp * 2, takeoff + v * T + sp)) {
@@ -257,11 +263,12 @@ export class GemField {
   arc(takeoff, v, diff, sp, crown) {
     const n = diff > 0.4 && this.rng.chance(0.6) ? 7 : 5;
     const x = this.xAt(takeoff);
+    const A = this.arcAt(takeoff);
     for (let i = 0; i < n; i++) {
-      const t = (T * (i + 0.5)) / n;
-      this.gem(takeoff + v * t, x, feet(t) + CONFIG.gems.ground, v, diff, crown && i === (n - 1) >> 1);
+      const t = (A.T * (i + 0.5)) / n;
+      this.gem(takeoff + v * t, x, A.feet(t) + CONFIG.gems.ground, v, diff, crown && i === (n - 1) >> 1);
     }
-    const land = takeoff + v * T + sp * 0.6;
+    const land = takeoff + v * A.T + sp * 0.6;
     this.gem(land, this.xAt(land), CONFIG.gems.ground, v, diff);
   }
 

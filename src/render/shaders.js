@@ -381,6 +381,12 @@ uniform vec4 uCloth;
 // spin about the local y axis (rad/s)
 uniform vec4 uTurn;
 #endif
+#ifdef TUMBLE
+// Tumbling about its own middle (an asteroid): x turns a second about the
+// local x axis, y about the local z axis, both through (0, z, 0); each
+// instance starts at its own angle and goes at its own pace (its phase).
+uniform vec4 uTumble;
+#endif
 attribute vec3 fx;
 #ifdef OUTLINE
 uniform float uOutline;
@@ -732,6 +738,25 @@ void main() {
       #ifdef OUTLINE
         lo = rotY(lo, uTurn.w * uTime + phase);
       #endif
+    }
+  #endif
+  #ifdef TUMBLE
+    {
+      vec3 c = vec3(0.0, uTumble.z, 0.0);
+      vec3 r = lp - c;
+      float pace = 0.7 + 0.6 * fract(phase * 0.731);
+      float a = uTime * uTumble.x * pace + phase * 6.2831;
+      float b = uTime * uTumble.y * pace + phase * 3.917;
+      float ca = cos(a), sa = sin(a), cb = cos(b), sb = sin(b);
+      r = vec3(r.x, r.y * ca - r.z * sa, r.y * sa + r.z * ca);
+      r = vec3(r.x * cb - r.y * sb, r.x * sb + r.y * cb, r.z);
+      ln = vec3(ln.x, ln.y * ca - ln.z * sa, ln.y * sa + ln.z * ca);
+      ln = vec3(ln.x * cb - ln.y * sb, ln.x * sb + ln.y * cb, ln.z);
+      #ifdef OUTLINE
+        lo = vec3(lo.x, lo.y * ca - lo.z * sa, lo.y * sa + lo.z * ca);
+        lo = vec3(lo.x * cb - lo.y * sb, lo.x * sb + lo.y * cb, lo.z);
+      #endif
+      lp = c + r;
     }
   #endif
   #ifdef SPLASH
@@ -1690,6 +1715,79 @@ vec3 groundColor(vec2 p, float dist) {
     return mix(c, mix(uGroundA, uGroundC, bed * 0.8 + 0.1), far * 0.5);
   #elif GROUND == 10
     return sandGround(p, dist, far);
+  #elif GROUND == 11
+    // The Red Drift: regolith - half Mars, half moon. Rust-red sand drifted
+    // in soft mottles, flats of grey-violet basalt showing through it,
+    // craters great and small (each bowl shaded away from the sun, its far
+    // wall and raised rim catching the light, a splash of pale ejecta round
+    // the big ones), rocks and pebbles scattered over it all, and out beyond
+    // the road the sand blown into ripples. Down the middle, where everyone
+    // runs, the dust is trodden fine and pale. (p.y runs on from chunk to
+    // chunk; every period divides the 4096 m it wraps at.)
+    float n1 = texture2D(uNoise, p * 0.03125).g;
+    float n2 = texture2D(uNoise, p * 0.125 + 0.31).g;
+    float n3 = texture2D(uNoise, p * 0.5 + 0.67).g;
+    float n4 = texture2D(uNoise, p * 2.0 + 0.13).g;
+    vec3 c = mix(uGroundA, uGroundB, smoothstep(0.28, 0.78, n1 * 0.6 + n2 * 0.4));
+    // the moon showing through: grey-violet basalt flats
+    float flats = smoothstep(0.58, 0.7, n1 * 0.75 + n2 * 0.25) * smoothstep(3.0, 7.0, abs(p.x));
+    vec3 basalt = mix(uGroundC, vec3(0.5, 0.44, 0.5), 0.45) * (0.85 + 0.3 * n3);
+    c = mix(c, basalt, flats * 0.8);
+    c *= 0.86 + 0.28 * n3 * (1.0 - far * 0.6) + 0.08 * (n4 - 0.5) * (1.0 - far);
+    // the road: trodden fine and pale, its edges frayed
+    float edgeN = (n2 - 0.5) * 1.4 + (n3 - 0.5) * 0.6;
+    float road = 1.0 - smoothstep(3.4, 5.0, abs(p.x) + edgeN);
+    vec3 trod = mix(uGroundB, vec3(1.0, 0.86, 0.74), 0.16) * (0.93 + 0.1 * n3 + 0.05 * n4);
+    c = mix(c, trod, road * 0.78 * (1.0 - far * 0.35));
+    // ripples blown into the sand out beyond the road (they run along it,
+    // so they never strobe)
+    float rx = p.x * 1.6 + sin(p.y * 0.0981748) * 1.4 + (n2 - 0.5) * 4.0;
+    float rip = sin(rx * 3.14159) * (1.0 - smoothstep(0.35, 1.0, fwidth(rx)));
+    c *= 1.0 + rip * 0.07 * (1.0 - road) * (1.0 - flats) * (1.0 - far * 0.8);
+    // craters: small ones everywhere (fainter on the road), big ones off it
+    // (the sun across the ground: p.y runs along the run, toward -z)
+    vec2 L2 = normalize(vec2(uLightDir.x, -uLightDir.z) + vec2(1e-4, 0.0));
+    for (int k = 0; k < 2; k++) {
+      float S = k == 0 ? 8.0 : 32.0;
+      vec2 cq = p / S;
+      vec2 cell = floor(cq);
+      float h = hash12(cell + 37.0 + float(k) * 17.0);
+      if (h < (k == 0 ? 0.55 : 0.45)) continue;
+      vec2 o = vec2(hash12(cell + 2.7), hash12(cell + 9.4)) * 0.5 + 0.25;
+      float R = S * (k == 0 ? 0.1 + 0.14 * hash12(cell + 5.1) : 0.12 + 0.12 * hash12(cell + 5.1));
+      vec2 dv = (fract(cq) - o) * S;
+      float rr = length(dv) / R;
+      if (rr > 2.2) continue;
+      float side = dot(dv / max(length(dv), 1e-3), L2);
+      float onRoad = k == 0 ? 0.45 : 0.0;
+      float keep = mix(1.0, onRoad, road);
+      // the bowl: in shade on the side toward the sun, its far wall lit
+      float bowl = 1.0 - smoothstep(0.92, 1.0, rr);
+      float wall = smoothstep(0.25, 0.95, rr) * bowl;
+      float shade = 1.0 - 0.42 * wall * smoothstep(-0.3, 0.7, side) + 0.2 * wall * smoothstep(-0.2, -0.9, side);
+      shade *= 1.0 - 0.1 * bowl;
+      // the raised rim, lit on its sunward face and shaded behind
+      float rim = exp(-pow((rr - 1.04) / 0.11, 2.0));
+      shade *= 1.0 + rim * (0.12 + 0.12 * side);
+      // ejecta: a pale splash round the big ones
+      float ej = (1.0 - smoothstep(1.0, 2.1, rr)) * step(1.0, rr) * float(k) * (0.6 + 0.4 * n4);
+      vec3 cc = c * shade;
+      cc = mix(cc, mix(uGroundB, vec3(1.0, 0.9, 0.82), 0.3), ej * 0.22);
+      c = mix(c, cc, keep * (1.0 - far * 0.7));
+    }
+    // rocks and pebbles: dark on the sand, a sunlit cap on each
+    vec2 sq = p / 0.5;
+    vec2 sc = floor(sq);
+    float sh = hash12(sc + 23.0);
+    vec2 so = vec2(hash12(sc + 3.3), hash12(sc + 6.6)) * 0.6 + 0.2;
+    vec2 sd = (fract(sq) - so) * vec2(1.0, 1.0 + 0.6 * hash12(sc + 1.9));
+    float sr = 0.05 + 0.1 * hash12(sc + 4.4);
+    float sfa = fwidth(sq.x) + 0.02;
+    float pebble = (1.0 - smoothstep(sr - sfa, sr + sfa, length(sd))) * step(mix(0.82, 0.93, road), sh) * (1.0 - far);
+    float cap = smoothstep(-0.2, 0.6, dot(normalize(sd + 1e-4), L2));
+    vec3 pc = mix(uGroundC * 0.9, mix(uGroundC, uGroundB, 0.6), cap);
+    c = mix(c, pc, pebble);
+    return mix(c, mix(uGroundA, uGroundC, 0.25), far * 0.45);
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -3826,6 +3924,11 @@ void main() {
 const FS_SKY = /* glsl */ `
 uniform float uTime;
 uniform vec4 uSkyFx2; // x sun rays, y cloud bands, z aurora, w planet ring (moon drawn full)
+// deep space (env.space): x nebula ribbons, y galaxies, z the starfield, w comets
+uniform vec4 uSkyFx3;
+uniform vec3 uNeb0;
+uniform vec3 uNeb1;
+uniform vec3 uNeb2;
 // a total eclipse in place of the sun (env.eclipse): x how much, y how bright
 // its ring of fire burns, z the corona's reach
 uniform vec4 uEclipse;
@@ -3841,10 +3944,141 @@ float hash13(vec3 p) {
   p += dot(p, p.zyx + 31.32);
   return fract((p.x + p.y) * p.z);
 }
+// Deep space (env.space, the Red Drift): the whole sky, all round and below
+// the horizon where the little world falls away, crowded with stars - three
+// layers of them, white, ice blue, gold and rose, the brightest throwing
+// four-pointed sparkles - a milky way of fainter ones in a dusty band; across
+// it, a nebula in flowing ribbons of flat colour like cut paper, stippled,
+// pink into orange into blue, wisps of glow round them; two spiral galaxies
+// turning slowly, pink arms streaked with gold round a white-hot core; and,
+// on later laps, comets.
+float triN(vec3 p, vec3 w) {
+  return texture2D(uNoise, p.yz).g * w.x + texture2D(uNoise, p.xz).g * w.y + texture2D(uNoise, p.xy).g * w.z;
+}
+vec3 starCol(float h) {
+  return h < 0.5 ? vec3(1.0, 0.97, 0.92) : h < 0.7 ? vec3(0.72, 0.86, 1.0) : h < 0.86 ? vec3(1.0, 0.86, 0.6) : vec3(1.0, 0.7, 0.8);
+}
+vec3 galaxy(vec3 d, vec3 g, float size, float tilt, float spin, vec3 armC, vec3 dustC) {
+  float facing = dot(d, g);
+  if (facing < 0.9) return vec3(0.0);
+  vec3 e1 = normalize(cross(g, vec3(0.0, 1.0, 0.0)));
+  vec3 e2 = cross(e1, g);
+  vec2 p = vec2(dot(d, e1), dot(d, e2)) / size;
+  float ct = cos(tilt), st = sin(tilt);
+  p = vec2(p.x * ct - p.y * st, (p.x * st + p.y * ct) / 0.42);
+  float r = length(p);
+  if (r > 1.6) return vec3(0.0);
+  float a = atan(p.y, p.x);
+  float arms = sin(2.0 * a - log(r + 0.02) * 4.2 - uTime * spin);
+  float arm = pow(0.5 + 0.5 * arms, 3.0);
+  float lane = texture2D(uNoise, vec2(a * 0.32 + r * 0.6, r * 0.8 - uTime * spin * 0.05)).g;
+  float fall = exp(-r * 2.4);
+  vec3 c = armC * arm * fall * (0.55 + 0.6 * lane) * 1.4;
+  c += mix(dustC, vec3(1.0, 0.9, 0.6), 0.5) * smoothstep(0.62, 0.8, lane) * arm * fall * 0.9;
+  c += vec3(1.0, 0.95, 0.82) * (exp(-r * 13.0) * 1.4 + exp(-r * 5.0) * 0.35);
+  return c * smoothstep(1.6, 0.9, r);
+}
+vec3 spaceSky(vec3 c, vec3 d) {
+  vec3 w = abs(d);
+  w = w * w * w;
+  w /= w.x + w.y + w.z;
+  // the milky way: a dusty band across the sky, thick with faint stars
+  vec3 mwAx = normalize(vec3(0.42, 0.52, -0.74));
+  float mwD = dot(d, mwAx);
+  float mwN = triN(d * 1.6 + 0.21, w);
+  float mw = exp(-pow(mwD / (0.2 + 0.08 * mwN), 2.0)) * uSkyFx3.z;
+  c += mix(uNeb2, vec3(0.85, 0.8, 1.0), 0.55) * mw * (0.05 + 0.08 * smoothstep(0.35, 0.75, mwN));
+  // the nebula: ribbons of flat colour flowing across the sky
+  if (uSkyFx3.x > 0.0) {
+    vec3 ax = normalize(vec3(-0.55, 0.62, 0.55));
+    float n1 = triN(d * 0.55 + vec3(uTime * 0.0015, 0.0, 0.0), w);
+    float n2 = triN(d * 1.3 + 0.37, w);
+    float n3 = triN(d * 3.4 + 0.71, w);
+    float f = dot(d, ax) * 3.2 + (n1 - 0.5) * 2.6 + (n2 - 0.5) * 0.8;
+    float e = fwidth(f) * 1.2 + 0.015;
+    float belt = 1.0 - smoothstep(1.0, 1.6, abs(f + 0.1));
+    // three ribbons and a dark lane between, each edge wavering on its own
+    float b0 = smoothstep(-1.15 - e, -1.15 + e, f + (n3 - 0.5) * 0.25);
+    float b1 = smoothstep(-0.5 - e, -0.5 + e, f + (n2 - 0.5) * 0.35);
+    float b2 = smoothstep(0.15 - e, 0.15 + e, f - (n3 - 0.5) * 0.3);
+    float b3 = smoothstep(0.75 - e, 0.75 + e, f + (n1 - 0.5) * 0.3);
+    vec3 rib = mix(uNeb2 * 0.75, uNeb0, b0);
+    rib = mix(rib, uNeb1, b1 * (1.0 - b2));
+    rib = mix(rib, mix(uNeb0, uNeb2, 0.5), b2);
+    rib = mix(rib, uNeb2, b3);
+    float on = belt * smoothstep(-1.4, -1.15, f) * (1.0 - smoothstep(1.2, 1.5, f));
+    // stippled, like a print
+    float sp = hash13(floor(d * 700.0));
+    rib *= 0.9 + 0.22 * step(0.82, sp) - 0.1 * step(sp, 0.12);
+    rib *= 0.82 + 0.3 * n3;
+    c = mix(c, rib, on * 0.62 * uSkyFx3.x);
+    // and wisps of glow drifting round them
+    float wisp = smoothstep(0.5, 0.85, n1 * 0.55 + n2 * 0.35 + n3 * 0.2);
+    c += mix(uNeb0, uNeb2, n2) * wisp * 0.22 * uSkyFx3.x * (1.0 - on * 0.5);
+  }
+  // galaxies
+  if (uSkyFx3.y > 0.0) {
+    c += galaxy(d, normalize(vec3(-0.62, 0.22, -0.75)), 0.085, 0.5, 0.02, vec3(1.0, 0.45, 0.78), vec3(1.0, 0.75, 0.3)) * uSkyFx3.y;
+    c += galaxy(d, normalize(vec3(0.7, 0.32, -0.64)), 0.05, -0.9, -0.03, vec3(0.6, 0.55, 1.0), vec3(0.45, 0.9, 1.0)) * uSkyFx3.y * 0.85;
+  }
+  // stars, three layers deep (more of them in the milky way)
+  if (uSkyFx3.z > 0.0) {
+    vec3 e1 = normalize(cross(d, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
+    vec3 e2 = cross(e1, d);
+    for (int L = 0; L < 3; L++) {
+      float sc = L == 0 ? 70.0 : L == 1 ? 160.0 : 340.0;
+      vec3 p = d * sc;
+      vec3 cell = floor(p);
+      float h = hash13(cell + float(L) * 17.3);
+      float th = (L == 0 ? 0.955 : L == 1 ? 0.93 : 0.9) - mw * 0.12 * float(L);
+      if (h < th) continue;
+      vec3 jit = vec3(hash13(cell + 1.7), hash13(cell + 3.1), hash13(cell + 5.3)) - 0.5;
+      vec3 f = fract(p) - 0.5 - jit * 0.6;
+      vec2 fq = vec2(dot(f, e1), dot(f, e2));
+      float px = length(fwidth(p)) * 0.6;
+      float sz = L == 0 ? 0.11 : 0.085;
+      float rad = max(sz, px);
+      float s = (1.0 - smoothstep(0.0, rad, length(fq))) * (sz / rad);
+      float hk = fract(h * 13.7);
+      float tw = 0.65 + 0.35 * sin(uTime * (1.1 + hk * 4.0) + hk * 60.0);
+      float b = (L == 0 ? 1.5 : L == 1 ? 1.0 : 0.65) * (0.5 + hk);
+      vec3 col = starCol(fract(h * 7.31));
+      c += col * s * tw * b * uSkyFx3.z;
+      if (L == 0 && h > 0.988) {
+        // the brightest throw four-pointed sparkles
+        float k = 0.03 + px;
+        float spk = exp(-abs(fq.x) / k) * exp(-abs(fq.y) * 7.0) + exp(-abs(fq.y) / k) * exp(-abs(fq.x) * 7.0);
+        c += col * spk * 0.8 * tw * uSkyFx3.z;
+      }
+    }
+  }
+  // comets: a few, each crossing the sky over a minute or so, its tail
+  // streaming away from the sun
+  if (uSkyFx3.w > 0.0) {
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float T = 70.0 + 25.0 * fi;
+      float u = fract(uTime / T + fi * 0.37);
+      float az = mix(-0.9, 0.9, u) * (i == 1 ? -1.0 : 1.0) + fi * 0.6;
+      float el = 0.12 + 0.12 * fi + 0.06 * sin(u * 3.0 + fi);
+      vec3 hd = normalize(vec3(sin(az) * cos(el), sin(el), -cos(az) * cos(el)));
+      // (the tail: along the sky, straight away from the sun)
+      vec3 tl = normalize(-uSunDir + hd * dot(hd, uSunDir) + vec3(1e-4, 2e-4, 0.0));
+      vec3 q = d - hd;
+      float along = dot(q, tl);
+      float across = length(q - tl * along);
+      float headG = exp(-dot(q, q) / 0.00002);
+      float tailG = step(0.0, along) * exp(-along / 0.09) * exp(-pow(across / (0.0025 + along * 0.12), 2.0));
+      c += (vec3(1.0, 0.98, 0.92) * headG * 1.5 + mix(vec3(0.6, 0.85, 1.0), vec3(0.95, 0.9, 1.0), exp(-along * 20.0)) * tailG * 0.55) * uSkyFx3.w * smoothstep(0.0, 0.08, u) * (1.0 - smoothstep(0.92, 1.0, u));
+    }
+  }
+  return c;
+}
 // Everything in the sky behind the sun: its gradient, the moon, stars, rays,
 // clouds, smoke and lightning, aurora.
 vec3 skyBack(vec3 d) {
   vec3 c = skyColor(d);
+  if (uSkyFx3.x + uSkyFx3.y + uSkyFx3.z + uSkyFx3.w > 0.0) c = spaceSky(c, d);
   float sd = dot(d, uSunDir);
   if (uEclipse.x <= 0.0) {
     float sun = smoothstep(uSkyFx.y - 0.00012, uSkyFx.y + 0.00012, sd);
@@ -4084,7 +4318,7 @@ void main() {
 // ---------------------------------------------------------------------------
 const VS_DUST = COMMON + /* glsl */ `
 uniform vec2 uResolution;
-attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray), w seed
+attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour), w seed
 varying vec4 vDust;
 varying vec3 vWorld;
 varying vec3 vPos;
@@ -4126,6 +4360,9 @@ void main() {
   col = mix(col, dust * 0.42, grit * (1.0 - wet));
   // water: white, a glassy teal shade beneath
   col = mix(col, mix(vec3(0.62, 0.84, 0.86), vec3(1.0), 0.4 + 0.6 * lit), wet);
+  // vapour (a thruster's plume): bright white, a cold lilac shade beneath
+  float vap = step(3.5, vDust.z);
+  col = mix(col, mix(vec3(0.7, 0.72, 0.95), vec3(1.0, 0.99, 0.97), 0.35 + 0.65 * lit), vap);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
@@ -4835,6 +5072,278 @@ void main() {
 `;
 
 // ---------------------------------------------------------------------------
+// Planets (world/planets.js): whole worlds hung in the sky round the camera,
+// one instanced draw for the lot (and one for their rings, one for the glow
+// of their air). Every one has its own style and palette: a gas giant in
+// banded flat colour with a great storm in the south, an ice giant soft and
+// pale with a blaze of colour round its rim, a cratered moon, an ocean world
+// of continents under drifting cloud, a candy-striped one in pastel bands
+// like an illustration, a rust-red one with a polar cap. Each turns on its
+// own axis; lit by the world's sun, its night side sinks into a crescent of
+// violet, crisp at the terminator; air glows at the limb; the print's grain
+// is over all of it; and low on the horizon, the dust of the little world
+// hazes them over.
+// aPlanet: x style, y seed, z spin (rad/s), w bands; aAtmo: rgb, strength.
+// ---------------------------------------------------------------------------
+const VS_PLANET = /* glsl */ `
+uniform float uTime;
+attribute vec4 aPlanet;
+attribute vec3 aColA;
+attribute vec3 aColB;
+attribute vec3 aColC;
+attribute vec4 aAtmo;
+varying vec3 vN;
+varying vec3 vWN;
+varying vec3 vWP;
+varying vec4 vPl;
+varying vec3 vA;
+varying vec3 vB;
+varying vec3 vC;
+varying vec4 vAtmo;
+void main() {
+  mat4 M = modelMatrix * instanceMatrix;
+  vec4 wp = M * vec4(position, 1.0);
+  vWP = wp.xyz;
+  vWN = normalize(mat3(M) * normal);
+  float a = uTime * aPlanet.z + aPlanet.y * 6.2831;
+  float ca = cos(a), sa = sin(a);
+  vN = vec3(ca * normal.x + sa * normal.z, normal.y, -sa * normal.x + ca * normal.z);
+  vPl = aPlanet;
+  vA = aColA;
+  vB = aColB;
+  vC = aColC;
+  vAtmo = aAtmo;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}
+`;
+const FS_PLANET = /* glsl */ `
+uniform vec3 uCamPos;
+uniform float uTime;
+uniform vec4 uTrip;
+uniform sampler2D uNoise;
+uniform vec3 uPlanetShade;
+varying vec3 vN;
+varying vec3 vWN;
+varying vec3 vWP;
+varying vec4 vPl;
+varying vec3 vA;
+varying vec3 vB;
+varying vec3 vC;
+varying vec4 vAtmo;
+` + SKY_FN + /* glsl */ `
+float hashP(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float triP(vec3 p, vec3 w) {
+  return texture2D(uNoise, p.yz).g * w.x + texture2D(uNoise, p.xz).g * w.y + texture2D(uNoise, p.xy).g * w.z;
+}
+// flat bands: four tones, crisp-edged
+vec3 bands4(float b, vec3 c0, vec3 c1, vec3 c2, vec3 c3) {
+  float e = fwidth(b) + 0.012;
+  float k = fract(b);
+  vec3 c = mix(c0, c1, smoothstep(0.25 - e, 0.25 + e, k));
+  c = mix(c, c2, smoothstep(0.5 - e, 0.5 + e, k));
+  c = mix(c, c3, smoothstep(0.75 - e, 0.75 + e, k));
+  return mix(c, c0, smoothstep(1.0 - e, 1.0, k));
+}
+void main() {
+  vec3 n = normalize(vN);
+  vec3 wn = normalize(vWN);
+  vec3 V = normalize(uCamPos - vWP);
+  vec3 w = abs(n);
+  w = w * w * w;
+  w /= w.x + w.y + w.z;
+  float seed = vPl.y;
+  float style = vPl.x;
+  float n1 = triP(n * 0.6 + seed, w);
+  float n2 = triP(n * 1.5 + seed * 1.37 + 0.3, w);
+  float n3 = triP(n * 4.0 + seed * 2.11 + 0.6, w);
+  float lat = n.y;
+  float lon = atan(n.z, n.x);
+  vec3 col;
+  if (style < 0.5) {
+    // gas giant: banded, the bands swirling where they meet, a great storm
+    float b = lat * vPl.w + (n1 - 0.5) * 1.1 + (n2 - 0.5) * 0.4 + sin(lon * 3.0 + lat * 9.0 + seed) * 0.05;
+    col = bands4(b, vA, vB, vC, mix(vA, vB, 0.5));
+    vec2 sq = vec2(mod(lon - seed * 2.0 + 3.14159, 6.28318) - 3.14159, (lat + 0.34) * 3.0);
+    float sr = length(sq);
+    float storm = 1.0 - smoothstep(0.24, 0.29, sr);
+    col = mix(col, mix(vC, vec3(1.0, 0.5, 0.36), 0.55) * (0.88 + 0.16 * sin(sr * 40.0 - uTime * 0.6)), storm);
+    col = mix(col, mix(vA, vec3(1.0), 0.3), (1.0 - smoothstep(0.29, 0.34, sr)) * (1.0 - storm) * 0.6);
+  } else if (style < 1.5) {
+    // ice giant: soft and pale, a few fine bright streaks, a dark spot
+    col = mix(vA, vB, smoothstep(-0.9, 0.9, lat * 1.6 + (n1 - 0.5) * 0.8));
+    float st = smoothstep(0.9, 0.98, sin(lat * 16.0 + (n2 - 0.5) * 5.0) * 0.5 + 0.5) * smoothstep(0.5, 0.68, n1);
+    col = mix(col, vec3(1.0), st * 0.75);
+    col = mix(col, vC, smoothstep(0.6, 0.7, n2) * 0.35);
+    vec2 sq = vec2(mod(lon - seed * 3.0 + 3.14159, 6.28318) - 3.14159, (lat + 0.22) * 3.6);
+    float spot = 1.0 - smoothstep(0.16, 0.21, length(sq));
+    col = mix(col, vC * 0.45, spot);
+    col = mix(col, vec3(1.0), (1.0 - smoothstep(0.03, 0.07, length(sq - vec2(0.05, -0.12)))) * 0.9);
+  } else if (style < 2.5) {
+    // a cratered moon: highlands and dark seas, craters great and small
+    col = mix(vA, vB, smoothstep(0.35, 0.7, n1 * 0.7 + n2 * 0.3));
+    col = mix(col, vC, smoothstep(0.56, 0.62, n2 * 0.8 + n1 * 0.2) * 0.65);
+    for (int k = 0; k < 2; k++) {
+      float S = k == 0 ? 4.0 : 9.0;
+      vec3 p = n * S + seed * 5.0;
+      vec3 cell = floor(p);
+      float h = hashP(cell + float(k) * 3.7);
+      if (h < 0.5) continue;
+      vec3 o = vec3(hashP(cell + 1.3), hashP(cell + 2.9), hashP(cell + 4.1)) * 0.5 + 0.25;
+      vec3 dv = fract(p) - o;
+      dv -= n * dot(dv, n);
+      float rr = length(dv) / (0.16 + 0.16 * h);
+      float bowl = 1.0 - smoothstep(0.85, 1.0, rr);
+      float rim = exp(-pow((rr - 1.02) / 0.12, 2.0));
+      float sl = dot(normalize(dv + 1e-4), normalize(uSunDir - n * dot(uSunDir, n) + 1e-4));
+      col *= 1.0 - bowl * (0.18 + 0.2 * smoothstep(-0.2, 0.8, sl)) + rim * 0.14;
+    }
+  } else if (style < 3.5) {
+    // an ocean world: continents, ice caps, cloud drifting over it all
+    float land = smoothstep(0.53, 0.56, n1 * 0.65 + n2 * 0.35);
+    col = mix(vA * (0.85 + 0.3 * n3), vB * (0.78 + 0.45 * n3), land);
+    col = mix(col, vec3(0.95, 0.97, 1.0), smoothstep(0.8, 0.85, abs(lat) + (n3 - 0.5) * 0.12));
+    float cl = smoothstep(0.55, 0.7, triP(n * 2.1 + vec3(uTime * 0.003, 0.0, 0.0) + seed * 0.7, w) * 0.7 + n3 * 0.3);
+    col = mix(col, vec3(1.0), cl * 0.85);
+  } else if (style < 4.5) {
+    // candy stripes: bold flat bands in pastel, wavering a little
+    float b = lat * vPl.w + sin(lon * 2.0 + seed * 5.0) * 0.12 + (n1 - 0.5) * 0.3;
+    col = bands4(b, vA, vB, vC, mix(vB, vec3(1.0), 0.35));
+    col *= 0.94 + 0.12 * step(0.75, hashP(floor(n * 160.0)));
+  } else {
+    // rust-red: dark markings, dust, a white polar cap
+    col = mix(vA, vB, smoothstep(0.3, 0.7, n1 * 0.6 + n2 * 0.4));
+    col = mix(col, vC, smoothstep(0.58, 0.66, n2 * 0.6 + n3 * 0.4) * 0.8);
+    col = mix(col, vec3(1.0, 0.96, 0.94), smoothstep(0.84, 0.88, lat + (n3 - 0.5) * 0.08));
+  }
+  // light: a crisp terminator, the night side sunk in violet
+  float ndl = dot(wn, uSunDir);
+  float lit = smoothstep(-0.05, 0.16, ndl);
+  vec3 c = col * mix(uPlanetShade, vec3(1.0), lit);
+  c *= 0.9 + 0.14 * smoothstep(0.15, 1.0, ndl);
+  // air glowing at the limb, brightest on the day side
+  float mu = max(dot(wn, V), 0.0);
+  float fres = pow(1.0 - mu, 2.5);
+  c += vAtmo.rgb * fres * vAtmo.a * (0.35 + 0.9 * smoothstep(-0.4, 0.45, ndl));
+  // the print's grain, and a dark edge on the night side's rim
+  c *= 1.0 + (texture2D(uNoise, gl_FragCoord.xy * GRAIN).r - 0.5) * 0.08 + (n3 - 0.5) * 0.06;
+  c = mix(c, c * 0.4, smoothstep(0.14, 0.02, mu) * (1.0 - lit) * (1.0 - vAtmo.a * 0.5));
+  // low on the horizon the dust hazes them over
+  vec3 dir = normalize(vWP - uCamPos);
+  c = mix(c, skyColor(dir), (1.0 - smoothstep(-0.04, 0.13, dir.y)) * 0.6);
+  gl_FragColor = vec4(grade(c, uTrip), 1.0);
+}
+`;
+// The rings: a flat annulus about the planet's equator (geometry radii 1..2
+// mapped onto aRing.x..aRing.y planet radii), banded, with gaps, lit by the
+// sun and dark where the planet shades them.
+const VS_RING = /* glsl */ `
+attribute vec4 aPlanet;
+attribute vec3 aColB;
+attribute vec3 aColC;
+attribute vec4 aRing;
+varying vec3 vWP;
+varying vec3 vCtr;
+varying float vRad;
+varying float vR;
+varying vec4 vPl;
+varying vec3 vB;
+varying vec3 vC;
+varying vec4 vRing;
+void main() {
+  mat4 M = modelMatrix * instanceMatrix;
+  float r0 = length(position.xz);
+  vR = clamp(r0 - 1.0, 0.0, 1.0);
+  vec3 p = vec3(position.xz / max(r0, 1e-4) * mix(aRing.x, aRing.y, vR), 0.0).xzy;
+  vec4 wp = M * vec4(p, 1.0);
+  vWP = wp.xyz;
+  vCtr = (M * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  vRad = length(M[0].xyz);
+  vPl = aPlanet;
+  vB = aColB;
+  vC = aColC;
+  vRing = aRing;
+  // (a ring with no width is no ring)
+  gl_Position = aRing.y > aRing.x ? projectionMatrix * viewMatrix * wp : vec4(0.0, 0.0, 2.0, 1.0);
+}
+`;
+const FS_RING = /* glsl */ `
+uniform vec3 uCamPos;
+uniform float uTime;
+uniform vec4 uTrip;
+uniform sampler2D uNoise;
+uniform vec3 uPlanetShade;
+varying vec3 vWP;
+varying vec3 vCtr;
+varying float vRad;
+varying float vR;
+varying vec4 vPl;
+varying vec3 vB;
+varying vec3 vC;
+varying vec4 vRing;
+` + SKY_FN + /* glsl */ `
+void main() {
+  float r = vR;
+  float seed = vPl.y;
+  float bands = 0.55 + 0.25 * sin(r * 38.0 + seed * 7.0) + 0.2 * sin(r * 91.0 + seed * 3.0);
+  float gap = smoothstep(0.02, 0.05, abs(r - 0.6)) * smoothstep(0.01, 0.025, abs(r - 0.83));
+  float edge = smoothstep(0.0, 0.06, r) * (1.0 - smoothstep(0.92, 1.0, r));
+  float a = vRing.z * clamp(bands, 0.0, 1.0) * gap * edge;
+  if (a < 0.01) discard;
+  vec3 col = mix(vB, vC, smoothstep(0.35, 0.75, sin(r * 12.0 + seed) * 0.5 + 0.5));
+  // in the planet's shadow?
+  vec3 rel = vWP - vCtr;
+  float t = dot(rel, uSunDir);
+  float d2 = dot(rel, rel) - t * t;
+  float shadow = step(t, 0.0) * (1.0 - smoothstep(vRad * vRad * 0.85, vRad * vRad * 1.05, d2));
+  col *= mix(vec3(1.0), uPlanetShade * 0.8, shadow);
+  vec3 dir = normalize(vWP - uCamPos);
+  col = mix(col, skyColor(dir), (1.0 - smoothstep(-0.04, 0.13, dir.y)) * 0.6);
+  gl_FragColor = vec4(grade(col, uTrip), a);
+}
+`;
+// The air round a planet: a soft glow just outside its limb, brightest on
+// the day side (a billboard facing the camera, additive).
+const VS_HALO = /* glsl */ `
+uniform vec3 uSunDir;
+attribute vec4 aAtmo;
+varying vec2 vQ;
+varying vec4 vAtmo;
+varying float vSun;
+void main() {
+  mat4 M = modelMatrix * instanceMatrix;
+  vec3 ctr = (M * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  float R = length(M[0].xyz);
+  vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+  vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+  vQ = position.xy * 2.9;
+  vec3 wp = ctr + (right * vQ.x + up * vQ.y) * R;
+  // (which way the sun is, across the screen)
+  vec2 sv = vec2(dot(uSunDir, right), dot(uSunDir, up));
+  vSun = atan(sv.y, sv.x);
+  vAtmo = aAtmo;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_HALO = /* glsl */ `
+uniform vec4 uGrade;
+varying vec2 vQ;
+varying vec4 vAtmo;
+varying float vSun;
+void main() {
+  float r = length(vQ);
+  if (r < 0.98 || vAtmo.a <= 0.0) discard;
+  float g = exp(-(r - 1.0) * 7.0) * smoothstep(0.98, 1.01, r);
+  float side = dot(vQ / r, vec2(cos(vSun), sin(vSun)));
+  g *= 0.3 + 0.7 * smoothstep(-0.6, 0.5, side);
+  gl_FragColor = vec4(vAtmo.rgb * g * vAtmo.a * 0.55 * uGrade.w, 1.0);
+}
+`;
+
+// ---------------------------------------------------------------------------
 // Uniform sets per world environment
 // ---------------------------------------------------------------------------
 // uDrain.y (the radius the colour still holds out inside) when a world is
@@ -4857,7 +5366,8 @@ export function makeEnvUniforms(env) {
     uSkyTop: c(), uSkyHorizon: c(), uSkyBottom: c(),
     uSunDir: v3(), uSunColor: c(), uSunDisc: c(),
     uMoonDir: v3(), uMoonColor: c(),
-    uSkyFx: v4(), uSkyFx2: v4(),
+    uSkyFx: v4(), uSkyFx2: v4(), uSkyFx3: v40(),
+    uNeb0: c(), uNeb1: c(), uNeb2: c(),
     uLightDir: v3(), uShadowTint: c(), uHiTint: c(), uLightK: v4(), uRim: v4(), uDapple: v4(), uWall: v4(),
     uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
@@ -4891,6 +5401,14 @@ export function writeEnvUniforms(u, env) {
   const sk = env.skyFx || {};
   u.uSkyFx.value.set(env.stars || 0, env.sun.size ? Math.cos(env.sun.size) : 2, env.moon ? Math.cos(env.moon.size) : 2, sk.smoke || 0);
   u.uSkyFx2.value.set(sk.rays || 0, sk.clouds || 0, sk.aurora || 0, sk.ring || 0);
+  // deep space (env.space): x the nebula's ribbons, y spiral galaxies, z a
+  // dense starfield all round, w comets; the nebula's three colours
+  const spc = env.space || {};
+  u.uSkyFx3.value.set(spc.nebula || 0, spc.galaxies || 0, spc.stars || 0, spc.comets || 0);
+  const neb = spc.colors || ['#ff6aa8', '#ff9a52', '#4a8adf'];
+  setColor(u.uNeb0.value, neb[0]);
+  setColor(u.uNeb1.value, neb[1]);
+  setColor(u.uNeb2.value, neb[2]);
   const ec = env.eclipse || [0, 0, 1];
   u.uEclipse.value.set(ec[0], ec[1] ?? 1, ec[2] ?? 1, 0);
   u.uLightDir.value.copy(dir(L.dir));
@@ -5036,6 +5554,11 @@ export function makeToonMaterial(env, o = {}) {
     defines.TURN = '';
     uniforms.uTurn = { value: new THREE.Vector4(...o.turn) };
   }
+  // [turns a second about x, about z, the height of its middle]
+  if (o.tumble) {
+    defines.TUMBLE = '';
+    uniforms.uTumble = { value: new THREE.Vector4(o.tumble[0], o.tumble[1], o.tumble[2] ?? 0, 0) };
+  }
   // under the sea (see the object shader): [lean across, rate, wave per
   // metre up, lean along]; [speed, loop, snaking, shape]; [beats per second,
   // squeeze, ripple, lift]; [glide per metre, beat rate, beat at the flukes,
@@ -5085,7 +5608,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'JELLY', 'CROSS', 'LID']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'JELLY', 'CROSS', 'LID']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -5234,6 +5757,30 @@ export function makeSkyMaterial(env) {
     side: THREE.BackSide,
     depthWrite: false,
   });
+}
+
+// A world's planets (world/planets.js): the globes, their rings and the
+// glow of their air. shade: the colour their night side sinks into.
+export function makePlanetMaterials(env, shade) {
+  const uniforms = withShared(env, { uPlanetShade: { value: new THREE.Color(shade) } });
+  const planet = new THREE.ShaderMaterial({ uniforms, vertexShader: VS_PLANET, fragmentShader: FS_PLANET });
+  const ring = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: VS_RING,
+    fragmentShader: FS_RING,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const halo = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: VS_HALO,
+    fragmentShader: FS_HALO,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  return { planet, ring, halo };
 }
 
 export function makePortalMaterial(mode) {

@@ -1364,7 +1364,7 @@ export class Elder extends Player {
     setColliders(cl, this.beardDefs, this.boneM, Q, BEARD.margin);
     const f = this.beardWind;
     f.gx = -this.frameAcc.x * 0.3;
-    f.gy = Math.min(-3.5, -8.4 - this.frameAcc.y * 0.24);
+    f.gy = Math.min(-3.5, -8.4 - this.frameAcc.y * 0.24) * this.gk;
     f.gz = -this.frameAcc.z * 0.35;
     const B = this.breeze;
     const still = 1 + 1.2 * (1 - Math.min(1, W / 6));
@@ -1422,7 +1422,7 @@ export class Elder extends Player {
     setColliders(cl, this.skirtDefs, this.boneM, Q, SKIRT.margin);
     const f = this.skirtWind;
     f.gx = -this.frameAcc.x * 0.22;
-    f.gy = Math.min(-5, -8.6 - this.frameAcc.y * 0.16);
+    f.gy = Math.min(-5, -8.6 - this.frameAcc.y * 0.16) * this.gk;
     f.gz = -this.frameAcc.z * 0.3;
     const B = this.breeze;
     const still = 1 + 1.4 * (1 - Math.min(1, W / 6));

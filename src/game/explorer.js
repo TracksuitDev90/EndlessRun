@@ -996,7 +996,7 @@ export class Explorer extends Player {
     setColliders(cl, this.hairDefs, this.boneM, Q, HAIR.margin);
     const f = this.wind;
     f.gx = -this.frameAcc.x * 0.3;
-    f.gy = Math.min(-3.5, -8.2 - this.frameAcc.y * 0.24);
+    f.gy = Math.min(-3.5, -8.2 - this.frameAcc.y * 0.24) * this.gk;
     f.gz = -this.frameAcc.z * 0.35;
     const B = this.breeze;
     const still = 1 + 1.2 * (1 - Math.min(1, W / 6));
