@@ -1280,13 +1280,13 @@ and how to make them live in `characters.js`).
 | | Rowan, the wayfarer | Wren, the explorer | Alder, the elder | Bramble, the tumbler | Hazel, the skater |
 |---|---|---|---|---|---|
 | Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick | a short, bipedal brown rabbit, a faded cream muzzle, cheeks and chin, buck teeth, big round dark glasses; big ears pink inside, one upright and one bent over, through a yellow bucket hat; a cream short-sleeved shirt, brown suspenders on brass clips, billowy rust trousers gathered at the ankles; big bare rabbit feet, a fluffy tail; an olive satchel slung across him | an oversized neon-lime tee, baggy black skate shorts piped in white, white crew socks with a little badge, chunky white-and-grey skate shoes on platform soles; long box braids up in a high ponytail through a gold cuff, a few left down to frame her face; small gold hoops, thin bracelets; her board — a purple deck, lime chevrons underneath |
-| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet | slim and athletic, about seven heads tall, ~1.66 m to the crown (her ponytail rises over it), stood a board's height (~10 cm) up off the road |
-| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth), the skirt of his robe (19×11) and of the under-robe under it (15×10); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings |
+| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet | slim and athletic, about six and a half heads tall, ~1.66 m to the crown (her ponytail rises over it), a round young face, stood a board's height (~10 cm) up off the road |
+| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth), the skirt of his robe (19×11) and of the under-robe under it (15×10); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles, each with its own weight, drag, stiffness and flutter, so they part and swing on their own); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out | spring 38/s: a quick sideways hop, knees tucked, arms out | spring 30/s: a carve, the board leaning hard into it — out over her toes turning right, back on her heels turning left |
-| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the same airtime but the highest apex of all (2.3 m to the others' 1.6); a rabbit's bound stretched out flat and twisted side-on, a long float down (a whole second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip — each to a side picked at random | the same airtime but higher (1.9 m: her board has to clear things too); an ollie, knees tucked right up and the board stuck to her feet, a kickflip or a heelflip, the board turning a whole flip under her as her feet lift out of its way |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the highest of all by far, and a little longer in the air (2.8 m up to the others' 1.6, 0.72 s to their 0.64); a rabbit's bound stretched out flat and twisted side-on, a long float down (just over a second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip, done side-on — he snaps round to face across the road and flips over head first down it — each to a side picked at random | the same airtime but higher (1.9 m: her board has to clear things too); an ollie, knees tucked right up and the board stuck to her feet, a kickflip or a heelflip, the board turning a whole flip under her as her feet lift out of its way |
 | Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces | a precision landing on springs: down onto the balls of his big feet, arms swung forward, and straight back up onto his toes, ears bouncing | deep into her knees on the board, arms swung down, and back up; a puff of dust off the wheels |
 | Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust | a dive roll: arms reaching for the road, tucked into a ball, over once and up into a crouch, in a little cloud of dust | ducked right down on the board, folded over her knees, her front hand on its rail and the back arm up behind |
-| Run | a bruiser's charge: hunched, head down, crouched low on bent knees, stomping along wide-footed with the knees driven high, rocking side to side, the elbows out and the arms pumping round in big loops | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | two, and every few seconds he changes from one to the other: bolt upright with his head thrown back and his fists pumping at his chest on quick little steps; or flung forward, arms swinging long and straight, in big bounding strides | she rides: side-on, carving gently from heel to toe and pumping, in one of three moods — and every few seconds she turns her front foot down the board and kicks off the road two or three times |
+| Run | a bruiser's charge: hunched, head down, crouched low on bent knees, stomping along wide-footed with the knees driven high, rocking side to side, the elbows out and the arms pumping round in big loops | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | two, and every few seconds he changes from one to the other: bolt upright with his head thrown back and his fists pumping at his chest on quick little steps; or flung forward, arms swinging long and straight, in big bounding strides | she rides: side-on, never still — carving in a long slow S, the whole of her leaning out from the wheels over her toes and back on her heels, drifting across her lane, hips leading and chest, head and loose arms following on behind; pumping, shifting her weight, in one of three moods — and every few seconds she turns her front foot down the board and pushes off the road, hard, two or three times |
 
 ### Choosing who runs
 
@@ -1437,7 +1437,8 @@ reference sheet in `tools/runner/view.html?runner=explorer` (also
 `&pose=idle|run|jump|slide|bind`, `&t=` seconds into it,
 `&trick=leap|flip|twist|handspring` (the elder's `hop|pole`, the bunny's
 `leap|float|webster`, the skater's `ollie|kickflip|heelflip`, and
-`&item=umbrella|balloon|dandelion` for what the bunny floats on), `&jt=`
+`&item=umbrella|balloon|dandelion` for what the bunny floats on, `&turn=1|-1`
+which way his side flip turns), `&jt=`
 seconds into the jump or slide, `&side=1|-1` the slide's lead leg, `&carry=1`
 the elder picking up his stick as soon as he can, `&style=pump|reach` the bunny
 keeping to one of his two runs (`flow|chill|low`: the skater riding in one
@@ -1815,7 +1816,7 @@ his mesh is about 26k triangles.
 
 ### The bunny
 
-![Bramble standing with his hands in his pockets; sprinting; flying flat out over the top of a bound; upside down in a webster side flip, seen from behind; floating down on an umbrella, a balloon and a giant dandelion; and tucked into his dive roll](docs/bunny.jpg)
+![Bramble standing with his hands in his pockets; sprinting; flying flat out over the top of a bound; upside down in his webster side flip, turned side-on to the road, seen from behind; floating down on an umbrella, a balloon and a giant dandelion; and tucked into his dive roll](docs/bunny.jpg)
 
 `tools/runner/bunny.py` sculpts him to his reference sheet
 (`tools/characters/bunny-sheet.jpg`) with `build.py`'s kit, as the others are:
@@ -1880,12 +1881,18 @@ hat would go under it as they come round; his ears are swept flat back along
 him while he rolls). Standing on the title screen he has his hands in his
 pockets, rocking up onto his toes and back, his head cocked, looking about.
 
-**He jumps the highest.** Every runner's jump takes the same time
-(`CONFIG.jump.time`), so every gap is as fair whoever you are — but his goes
-up to 2.3 m where the others' go to 1.6 (every gem laid on a jump's arc is
-still in his reach on the way up and the way down); only his float keeps him
-up longer. He has three, dealt from a shuffled deck so the same one never
-comes twice running, each to one side or the other at random:
+**He jumps the highest — by far.** He's a rabbit: his jump goes up to 2.8 m
+where the others' go to 1.6 (the skater's 1.9), and it keeps him up a little
+longer too — 0.72 s to everyone else's 0.64 — so it carries him a little
+further down the road. Every gap is still fair for him: nothing you have to
+jump or duck is ever laid closer than `CONFIG.obstacles.minAfterVertical`
+(0.92 s) behind the last, so he's always down in time; his higher arc clears a
+hurdle over a longer stretch, so his take-off is if anything more forgiving;
+and the gems hung over a jump are laid along the arc of whoever's running
+(`Gems.arcAt`: his, for him), so every one is in his reach on the way up and
+the way down. Only his float keeps him up longer. He has three, dealt from a
+shuffled deck so the same one never comes twice running, each to one side or
+the other at random:
 
 - **the bound** — a rabbit's leap, as in the sheet's drawings: he springs off
   both feet and stretches right out through the air, his whole body tipped
@@ -1905,8 +1912,8 @@ comes twice running, each to one side or the other at random:
   hangs from it as he drifts down, legs dangling and pedalling gently,
   swinging a little under it, the air coming up past him lifting his ears.
   It's a real float: a pop straight up to the top in a quarter of a second,
-  then a long drift down, gravity giving way to a steady sinking speed — a
-  whole second in the air, half as long again as any jump (`FLOAT`; solved
+  then a long drift down, gravity giving way to a steady sinking speed — just
+  over a second in the air, half as long again as anyone's jump (`FLOAT`; solved
   exactly, piece by piece, the same at any frame rate: `solveFloat`), and he
   comes down soft. Each thing lets him down its own way: the umbrella
   catches the air at once, a steady parachute's pace; the balloon holds him
@@ -1930,13 +1937,18 @@ comes twice running, each to one side or the other at random:
   slowly at first, as if carried a moment in the rush of air behind him, so
   you see it go. A fast-fall drops him out of the float on plain gravity (and
   he lets it go at once). Never the same thing twice running;
-- **the webster side flip** — off one foot, the other leg kicking up and out
-  to throw him over, arms flung up; tucked tight over the top, knees to his
-  chest; opening out, arms wide, to land on the leg he kicked with. He turns a
-  whole sideways somersault about the line he's running along (toward the
-  foot he took off from, so the kick leads it over), quickest through the
-  tuck, so from the chase camera it reads clearly (keyed on how far round
-  he's turned: `WEB`).
+- **the webster side flip**, done the way a free-runner does one — side-on.
+  A side flip travels the way it turns, so as he springs he plants and snaps
+  round to face across the road (left or right: `FACE`, on a spring, so it
+  whips round and settles), and only then goes over: off one foot, the other
+  leg kicking up and out to throw him over, arms flung up; tucked tight over
+  the top, knees to his chest; opening out, arms wide, to land on the leg he
+  kicked with. Turned side-on, the flip — a whole sideways somersault about
+  his own front-to-back, toward the foot he took off from so the kick leads
+  it over, quickest through the tuck (keyed on how far round he's turned:
+  `WEB`) — turns him over head first down the road, the way he's going; from
+  the chase camera you see him side-on, going over in profile. He lands
+  facing across the road and turns back to run on as he comes out of it.
 
 **His secondary motion is all springs** (he has no cloth): his ears ride on
 the shared runner's hair springs (`hairSim`: laid back by the headwind,
@@ -1953,35 +1965,47 @@ triangles; his simulation costs a handful of springs.
 
 ### The skater
 
-![Hazel standing on her board with her hands in her pockets; carving side-on, arms out, her ponytail streaming; kicking off the road; mid-kickflip, the board on its edge under her tucked feet; mid-heelflip, the board upside down; tucked up in an ollie; and crouched right down on the board, a hand on its rail](docs/skater.jpg)
+![Hazel standing on her board with her hands in her pockets; carving side-on, arms out, her ponytail streaming braid by braid; pushing hard off the road; mid-kickflip, the board on its edge under her tucked feet; mid-heelflip, the board upside down; tucked up in an ollie; and crouched right down on the board, a hand on its rail](docs/skater.jpg)
 
 `tools/runner/skater.py` sculpts her to her reference sheet
 (`tools/characters/skater-sheet.jpg`) with `build.py`'s kit, as the others are:
-a young woman, slim and athletic, about seven heads tall and ~1.66 m to her
-crown, with natural, youthful proportions — long in the leg, the ankle lifted
-on thick platform soles. Warm deep-brown skin (a shade deeper in its hollows,
-a soft sheen up high on the cheekbones and down the bridge of the nose); a
-slightly oval face with a defined jaw tapering to the chin, high cheekbones,
-a small nose and full lips, sculpted, the lower one catching the light. The
-shader draws the rest of her face: big almond-shaped dark-brown eyes, their
-outer corners lifted, under heavy lids lowered a little over the irises (cool,
-not much impressed), a heavy upper lash line winging out at the corner, thick
-neat brows lying nearly flat. Her box braids are drawn up from the hairline
+a young woman, slim and athletic, about six and a half heads tall and ~1.66 m
+to her crown, with natural, youthful proportions — long in the leg, the ankle
+lifted on platform soles. Warm deep-brown skin (a shade deeper in its
+hollows, a soft sheen up high on the cheekbones and down the bridge of the
+nose, a warm blush over the cheeks; the face takes the light softly, not in
+hard-edged shadow); a round, young face, about as wide across the cheekbones
+as it is long from the hairline to the chin — full cheeks up high, a soft jaw
+tapering to a small rounded chin — a small soft nose and full lips in low
+relief on a slender neck. The face is kept smooth (no sockets cut for the
+eyes: creases there catch the ink outline and read as lines down the
+cheeks), and its ink line is finer than the rest of her. The shader draws the
+rest of her face: big almond-shaped eyes, their outer corners lifted, warm
+brown irises filling most of them (lighter low down where the light comes
+through, a dark ring round them, two catch-lights), under heavy lids lowered
+over the tops of the irises and casting a soft shadow on them (cool, not much
+impressed), a bold upper lash line thickening toward the outer corner and
+winging out past it, the fold of the lid over it; thick, neat brows rising to
+an arch two-thirds of the way out and falling to a fine tail; rosy-brown
+lips. Her box braids are drawn up from the hairline
 all round into a high ponytail on her crown — the cap of them is sculpted,
 each braid raised over her scalp and plaited (the shader), the parts between
 them showing — through a gold cuff, and twelve long braids spring up out of
-it, arc back over her head and fall down her back to below her seat; four
-more are left down, two either side, framing her face from the temples, past
-her cheeks and over the front of her shoulders onto her chest. Small gold
-hoops hang from her lobes; a few thin gold bracelets are loose round her
-wrists. Her oversized neon-lime tee hangs loose and boxy from dropped
-shoulders, its wide sleeves to the elbow, soft folds hanging from the chest,
-a ribbed crew collar, stitched hems. Baggy black skate shorts to just over the
-knee, wide in the leg, piped in white down the outside of each leg and round
-its hem; white crew socks to mid-calf, ribbed, a little blue-and-red square
-badge on the outside; chunky white-and-grey skate shoes — a thick platform
-cupsole grooved all round, a wide toe box under a grey suede toe cap and heel
-counter, laces criss-crossing up the front, a padded collar. Her card is cut
+it in a loose round bundle, arc back over her head and fall down her back to
+below her seat; four more are left down, two either side, framing her face
+from the temples, past her cheeks and over the front of her shoulders onto
+her chest. Small gold hoops hang from her lobes; a few thin gold bracelets
+are loose round her wrists. Her oversized neon-lime tee hangs loose from
+dropped shoulders to just over her hips (as her sheet has it: oversized, not
+a dress), its wide sleeves to the elbow, soft folds hanging from the chest, a
+ribbed crew collar sitting round the base of her neck, stitched hems. Baggy
+black skate shorts to just over the knee, wide in the leg, piped in white
+down the outside of each leg and round its hem; white crew socks to
+mid-calf, ribbed, a little blue-and-red square badge on the outside; chunky
+white-and-grey skate shoes, her size (~27 cm, the heel just behind the ankle,
+the toe well out in front) — a platform cupsole grooved all round, a rounded
+toe box under a grey suede toe cap and heel counter, laces criss-crossing up
+the front, a padded collar. Her card is cut
 from the sheet's front view (a brand mark on the shorts painted out first:
 her sculpt has none). Through Hell's drain her tee keeps its colour (and her
 board's graphic).
@@ -2002,20 +2026,35 @@ under her feet.
 
 **She rides.** Regular — left foot forward — side-on to the road, the hips
 turned to face her toes, the shoulders opened a little down the road and her
-head turned to see where she's going; never still on it: she carves gently
-from heel to toe and back, the board rolling under her and swinging a touch
-with it, pumps her knees, shifts over it, her arms balancing against it. And
-every few seconds she drifts into another mood (`MOODS`): carving wide and
-slow, knees soft, arms out like wings; chilling, tall and loose, arms down,
-nodding along to something; or crouched down low and fast, the front arm
-reaching down the board. At the start of a run she kicks off — and again every
-few seconds as she rides — two or three pushes (`PUSH`): her hips and shoulders
-turn square to the road as she swings her front foot round to point down the
-board, her back foot steps off the tail down onto the road beside it, drives
-back along it with her front knee sinking under her and her arms swinging,
-swings forward for the next push (the heel kicking up behind), and after the
-last steps back up onto the tail as she turns side-on again; a scuff of dust
-off the road where her foot comes down. Anything that needs her on the board
+head turned to see where she's going — and never still on it. She carves
+(`CARVE`), a long slow S from heel to toe and back on a clock of its own
+(quicker the faster she goes, wandering a little so no two carves are quite
+alike): the whole of her leans out from the wheels like a pendulum, over her
+toes and back onto her heels, further than the deck tips under her; the
+board's nose swings the way she leans and she drifts across her lane with it
+(the figure, not where the game has her). Her knees soak into each carve and
+pump out of it; and the motion rolls up through her: her hips lead, her chest
+follows a beat later, then her head (which rights itself against the lean to
+keep her eyes on the road), then her loose arms — shoulder, elbow, wrist, a
+wave running out along each — all of it riding on the shared runner's
+follow-through springs. Under it all go the little things a body does to stay
+on a board, each on its own clock so it never falls into a loop: her weight
+shifting from foot to foot, shoulders rolling, the head bobbing, wrists
+idling, a rattle off the road the faster she goes. And every few seconds she
+drifts into another mood (`MOODS`): carving wide and slow, knees soft, arms
+out like wings; chilling, tall and loose, arms down, nodding along to
+something; or crouched down low and fast, the front arm reaching down the
+board. At the start of a run she kicks off — and again every few seconds as
+she rides — two or three pushes (`PUSH`), each a hard one: her hips and
+shoulders turn square to the road as she swings her front foot round to point
+down the board, her back foot steps off the tail and plants on the road beside
+her front foot, and drives right back along it — quickest in the middle of the
+stroke — till the leg's straight and the toe flicks off the road, her front
+knee sinking deep under her, her arms swinging hard against her legs, and the
+board and all of her surging ahead with it; then she rises as the leg swings
+through for the next, the heel kicking up high behind, and after the last
+steps back up onto the tail as she turns side-on again; a scuff of dust off
+the road where her foot comes down. Anything that needs her on the board
 — a jump, a duck, a lane change — puts her foot straight back on it. A lane
 change is a carve: the board leans hard into it, and side-on as she is, a turn
 to her right is out over her toes and one to her left back on her heels, arms
@@ -2039,10 +2078,16 @@ eyes on the board; then she rides it down:
   board flipping the other way.
 
 She lands deep into her knees on the board, arms swung down, and springs back
-up out of it, a puff of dust off the wheels. Her duck is a crouch right down on
-the board — onto her heels, folded over her knees, chin up to see, her front
-hand gripping the board's toe rail between her feet (her arm solved to reach
-it: `reachArm`) and the back arm up behind for balance. Standing on the title
+up out of it, a puff of dust off the wheels. Her duck is a skater's crouch on
+the board — her seat sat back over her heels (not dropped straight down onto
+them), folded forward over her knees, chin up to see, her front hand gripping
+the board's toe rail between her feet (her arm solved to reach it:
+`reachArm`) and the back arm up behind for balance. However she bends, her
+feet stay feet: an ankle in a stiff skate shoe only bends so far up toward
+the shin (`ANKLE_MAX`), so crouched deeper than that her heel comes up off
+the deck, the foot pivoting on its ball (which stays put) and the toes
+staying flat (`heelLift`) — the back foot rolls up onto its toes in the duck
+rather than the shoe folding over her ankle. Standing on the title
 screen she's on her board turned three-quarters your way, her hands in her
 pockets under the tee's hem (solved there), her weight drifting from heel to
 toe, looking about — down the road, over her shoulder at you, away; when she's
@@ -2060,11 +2105,16 @@ and swung by gravity, her own accelerations and the headwind (each braid
 catching it a little differently, fluttering toward its tip), kept off her
 head, neck, shoulders, arms, back, seat and legs by their own volumes and off
 the road; the ponytail's first few joints are held in their arc up out of the
-cuff, and its braids are drawn toward where each lies in the fan across her
-back (turned as her head is) and pushed apart where they'd run into each
-other, so the tail keeps its spread and its braids part and swing one by one.
-At the start pace they stream back about forty degrees, toward sixty at full
-tilt; they fly up through a jump and slap down as she lands, and the
+cuff. Each braid is its own: how much the wind takes it, how heavy it hangs,
+how quickly and how hard it flutters (in long waves running down it, so it
+ripples rather than kinks) and how stiff it is are all hashed off its seed,
+so no braid moves quite like its neighbour. The ponytail's braids are drawn
+only gently toward where each lies across the bundle (turned as her head is,
+looser toward the tips) — enough to keep it a ponytail, not so much that it
+swings as one sheet — and every braid is pushed apart from any other it would
+run into, so they part and slide past each other and swing one by one. At the
+start pace they stream back about forty degrees (some a little more, some a
+little less), toward sixty at full tilt; they fly up through a jump and slap down as she lands, and the
 face-framers blow back over her shoulders as she picks up speed. It's
 simulated in a space with the world's axes and its origin at her (so a lean or
 a turn swings them rather than carrying them round), in the runner's fixed
@@ -2463,9 +2513,10 @@ src/game/                     game loop, player (the runners' shared core:
                               roll, tail, ears, satchel), props (what he
                               floats on) and seeds (what blows off his
                               dandelion), skater (her palette, board, stance,
-                              moods, pushes, tricks, crouch, braids, tee's
-                              hem and the arms that reach for the rail and
-                              her pockets), kit (body geometry, sheet
+                              carve, moods, pushes, tricks, crouch and the
+                              heel that lifts in it, braids, tee's hem and
+                              the arms that reach for the rail and her
+                              pockets), kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset
                               loader, camera, course (world order),
                               chunk streaming, obstacle director, gem director

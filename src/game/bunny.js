@@ -147,14 +147,18 @@ function blendGait(out, a, b, k) {
 }
 
 // How he handles: snappy between the lanes, and the highest jump in the
-// game - the same airtime as everyone's (CONFIG.jump.time), so every gap is
-// as fair, but well over half as high again; he lands on springs.
+// game by far - he's a rabbit: 2.8 m up to everyone else's 1.6 (the skater's
+// 1.9), and a little longer in the air (0.72 s to 0.64), so a little further
+// down the road too. (Every gap still leaves him room: obstacles are never
+// closer than CONFIG.obstacles.minAfterVertical after one you jump, and gems
+// hung over a jump are laid along his own arc - see Gems.arcAt.) He lands on
+// springs.
 const FEEL = {
   laneSpring: 38,
   lean: [0.045, 0.5],
   turn: [0.03, 0.4],
   blend: [5, 6.5, 7],
-  jump: { height: 2.3, time: CONFIG.jump.time },
+  jump: { height: 2.8, time: 0.72 },
   land: { freq: 5.0, zeta: 0.24, thud: 0 },
 };
 
@@ -166,7 +170,7 @@ const FEEL = {
 // own way: the umbrella catches the air at once and lets him down at a
 // steady parachute's pace; the balloon holds him up at the top, buoyant, and
 // only gathers speed toward the end; the dandelion's in between.
-const FLOAT = { height: 2.0, rise: 0.26, time: 1.0, fallG: { umbrella: 14, dandelion: 10, balloon: 7 } };
+const FLOAT = { height: 2.4, rise: 0.27, time: 1.05, fallG: { umbrella: 14, dandelion: 10, balloon: 7 } };
 function solveFloat(H, T, fallG) {
   const t1 = FLOAT.rise;
   const Td = T - t1;
@@ -221,7 +225,10 @@ const LEAP_TILT = [0.0, -0.45, -0.95, -0.45, 0.05];
 // take-off, 0.5 upside down, 1 upright again): off one foot (L), the other
 // (R) kicking up and out to the side to throw him over, arms flung up; tucked
 // tight over the top, knees to his chest, arms hugging them; opening out,
-// arms wide, to land on the leg he kicked with.
+// arms wide, to land on the leg he kicked with. A side flip travels the way
+// it turns - so he does it side-on: he plants and snaps round to face across
+// the road as he springs (FACE), and flips over sideways down it, head first
+// the way he's going, landing side-on and turning back to run on.
 const WEB_T = [0, 0.12, 0.3, 0.5, 0.7, 0.86, 1];
 const WEB = {
   hipPitch: [0.05, 0.0, 0.1, 0.15, 0.1, 0.05, 0.05],
@@ -246,6 +253,9 @@ const WEB = {
   clR: [0.15, 0.2, 0.05, 0.05, 0.05, 0.1, 0.05],
 };
 const keys = (T, K) => [Float64Array.from(T), Object.entries(K).map(([k, v]) => [C[k], Float64Array.from(v)])];
+// (how far he turns side-on for the side flip, rad; how snappily he turns
+// in as he springs, and back out once he's down: a spring's rate, 1/s)
+const FACE = { turn: Math.PI / 2, in: 15, out: 9 };
 const [LEAP_TS, LEAP_KEYS] = keys(LEAP_T, LEAP);
 const [WEB_TS, WEB_KEYS] = keys(WEB_T, WEB);
 const LEAP_TILT_V = Float64Array.from(LEAP_TILT);
@@ -426,6 +436,8 @@ export class Bunny extends Player {
       pitch: { value: 0, from: 0, to: 0, start: 0, t: 0, delay: 0, dur: 1, pivot: ROLL_PIVOT, ease: null },
       roll: { value: 0, from: 0, to: 0, start: 0, t: 0, delay: 0, dur: 1, pivot: FLIP_PIVOT, ease: null },
     };
+    // (turned side-on for the side flip)
+    this.faceS = new Spring();
     this.prop = { kind: null, t: 0, state: 'none', open: 0, size: 0, end: 0, seedT: 0 };
     this.gripM = new THREE.Matrix4();
   }
@@ -433,6 +445,8 @@ export class Bunny extends Player {
   resetSim() {
     super.resetSim();
     for (const g of [this.bagS, this.tailS, this.earS]) for (const s of Object.values(g || {})) s.reset();
+    this.faceS?.reset();
+    this.face = 0;
     for (const S of Object.values(this.spins || {})) {
       S.value = S.from = S.to = S.start = 0;
       S.ease = null;
@@ -604,7 +618,9 @@ export class Bunny extends Player {
     super.jump();
     // (which way he goes - the leg he leads with, the way the flip turns
     // and the bound twists - is anyone's guess, not just turn and turn about)
-    this.jumpSide = Math.random() < 0.5 ? -1 : 1;
+    // (nextSide: asked for by the viewer)
+    this.jumpSide = this.nextSide || (Math.random() < 0.5 ? -1 : 1);
+    this.nextSide = 0;
     this.floatFast = false;
     this.floating = this.trick === 'float';
     this.hurry('pitch', 0.16);
@@ -616,7 +632,8 @@ export class Bunny extends Player {
     } else if (this.prop.state === 'hold' || this.prop.state === 'out') {
       this.endFloat();
     }
-    if (this.trick === 'webster') this.spinTo('roll', this.jumpSide, 0.05, this.feel.jump.time * 0.8, WEB_EASE);
+    // (the side flip waits the moment it takes him to snap round side-on)
+    if (this.trick === 'webster') this.spinTo('roll', this.jumpSide, 0.09, this.feel.jump.time * 0.78, WEB_EASE);
     else this.hurry('roll', 0.16);
     // the tail flicks up as he springs, the ears are thrown back
     this.tailS.lift.v += 6;
@@ -962,6 +979,14 @@ export class Bunny extends Player {
     if (pitch !== 0) turnAbout(b, _q.setFromAxisAngle(AX, pitch), this.spins.pitch.pivot, ROLL_FWD);
     const roll = (this.spins.roll.value % TAU) * live;
     if (roll !== 0) turnAbout(b, _q.setFromAxisAngle(AZ, roll), FLIP_PIVOT);
+    // the side flip side-on: he snaps round to face across the road as he
+    // springs - so the flip, turning about his own front-to-back, turns him
+    // over head first down the road, the way he's going - and turns back
+    // once he's down (after the flip's turn, so it turns the flip with him)
+    const faceTo = this.trick === 'webster' && !this.grounded && this.mode === 'run' ? -this.jumpSide * FACE.turn : 0;
+    this.face = this.faceS.step(faceTo, faceTo ? FACE.in : FACE.out, 0.8, dt);
+    const face = this.face * live;
+    if (Math.abs(face) > 1e-4) turnAbout(b, _q.setFromAxisAngle(AY, face), FLIP_PIVOT);
     // rolling on the road: nothing of him goes under it (his ball isn't
     // round - he's lifted off it as his big head and hat come round)
     this.rollAmt = 0;

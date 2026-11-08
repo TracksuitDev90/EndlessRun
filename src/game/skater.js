@@ -12,12 +12,16 @@ import { Dust } from './dust.js';
 // doesn't run: she rides. On top of the shared runner (player.js), everything
 // stands on her board, which is a body of its own (its bone is posed here,
 // and her legs are solved down onto it every frame):
-//   - she rides side-on to the road, regular (left foot forward), and between
-//     rides she turns her front foot down the board and kicks: two or three
-//     pushes off the road with her back foot, then she sets it back on the
-//     tail and cruises - carving gently from heel to toe, pumping, bobbing,
-//     in one of three ways (MOODS: carving wide with her arms out, chilling
-//     upright and nodding along, crouched low and fast);
+//   - she rides side-on to the road, regular (left foot forward), and never
+//     still: she carves (CARVE), the whole of her leaning out from the wheels
+//     over her toes and back on her heels, drifting across her lane, her hips
+//     leading and her chest, head and loose arms following on behind, pumping
+//     and shifting her weight, in one of three ways (MOODS: carving wide with
+//     her arms out, chilling upright and nodding along, crouched low and
+//     fast); and between rides she turns her front foot down the board and
+//     pushes, hard: two or three strokes off the road with her back foot, her
+//     front knee sinking deep as each one drives, then she sets it back on
+//     the tail;
 //   - three jumps, dealt so the same one never comes twice running: an ollie
 //     (she pops the tail, slides her front foot up and tucks her knees right
 //     up to her chest, the board stuck to her feet), a kickflip and a heelflip
@@ -25,7 +29,9 @@ import { Dust } from './dust.js';
 //     kickflip, off the toes for the heelflip - and the board flips a whole
 //     turn under her as her feet lift out of its way; she catches it and rides
 //     it down). Her jump goes higher than the runners' (but takes as long);
-//   - she ducks right down on the board, a hand on its rail;
+//   - she ducks right down on the board, a hand on its rail, her seat back
+//     over her heels (and a heel comes up off the deck before an ankle would
+//     bend further than it can: heelLift);
 //   - every lane change is a carve, the board leaning hard into it;
 //   - her braids are simulated one by one (twelve in the ponytail, four
 //     framing her face - each a chain of bones swung by a little rope of
@@ -51,13 +57,13 @@ export const COL = {
   14: '#4b2d1c', // braids, the warmer ones
   15: '#5b311f', // skin, deep
   16: '#a5704b', // skin, light
-  17: '#5e2d24', // lips
-  18: '#8a4a3c', // lips, light
+  17: '#6f3529', // lips (rosy brown)
+  18: '#a35a49', // lips, light
   19: '#8fbf1c', // tee, deep
   20: '#e7ff86', // tee, light
   21: '#f6f6f2', // piping
   22: '#f6eee4', // eye whites
-  23: '#3b2015', // irises
+  23: '#4a2612', // irises (warm brown)
   24: '#140b07', // ink
   25: '#2f63c4', // sock stripe (blue)
   26: '#d4483b', // sock stripe (red)
@@ -89,8 +95,6 @@ const FEEL = {
 // foot across the tail's bolts; popping a trick, the back foot on the tail.
 const SPOT = { front: -0.17, back: 0.21, tail: 0.3, slide: -0.29 };
 const ANGLE = { front: 1.12, back: 1.5, push: 0.28 };
-// how far the middle of her shoe is ahead of her ankle
-const SHOE_MID = 0.03;
 
 // Riding, her stance: side-on (the hips turned to face her toes, +x), the
 // shoulders open a little down the road, her head turned to see where she's
@@ -100,10 +104,16 @@ const SHOE_MID = 0.03;
 //   - chill: tall and loose, arms down, nodding along to something;
 //   - low: crouched down low and fast, the front arm reaching down the board.
 const MOODS = {
-  flow: { hipY: 0.965, hipPitch: 0.12, spLean: 0.24, chLean: 0.08, spTwist: 0.22, chTwist: 0.16, hdPitch: 0.1, shLx: 0.3, shRx: 0.12, shLz: 0.95, shRz: 0.8, shLy: 0.25, shRy: 0.1, elL: 0.45, elR: 0.6, wrL: 0.15, wrR: 0.2, carve: 1.3, pump: 0.7 },
-  chill: { hipY: 0.995, hipPitch: 0.06, spLean: 0.1, chLean: -0.02, spTwist: 0.16, chTwist: 0.1, hdPitch: 0.06, shLx: 0.12, shRx: 0.02, shLz: 0.28, shRz: 0.24, shLy: 0.1, shRy: 0.1, elL: 0.35, elR: 0.42, wrL: 0.1, wrR: 0.1, carve: 0.6, pump: 0.35 },
-  low: { hipY: 0.88, hipPitch: 0.2, spLean: 0.48, chLean: 0.14, spTwist: 0.3, chTwist: 0.2, hdPitch: -0.14, shLx: 0.75, shRx: -0.35, shLz: 1.15, shRz: 0.55, shLy: 0.15, shRy: -0.1, elL: 0.2, elR: 0.5, wrL: 0.0, wrR: 0.25, carve: 0.8, pump: 0.25 },
+  flow: { hipY: 0.955, hipPitch: 0.12, spLean: 0.22, chLean: 0.08, spTwist: 0.22, chTwist: 0.16, hdPitch: 0.1, shLx: 0.3, shRx: 0.12, shLz: 0.95, shRz: 0.8, shLy: 0.25, shRy: 0.1, elL: 0.45, elR: 0.6, wrL: 0.15, wrR: 0.2, carve: 1.35, pump: 0.8, rate: 1.0 },
+  chill: { hipY: 0.985, hipPitch: 0.06, spLean: 0.1, chLean: -0.02, spTwist: 0.16, chTwist: 0.1, hdPitch: 0.06, shLx: 0.12, shRx: 0.02, shLz: 0.24, shRz: 0.2, shLy: 0.1, shRy: 0.1, elL: 0.35, elR: 0.42, wrL: 0.1, wrR: 0.1, carve: 0.75, pump: 0.45, rate: 0.85 },
+  low: { hipY: 0.87, hipPitch: 0.2, spLean: 0.48, chLean: 0.14, spTwist: 0.3, chTwist: 0.2, hdPitch: -0.14, shLx: 0.75, shRx: -0.35, shLz: 1.15, shRz: 0.55, shLy: 0.15, shRy: -0.1, elL: 0.2, elR: 0.5, wrL: 0.0, wrR: 0.25, carve: 0.9, pump: 0.35, rate: 1.2 },
 };
+// The carve: a long, slow S from heel to toe and back on its own clock
+// (rad/s, quicker the faster she goes, wandering a little), the whole of her
+// leaning out from the wheels like a pendulum (rad, per unit of the mood's
+// carve) - further than the deck tips under her - and drifting across her
+// lane with it (m).
+const CARVE = { rate: [2.6, 0.9], lean: 0.12, deck: 0.07, yaw: 0.06, drift: 0.1 };
 const MOOD_NAMES = Object.keys(MOODS);
 const MOOD_HOLD = [3.2, 3.5];
 const MOOD_EASE = 0.8;
@@ -117,7 +127,12 @@ const PUSH_YAW = -0.42;
 // Pushing (body space; the road at y 0): the back foot steps off the tail
 // down beside the board (G0), drives back along the road (to G1) and swings
 // forward again - for the next push, or back up onto the tail.
-const PUSH = { entry: 0.17, each: 0.46, drive: 0.19, G0: [0.2, -0.04], G1: [0.15, 0.4], n: [2, 3], gap: [2.6, 3.4] };
+// Each push is a hard one: planted beside her front foot and driven right
+// back till the leg's straight and the toe flicks off the road, her front
+// knee sinking deep under her as it goes, the board and all of her surging
+// ahead with it (surge, m), and a high kick of the heel as the leg swings
+// through for the next.
+const PUSH = { entry: 0.2, each: 0.6, drive: 0.29, G0: [0.2, -0.13], G1: [0.16, 0.47], n: [2, 3], gap: [2.6, 3.4], sink: 0.15, surge: 0.07 };
 
 // Her jumps, dealt from a shuffled deck so the same one never comes twice
 // running.
@@ -127,10 +142,15 @@ const TRICKS = ['ollie', 'kickflip', 'heelflip', 'ollie', 'kickflip', 'heelflip'
 const TUCK = 0.33;
 const FLIP_LIFT = 0.25;
 
-// The crouch under a bar (by how far through the slide she is): down onto
-// her heels, folded right over her knees, her front hand on the board's toe
-// rail between her feet, the back arm up behind for balance, chin up to see.
-const DUCK = { hipY: 0.5, hipX: 0.06, hipPitch: 0.32, hipYaw: -1.32, spLean: 1.02, chLean: 0.32, spTwist: 0.18, chTwist: 0.1, hdPitch: -0.62, hdYaw: 0.72, shLx: 1.35, shLz: 0.22, shLy: 0.1, elL: 0.35, wrL: 0.45, shRx: -0.4, shRz: 1.05, shRy: -0.2, elR: 0.45, wrR: 0.2 };
+// The crouch under a bar (by how far through the slide she is): a skater's
+// crouch - her seat sat back over her heels (not dropped straight down onto
+// them: no ankle bends that far), folded forward over her knees, her front
+// hand on the board's toe rail between her feet, the back arm up behind for
+// balance, chin up to see.
+const DUCK = { hipY: 0.63, hipX: -0.14, hipPitch: 0.46, hipYaw: -1.32, spLean: 0.92, chLean: 0.3, spTwist: 0.18, chTwist: 0.1, hdPitch: -0.6, hdYaw: 0.72, shLx: 1.35, shLz: 0.22, shLy: 0.1, elL: 0.35, wrL: 0.45, shRx: -0.4, shRz: 1.05, shRy: -0.2, elR: 0.45, wrR: 0.2 };
+// How far her foot can bend up toward her shin (rad: her ankle, in a stiff
+// skate shoe); crouched deeper than that, the heel lifts off the deck.
+const ANKLE_MAX = 0.68;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -139,6 +159,11 @@ const _p = new THREE.Vector3();
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _n = new THREE.Vector3();
+const _n2 = new THREE.Vector3();
+const _f = new THREE.Vector3();
+const _ball = new THREE.Vector3();
+const _H = new THREE.Vector3();
+const _u = new THREE.Vector3();
 const _dv = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
@@ -173,9 +198,10 @@ export class Skater extends Player {
     this.flutter = new THREE.Vector4();
     // (what the shader draws her details by: [0] x the socks' tops, y the
     // shoes' x, w the shorts' hem; [1] x the shoes' collars, z their soles'
-    // height; [2] x how far down the arm the sleeves reach)
+    // height, y and w their heels' and toes' ends; [2] x how far down the
+    // arm the sleeves reach, y the tee's hem)
     const R0 = this.rig;
-    const rig = [new THREE.Vector4(R0.sockTop, R0.shoeX, 0, R0.shortsHem), new THREE.Vector4(R0.shoeCollar, 0, R0.soleH, 0), new THREE.Vector4(R0.tee.end, 0, 0, 0)];
+    const rig = [new THREE.Vector4(R0.sockTop, R0.shoeX, 0, R0.shortsHem), new THREE.Vector4(R0.shoeCollar, R0.shoe[0], R0.soleH, R0.shoe[1]), new THREE.Vector4(R0.tee.end, R0.tee.hem, 0, 0)];
     const mats = makeCharacterMaterials(this.u, palette(COL), rig, 0.0072, null, { style: 'skater', uniforms: { uFlutter: { value: this.flutter } } });
     this.mat = mats.mat;
     this.inkMat = mats.ink;
@@ -184,6 +210,8 @@ export class Skater extends Player {
     const R = this.rig.board;
     this.BOARD_Y = R.y;
     this.ANKLE_H = this.HIP_JOINT.y - this.THIGH - this.SHIN;
+    // how far the middle of her shoe is ahead of her ankle
+    this.SHOE_MID = -(R0.shoe[0] + R0.shoe[1]) / 2;
   }
 
   get objects() {
@@ -209,6 +237,10 @@ export class Skater extends Player {
     this.feet = [0, 1].map(() => ({ at: new THREE.Vector3(), yaw: 0, pitch: 0, flat: 1, n: new THREE.Vector3(0, 1, 0) }));
     this.flip = { value: 0, from: 0, to: 0, t: 0, dur: 1, axis: 'z' };
     this.carveS = { roll: new Spring(), yaw: new Spring() };
+    // her drift across the lane with each carve (m: the figure, not where
+    // the game has her)
+    this.swayS = new Spring();
+    this.swayX = 0;
     this.hemS = { F: new Spring(), B: new Spring(), L: new Spring(), R: new Spring() };
     this.buildBraids();
   }
@@ -223,6 +255,8 @@ export class Skater extends Player {
     this.moodNext = MOOD_HOLD[0] + MOOD_HOLD[1] * Math.random();
     for (const k of MOOD_NAMES) this.moodK[k] = k === this.mood ? 1 : 0;
     this.push = { on: false, t: 0, n: 0, w: 0, foot: 0, next: 0.25, wantFirst: true, planted: -1 };
+    this.carvePh = Math.random() * TAU;
+    if (this.swayS) this.swayS.reset();
     this.pushPlant = false;
     this.greetT = 9;
     this.dodgeT = 9;
@@ -240,6 +274,12 @@ export class Skater extends Player {
 
   update(dt, speed, groundAt) {
     this.lastDt = dt;
+    // the carve's clock (quicker the faster she goes, and in the mood she's
+    // in; wandering a little, so no two carves are quite the same)
+    let rate = 0, tot = 0;
+    for (const k of MOOD_NAMES) (rate += MOODS[k].rate * this.moodK[k]), (tot += this.moodK[k]);
+    const sp = clamp((speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start), 0, 1);
+    this.carvePh += dt * (CARVE.rate[0] + CARVE.rate[1] * sp) * (rate / (tot || 1)) * (1 + 0.22 * Math.sin(this.time * 0.29 + 1.1));
     this.moodStep(dt);
     this.pushStep(dt, speed);
     this.greetT += dt;
@@ -350,25 +390,26 @@ export class Skater extends Player {
       const u = (t - PUSH.entry - i * PUSH.each) / PUSH.each;
       const dr = PUSH.drive / PUSH.each;
       if (u < dr) {
-        // driving back along the road, the heel peeling up at the end
+        // driven back along the road, hard - quickest in the middle of the
+        // stroke - the heel peeling up and the toe flicking off at the end
         const e = u / dr;
-        const k = e * e * (3 - 2 * e) * 0.7 + e * 0.3;
+        const k = e * e * (3 - 2 * e) * 0.8 + e * 0.2;
         x = mix(g0[0], g1[0], k);
         z = mix(g0[1], g1[1], k);
-        y = ANKLE_H + 0.03 * smooth(0.7, 1, e);
-        pitch = -0.55 * smooth(0.55, 1, e);
+        y = ANKLE_H + 0.04 * smooth(0.65, 1, e);
+        pitch = -0.75 * smooth(0.5, 1, e);
         ground = 1 - smooth(0.85, 1, e);
       } else {
-        // swinging forward: the heel kicks up behind, the knee drives
+        // swinging forward: the heel kicks up high behind, the knee drives
         // through; back onto the tail after the last
         const e = (u - dr) / (1 - dr);
         const last = i === P.n - 1;
         const to = last ? [tail.x, tail.z, tail.y] : [g0[0], g0[1], ANKLE_H];
         const k = ease(e);
         x = mix(g1[0], to[0], k);
-        z = mix(g1[1], to[1], k) + 0.08 * Math.sin(Math.PI * e) * (1 - e);
-        y = mix(ANKLE_H + 0.03, to[2], k) + (last ? 0.16 : 0.13) * Math.sin(Math.PI * Math.pow(e, 0.8));
-        pitch = -0.55 * (1 - smooth(0, 0.5, e)) + 0.1 * Math.sin(Math.PI * e);
+        z = mix(g1[1], to[1], k) + 0.1 * Math.sin(Math.PI * e) * (1 - e);
+        y = mix(ANKLE_H + 0.03, to[2], k) + (last ? 0.2 : 0.18) * Math.sin(Math.PI * Math.pow(e, 0.7));
+        pitch = -0.75 * (1 - smooth(0, 0.45, e)) + 0.12 * Math.sin(Math.PI * e);
         if (last) yaw = mix(-0.18, tail.yaw, smooth(0.4, 0.9, e));
         ground = last ? 0 : smooth(0.88, 1, e);
       }
@@ -465,8 +506,15 @@ export class Skater extends Player {
 
   // --- poses ------------------------------------------------------------------------
   // Riding (r: the pose; f: the stride's phase, which doesn't run; sp: the
-  // pace): her stance in the moods she's in, carving and pumping, turned
-  // toward pushing as far as she is.
+  // pace): her stance in the moods she's in - and never still in it. She
+  // carves (CARVE): the whole of her leaning out from the wheels over her
+  // toes and back onto her heels like a pendulum, the knees soaking into
+  // each carve and pumping out of it, her hips leading and her chest, head
+  // and loose arms following on behind - each a beat later than the last,
+  // so the motion rolls up through her - and under it all the little things
+  // a body does to stay on a board: weight shifting foot to foot, shoulders
+  // rolling, the head bobbing to the road. Turned toward pushing as far as
+  // she is.
   poseRun(r, f, sp) {
     const t = this.time;
     r.fill(0);
@@ -485,30 +533,81 @@ export class Skater extends Player {
       pump += M.pump * w;
     }
     const chill = this.moodK.chill / tot;
-    // the carve, heel to toe and back, and a pump of the knees with it
-    const ph = t * 2.05 + 0.6 * Math.sin(t * 0.37);
-    const cv = Math.sin(ph);
+    const flow = this.moodK.flow / tot;
+    // the carve: + out over her toes, - back on her heels; the hips lead it,
+    // the chest, the head and the arms follow, each a beat behind
+    const ph = this.carvePh;
+    const A = carve;
+    const L = Math.sin(ph);
+    const Lh = Math.sin(ph + 0.25);
+    const Lc = Math.sin(ph - 0.45);
+    const Ld = Math.sin(ph - 0.9);
     this.carveAmt = carve;
-    r[C.hipX] = 0.03 * carve * Math.sin(ph - 0.35);
-    r[C.hipRoll] = 0.03 * carve * cv;
-    r[C.hipY] += -0.028 * pump * (0.5 + 0.5 * Math.sin(ph * 2 - 0.5)) - 0.01 * sp;
-    r[C.spLean] += 0.06 * carve * Math.sin(ph - 0.3) + 0.06 * sp;
-    r[C.spSide] = -0.05 * carve * cv;
-    // (chilling, she nods along)
-    const nod = Math.pow(Math.abs(Math.sin(t * 4.4)), 3);
-    r[C.hdPitch] += 0.08 * chill * nod;
-    r[C.hipY] -= 0.012 * chill * nod;
-    // arms balance against the carve
-    r[C.shLz] += 0.12 * carve * cv;
-    r[C.shRz] -= 0.12 * carve * cv;
-    r[C.shLx] += 0.06 * Math.sin(t * 1.3 + 1);
-    r[C.shRx] += 0.06 * Math.sin(t * 1.1 + 2);
+    // the whole of her, from the wheels (toward her toes is -roll)
+    r[C.bodyRoll] = -CARVE.lean * A * L;
+    r[C.hipX] = 0.045 * A * Lh;
+    r[C.hipYaw] = -CARVE.yaw * 0.8 * A * L;
+    // knees: soaking into the toe side, rising onto the heels, and pumping
+    // twice a carve (down into each, up out of it)
+    const pumpW = 0.5 + 0.5 * Math.sin(2 * ph - 0.7);
+    r[C.hipY] += -0.03 * A * Math.max(0, L) + 0.012 * A * Math.max(0, -L) - 0.04 * pump * pumpW - 0.012 * sp;
+    r[C.hipPitch] += 0.05 * A * Lh;
+    // the body folds toward her toes and opens back over her heels
+    r[C.spLean] += 0.13 * A * Lc + 0.05 * sp + 0.05 * pump * pumpW;
+    r[C.chLean] += 0.07 * A * Ld;
+    r[C.spSide] = -0.05 * A * Lc;
+    r[C.chSide] = -0.035 * A * Ld;
+    // the shoulders wind against the hips and unwind through the carve
+    r[C.spTwist] += 0.07 * A * Math.sin(ph - 0.6);
+    r[C.chTwist] += 0.09 * A * Math.sin(ph - 1.0);
+    // (her eyes stay on the road: the head rights itself against the lean)
+    r[C.hdPitch] += -0.55 * (0.13 * A * Lc + 0.07 * A * Ld) + 0.03 * Math.sin(ph * 2 - 1.4);
+    // arms: loose, swung out against the lean and trailing it - shoulder,
+    // then elbow, then wrist, a wave running out along each
+    const aw = Math.sin(ph - 1.3), ew = Math.sin(ph - 1.85), ww = Math.sin(ph - 2.4);
+    const loose = 0.6 + 0.6 * flow;
+    r[C.shLz] += A * loose * (0.16 * aw);
+    r[C.shRz] += A * loose * (-0.13 * aw);
+    r[C.shLx] += A * loose * (0.12 * Math.sin(ph - 1.1));
+    r[C.shRx] += A * loose * (-0.16 * Math.sin(ph - 1.5));
+    r[C.elL] += A * loose * (0.1 + 0.12 * ew);
+    r[C.elR] += A * loose * (0.08 - 0.12 * ew);
+    r[C.wrL] += A * loose * 0.2 * ww;
+    r[C.wrR] += A * loose * -0.18 * ww;
+    // the little things, always going (on clocks of their own, so it never
+    // falls into a loop): her weight shifting from foot to foot, shoulders
+    // rolling, the head bobbing, fingers and wrists idling, a rattle off the
+    // road the faster she goes
+    const n1 = Math.sin(t * 1.37) + 0.5 * Math.sin(t * 2.71 + 1.3);
+    const n2 = Math.sin(t * 1.13 + 2.1) + 0.5 * Math.sin(t * 3.07 + 0.4);
+    const n3 = Math.sin(t * 0.71 + 0.8) + 0.4 * Math.sin(t * 1.93 + 2.6);
+    r[C.hipRoll] = 0.035 * A * L + 0.018 * n1;
+    r[C.hipX] += 0.012 * n2;
+    r[C.spSide] += 0.018 * n2;
+    r[C.chSide] += 0.02 * Math.sin(t * 1.61 + 0.5);
+    r[C.chTwist] += 0.03 * n3;
+    r[C.clL] += 0.04 * (0.5 + 0.5 * Math.sin(t * 1.9 + 0.3));
+    r[C.clR] += 0.04 * (0.5 + 0.5 * Math.sin(t * 1.7 + 2.0));
+    r[C.shLx] += 0.07 * Math.sin(t * 1.3 + 1);
+    r[C.shRx] += 0.07 * Math.sin(t * 1.1 + 2);
     r[C.elL] += 0.08 * Math.sin(t * 1.7);
     r[C.elR] += 0.08 * Math.sin(t * 1.5 + 1);
-    // side-on, her head turned down the road
-    r[C.hipYaw] = STANCE_YAW;
-    r[C.hdYaw] = -0.94 * (STANCE_YAW + r[C.spTwist] + r[C.chTwist]) + 0.08 * Math.sin(t * 0.43);
-    r[C.hdRoll] = 0.06 + 0.04 * Math.sin(t * 0.31);
+    r[C.wrL] += 0.08 * Math.sin(t * 2.3 + 0.7);
+    r[C.wrR] += 0.08 * Math.sin(t * 2.1 + 2.2);
+    const rattle = (0.0025 + 0.0035 * sp) * (Math.sin(t * 37) + 0.6 * Math.sin(t * 53 + 1));
+    r[C.hipY] += rattle;
+    r[C.hdPitch] += 2.5 * rattle;
+    // (chilling, she nods along to something)
+    const nod = Math.pow(Math.abs(Math.sin(t * 4.4)), 3);
+    r[C.hdPitch] += 0.08 * chill * nod;
+    r[C.hipY] -= 0.014 * chill * nod;
+    r[C.shLz] += 0.04 * chill * nod;
+    r[C.shRz] += 0.04 * chill * nod;
+    // side-on, her head turned down the road (and turning a little into
+    // each carve, looking where it's taking her)
+    r[C.hipYaw] += STANCE_YAW;
+    r[C.hdYaw] = -0.94 * (STANCE_YAW + r[C.spTwist] + r[C.chTwist]) + 0.08 * Math.sin(t * 0.43) - 0.12 * A * Lc;
+    r[C.hdRoll] = 0.06 + 0.04 * Math.sin(t * 0.31) + 0.05 * A * Ld + 0.02 * n3;
     this.posePush(r, sp);
     // (with the fox riding on her shoulder, the arm under her stays down)
     if (this.rider) {
@@ -519,42 +618,52 @@ export class Skater extends Player {
   }
 
   // Turned toward pushing as far as she is: hips and shoulders square to the
-  // road, leaning into it, sinking on her front knee as the back foot drives,
-  // her arms swinging with it.
+  // road, leaning into it - and each push a hard one: as her back foot drives
+  // back along the road her front knee sinks deep under her, her body
+  // surges ahead with the board, and her arms swing hard against her legs;
+  // then she rises as the leg swings through.
   posePush(r, sp) {
     const P = this.push;
     const w = P.w;
     if (w <= 0.001) return;
     const t = P.t;
-    let drive = 0, swing = 0;
+    let drive = 0, swing = 0, rise = 0;
     if (P.on && t > PUSH.entry) {
       const i = Math.min(P.n - 1, Math.floor((t - PUSH.entry) / PUSH.each));
       const u = (t - PUSH.entry - i * PUSH.each) / PUSH.each;
       const dr = PUSH.drive / PUSH.each;
-      drive = bump(0, 0.15, 0.7, 1.15, u / dr);
-      swing = Math.sin(TAU * (u - 0.08));
+      // (the drive builds and lets go; the swing through rises out of it)
+      drive = bump(0, 0.25, 0.75, 1.25, u / dr);
+      rise = bump(dr, dr + 0.2, 0.85, 1.0, u);
+      swing = Math.sin(TAU * (u - 0.06));
     }
     const k = (a, v) => (r[C[a]] += (v - r[C[a]]) * w);
-    k('hipYaw', PUSH_YAW);
-    k('hipPitch', 0.16);
+    k('bodyRoll', 0);
+    k('bodyZ', -PUSH.surge * drive);
+    k('hipYaw', PUSH_YAW + 0.05 * swing);
+    k('hipPitch', 0.14 + 0.08 * drive);
     k('hipX', 0.05);
-    k('hipRoll', -0.04);
-    k('spLean', 0.34 + 0.12 * drive + 0.05 * sp);
-    k('chLean', 0.08);
-    k('spTwist', 0.12);
-    k('chTwist', 0.04 + 0.08 * swing);
-    k('spSide', 0.04);
-    k('hipY', 0.93 - 0.1 * drive);
-    k('hdPitch', 0.05);
-    k('hdYaw', -0.9 * (PUSH_YAW + 0.16) - 0.06 * swing);
-    k('shLx', 0.25 - 0.55 * swing);
-    k('shRx', 0.15 + 0.6 * swing);
-    k('shLz', 0.32);
-    k('shRz', 0.36);
+    k('hipRoll', -0.05 - 0.05 * drive);
+    k('spLean', 0.3 + 0.16 * drive - 0.06 * rise + 0.04 * sp);
+    k('chLean', 0.06 + 0.04 * drive);
+    k('spTwist', 0.12 + 0.05 * swing);
+    k('chTwist', 0.04 + 0.13 * swing);
+    k('spSide', 0.04 + 0.04 * drive);
+    k('chSide', 0);
+    k('hipY', 0.93 - PUSH.sink * drive + 0.025 * rise);
+    k('hdPitch', -0.04 - 0.24 * drive);
+    k('hdYaw', -0.9 * (PUSH_YAW + 0.16) - 0.08 * swing);
+    k('hdRoll', 0.04);
+    k('shLx', 0.25 - 0.8 * swing);
+    k('shRx', 0.2 + 0.85 * swing);
+    k('shLz', 0.3 + 0.12 * drive);
+    k('shRz', 0.36 + 0.1 * drive);
     k('shLy', 0.1);
     k('shRy', 0.1);
-    k('elL', 0.55 + 0.15 * Math.max(0, -swing));
-    k('elR', 0.55 + 0.15 * Math.max(0, swing));
+    k('elL', 0.5 + 0.35 * Math.max(0, -swing));
+    k('elR', 0.5 + 0.35 * Math.max(0, swing));
+    k('wrL', 0.1 + 0.2 * Math.max(0, swing));
+    k('wrR', 0.1 + 0.2 * Math.max(0, -swing));
   }
 
   // Standing on her board on the title screen: hands in her pockets, her
@@ -746,13 +855,17 @@ export class Skater extends Player {
     const tot = W.run + W.jump + W.slide + W.idle || 1;
     const wr = W.run / tot, wj = W.jump / tot, ws = W.slide / tot, wi = W.idle / tot;
     // --- the board ---
-    // carving (riding): rolled from heel to toe and back, swung with it; hard
-    // into a lane change
-    const ph = t * 2.05 + 0.6 * Math.sin(t * 0.37);
+    // carving (riding): she leans out from the wheels further than the deck
+    // tips (it's rolled back a little under her, here in her body's space),
+    // its nose swinging the way she leans; hard into a lane change
+    const ph = this.carvePh;
     const carve = (this.carveAmt ?? 1) * wr * (1 - this.push.w);
+    const L = Math.sin(ph);
     const lc = this.laneC || 0;
-    const roll = this.carveS.roll.step(0.075 * carve * Math.sin(ph) - 0.2 * lc * (wr + ws), 3.5, 0.6, this.lastDt || 1 / 60);
-    const yaw = this.carveS.yaw.step(0.045 * carve * Math.sin(ph - 0.7) + 0.12 * lc * (wr + ws), 3, 0.6, this.lastDt || 1 / 60);
+    const roll = this.carveS.roll.step(CARVE.deck * carve * L - 0.2 * lc * (wr + ws), 4.5, 0.7, this.lastDt || 1 / 60);
+    const yaw = this.carveS.yaw.step(-CARVE.yaw * carve * Math.sin(ph - 0.2) + 0.12 * lc * (wr + ws), 3.5, 0.7, this.lastDt || 1 / 60);
+    // ...and drifts across her lane with it (the way she leans, a beat on)
+    this.swayX = this.swayS.step(-CARVE.drift * carve * Math.cos(ph), 3, 0.9, this.lastDt || 1 / 60);
     // the jump: popped off its tail, up toward her as she tucks, flipping
     const u = this.jumpU();
     const trick = this.trick;
@@ -776,7 +889,7 @@ export class Skater extends Player {
     const q = this.bQ.identity();
     q.multiply(_q.setFromAxisAngle(AY, yaw + IDLE_BOARD * wi));
     q.multiply(_q.setFromAxisAngle(AZ, roll + wob));
-    const P = this.bPos.set(0.012 * carve * Math.sin(ph - 0.35), BOARD_Y + lift + hop, 0);
+    const P = this.bPos.set(0, BOARD_Y + lift + hop, 0);
     // (the pop turns it nose up about its tail on the road)
     if (pop > 0) {
       const pv = _v.set(0, -BOARD_Y, 0.36);
@@ -865,7 +978,7 @@ export class Skater extends Player {
       _n.set(0, 1, -slope).normalize().applyQuaternion(q);
     }
     const dir = _a.set(Math.sin(angle), 0, -Math.cos(angle)).applyQuaternion(q);
-    F.at.copy(_p).addScaledVector(_n, this.ANKLE_H).addScaledVector(dir, -SHOE_MID);
+    F.at.copy(_p).addScaledVector(_n, this.ANKLE_H).addScaledVector(dir, -this.SHOE_MID);
     F.n.copy(_n);
     F.yaw = Math.atan2(-dir.x, -dir.z);
     F.pitch = 0;
@@ -895,9 +1008,59 @@ export class Skater extends Player {
     if (cw > 0) for (let i = 0; i < 12; i++) keep[i] = Pz[LEG[i]];
     for (let side = 0; side < 2; side++) {
       const F = this.feet[side];
+      const e = F.flat > 0.5 ? this.heelLift(F, side) : 0;
       this.legTo(Pz, side, F.at, F.yaw, F.pitch);
+      // (the toes stay flat on the deck as the heel comes up)
+      Pz[side ? C.toR : C.toL] = e;
     }
     if (cw > 0) for (let i = 0; i < 12; i++) Pz[LEG[i]] += (keep[i] - Pz[LEG[i]]) * cw;
+  }
+
+  // A foot can only bend so far up toward the shin (ANKLE_MAX): crouched
+  // deeper than that, its heel comes up off the deck - the foot pivoting on
+  // its ball, which stays where it was - so the shoe never folds up over her
+  // ankle. Moves the ankle target, tips what the sole is laid flat on, and
+  // returns how far the heel came up (rad).
+  heelLift(F, side) {
+    const { THIGH, SHIN, HIP_JOINT, HIP_Y, TOE_D, TOE_F } = this;
+    const H = _H.set((side ? 1 : -1) * HIP_JOINT.x, HIP_JOINT.y - HIP_Y, 0).applyMatrix4(_hips);
+    // the foot's frame: up (what it stands on), forward (the way it points)
+    const n0 = _n2.copy(F.n);
+    const f0 = _f.set(-Math.sin(F.yaw), 0, -Math.cos(F.yaw));
+    f0.addScaledVector(n0, -f0.dot(n0)).normalize();
+    // the ball of the foot, where the toe bends
+    const ball = _ball.copy(F.at).addScaledVector(f0, TOE_F).addScaledVector(n0, -TOE_D);
+    const nn = _a, ff = _b, A = _v2, u = _u, pole = _v3;
+    let e = 0;
+    for (let it = 0; it < 4; it++) {
+      const c = Math.cos(e), sn = Math.sin(e);
+      nn.copy(n0).multiplyScalar(c).addScaledVector(f0, sn);
+      ff.copy(f0).multiplyScalar(c).addScaledVector(n0, -sn);
+      A.copy(ball).addScaledVector(ff, -TOE_F).addScaledVector(nn, TOE_D);
+      // where the shin runs from the ankle (the knee bends out over the toes)
+      u.subVectors(H, A);
+      const L = clamp(u.length(), Math.abs(THIGH - SHIN) + 0.02, THIGH + SHIN - 0.003);
+      u.normalize();
+      pole.copy(ff).addScaledVector(u, -ff.dot(u));
+      if (pole.lengthSq() < 1e-8) break;
+      pole.normalize();
+      const cp = clamp((SHIN * SHIN + L * L - THIGH * THIGH) / (2 * SHIN * L), -1, 1);
+      const sp = Math.sqrt(1 - cp * cp);
+      // how far it leans out over the foot, from the foot's own upright
+      const sx = cp * u.dot(ff) + sp * pole.dot(ff);
+      const sy = cp * u.dot(nn) + sp * pole.dot(nn);
+      const over = Math.atan2(sx, sy) - ANKLE_MAX;
+      if (over <= 0.002) break;
+      e = Math.min(0.9, e + over * 0.85);
+    }
+    if (e <= 0) return 0;
+    const c = Math.cos(e), sn = Math.sin(e);
+    nn.copy(n0).multiplyScalar(c).addScaledVector(f0, sn);
+    ff.copy(f0).multiplyScalar(c).addScaledVector(n0, -sn);
+    F.at.copy(ball).addScaledVector(ff, -TOE_F).addScaledVector(nn, TOE_D);
+    F.n.copy(nn);
+    F.pitch -= e;
+    return e;
   }
 
   // Two-bone solve of one leg for an ankle target (body space) and the way
@@ -946,6 +1109,8 @@ export class Skater extends Player {
     const b = this.b;
     for (const k of ['footL', 'footR', 'toeL', 'toeR']) b[k].rotation.set(0, 0, 0);
     super.applyPose(Pz, roll);
+    // (carving across her lane: the figure drifts, the game's lane doesn't)
+    b.body.position.x += this.swayX * (1 - (this.crashW || 0));
   }
 
   // The board onto its bone (from her body's space into the root's - or
@@ -1110,9 +1275,9 @@ export class Skater extends Player {
     const up = Math.max(0, air.y) * 0.02;
     const go = (s, out, ph) => {
       s.v -= kick;
-      const wind = clamp(out * 0.017, -0.04, 0.42);
+      const wind = clamp(out * 0.013, -0.04, 0.3);
       const flap = 0.07 * fl * (Math.sin(t * 9.3 + ph) + 0.6 * Math.sin(t * 14.7 + ph * 2.1)) * (0.4 + wind * 2);
-      return clamp(s.step(wind + up + flap, 3.2, 0.28, dt), -0.12, 0.7);
+      return clamp(s.step(wind + up + flap, 3.2, 0.28, dt), -0.1, 0.42);
     };
     const fF = go(S.F, -air.z, 0);
     const fB = go(S.B, air.z, 1.3);
@@ -1148,7 +1313,11 @@ export class Skater extends Player {
       const tail = d.group === 'tail';
       // how hard each joint is held to where it sits on her head: the
       // ponytail's arc out of the cuff, the face-framing ones at their roots
-      const hold = tail ? [1, 0.55, 0.28, 0.1, 0.03] : [1, 0.25, 0.06];
+      const hold = tail ? [1, 0.5, 0.22, 0.07, 0.02] : [1, 0.25, 0.06];
+      // each braid its own: how much the wind takes it, how heavy it hangs,
+      // how quickly and how hard it flutters, how stiff it is (hashed off its
+      // seed, so none moves quite like its neighbour)
+      const h = (k) => { const x = Math.sin(d.seed * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
       return {
         d,
         n,
@@ -1163,7 +1332,11 @@ export class Skater extends Player {
         tgt: Array.from({ length: n }, () => new THREE.Vector3()),
         tgt0: Array.from({ length: n }, () => new THREE.Vector3()),
         hold: Array.from({ length: n }, (_, k) => hold[k] ?? 0),
-        drag: (tail ? 0.64 : 0.56) * (0.85 + 0.3 * d.seed),
+        drag: (tail ? 0.64 : 0.56) * (0.7 + 0.6 * h(1)),
+        heavy: 0.88 + 0.24 * h(2),
+        freq: 0.75 + 0.55 * h(3),
+        flut: 0.7 + 0.7 * h(4),
+        stiff: 0.88 + 0.06 * h(5),
         seed: d.seed,
       };
     });
@@ -1176,7 +1349,7 @@ export class Skater extends Player {
       _p.set(0, 0, 0);
       for (const B of T) _p.add(B.rest[k]);
       _p.multiplyScalar(1 / T.length);
-      for (const B of T) B.fan[k].subVectors(B.rest[k], _p).multiplyScalar(1.25);
+      for (const B of T) B.fan[k].subVectors(B.rest[k], _p).multiplyScalar(1.15 + 0.7 * (k / T[0].n));
     }
     this.headQs = new THREE.Quaternion();
     this.braidCols = R.colliders.map((c) => ({ ...c, a: c.a && new THREE.Vector3(...c.a), b: c.b && new THREE.Vector3(...c.b), c: c.c && new THREE.Vector3(...c.c), r: c.r && new THREE.Vector3(...c.r) }));
@@ -1196,17 +1369,20 @@ export class Skater extends Player {
       const d = this.braidCols[i];
       const c = this.cols[i];
       const T = this.boneM(d.bone);
+      // (a braid's own thickness, and its ink, clear of her - a little more
+      // off her clothes, which bulge and ripple past the shapes kept here)
+      const m = d.bone === 'head' || d.bone === 'neck' ? 0.009 : 0.015;
       if (d.kind === 'ell') {
         c.c.copy(d.c).applyMatrix4(T).applyQuaternion(Q);
         for (let e = 0; e < 3; e++) {
           c.ax[e].setFromMatrixColumn(T, e).normalize().applyQuaternion(Q);
-          c.r[e] = d.r.getComponent(e) + 0.009;
+          c.r[e] = d.r.getComponent(e) + m;
         }
       } else {
         c.a.copy(d.a).applyMatrix4(T).applyQuaternion(Q);
         c.b.copy(d.b).applyMatrix4(T).applyQuaternion(Q);
-        c.ra = d.ra + 0.009;
-        c.rb = d.rb + 0.009;
+        c.ra = d.ra + m;
+        c.rb = d.rb + m;
       }
     }
     // where each braid's joints sit on her head (the pins, and what the
@@ -1231,7 +1407,7 @@ export class Skater extends Player {
     const vel = _dv.set(this.vx, this.grounded ? 0 : this.vy, -this.speed);
     const airX = -vel.x + this.breeze.x, airY = -vel.y + this.breeze.y, airZ = -vel.z + this.breeze.z;
     const airS = Math.hypot(airX, airY, airZ);
-    const gx = -this.frameAcc.x, gy = -9.8 * this.gk - this.frameAcc.y, gz = -this.frameAcc.z;
+    const gx = -this.frameAcc.x, gy0 = -9.8 * this.gk, gyA = -this.frameAcc.y, gz = -this.frameAcc.z;
     const groundY = (this.groundY || 0) - this.y + 0.012;
     const h = dt / steps;
     const scale = h / this.braidH;
@@ -1243,19 +1419,26 @@ export class Skater extends Player {
       for (const B of this.braids) {
         const n = B.n;
         const kd = B.drag;
+        const gy = gy0 * B.heavy + gyA;
+        // (the braid's own clock: its flutter runs down it as a wave)
+        const tb = ts * B.freq + B.seed * 17;
         for (let k = 1; k < n; k++) {
           const p = B.p[k], q = B.q[k];
           const vx = ((p.x - q.x) * scale) / h, vy = ((p.y - q.y) * scale) / h, vz = ((p.z - q.z) * scale) / h;
-          // fluttering in the wind, more toward the tip
-          const fk = (k / n) * airS * 0.36;
-          const n1 = Math.sin(ts * 7.1 + B.seed * 23 + k * 0.9) + 0.5 * Math.sin(ts * 12.7 + B.seed * 9 + k * 1.7);
-          const n2 = Math.sin(ts * 6.3 + B.seed * 31 + k * 1.3) + 0.5 * Math.sin(ts * 11.3 + B.seed * 5 - k * 0.7);
+          // fluttering in the wind, more toward the tip, each braid in its
+          // own time and to its own degree
+          // (long waves down it - a joint and its neighbours pushed much the
+          // same way - so it ripples rather than kinks)
+          const fk = Math.pow(k / n, 1.1) * airS * 0.3 * B.flut;
+          const n1 = Math.sin(tb * 7.1 - k * 0.5 + B.seed * 23) + 0.35 * Math.sin(tb * 11.7 - k * 0.75 + B.seed * 9);
+          const n2 = Math.sin(tb * 6.3 - k * 0.55 + B.seed * 31) + 0.3 * Math.sin(tb * 10.3 - k * 0.8 + B.seed * 5);
+          const n3 = Math.sin(tb * 4.9 - k * 0.4 + B.seed * 13);
           const ax = gx + kd * (airX - vx) + fk * n1;
-          const ay = gy + kd * (airY - vy) + fk * n2 * 0.6;
-          const az = gz + kd * (airZ - vz);
-          const nx = p.x + (p.x - q.x) * scale * 0.992 + ax * h * h;
-          const ny = p.y + (p.y - q.y) * scale * 0.992 + ay * h * h;
-          const nz = p.z + (p.z - q.z) * scale * 0.992 + az * h * h;
+          const ay = gy + kd * (airY - vy) + fk * n2 * 0.7;
+          const az = gz + kd * (airZ - vz) + fk * n3 * 0.35;
+          const nx = p.x + (p.x - q.x) * scale * 0.988 + ax * h * h;
+          const ny = p.y + (p.y - q.y) * scale * 0.988 + ay * h * h;
+          const nz = p.z + (p.z - q.z) * scale * 0.988 + az * h * h;
           q.copy(p);
           p.set(nx, ny, nz);
         }
@@ -1286,7 +1469,7 @@ export class Skater extends Player {
           // a little stiffness against folding back on itself
           for (let k = 0; k < B.n - 2; k++) {
             const a = B.p[k], c = B.p[k + 2];
-            const want = 0.82 * (B.len[k] + B.len[k + 1]);
+            const want = B.stiff * (B.len[k] + B.len[k + 1]);
             _v.subVectors(c, a);
             const L = _v.length() || 1e-6;
             if (L < want) {
@@ -1320,9 +1503,11 @@ export class Skater extends Player {
     return (this._qi || (this._qi = new THREE.Quaternion())).copy(q).invert();
   }
 
-  // The ponytail's braids drawn a little toward each other, joint by joint
-  // (not the ones near the cuff: they're held), and pushed apart where
-  // they'd run into one another.
+  // The ponytail's braids drawn only gently toward the bundle they're in,
+  // joint by joint (not the ones near the cuff: they're held) - enough to
+  // keep it a ponytail, not so much they swing as one - and pushed apart
+  // wherever any two would run into each other, so they part and slide past
+  // one another.
   tailCohesion() {
     const T = this.tailBraids;
     const n = T[0].n;
@@ -1332,19 +1517,25 @@ export class Skater extends Player {
       let m = 0;
       for (const B of T) if (k < B.n) _p.add(B.p[k]), m++;
       _p.multiplyScalar(1 / m);
-      // (each toward where it lies in the fan, turned as her head is: the
-      // tail keeps its spread across her back as it swings)
-      for (const B of T) if (k < B.n) B.p[k].lerp(_v.copy(B.fan[k]).applyQuaternion(Qh).add(_p), 0.035);
+      // (each toward where it lies across the bundle, turned as her head is,
+      // and looser toward the tips)
+      const pull = 0.011 * (1 - 0.6 * (k / n));
+      for (const B of T) if (k < B.n) B.p[k].lerp(_v.copy(B.fan[k]).applyQuaternion(Qh).add(_p), pull);
+      const want = 0.0145;
       for (let i = 0; i < T.length - 1; i++) {
-        const a = T[i].p[k], c = T[i + 1].p[k];
-        if (!a || !c) continue;
-        _v.subVectors(c, a);
-        const L = _v.length();
-        const want = 0.016;
-        if (L < want && L > 1e-6) {
-          const e = ((want - L) / L) * 0.5;
-          a.addScaledVector(_v, -e);
-          c.addScaledVector(_v, e);
+        const a = T[i].p[k];
+        if (!a) continue;
+        for (let j = i + 1; j < T.length; j++) {
+          const c = T[j].p[k];
+          if (!c) continue;
+          _v.subVectors(c, a);
+          const L2 = _v.lengthSq();
+          if (L2 < want * want && L2 > 1e-12) {
+            const L = Math.sqrt(L2);
+            const e = ((want - L) / L) * 0.5;
+            a.addScaledVector(_v, -e);
+            c.addScaledVector(_v, e);
+          }
         }
       }
     }
