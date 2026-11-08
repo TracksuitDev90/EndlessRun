@@ -1,7 +1,8 @@
 # EndlessRun
 
-An endless runner through worlds within worlds. Pick who runs — Rowan, a tall,
-heavy-striding wayfarer in a puffer jacket and an orange hooded cape; Wren, a nimble
+An endless runner through worlds within worlds. Pick who runs — Rowan, a tall
+wayfarer in a puffer jacket and an orange hooded cape who charges along like a
+bruiser; Wren, a nimble
 explorer with a shock of vermilion hair and a backpack that won't stay shut; or
 Alder, an incredibly old man in a flowing teal robe and orange spectacles, bent
 double, a beard down to his belt, who hobbles along on his long twisted walking
@@ -942,7 +943,7 @@ and moves in their own way (`wayfarer.js`, `explorer.js`, `elder.js`,
 | Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the same airtime but the highest apex of all (2.3 m to the others' 1.6); a rabbit's bound stretched out flat and twisted side-on, a long float down (a whole second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip — each to a side picked at random |
 | Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces | a precision landing on springs: down onto the balls of his big feet, arms swung forward, and straight back up onto his toes, ears bouncing |
 | Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust | a dive roll: arms reaching for the road, tucked into a ball, over once and up into a crouch, in a little cloud of dust |
-| Run | a long, heavy, bounding stride, wide-footed, arms pumping big | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | a sprinter's: quick little legs turning over fast under a strong forward lean, knees driving, arms pumping, ears streaming back |
+| Run | a bruiser's charge: hunched, head down, crouched low on bent knees, stomping along wide-footed with the knees driven high, rocking side to side, the elbows out and the arms pumping round in big loops | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | two, and every few seconds he changes from one to the other: bolt upright with his head thrown back and his fists pumping at his chest on quick little steps; or flung forward, arms swinging long and straight, in big bounding strides |
 
 ### Choosing who runs
 
@@ -1083,7 +1084,9 @@ To change a runner, edit their script and regenerate (about 15, 35, 65 and
 `hop|pole`, the bunny's `leap|float|webster`, and `&item=umbrella|balloon|dandelion`
 for what he floats on), `&jt=` seconds into the jump or slide, `&side=1|-1`
 the slide's lead leg, `&carry=1` the elder picking up his stick as soon as he
-can, `&views=front,left,back,right,three`, `&zoom=`, `&y=`):
+can, `&style=pump|reach` the bunny keeping to one of his two runs, `&speed=`
+how fast they run (m/s, 14 if not given; 12–28 in the game),
+`&views=front,left,back,right,three`, `&zoom=`, `&y=`):
 
 ```sh
 pip install numpy scipy scikit-image fast-simplification pillow
@@ -1137,9 +1140,22 @@ is read back through it, so the surfaces stretch without losing a line of the
 sculpt (the quilting, socks and hems all follow), and the skeleton and every
 rig constant the game reads are carried through it too — the cape's drape is
 laid out by the sculpt's heights and stretched the same way (`rig.stretch`).
-His stride is drawn out to match: longer and slower, sinking deeper into each
-contact and bouncing higher off it, wider-footed, the hips rolling and the
-shoulders driving round against them, arms pumping big. Every time a boot
+He runs like the bruiser he's drawn as — a charge (`GAIT`, `CHARGE` and
+`ROCK` in `wayfarer.js`): hunched over, his shoulders hunched up round his
+neck and his head down between them, eyes on the road, nodding into each
+stomp; crouched low on bent knees at a slow, heavy cadence, each knee driven
+up high and swung out round the other leg and each boot coming down hard
+well out to its side; his whole body rocking from side to side over the foot
+that's coming down (the hips' share of it laid on before the feet are
+placed, so a planted boot stays put), the hips swinging and the shoulders
+driving round against them. His arms pump round in a big loop with the
+elbows out: the fist punches forward low across his belly, then the arm
+swings back out wide and up, the elbow high behind him and the fist up by
+his ear, and comes round and down to punch again, the shoulder rolling with
+it. (The loop's shoulder angles were solved from where the elbow and fist
+should go, so it reads the same from any side.) With the fox riding on his
+shoulder he keeps the arm under her down, in a small pump, and swings it up
+again once she hops off. Every time a boot
 drives off the road it kicks up a puff of dust behind it — two, more often
 than not, bigger as the pace builds — thrown with a share of his speed so it
 blooms at his heel before the still air stops it and he runs on out of it
@@ -1449,11 +1465,26 @@ pixel wide however far off he is, fainter instead, so they never shimmer
 away: `VS_WHISKER`). His card is cut from the sheet's front view. His hat and
 his trousers keep their colour through Hell's drain.
 
-**He's a tumbler, and he moves like one.** His run is a sprinter's: quick
-little legs turning over fast (the quickest cadence of them all) under a
-strong forward lean, his knees driving high, arms pumping hard with the
-elbows bent and the hands flat, his big feet turned out a little; the
-headwind lays his ears back. A lane change is a quick sideways hop, knees
+**He's a tumbler, and he moves like one.** He has two runs (`STYLES`), on
+quick little legs with his big feet turned out a little, and every few
+seconds he changes from one to the other — always with his feet on the road
+(if the time comes round in the air or in a roll, he changes as he comes
+out of it, so often as he lands), easing over a couple of strides from one
+into the other, legs, arms, lean and cadence all at once, without missing a
+step:
+
+- **the pump** — bolt upright, leaning back a little with his chest puffed
+  out and his head thrown right back, nose to the sky; his fists pumping
+  tight in front of his chest with the elbows tucked in; quick little steps
+  (the quickest cadence of any runner), his heels kicking right up under his
+  seat and his knees coming up in front;
+- **the reach** — flung forward in a strong lean, eyes on the road, reaching
+  out long: his arms nearly straight, swinging right up in front of him and
+  flung back behind, hands open; long, bounding strides at a slower cadence,
+  the back leg kicked out long behind him and the front foot reaching well
+  out ahead.
+
+Either way the headwind lays his ears back. A lane change is a quick sideways hop, knees
 tucked, arms out. He lands on springs — a precision landing, down deep onto
 the balls of his feet folded over his knees with his arms swung forward for
 balance, then straight back up onto his toes, ears bouncing, and a smaller
@@ -1672,7 +1703,9 @@ ahead and dropping back; every few seconds she gets an idea:
   crouched, ears streaming, her brush hanging down your back, looking about
   (and back at you); she leaps off ahead into a clear lane when she's had
   enough, when something's coming, or the moment you slide or stumble
-  (neither of these with the bunny: he's hardly bigger than she is);
+  (neither of these with the bunny: he's hardly bigger than she is). Rowan
+  keeps the arm under her down while she's up there, instead of swinging it
+  up into her;
 - **pounce** — the mousing leap, on open road (and now and then over a low
   hurdle) — a treat: rare, and never within twenty seconds of the last;
 - **whirl** — rarer still: for the joy of it (and sometimes when you take a

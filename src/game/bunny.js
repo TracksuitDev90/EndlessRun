@@ -2,7 +2,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeCharacterMaterials, makeWhiskerMaterial } from '../render/shaders.js';
 import { TAU, clamp, smooth, Spring } from './rig.js';
 import { palette } from './kit.js';
-import { Player, C, mirror, hermite } from './player.js';
+import { Player, C, mirror, hermite, merge } from './player.js';
 import { CONFIG } from '../config.js';
 import { Dust } from './dust.js';
 import { Props, KINDS } from './props.js';
@@ -13,8 +13,10 @@ import { Seeds } from './seeds.js';
 // by far, and the one who jumps highest (sculpted in tools/runner/bunny.py).
 // He's a tumbler: quick and springy, parkour in every move. On top of the
 // shared runner (player.js):
-//   - a sprinter's run, quick little legs turning over under a forward
-//     lean, arms pumping, ears streaming back;
+//   - two runs, and every so often he changes from one to the other
+//     (STYLES): bolt upright with his head thrown back and his fists pumping
+//     at his chest, on quick little steps; or flung forward, arms swinging
+//     long and straight, in big bounding strides;
 //   - three jumps, dealt so the same one never comes twice running: a
 //     rabbit's bound, stretched out long through the air and turned side-on
 //     to it, one way or the other; a float - he pulls something out of his
@@ -69,30 +71,80 @@ export const COL = {
   31: '#e9a58c', // foot pads
 };
 
-// How he runs: a sprinter on little legs - a quick cadence, the knees
-// driving high, a strong forward lean, his arms pumping hard with the
-// elbows bent; his big feet turned out a little.
+// How he runs: quick little legs, his big feet turned out a little - in one
+// of two ways (STYLES), and every so often he changes from one to the other.
 const GAIT = {
-  cadence: [2.3, 0.065],
-  stride: { reach: 0.36, hipY: 0.4, bob: 0.024, trackX: 0.06, swingX: 0.078, toeOut: 0.16, heelLift: 0.82, ballZ: -0.02, maxDuty: 0.34, minContact: 0.035 },
-  swing: [
-    [0.16, 0.2, 0.18, 0.02, 0.02],
-    [0.4, 0.1, 0.285, 0.0, 0.05],
-    [0.65, -0.09, 0.22, -0.025, 0.02],
-    [0.84, -0.16, 0.15, -0.012, 0.0],
-  ],
-  arm: {
-    swing: [0.2, 0.62, 0.72, 0.45, -0.12, -0.55, -0.66, -0.4],
-    abd: [0.32, 0.28, 0.27, 0.3, 0.33, 0.36, 0.37, 0.35],
-    elbow: [1.5, 1.8, 1.95, 1.75, 1.4, 1.15, 1.1, 1.25],
-    amp: [0.95, 0.25],
-  },
-  lean: [0.24, 0.14],
-  hipYaw: 0.2,
-  hipRoll: 0.06,
-  spTwist: 0.2,
-  chTwist: 0.15,
+  stride: { trackX: 0.06, swingX: 0.078, toeOut: 0.16, minContact: 0.035 },
 };
+
+// His two runs, laid over GAIT:
+//   - pump: bolt upright, leaning back a little with his chest puffed out
+//     and his head thrown right back, nose to the sky; his fists pumping
+//     tight in front of his chest, elbows tucked in; quick little steps, the
+//     heels kicking right up under his seat and the knees coming up in front;
+//   - reach: flung forward in a strong lean, eyes on the road, reaching out
+//     long - his arms nearly straight, swinging right up in front of him and
+//     flung back behind, hands open - in long, bounding strides, the back
+//     leg kicked out long behind him and the front foot reaching well ahead.
+// (Swing paths and arm keys as in GAIT, player.js.)
+const STYLES = [
+  {
+    name: 'pump',
+    cadence: [2.55, 0.07],
+    stride: { reach: 0.3, hipY: 0.405, bob: 0.022, heelLift: 0.9, ballZ: -0.015, maxDuty: 0.34 },
+    swing: [
+      [0.16, 0.17, 0.2, 0.02, 0.02],
+      [0.4, 0.05, 0.295, 0.0, 0.04],
+      [0.65, -0.09, 0.25, -0.02, 0.02],
+      [0.84, -0.14, 0.15, -0.01, 0.0],
+    ],
+    arm: {
+      swing: [0.5, 0.72, 0.8, 0.68, 0.42, 0.24, 0.2, 0.3],
+      abd: [0.24, 0.22, 0.22, 0.24, 0.26, 0.28, 0.28, 0.26],
+      elbow: [2.1, 2.25, 2.3, 2.2, 2.05, 1.95, 1.9, 2.0],
+      amp: [1, 0.12],
+    },
+    lean: [-0.06, 0.04],
+    hipYaw: 0.14,
+    hipRoll: 0.05,
+    spTwist: 0.1,
+    chTwist: 0.08,
+  },
+  {
+    name: 'reach',
+    cadence: [2.05, 0.06],
+    stride: { reach: 0.4, hipY: 0.392, bob: 0.034, heelLift: 0.78, ballZ: -0.03, maxDuty: 0.32 },
+    swing: [
+      [0.18, 0.26, 0.16, 0.03, 0.02],
+      [0.42, 0.12, 0.245, 0.0, 0.035],
+      [0.66, -0.13, 0.23, -0.03, 0.02],
+      [0.85, -0.21, 0.14, -0.015, 0.0],
+    ],
+    arm: {
+      swing: [0.3, 1.1, 1.45, 1.0, -0.2, -0.95, -1.15, -0.75],
+      abd: [0.3, 0.25, 0.22, 0.28, 0.38, 0.5, 0.55, 0.45],
+      elbow: [0.75, 0.6, 0.5, 0.65, 0.6, 0.4, 0.35, 0.45],
+      amp: [1, 0.12],
+    },
+    lean: [0.46, 0.12],
+    hipYaw: 0.26,
+    hipRoll: 0.07,
+    spTwist: 0.26,
+    chTwist: 0.2,
+  },
+];
+// how long he keeps to one before he changes (s: at least, and up to this
+// much longer), and how long the change takes
+const STYLE_HOLD = [3.5, 4];
+const STYLE_EASE = 0.5;
+
+// Lay gait b over gait a by k into out (the same shape as both).
+function blendGait(out, a, b, k) {
+  for (const key in out) {
+    if (typeof out[key] === 'number') out[key] = a[key] + (b[key] - a[key]) * k;
+    else blendGait(out[key], a[key], b[key], k);
+  }
+}
 
 // How he handles: snappy between the lanes, and the highest jump in the
 // game - the same airtime as everyone's (CONFIG.jump.time), so every gap is
@@ -250,6 +302,10 @@ export class Bunny extends Player {
 
   configure() {
     super.configure();
+    // his two runs, whole, and the one he's running in: a copy of its own
+    // (the blend between them is written into it)
+    this.gaits = STYLES.map(({ name, ...over }) => merge(this.gait, over));
+    this.gait = JSON.parse(JSON.stringify(this.gaits[0]));
     this.floats = {};
     for (const k of KINDS) this.floats[k] = solveFloat(FLOAT.height, FLOAT.time, FLOAT.fallG[k]);
     this.useFloat(KINDS[0]);
@@ -398,6 +454,13 @@ export class Bunny extends Player {
     this.lastItem = this.lastItem || null;
     this.letGoPending = false;
     this.rollPlan = null;
+    // (a fresh run starts in either)
+    if (this.gaits) {
+      this.runStyle = Math.random() < 0.5 ? 0 : 1;
+      this.styleX = this.styleK = this.runStyle;
+      this.styleNext = STYLE_HOLD[0] + STYLE_HOLD[1] * Math.random();
+      blendGait(this.gait, this.gaits[0], this.gaits[1], this.styleK);
+    }
     if (this.prop) {
       this.prop.kind = null;
       this.prop.state = 'none';
@@ -409,6 +472,7 @@ export class Bunny extends Player {
 
   update(dt, speed, groundAt) {
     this.lastDt = dt;
+    this.styleStep(dt);
     super.update(dt, speed, groundAt);
     // now and then a little burst of wagging; more often while he stands
     this.wagT -= dt;
@@ -425,6 +489,38 @@ export class Bunny extends Player {
       this.twitchT = this.mode === 'run' ? 3 + 5 * Math.random() : 1.5 + 3 * Math.random();
     }
     this.greetT += dt;
+  }
+
+  // Every few seconds of the run he changes how he runs (STYLES): with his
+  // feet on the road, never in the air or a roll (the first moment he's
+  // running again, if it came round while he wasn't - so often as he lands),
+  // easing from one into the other over a couple of strides (legs, arms,
+  // lean and cadence all at once - the stride's phase runs on through it,
+  // so not a step is missed).
+  styleStep(dt) {
+    if (this.mode === 'run' && !this.crashed) {
+      this.styleNext -= dt;
+      const free = this.grounded && !this.sliding && this.w.run > 0.9 && this.speed > 4;
+      if (free && this.styleNext <= 0) {
+        this.runStyle = 1 - this.runStyle;
+        this.styleNext = STYLE_HOLD[0] + STYLE_HOLD[1] * Math.random();
+      }
+    }
+    const x = this.styleX + clamp(this.runStyle - this.styleX, -dt / STYLE_EASE, dt / STYLE_EASE);
+    if (x === this.styleX) return;
+    this.styleX = x;
+    this.styleK = x * x * (3 - 2 * x);
+    blendGait(this.gait, this.gaits[0], this.gaits[1], this.styleK);
+  }
+
+  // Keep to one run (by name) from now on (the viewer: &style=).
+  holdStyle(name) {
+    const i = STYLES.findIndex((S) => S.name === name);
+    if (i < 0) return;
+    this.runStyle = i;
+    this.styleX = this.styleK = i;
+    this.styleNext = Infinity;
+    blendGait(this.gait, this.gaits[0], this.gaits[1], i);
   }
 
   place(z, dist = 0) {
@@ -620,12 +716,33 @@ export class Bunny extends Player {
   }
 
   // --- poses ------------------------------------------------------------------------
+  // His run, as far between the two as he is (styleK: 0 pump, 1 reach) -
+  // on top of the gait's legs, lean and arms, the rest of each: pumping, his
+  // chest puffed out, his head thrown back, chin up, and the fists turned in
+  // tight in front of him, curled; reaching, his head up to see where he's
+  // flinging himself, his hands open.
   poseRun(r, f, sp) {
     super.poseRun(r, f, sp);
-    // (hands flat as blades, the wrists straight)
-    r[C.wrL] = 0.04;
-    r[C.wrR] = 0.04;
-    r[C.hdPitch] += 0.04;
+    const k = this.styleK;
+    const p = 1 - k;
+    const puff = -0.12 * p;
+    r[C.chLean] += puff;
+    // (the head pitch is laid on the lean: keep it level through the puff,
+    // then throw it back, a little more on each footfall)
+    const fall = Math.pow(Math.abs(Math.cos(f)), 4);
+    r[C.hdPitch] += puff + (0.6 + 0.06 * fall) * p + 0.12 * k + 0.04;
+    r[C.shLy] += 0.42 * p;
+    r[C.shRy] += 0.42 * p;
+    r[C.wrL] = 0.35 * p - 0.12 * k;
+    r[C.wrR] = 0.35 * p - 0.12 * k;
+  }
+
+  // (however a landing or a footfall swings his long reaching arms, an
+  // elbow never bends backward)
+  applyPose(Pz, roll) {
+    Pz[C.elL] = Math.max(0, Pz[C.elL]);
+    Pz[C.elR] = Math.max(0, Pz[C.elR]);
+    super.applyPose(Pz, roll);
   }
 
   // Standing: his hands in his pockets, rocking up onto his toes and back,

@@ -169,7 +169,7 @@ const _m = new THREE.Matrix4();
 const kick = (spr, c, d, live) => (spr.v += c * d * live);
 const soft = (x, m) => m * Math.tanh(x / m);
 
-const merge = (base, over) => {
+export const merge = (base, over) => {
   const out = { ...base };
   for (const k in over || {}) {
     const v = over[k];
