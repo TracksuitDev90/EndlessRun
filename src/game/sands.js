@@ -27,9 +27,9 @@ import { mulberry32 } from '../core/rng.js';
 
 const TAU = Math.PI * 2;
 // which print each runner leaves (see footprint in the shaders)
-const SOLE = { wayfarer: 0, explorer: 1, elder: 0, bunny: 4 };
+const SOLE = { wayfarer: 0, explorer: 1, elder: 0, bunny: 4, skater: 1 };
 // how deep each presses a running footprint in (m)
-const DEPTH = { wayfarer: 0.03, explorer: 0.024, elder: 0.026, bunny: 0.02 };
+const DEPTH = { wayfarer: 0.03, explorer: 0.024, elder: 0.026, bunny: 0.02, skater: 0.024 };
 // prints are let go this far behind the runner (m)
 const KEEP = 24;
 // the share of a wave's cycle it spends rolling up the beach
@@ -74,6 +74,7 @@ export class Sands {
     this.stepK = [NaN, NaN];
     this.wasGrounded = true;
     this.furrow = null;
+    this.tracks = null;
     // the surf
     this.sea = 0;
     this.doorD = 0;
@@ -186,8 +187,19 @@ export class Sands {
     const running = game.state === 'running' && p.mode === 'run' && !p.crashed && game.speed > 2;
     const onSand = p.grounded && (p.groundY || 0) < 0.05;
     const wet = this.wetAt(p.x, game.dist);
+    // on a board (the skater's), her wheels roll two tracks through it, and
+    // where she plants her foot to push, a print
+    const rolls = !!p.rolls;
+    if (rolls) {
+      if (p.pushPlant && running && onSand && !p.sliding) this.step(game, 1, 1, wet);
+      if (running && onSand && !wet) {
+        this.track(game, 0, p.x - 0.104);
+        this.track(game, 1, p.x + 0.104);
+      } else this.tracks = null;
+    }
+    p.pushPlant = false;
     // a foot planted (mid-stance)
-    for (let side = 0; side < 2; side++) {
+    for (let side = 0; side < 2 && !rolls; side++) {
       const n = Math.floor((p.phase + side * Math.PI - Math.PI) / TAU);
       if (n > this.stepK[side] && running && onSand && !p.sliding) this.step(game, side, 1, wet);
       // (a contact share growing as the pace drops can tick the count back
@@ -201,14 +213,14 @@ export class Sands {
       S.n = 0;
     }
     // a landing: both feet at once, deeper
-    if (running && onSand && !this.wasGrounded) {
+    if (running && onSand && !this.wasGrounded && !rolls) {
       this.step(game, 0, 1.6, wet);
       this.step(game, 1, 1.6, wet);
     }
     this.wasGrounded = p.grounded;
     // a slide ploughs a furrow (a new straight stretch of it each time it
     // swerves off the line it's on)
-    if (running && onSand && p.sliding) this.plough(game, wet);
+    if (running && onSand && p.sliding && !rolls) this.plough(game, wet);
     else this.furrow = null;
     // the water churned round their legs as they wade (see the shader)
     this.wade += ((wet && p.grounded && running ? 1 : 0) - this.wade) * (1 - Math.exp(-dt * 10));
@@ -293,6 +305,36 @@ export class Sands {
       f.depth = 0.045;
       f.flip = 1;
       this.furrow = f;
+    }
+    f.x = x;
+    f.d = d;
+    f.len = Math.hypot(x - f.sx, d - f.sd);
+    f.yaw = Math.atan2(x - f.sx, Math.max(d - f.sd, 1e-3));
+  }
+
+  // A wheel's track (k: which of the two, at x): a narrow furrow drawn along
+  // behind the board, a fresh straight stretch each time it swerves off the
+  // line it's on.
+  track(game, k, x) {
+    const T = this.tracks || (this.tracks = [null, null]);
+    const d = game.dist + 0.18;
+    let f = T[k];
+    if (f && !f.live) f = null;
+    if (f) {
+      const dd = d - f.sd;
+      const drift = x - (f.sx + Math.tan(f.yaw) * dd);
+      if (Math.abs(drift) > 0.06 && dd > 0.3) f = null;
+    }
+    if (!f) {
+      const prev = T[k];
+      f = this.add();
+      f.sx = prev && prev.live ? prev.x : x;
+      f.sd = prev && prev.live ? prev.d : d - 0.05;
+      f.kind = 2;
+      f.w = 0.036;
+      f.depth = 0.012;
+      f.flip = 1;
+      T[k] = f;
     }
     f.x = x;
     f.d = d;

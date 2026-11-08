@@ -2,6 +2,7 @@ import { Wayfarer } from './wayfarer.js';
 import { Explorer } from './explorer.js';
 import { Elder } from './elder.js';
 import { Bunny } from './bunny.js';
+import { Skater } from './skater.js';
 
 // Who you can run as. Each has their sculpted asset (tools/runner/), the art
 // their card on the title screen is cut from (tools/characters/cards.py), a
@@ -47,6 +48,16 @@ export const CHARACTERS = [
     card: 'assets/characters/bunny.webp',
     tint: ['#ffd36b', '#e0702e'],
     make: (env, asset) => new Bunny(env, asset),
+  },
+  {
+    id: 'skater',
+    name: 'Hazel',
+    title: 'the skater',
+    blurb: 'cool · rides her board · flips it over everything',
+    asset: 'assets/skater/',
+    card: 'assets/characters/skater.webp',
+    tint: ['#d9b3ff', '#7046c4'],
+    make: (env, asset) => new Skater(env, asset),
   },
 ];
 

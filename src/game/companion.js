@@ -397,7 +397,7 @@ export class Companion {
       ['whirl', this.canWhirl() ? 0.25 : 0],
       // (a runner as small as she is - the bunny - has no room between his
       // legs to shoot through, nor a shoulder to ride on)
-      ['under', this.openRoad(p.x, 2.2) && p.grounded && !p.sliding && g.speed > 8 && !p.small ? 2.4 : 0],
+      ['under', this.openRoad(p.x, 2.2) && p.grounded && !p.sliding && g.speed > 8 && !p.small && !p.onBoard ? 2.4 : 0],
       ['ride', this.openRoad(p.x, 3.2) && p.grounded && !p.sliding && !g.stumbleWindow && !p.small ? 2.6 : 0],
     ];
     if (this.lastBeat) for (const o of opts) if (o[0] === this.lastBeat) o[1] *= 0.25;

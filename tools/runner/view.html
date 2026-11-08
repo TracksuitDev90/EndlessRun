@@ -42,7 +42,8 @@
       const env = WORLD_DEFS[0].env;
       const runner = char.make(env, asset);
       runner.reset();
-      // (&style=pump|reach: the bunny keeps to one of his two runs)
+      // (&style=pump|reach: the bunny keeps to one of his two runs;
+      // flow|chill|low: the skater rides in one mood)
       if (q.get('style') && runner.holdStyle) runner.holdStyle(q.get('style'));
       runner.mode = pose === 'idle' || pose === 'bind' ? 'idle' : 'run';
       const scene = new THREE.Scene();
@@ -80,6 +81,8 @@
       }
       runner.place(0, 0);
       runner.shadow.visible = false;
+      // (&follow=1: the cameras rise with them, up through a jump)
+      const lift = q.get('follow') ? runner.y : 0;
       // the ground, and a mark every 10 cm up a pole beside them
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(3, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd9ccb8 }));
       ground.position.y = -0.001;
@@ -97,8 +100,8 @@
       views.forEach((v, i) => {
         const a = yaws[v] ?? 0;
         const d = 7.2;
-        cam.position.set(Math.sin(a) * d, focusY + Number(q.get('up') || 0.1), -Math.cos(a) * d);
-        cam.lookAt(0, focusY, 0);
+        cam.position.set(Math.sin(a) * d, focusY + lift + Number(q.get('up') || 0.1), -Math.cos(a) * d);
+        cam.lookAt(0, focusY + lift, 0);
         shared.uCamPos.value.copy(cam.position);
         renderer.setViewport(i * w, 0, w, innerHeight);
         renderer.setScissor(i * w, 0, w, innerHeight);

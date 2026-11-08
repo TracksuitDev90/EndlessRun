@@ -182,12 +182,12 @@ body:not(.touch) .touch-only {
 }
 
 /* --- choosing who runs ---------------------------------------------------- */
-/* Pop-up storybook cards, one per runner, in a grid two by two: each one's
+/* Pop-up storybook cards, one per runner, in a grid three by two: each one's
    front view cut out like a sticker (a paper keyline and an ink shadow)
    standing up out of a card washed in their colours, a sunburst behind
    them, their name on a paper plate; under the grid, a line about whoever's
    picked. The one you've picked stands up taller and bobs; the others
-   wait. */
+   wait. A slot nobody fills yet holds a mystery card, greyed out. */
 .choose {
   display: flex;
   flex-direction: column;
@@ -198,11 +198,11 @@ body:not(.touch) .touch-only {
 .pick {
   /* (how wide a card is; each stands a little less tall than wide, and
      their figures pop up out of them into the gap above) */
-  --w: clamp(104px, min(31vw, 15.5vh), 150px);
+  --w: clamp(84px, min(26.5vw, 14.5vh), 140px);
   display: grid;
-  grid-template-columns: repeat(2, var(--w));
+  grid-template-columns: repeat(3, var(--w));
   justify-content: center;
-  column-gap: clamp(12px, 4vw, 22px);
+  column-gap: clamp(10px, 3.4vw, 20px);
   row-gap: calc(var(--w) * 0.34);
   margin-bottom: 6px;
   padding-top: calc(var(--w) * 0.32);
@@ -225,8 +225,7 @@ body:not(.touch) .touch-only {
   transition: transform 0.38s cubic-bezier(0.2, 1.5, 0.4, 1), box-shadow 0.3s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.pick-card:nth-child(4n + 2),
-.pick-card:nth-child(4n + 3) {
+.pick-card:nth-child(even) {
   transform: translateY(6px) scale(0.92) rotate(-1.5deg);
 }
 .pick-card[aria-checked='true'] {
@@ -234,8 +233,7 @@ body:not(.touch) .touch-only {
   box-shadow: 5px 7px 0 var(--ink);
   z-index: 1;
 }
-.pick-card:nth-child(4n + 2)[aria-checked='true'],
-.pick-card:nth-child(4n + 3)[aria-checked='true'] {
+.pick-card:nth-child(even)[aria-checked='true'] {
   transform: translateY(-4px) scale(1.05) rotate(2deg);
 }
 .pick-card:focus-visible {
@@ -293,6 +291,39 @@ body:not(.touch) .touch-only {
 /* (the bunny is the smallest, but for his ears) */
 .pick-card[data-id='bunny'] .pick-fig {
   height: 116%;
+}
+/* (the skater: tall and slim, her ponytail over her) */
+.pick-card[data-id='skater'] .pick-fig {
+  height: 122%;
+}
+/* the mystery card: someone's still to come - washed out in greys, a big
+   question mark standing up where they will, a dashed edge, nothing to
+   pick */
+.pick-mystery {
+  --c1: #d8d4ce;
+  --c2: #8f8a84;
+  cursor: default;
+  border-style: dashed;
+  box-shadow: 3px 4px 0 rgba(42, 29, 20, 0.45);
+  color: rgba(42, 29, 20, 0.55);
+}
+.pick-mystery .pick-bg {
+  filter: saturate(0) brightness(0.95);
+}
+.pick-mystery .pick-fig.pick-q {
+  height: auto;
+  bottom: 30%;
+  font: 600 calc(var(--w) * 0.78) / 1 var(--serif);
+  color: #6f6a64;
+  opacity: 0.85;
+  animation: none;
+}
+.pick-mystery .pick-plate {
+  background: #ebe7e1;
+  border-style: dashed;
+}
+.pick-mystery .pick-name {
+  letter-spacing: 0.12em;
 }
 .pick-card[aria-checked='false'] .pick-fig {
   opacity: 0.8;
@@ -1074,7 +1105,7 @@ body:not(.touch) .touch-only {
     padding-top: calc(6vh + var(--safe-top));
   }
   .pick {
-    --w: clamp(88px, min(28vw, 14vh), 150px);
+    --w: clamp(76px, min(25vw, 13vh), 130px);
   }
 }
 
@@ -1088,7 +1119,7 @@ body:not(.touch) .touch-only {
     margin: 0;
   }
   .pick {
-    --w: clamp(104px, min(11vw, 19vh), 160px);
+    --w: clamp(96px, min(9.6vw, 18vh), 150px);
     margin: 0 0 6px;
   }
   .pals {
