@@ -4,7 +4,7 @@ import { clamp, Spring } from './rig.js';
 import { Cloth } from './cloth.js';
 import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
 import { COL, CAPE, capeBind, capeColliders } from './outfit.js';
-import { Player, C, mirror } from './player.js';
+import { Player, C, mirror, cyc } from './player.js';
 import { Dust } from './dust.js';
 
 // The wayfarer: a young wayfarer in a hooded cape (outfit.js), steady and
@@ -16,8 +16,10 @@ import { Dust } from './dust.js';
 //   - curls bounce on springs; the hip pouch is a pendulum, its flap lifting;
 //   - he leaps with the lead leg alternating, arms out like wings coming down,
 //     and slides feet first, leaning back, a hand trailing on the floor;
-//   - he runs heavy: every push-off kicks a puff of dust off the road behind
-//     his boot (dust.js), and he lands with a stomp.
+//   - he runs heavy, a bruiser's charge (GAIT, CHARGE, ROCK): hunched and
+//     crouched, rocking side to side, his elbows out and his arms pumping
+//     round in big loops; every push-off kicks a puff of dust off the road
+//     behind his boot (dust.js), and he lands with a stomp.
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -28,32 +30,45 @@ const _dv = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
 
-// How he runs: a tall bruiser's stride - long legs (see build.py's stretch)
-// covering more road with each step at a slower, heavier cadence; sinking a
-// little deeper into every contact and bouncing higher off it; wider-footed,
-// the hips rolling and the shoulders driving round against them, arms
-// pumping big. (The swing path is the default's drawn out to his legs.)
+// How he runs: a bruiser's charge. Hunched over, head down and shoulders
+// up, he crouches low on bent knees and stomps along wide-footed at a slow,
+// heavy cadence - each knee driven up high and swung out round the other
+// leg, each foot coming down hard well out to its side - his whole body
+// rocking from side to side over the foot that's coming down, the hips
+// swinging and the shoulders driving round against them. (His arms: CHARGE.)
 const GAIT = {
-  cadence: [1.38, 0.05],
-  stride: { reach: 0.67, hipY: 0.774, bob: 0.046, trackX: 0.084, swingX: 0.112, toeOut: 0.07, heelLift: 0.72, ballZ: -0.025 },
+  cadence: [1.22, 0.045],
+  stride: { reach: 0.64, hipY: 0.72, bob: 0.06, trackX: 0.11, swingX: 0.17, toeOut: 0.22, heelLift: 0.62, ballZ: -0.03 },
   swing: [
-    [0.16, 0.42, 0.32, 0.035, 0.035],
-    [0.4, 0.23, 0.49, 0.0, 0.09],
-    [0.65, -0.17, 0.4, -0.045, 0.035],
-    [0.84, -0.32, 0.26, -0.023, 0.0],
+    [0.16, 0.34, 0.28, 0.03, 0.03],
+    [0.42, 0.06, 0.43, 0.0, 0.04],
+    [0.66, -0.25, 0.44, -0.03, 0.03],
+    [0.85, -0.31, 0.28, -0.02, 0.0],
   ],
-  arm: {
-    swing: [0.16, 0.5, 0.6, 0.38, -0.1, -0.46, -0.56, -0.34],
-    abd: [0.48, 0.42, 0.41, 0.45, 0.49, 0.53, 0.54, 0.52],
-    elbow: [1.4, 1.7, 1.82, 1.62, 1.28, 1.05, 1.0, 1.15],
-    amp: [1.0, 0.24],
-  },
-  lean: [0.2, 0.12],
-  hipYaw: 0.22,
-  hipRoll: 0.09,
-  spTwist: 0.2,
-  chTwist: 0.16,
+  lean: [0.3, 0.08],
+  hipYaw: 0.26,
+  hipRoll: 0.05,
+  spTwist: 0.24,
+  chTwist: 0.22,
 };
+
+// His arms pump round in a big loop with the elbows out, keyed on the arm's
+// own phase as GAIT.arm is (key 2: the fist furthest forward, 6: the arm
+// furthest back): the fist punches forward low across his belly; the arm
+// swings back out wide and up, the elbow high behind him and the fist up by
+// his ear; and it comes round and down to punch again. The shoulder's
+// angles were solved from where the elbow and the fist go (swing, twist,
+// spread, elbow); fwd is how far forward it is, for the shoulders' roll.
+const CHARGE = {
+  swing: [0.11, 0.46, 0.64, 0.33, -0.17, 0.38, 1.0, -0.04],
+  twist: [0.33, 0.57, 0.67, 0.41, -0.04, -0.66, -0.57, -0.47],
+  abd: [0.5, 0.44, 0.42, 0.54, 0.68, 1.31, 1.9, 0.87],
+  elbow: [1.51, 1.47, 1.5, 1.59, 1.79, 2.2, 2.01, 2.22],
+  fwd: [0.3, 0.8, 1, 0.7, 0, -0.6, -1, -0.6],
+};
+// how far his body rocks over the foot coming down (hips across, m; torso
+// and chest leaning over, rad) and how far ahead of its mid-stance (rad)
+const ROCK = { hipX: 0.045, spSide: 0.16, chSide: 0.08, lead: 0.5 };
 
 // How he lands: a stomp - a slow, heavy bounce that sinks deep and pushes
 // back up once, and the camera feels the thud.
@@ -164,8 +179,60 @@ export class Wayfarer extends Player {
     this.gustT = 0;
     this.lastDt = 0;
     this.toeOffK = null;
+    // (which shoulder the fox rides on, -1 left, 1 right, and how far each
+    // arm has come down for her)
+    this.rider = 0;
+    this.holdW = [0, 0];
     this.dust?.clear();
     this.cloth.collidersMoved = false;
+  }
+
+  // The charge (GAIT, CHARGE, ROCK): hunched, head down, shoulders up, his
+  // body rocking over each foot as it comes down and his arms pumping round.
+  poseRun(r, f, sp) {
+    super.poseRun(r, f, sp);
+    const rock = Math.cos(f + ROCK.lead);
+    r[C.spSide] -= ROCK.spSide * rock;
+    r[C.chSide] -= ROCK.chSide * rock;
+    // rounded over, the shoulders hunched up round his neck, the head down
+    // between them but the eyes still on the road ahead, nodding into each
+    // stomp
+    r[C.chLean] += 0.16;
+    const stomp = Math.pow(Math.abs(Math.cos(f)), 3);
+    r[C.hdPitch] = r[C.hipPitch] + r[C.spLean] + r[C.chLean] - 0.16 - 0.06 * stomp;
+    r[C.hdRoll] = -0.5 * (r[C.hipRoll] + r[C.spSide] + r[C.chSide]);
+    const amp = 0.9 + 0.1 * sp;
+    const H = this.holdW;
+    const ease = (this.lastDt || 0) / 0.3;
+    for (let side = 0; side < 2; side++) {
+      const q = f + side * Math.PI + Math.PI;
+      const sh = side ? C.shRx : C.shLx, sy = side ? C.shRy : C.shLy, sz = side ? C.shRz : C.shLz;
+      const el = side ? C.elR : C.elL, cl = side ? C.clR : C.clL, cy = side ? C.clRy : C.clLy;
+      // With the fox riding on that shoulder he keeps the arm under her
+      // down, in the shared runner's small pump (as it's posed already),
+      // rather than swinging it up into her.
+      H[side] += clamp((this.rider === (side ? 1 : -1) ? 1 : 0) - H[side], -ease, ease);
+      const h = H[side] * H[side] * (3 - 2 * H[side]);
+      const m = (i, v) => (r[i] = v + (r[i] - v) * h);
+      const fwd = cyc(CHARGE.fwd, q);
+      m(sh, cyc(CHARGE.swing, q) * amp);
+      m(sy, cyc(CHARGE.twist, q) * amp);
+      m(sz, cyc(CHARGE.abd, q));
+      m(el, cyc(CHARGE.elbow, q));
+      // the shoulder rolls forward with the punch, back and up as the arm
+      // swings up behind him
+      r[cy] = 0.2 * fwd * (1 - h);
+      r[cl] = 0.1 + 0.08 * Math.max(0, -fwd) * (1 - h);
+    }
+    r[C.wrL] = 0.25;
+    r[C.wrR] = 0.25;
+  }
+
+  // (the hips' share of the rock goes on before the feet are placed, so a
+  // planted boot stays put through it)
+  runLegs(r, f, sp) {
+    r[C.hipX] += ROCK.hipX * Math.cos(f + ROCK.lead);
+    super.runLegs(r, f, sp);
   }
 
   // The stomp: he drops deep into his knees, feet splaying, his body folding

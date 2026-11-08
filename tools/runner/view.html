@@ -42,15 +42,19 @@
       const env = WORLD_DEFS[0].env;
       const runner = char.make(env, asset);
       runner.reset();
+      // (&style=pump|reach: the bunny keeps to one of his two runs)
+      if (q.get('style') && runner.holdStyle) runner.holdStyle(q.get('style'));
       runner.mode = pose === 'idle' || pose === 'bind' ? 'idle' : 'run';
       const scene = new THREE.Scene();
       scene.add(runner.root);
       const cam = new THREE.PerspectiveCamera(22 / zoom, innerWidth / views.length / innerHeight, 0.1, 50);
       const dt = 1 / 60;
+      // (&speed=: how fast they run, m/s - 12 to 28 in the game)
+      const V = Number(q.get('speed') || 14);
       // pose: step the runner there
       if (pose !== 'bind') {
         if (pose === 'jump') {
-          for (let i = 0; i < 60; i++) runner.update(dt, 14, () => 0);
+          for (let i = 0; i < 60; i++) runner.update(dt, V, () => 0);
           if (q.get('trick')) {
             runner.deck = [q.get('trick')];
             runner.nextTrick = q.get('trick');
@@ -59,19 +63,19 @@
           if (q.get('item')) runner.nextItem = q.get('item');
           runner.action('up');
           const n = Math.round(Number(q.get('jt') || 0.3) / dt);
-          for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
+          for (let i = 0; i < n; i++) runner.update(dt, V, () => 0);
         } else if (pose === 'slide') {
-          for (let i = 0; i < 60; i++) runner.update(dt, 14, () => 0);
+          for (let i = 0; i < 60; i++) runner.update(dt, V, () => 0);
           // (&side=1: lead with the left leg, -1 the right)
           if (q.get('side')) runner.slideSide = -Number(q.get('side'));
           runner.action('down');
           const n = Math.round(Number(q.get('jt') || 0.3) / dt);
-          for (let i = 0; i < n; i++) runner.update(dt, 14, () => 0);
+          for (let i = 0; i < n; i++) runner.update(dt, V, () => 0);
         } else {
           // (&carry=1: the elder picks up his stick as soon as he can)
           if (q.get('carry') && runner.carry) runner.carry.next = 0;
           const n = Math.round(T / dt);
-          for (let i = 0; i < n; i++) runner.update(dt, pose === 'run' ? 14 : 0, () => 0);
+          for (let i = 0; i < n; i++) runner.update(dt, pose === 'run' ? V : 0, () => 0);
         }
       }
       runner.place(0, 0);

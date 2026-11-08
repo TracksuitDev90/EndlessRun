@@ -12,7 +12,7 @@ export const CHARACTERS = [
     id: 'wayfarer',
     name: 'Rowan',
     title: 'the wayfarer',
-    blurb: 'tall · heavy stride · cape on the wind',
+    blurb: 'tall · a heavy charge · cape on the wind',
     asset: 'assets/runner/',
     card: 'assets/characters/wayfarer.webp',
     tint: ['#ffb54a', '#f2702a'],

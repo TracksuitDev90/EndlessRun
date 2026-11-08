@@ -106,6 +106,7 @@ export class Companion {
     this.restT = rand(1.5, 3);
     this.fetchT = rand(4, 7);
     this.fetching = null;
+    if (this.ride && this.game.player) this.game.player.rider = 0;
     this.ride = null;
     this.mood = { happy: 0, wag: 0, earsBack: 0, look: 0 };
     this.happyT = 0;
@@ -556,6 +557,9 @@ export class Companion {
     _p.set(this.x, this.y, this.pz - this.dz);
     _e.set(0, this.yaw, 0, 'YXZ');
     this.ride = { side, t: 0, up: 0.42, stay: rand(this.C.ride[0], this.C.ride[1]), from: _p.clone(), fromQ: new THREE.Quaternion().setFromEuler(_e) };
+    // (the runner knows which shoulder she's on, to keep that arm clear of
+    // her: see Wayfarer.poseRun)
+    this.game.player.rider = side;
     this.body.land(0.2);
     this.cheer(this.ride.stay);
   }
@@ -596,6 +600,7 @@ export class Companion {
     this.air = { t: 0, T, kind: 'leap' };
     this.yaw = 0;
     this.ride = null;
+    p.rider = 0;
     this.goal.x = tx;
     this.goal.dz = 2.5;
     this.endBeat();
