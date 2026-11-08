@@ -15,7 +15,7 @@ import { Quality, gpuClass } from './core/quality.js';
 // Query flags: ?debug (stats + N: next door, G: god mode), ?world=<id>,
 // ?visit=<n> (start on a later lap's look), ?dream=<x> (pin the dream depth,
 // 0 = off), ?seed=<n>, ?dpr=<n>, ?fps=<n> (lock the frame rate, e.g. 30), ?god,
-// ?runner=<id> (who runs: wayfarer, explorer, elder, bunny), ?companion=<id>
+// ?runner=<id> (who runs: wayfarer, explorer, elder, bunny, skater), ?companion=<id>
 // (who runs with you: fox, dragon, or none)
 function parseParams() {
   const q = new URLSearchParams(location.search);

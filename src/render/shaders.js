@@ -2462,12 +2462,28 @@ varying vec3 vFx;
 varying vec3 vRest;
 varying vec4 vD;
 varying float vMat;
+#ifdef SKATER
+// the skater's tee (and her shorts' legs) rippling in the wind: x how far
+// (m), y the waves' clock, z how hard the wind is
+uniform vec4 uFlutter;
+#endif
 
 void main() {
   vec3 lp = position;
   vec3 ln = normal;
   #ifdef OUTLINE
     vec3 lo = onrm;
+  #endif
+  #if defined(SKATER) && !defined(CAPE)
+    // (waves running round and down the loose cotton, where it hangs free:
+    // aD.x on the tee; the shorts' legs toward their hems)
+    if (aMat > 2.5 && aMat < 4.5) {
+      bool tee = aMat < 3.5;
+      float loose = tee ? aD.x : smoothstep(0.72, 0.6, position.y) * 0.45;
+      float az = atan(position.x, position.z);
+      float wv = sin(position.y * 48.0 + az * 3.0 - uFlutter.y) + 0.55 * sin(position.y * 29.0 - position.x * 37.0 - uFlutter.y * 1.37 + 1.7);
+      lp += ln * (wv * uFlutter.x * loose);
+    }
   #endif
   #ifdef CAPE
     vec3 P, Tu, Tv;
@@ -3569,6 +3585,269 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#elif defined(SKATER)
+// --- the skater ------------------------------------------------------------------
+// (palette: see COL in game/skater.js; r is the rest position - she is
+// sculpted where she stands; see tools/runner/skater.py)
+#define K_BRAID_WARM 14
+#define K_SKIN_DEEP 15
+#define K_SKIN_LIGHT 16
+#define K_LIP 17
+#define K_LIP_LIGHT 18
+#define K_TEE_DEEP 19
+#define K_TEE_LIGHT 20
+#define K_PIPE 21
+#define K_EYE 22
+#define K_IRIS 23
+#define K_INK 24
+#define K_BLUE 25
+#define K_RED 26
+#define K_PANEL 27
+#define K_TREAD 28
+#define K_MAPLE 29
+#define K_GRAPHIC 31
+float skHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float skNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(skHash(i), skHash(i + vec3(1, 0, 0)), f.x), mix(skHash(i + vec3(0, 1, 0)), skHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(skHash(i + vec3(0, 0, 1)), skHash(i + vec3(1, 0, 1)), f.x), mix(skHash(i + vec3(0, 1, 1)), skHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// Her skin: warm and even, a shade deeper in its hollows (under the jaw,
+// round the knee), catching a soft sheen up high.
+vec3 skSkin(vec3 c, vec3 r) {
+  float n = skNoise(r * 90.0);
+  c = mix(c, uPal[K_SKIN_DEEP], 0.12 * smoothstep(0.45, 0.8, n));
+  return mix(c, uPal[K_SKIN_LIGHT], 0.08 * smoothstep(0.5, 0.2, n));
+}
+// Her face, drawn on the front of her head: big almond eyes, dark brown,
+// under heavy lids lowered a little over the irises (cool, not much
+// impressed), a heavy upper lash line winging out at the corner; thick,
+// neat brows lying nearly flat over them; a small nose, its nostrils; full
+// lips, the lower one catching the light, closed in an even line.
+vec3 drawFace(vec3 base, vec3 r, vec4 d, inout float unlit) {
+  float front = smoothstep(-0.05, -0.072, r.z);
+  vec3 c = base;
+  vec2 f = vec2(abs(r.x), r.y);
+  vec3 ink = uPal[K_INK];
+  // a sheen across the cheekbones and down the bridge of the nose
+  float cheek = 1.0 - smoothstep(0.3, 1.0, length((f - vec2(0.046, 1.488)) / vec2(0.02, 0.011)));
+  float bridge = (1.0 - smoothstep(0.0025, 0.006, f.x)) * smoothstep(1.462, 1.475, r.y) * (1.0 - smoothstep(1.5, 1.51, r.y));
+  c = mix(c, uPal[K_SKIN_LIGHT], (0.32 * cheek + 0.28 * bridge) * front);
+  // (a shade deeper under the jaw and the brow)
+  c = mix(c, uPal[K_SKIN_DEEP], 0.3 * smoothstep(1.425, 1.395, r.y) * smoothstep(-0.02, -0.06, r.z));
+  if (front <= 0.0) return c;
+  // the eye: an almond, its outer corner lifted
+  vec2 E = vec2(0.0328, 1.5045);
+  vec2 q = f - E;
+  q.y -= 0.16 * q.x;
+  float w = 0.0166;
+  float xn = clamp(q.x / w, -1.0, 1.0);
+  float yU = 0.0086 * (1.0 - xn * xn) * (1.0 + 0.25 * xn);
+  float yL = -0.006 * (1.0 - xn * xn);
+  float dA = max(max(q.y - yU, yL - q.y), abs(q.x) - w);
+  // the heavy upper lid, lowered over the top of the iris
+  float lidY = yU * 0.55 - 0.0006;
+  float dS = max(dA, q.y - lidY);
+  float eye = fill(dS) * front;
+  c = mix(c, uPal[K_EYE], eye);
+  unlit = max(unlit, eye * 0.3);
+  // the iris (dark brown, a warmer ring), the pupil, a catch-light
+  vec2 ic = q - vec2(-0.0006, -0.0006);
+  float ir = length(ic);
+  vec3 iris = mix(uPal[K_IRIS] * 1.5 + 0.02, uPal[K_IRIS], smoothstep(0.002, 0.0062, ir));
+  iris = mix(iris, ink, fill(ir - 0.0029));
+  float inI = fill(max(ir - 0.0076, dS)) * front;
+  c = mix(c, iris, inI);
+  float glint = fill(length(ic - vec2(0.0022, 0.0018)) - 0.0012) * inI;
+  c = mix(c, vec3(1.0), glint);
+  unlit = max(unlit, max(inI * 0.2, glint));
+  // the lid: its heavy lash line, winging out past the outer corner, and
+  // the fold over it
+  float lash = band(q.y - lidY, 0.0008 + 0.0009 * smoothstep(-0.01, 0.014, q.x)) * step(abs(q.x), w) * step(yL, q.y);
+  float wing = band(q.y - (lidY + (q.x - w * 0.8) * 0.45), 0.0009) * step(w * 0.8, q.x) * step(q.x, w + 0.004);
+  c = mix(c, ink, max(lash, wing) * front);
+  float fold = band(q.y - (yU + 0.0032) * (1.0 - 0.15 * xn), 0.0006) * step(abs(q.x), w * 0.9);
+  c = mix(c, uPal[K_SKIN_DEEP] * 0.7, fold * front * 0.8);
+  float lower = band(q.y - yL, 0.0005) * step(abs(q.x), w * 0.75);
+  c = mix(c, uPal[K_SKIN_DEEP] * 0.6, lower * front * 0.6);
+  // brows: thick and neat, lying nearly flat, thinning toward the tail
+  vec2 bq = f - vec2(0.031, 1.5235);
+  bq.y -= 0.12 * bq.x - 90.0 * bq.x * bq.x * step(0.0, bq.x);
+  float bw = 0.0028 - 0.0016 * smoothstep(-0.01, 0.022, bq.x);
+  float brow = band(bq.y, bw) * step(-0.019, bq.x) * step(bq.x, 0.024);
+  float hairs = 0.75 + 0.25 * lines(bq.x * 900.0 + bq.y * 400.0, 0.3);
+  c = mix(c, mix(ink, uPal[2], 0.4), brow * front * hairs);
+  // the nostrils under the tip of her nose
+  vec2 nq = vec2(f.x - 0.0075, r.y - 1.4615);
+  float nos = fill(length(nq / vec2(0.0034, 0.0018)) - 1.0) * smoothstep(-0.085, -0.092, r.z);
+  c = mix(c, uPal[K_SKIN_DEEP] * 0.55, nos * 0.85);
+  // lips: full, the lower catching the light; closed in an even line
+  float mz = smoothstep(-0.066, -0.076, r.z);
+  vec2 lq = vec2(r.x, r.y - 1.433);
+  float bow = 0.0018 * (1.0 - smoothstep(0.0, 0.008, abs(lq.x)));
+  float up = (length(vec2(lq.x / 0.0225, (lq.y - 0.0062) / (0.0072 - bow * 0.6))) - 1.0);
+  float lo = (length(vec2(lq.x / 0.0205, (lq.y + 0.0058) / 0.0085)) - 1.0);
+  float lips = fill(min(up, lo) * 0.008) * mz;
+  vec3 lip = mix(uPal[K_LIP], uPal[K_LIP_LIGHT], smoothstep(-0.009, -0.002, lq.y) * (1.0 - smoothstep(-0.002, 0.0, lq.y)) * 0.0);
+  lip = mix(lip, uPal[K_LIP_LIGHT], 0.6 * (1.0 - smoothstep(0.0, 0.6, length(vec2(lq.x / 0.01, (lq.y + 0.0062) / 0.0035)))));
+  c = mix(c, lip, lips);
+  float seam = band(lq.y + 0.0002 + 0.0012 * smoothstep(0.012, 0.02, abs(lq.x)), 0.0006) * step(abs(lq.x), 0.0195) * mz;
+  c = mix(c, uPal[K_LIP] * 0.45, seam);
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    c = skSkin(c, r);
+    // (the inside of the ear a shade deeper)
+    c = mix(c, uPal[K_SKIN_DEEP], d.y * 0.35 * smoothstep(0.004, -0.004, r.z - 0.018));
+    c = drawFace(c, r, d, unlit);
+  } else if (m == 5 || m == 8) {
+    c = skSkin(c, r);
+    if (m == 5) {
+      // the crew socks: white, ribbed, a little square badge on the outside
+      // near the top (blue round red), the cuff's ribs
+      float side = r.x < 0.0 ? -1.0 : 1.0;
+      float x = r.x - side * 0.087;
+      float a = atan(r.z - 0.008, x * side);
+      float sock = fill(r.y - (uRig[0].x + 0.0015 * sin(a * 5.0)));
+      vec3 sk = uPal[6];
+      sk = mix(sk, sk * 0.92, lines(a * 9.5, 0.22) * 0.6);
+      vec2 bq = vec2(a / 1.4, r.y - (uRig[0].x - 0.045));
+      bq.x *= 0.04;
+      float badge = fill(max(abs(bq.x), abs(bq.y)) - 0.0085);
+      float inner = fill(max(abs(bq.x), abs(bq.y)) - 0.0052);
+      float core = fill(max(abs(bq.x - 0.0008), abs(bq.y + 0.0008)) - 0.0024);
+      sk = mix(sk, uPal[K_BLUE], badge * (1.0 - inner));
+      sk = mix(sk, uPal[K_RED], inner * (1.0 - core));
+      sk = mix(sk, uPal[K_BLUE], core);
+      sk = mix(sk, sk * 0.86, d.x * lines(a * 14.0, 0.25));
+      c = mix(c, sk, sock);
+      // (a soft shade where the sock's cuff meets her leg)
+      c = mix(c, uPal[K_SKIN_DEEP], 0.25 * (1.0 - sock) * smoothstep(0.012, 0.0, r.y - uRig[0].x));
+    }
+  } else if (m == 2) {
+    // the cap of braids: the parts between them showing her scalp, the
+    // braids plaited, pulled up toward the cuff (and the gold cuff round
+    // the ponytail)
+    float on = smoothstep(0.2, 0.62, d.x);
+    vec3 scalp = mix(uPal[K_SKIN_DEEP] * 0.75, uPal[2], 0.35);
+    float plait = lines(d.y / 0.0105 + 0.3 * skNoise(r * 400.0), 0.18);
+    c = mix(c, c * 0.62, plait * on);
+    c = mix(scalp, c, on);
+    c = mix(c, uPal[9], smoothstep(0.4, 0.7, d.z));
+    unlit = max(unlit, 0.15 * smoothstep(0.4, 0.7, d.z));
+  } else if (m == 13) {
+    // the braids: three strands plaited down each - chevrons along it, a
+    // shade between - each braid its own (a few of them warmer, browner)
+    float warm = step(0.62, d.z) * step(d.z, 0.86) + step(d.z, 0.08);
+    c = mix(c, uPal[K_BRAID_WARM], warm * 0.75);
+    c *= 0.9 + 0.2 * fract(d.z * 7.3);
+    float v = d.x / 0.0105 + 0.55 * abs(sin(d.y));
+    float groove = lines(v, 0.16);
+    c = mix(c, c * 0.5, groove);
+    c = mix(c, c * 1.25 + 0.012, (1.0 - smoothstep(0.0, 0.32, abs(fract(v) - 0.5))) * 0.4);
+    // (the ends, sealed, a touch lighter)
+    c = mix(c, c * 1.15, smoothstep(0.9, 1.0, fract(d.x * 0.0)));
+  } else if (m == 3) {
+    // the tee: neon lime cotton; the collar's rib, the hems stitched, the
+    // folds a shade deeper where it hangs loose
+    float n = skNoise(r * vec3(40.0, 14.0, 40.0));
+    c = mix(c, uPal[K_TEE_DEEP], 0.18 * smoothstep(0.5, 0.85, n) * d.x);
+    c = mix(c, uPal[K_TEE_LIGHT], 0.18 * smoothstep(0.45, 0.15, n));
+    float rib = d.z * (0.7 + 0.3 * lines(atan(r.x, r.z) * 40.0, 0.22));
+    c = mix(c, uPal[K_TEE_DEEP], 0.35 * rib);
+    float hem = 0.705 - 0.018 * clamp(r.z / 0.11, -1.0, 1.0) + 0.012 * smoothstep(0.09, 0.16, abs(r.x));
+    float stitch = band(r.y - hem - 0.016, 0.0007) * step(0.4, fract(atan(r.x, r.z) * 70.0)) * (1.0 - d.y);
+    float sl = band(d.w - (uRig[2].x - 0.018), 0.0008) * step(0.4, fract(atan(r.y, r.z) * 60.0)) * step(0.6, d.y);
+    c = mix(c, uPal[K_TEE_DEEP], max(stitch, sl) * 0.9);
+  } else if (m == 4) {
+    // the shorts: black, a faint sheen; white piping down the outside of each
+    // leg and round its hem; slant pockets; the waistband's edge
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float a = atan(r.z - 0.012, abs(r.x) - 0.08);
+    float hem = uRig[0].w + 0.01 * clamp(r.z / 0.09, -1.0, 1.0);
+    float pipe = band(a, 0.045) * smoothstep(0.86, 0.84, r.y) + band(r.y - hem - 0.011, 0.0013) * (1.0 - band(a, 0.4) * 0.0);
+    c = mix(c, c * 1.5 + 0.03, 0.4 * smoothstep(0.55, 0.85, skNoise(r * vec3(30.0, 10.0, 30.0))));
+    float pocket = band((abs(r.x) - 0.12) - (0.86 - r.y) * 0.35, 0.0008) * step(0.74, r.y) * step(r.y, 0.86) * step(r.z, 0.0);
+    c = mix(c, c * 2.4 + 0.05, pocket * 0.6);
+    c = mix(c, uPal[K_PIPE], pipe);
+  } else if (m == 7) {
+    // chunky skate shoes: a thick white cupsole, its wall grooved all
+    // round, a tread line along its top; light grey suede over the toe cap
+    // and the heel; laces criss-crossing up the front; a padded collar
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float x = r.x - side * uRig[0].y;
+    float y = r.y - 0.02 * pow(smoothstep(-0.1, -0.2, r.z), 2.0);
+    float sole = fill(y - uRig[1].z);
+    float a = atan(x, r.z - 0.0);
+    vec3 so = mix(uPal[7], uPal[7] * 0.97, 0.5);
+    so = mix(so, uPal[K_TREAD], lines(r.z * 60.0 + x * 20.0, 0.12) * step(0.008, y) * step(y, uRig[1].z - 0.008) * 0.6);
+    so = mix(so, uPal[K_TREAD], band(y - (uRig[1].z - 0.006), 0.0012));
+    so = mix(so, uPal[K_TREAD] * 0.8, fill(y - 0.006));
+    // panels: the toe cap, the heel counter, a stripe along the quarter
+    float toe = fill(r.z + 0.122 + max(0.0, y - 0.075) * 1.2);
+    float heel = fill(0.06 - r.z + max(0.0, y - 0.11) * 0.8);
+    float quarter = band(y - 0.085 - 0.25 * (r.z + 0.02), 0.009) * step(-0.06, r.z) * step(r.z, 0.05) * step(0.03, abs(x));
+    vec3 up = uPal[7];
+    up = mix(up, uPal[K_PANEL], max(max(toe, heel), quarter));
+    up = mix(up, uPal[K_PANEL] * 0.92, band(r.z + 0.122 + max(0.0, y - 0.075) * 1.2, 0.0012));
+    // the laces up the instep and the tongue
+    float onT = step(r.z, -0.02 + (y - 0.1) * 0.2) * step(-0.125, r.z) * step(abs(x), 0.027) * step(0.095, y) * step(y, uRig[1].x);
+    float lace = max(band(abs(fract((r.z * 1.0 + x * 0.9) / 0.019 + 0.5) - 0.5), 0.12), band(abs(fract((r.z - x * 0.9) / 0.019 + 0.5) - 0.5), 0.12));
+    up = mix(up, vec3(0.99, 0.98, 0.96), lace * onT * step(abs(x), 0.022));
+    up = mix(up, uPal[K_TREAD] * 0.85, (band(abs(x) - 0.024, 0.0015) * onT));
+    float collar = smoothstep(uRig[1].x - 0.022, uRig[1].x - 0.01, r.y);
+    up = mix(up, uPal[K_PANEL] * 1.03, collar * 0.6);
+    c = mix(up, so, sole);
+  } else if (m == 9) {
+    // gold: warm, with a bright edge where it catches the light
+    c = mix(c, vec3(1.0, 0.9, 0.55), 0.25);
+    unlit = max(unlit, 0.22);
+  } else if (m == 10) {
+    // the deck: black grip on top (grainy, its truck bolts showing), the
+    // maple plies round its edge, the graphic underneath - a purple deck,
+    // three lime chevrons up it toward the nose, scuffed at the ends
+    float g = skHash(floor(r * 900.0));
+    if (d.z > 0.5) {
+      c = mix(c, c * 1.6 + 0.02, step(0.86, g) * 0.6);
+      vec2 bq = vec2(abs(r.x), abs(abs(r.z) - 0.18));
+      float bolt = fill(length(vec2(bq.x - 0.019, bq.y - 0.022)) - 0.0042);
+      c = mix(c, uPal[11] * 1.1, bolt);
+    } else if (d.z < -0.5) {
+      vec3 gr = uPal[K_GRAPHIC];
+      float u = d.y + abs(d.x) * 0.45;
+      float chev = 0.0;
+      for (int k = 0; k < 3; k++) chev = max(chev, band(u - (-0.42 + 0.17 * float(k)), 0.042));
+      gr = mix(gr, uPal[3], chev * step(abs(d.x), 0.86));
+      gr = mix(gr, uPal[12], band(d.y - 0.55, 0.035) * step(abs(d.x), 0.86));
+      float wear = smoothstep(0.82, 0.97, abs(d.y)) * step(0.55, skNoise(r * 200.0));
+      gr = mix(gr, uPal[K_MAPLE], wear * 0.8);
+      c = gr;
+    } else {
+      float ply = lines((r.y - 0.087) / 0.0017, 0.18);
+      c = mix(uPal[K_MAPLE], uPal[K_MAPLE] * 0.72, ply * 0.6);
+    }
+  } else if (m == 11) {
+    // the trucks: brushed metal, the baseplate darker
+    c = mix(c, c * 0.72, step(0.068, r.y));
+    c = mix(c, c * 1.15, lines(r.x * 260.0, 0.2) * 0.3);
+  } else if (m == 12) {
+    // the wheels: cream urethane, the bearing showing at the hub
+    vec2 hq = vec2(r.y - 0.027, abs(r.z) - 0.18);
+    float rho = length(hq);
+    c = mix(c, vec3(0.32, 0.32, 0.35), fill(rho - 0.011) * step(0.8, d.w));
+    c = mix(c, c * 0.88, band(rho - 0.017, 0.0011) * step(0.8, d.w));
+  }
+  return c;
+}
 #elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
 // brown eyes under relaxed lids (the upper lid sits a little over the iris, so
@@ -3960,6 +4239,9 @@ void main() {
   #elif defined(BUNNY)
     // (his yellow hat and his rust trousers keep their colour through a drain)
     gKeep = (m == 4 || m == 10) ? 1.0 : 0.0;
+  #elif defined(SKATER)
+    // (her neon tee burns on through a drain, and her board's graphic)
+    gKeep = (m == 3 || (m == 10 && vD.z < -0.5)) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -3988,6 +4270,9 @@ void main() {
     float soft = m == 10 ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
   #elif defined(BUNNY) && defined(PROPS)
     float soft = 0.1;
+  #elif defined(SKATER)
+    // (loose cotton in soft gradients; the board and the gold crisp)
+    float soft = m == 3 ? 0.1 : m == 13 ? 0.08 : m == 4 ? 0.07 : (m >= 9 && m <= 12) ? 0.035 : 0.055;
   #elif defined(BUNNY)
     // (fur takes the light softly; the billowy trousers in soft gradients)
     float soft = (m == 1 || m == 2 || m == 6 || m == 8 || m == 11) ? 0.1 : m == 4 ? 0.11 : (m == 12 || m == 14) ? 0.04 : 0.07;
@@ -4038,6 +4323,8 @@ void main() {
   if (m == 2 || m == 13) {
   #elif defined(BUNNY)
   if (m == 10) {
+  #elif defined(SKATER)
+  if (m == 2 || m == 13) {
   #else
   if (m == 2) {
   #endif
@@ -4081,6 +4368,8 @@ void main() {
     gKeep = 1.0;
   #elif defined(BUNNY)
     gKeep = (m == 4 || m == 10) ? 1.0 : 0.0;
+  #elif defined(SKATER)
+    gKeep = m == 3 ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -6087,7 +6376,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER' };
   const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);

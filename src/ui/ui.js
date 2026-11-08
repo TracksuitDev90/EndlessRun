@@ -12,6 +12,9 @@ function replay(el, cls) {
   el.classList.add(cls);
 }
 
+// how many cards the title screen's grid holds (three by two)
+const SLOTS = 6;
+
 const HINTS = {
   up: { touch: 'Swipe up to jump', keys: '↑  W  or  Space to jump' },
   down: { touch: 'Swipe down to slide', keys: '↓  S  or  Shift to slide' },
@@ -78,9 +81,11 @@ export class UI {
   }
 
   // The title screen's cards, one per runner (see game/characters.js), in a
-  // grid two by two: each their cut-out art standing up out of a card in
+  // grid three by two: each their cut-out art standing up out of a card in
   // their colours, and under the grid a line about whoever's picked. Tapping
-  // one picks them (it doesn't start the run).
+  // one picks them (it doesn't start the run). The grid is always full: any
+  // slot no runner fills yet holds a mystery card, greyed out - someone's
+  // still to come.
   setRunners(list, selected) {
     this.runnerDefs = Object.fromEntries(list.map((c) => [c.id, c]));
     const root = $('pick');
@@ -110,6 +115,17 @@ export class UI {
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       root.appendChild(b);
       this.cards[c.id] = b;
+    }
+    for (let k = list.length; k < SLOTS; k++) {
+      const m = document.createElement('div');
+      m.className = 'pick-card pick-mystery';
+      m.setAttribute('aria-hidden', 'true');
+      m.title = 'Someone else is on their way';
+      m.innerHTML =
+        `<span class="pick-bg"></span>` +
+        `<span class="pick-fig pick-q">?</span>` +
+        `<span class="pick-plate"><span class="pick-name">? ? ?</span><span class="pick-title">coming soon</span></span>`;
+      root.appendChild(m);
     }
     this.runnerOrder = list.map((c) => c.id);
     this.showRunner(selected, false);

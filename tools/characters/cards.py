@@ -30,13 +30,24 @@ JOBS = [
     ('wayfarer', 'wayfarer-sheet.jpg', (30, 60, 410, 915), None),
     ('elder', 'elder-sheet.jpg', (8, 56, 380, 975), (242, 237, 234)),
     ('bunny', 'bunny-sheet.jpg', (0, 0, 428, 1000), (248, 242, 236)),
+    ('skater', 'skater-sheet.jpg', (40, 0, 420, 1000), (251, 248, 243)),
 ]
+# patches painted out of a sheet before it's cut (sheet pixels: left, top,
+# right, bottom), filled down each column from the colours above and below:
+# the little brand mark on the skater's shorts (her sculpt has none)
+PATCH = {'skater': [(301, 560, 331, 580)]}
 PAPER = np.array([250, 245, 239.0])
 
 
-def cut(sheet, box, paper=None):
+def cut(sheet, box, paper=None, patches=()):
     PAPER = np.array(paper, float) if paper else globals()['PAPER']
-    a = np.asarray(Image.open(os.path.join(HERE, sheet)).convert('RGB').crop(box)).astype(float)
+    full = np.asarray(Image.open(os.path.join(HERE, sheet)).convert('RGB')).astype(float).copy()
+    for x0, y0, x1, y1 in patches:
+        top, bot = full[y0 - 1, x0:x1], full[y1, x0:x1]
+        for y in range(y0, y1):
+            k = (y - y0 + 1) / (y1 - y0 + 1)
+            full[y, x0:x1] = top * (1 - k) + bot * k
+    a = full[box[1]:box[3], box[0]:box[2]]
     d = np.sqrt(((a - PAPER) ** 2).sum(-1))
     # light pixels touching the border are paper (and the soft floor shadow);
     # so is any big enclosed patch of near-paper (cream shoes are further off)
@@ -66,6 +77,6 @@ if __name__ == '__main__':
     for name, sheet, box, paper in JOBS:
         if only and name not in only:
             continue
-        img = cut(sheet, box, paper)
+        img = cut(sheet, box, paper, PATCH.get(name, ()))
         img.save(os.path.join(OUT, name + '.webp'), 'WEBP', quality=90, method=6)
         print(f'{name}: {img.size[0]}x{img.size[1]}')
