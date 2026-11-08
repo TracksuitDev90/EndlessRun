@@ -49,9 +49,9 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane through a lived-in neighbourhood: now and then a greengrocer's or a bakery café on a ground floor, picket fences round front gardens of raspberry canes, market stalls on the verge (apples, grapefruit and oranges at one; watermelons, grapes and pineapples at the other), benches, post boxes, a bike with a basket of apples, the bus stop's shelter; and the market spilling into the road (see [The breather](#the-breather-the-cypress-lane)) | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
 | II | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, a trodden path through long grass (taller still in among the trunks), ferns, wildflowers, glowing mushrooms, campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
 | III | **The Night Rooftops** — a slate walkway over a sleeping city, warm windows, chimney pots, a crescent moon, strings of little lights, washing stirring on the lines strung across it | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the slates, fog pools in the streets below | the night garden illustration |
-| IV | **The Hall of Doors** — a coral corridor open to the sky, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, doors floating among the clouds, books fluttering up off the shelves and stacks in the way | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration |
+| IV | **The Hall of Doors** — a coral corridor through the heart of a library that goes on for ever, a checkerboard floor, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, books fluttering up off the shelves and stacks in the way; over its walls the library rises on either side in four tiers of books, each a gallery railed and lamplit with rolling ladders on its shelves, and behind them rows and rows and rows of book stacks run off into a warm haze, lamps glowing on their ends; great timber arches span the hall under a beamed and plastered roof, green-shaded lamps hanging from them, shafts of sunlight slant down from high windows, a ladder leans now and then on the hall's wall up to the gallery, and doors and armchairs drift down the aisles between the stacks (see [The endless library](#the-endless-library)) | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration; old reading rooms — timber galleries under hammerbeam roofs, alcoves of shelves, rolling ladders, a domed reading room |
 | V | **The Glasshouse** — a white-ribbed greenhouse tunnel run wild: beds crowded with zinnias and spilling over their edges, ferns and monstera, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | the softest: backlit humid haze, sunbeams through the glazing, drifting leaf-dappled floor | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias |
-| VI | **The Sky Road** — a sandstone causeway over amber cloud, floating islands, a huge low sun | harsh backlight: the sun dead ahead turns everything into warm silhouettes with blazing gold rims, rays fan out of the sun, shadows stream back at you | Sky Dancer |
+| VI | **The Sky Road** — the processional way of the sun, high over a sea of golden cloud: a road of painted limestone with a band of lapis down its middle strewn with gold stars like a tomb's ceiling, colonnades of painted papyrus columns either side (shafts banded in red, gold, lapis and green, figures striding round them, capitals opening like papyrus heads, a striped cornice over them), now and then an avenue of sphinxes with braziers burning between them, great temple pylons painted with figures spanning the road with obelisks before them, golden pyramids and palms on floating islands, the three great pyramids far off on a plateau of their own, and Ra's disc low over the end of the road with its wings spread across the sky (see [The Sky Road of the sun](#the-sky-road-of-the-sun)) | a low sun ahead and to the right: warm light on the painted faces, the shade still showing their colours, golden rims, lapis overhead fading to gold | Sky Dancer; Egyptian temple painting — the winged sun, the eye of Horus, the scarab, the ankh — the pyramids of Giza at sunset, the painted columns of Philae |
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump (see [The sands of time](#the-sands-of-time)), your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 | IX | **The Kelp Deep** — under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
@@ -59,6 +59,67 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 
 The first lap always nests inward in that order; after that the order shuffles
 (never the same world twice in a row).
+
+### The endless library
+
+The Hall of Doors runs through the heart of a library that goes on for
+ever. The hall itself is as it always was — the coral walls and their
+doors, the paintings, the checkerboard, the frames — but there's no sky over
+it any more: over its walls the library rises on either side in four tiers,
+each set further back and higher than the one before, each a wall of books
+with its own gallery jutting out on a carved fascia, a balustrade along it
+with reading lamps on the rail, timber pilasters dividing it into bays, and
+rolling ladders hooked over a brass rail on its shelves. Behind the top
+tier, rows and rows and rows of book stacks stand across the run, four to
+every sixteen metres on either side, forty metres long and every one its
+own height, a lamp glowing on each end, running off into a warm haze of
+dust and lamplight where the library goes on out of sight. Great timber
+arches span the hall every other chunk under a beamed roof plastered pale
+between its timbers, green-shaded lamps hanging from them on chains; shafts
+of sunlight slant down from high windows; now and then a ladder leans on
+the hall's own wall up to the gallery; and doors and armchairs (and, on later
+laps, books, teacups and clocks) drift down the aisles between the stacks.
+
+Every book is drawn in the shader (toon option `shelves`, on parts whose
+mark flag is 0.7 — a wall of books along the run, its pattern running on
+from chunk to chunk — or 0.75 — one standing across it): a board every 0.62
+m and a row of books on each, every one its own width and height and its
+own leather, its spine rounded in the light, gilt bands at head and foot,
+now and then a paper label, the shelf's dark back showing over the shorter
+ones and the odd gap where one's been taken. Books stand in sets — a run of
+a dozen or so bound alike — so where the spines blur together, far off or
+rushing past, the shelves still read as bands of colour; further still,
+they settle into the shelf's own tone. So the whole library costs a few
+planes a chunk.
+
+### The Sky Road of the sun
+
+The Sky Road is the processional way of the sun, still high over a sea of
+golden cloud. Its road is painted limestone — great slabs faintly veined,
+down its middle a band of lapis strewn with gold stars like the ceiling of a
+tomb, gilt-edged, and along each edge a border of painted bands, red, gold,
+lapis, gold, green, the way a temple wall is framed (ground pattern 12; the
+bands all run along the road so they never strobe, and the stars and the
+joints smear at speed). Colonnades of papyrus columns line it, their feet
+sheathed in painted leaves, a figure striding round each, bands of colour
+under capitals that open like papyrus heads, an architrave painted in bands
+and a cavetto cornice striped like a temple's along the top; every so often
+they give way to an avenue of sphinxes on their plinths — a lion's body, a
+king's face in the striped headdress — bronze braziers burning between them,
+and now and then a great pylon spans the road, its towers painted with a
+king and a god, pennants flying from its masts, the winged disc over its
+gate and obelisks before it. Off in the sky, golden pyramids stand on
+floating islands of rock with palms round their edges, and far off the three
+great pyramids on a plateau of their own; and low over the end of the road
+Ra's disc hangs with its wings spread wide across the sky — rows of little
+lapis and red coverts, a band of green, long flight feathers in lapis and
+gold — drawn in the sky shader (`skyFx.wings`, `wingSpan`). In the way: a
+gilded sarcophagus and an offering table laden with canopic jars (jump), a
+painted gateway at the duck line crowned with the winged disc (duck), an
+obelisk and a seated colossus of the king (go round), a low screen wall of
+cartouches across the road and a wide gateway.
+
+![The endless library over the Hall of Doors — tiers of books rising over its coral walls, a ladder leaning up to the gallery, the timber arches and lamps of its roof — and the Sky Road of the sun: painted papyrus colonnades, the lapis road strewn with stars, the winged sun over its end, a seated colossus and an obelisk in the way, a sphinx on its plinth with pyramids on floating islands behind](docs/library-skyroad.jpg)
 
 ### The doors
 
@@ -75,7 +136,7 @@ colour, and each world dresses them its own way:
 | Night Rooftops | a cream stone gate with a pediment and a lamp, the city's facades either side, their windows lit | the night sky: a crescent moon glowing gold, stars, and a row of little lit windows |
 | Hall of Doors | a cream doorway under a clock, between columns, doors set into the coral walls either side | doors within doors: each leaf framed round a smaller door, and a smaller one in that, each its own colour with its own knob |
 | Glasshouse | an iron arch in a wall of glass, orange trees in pots at its feet, a lamp glowing over it | glazed: panes of pale glass in iron glazing bars, a fan of them under the arch, ivy climbing up from the foot |
-| Sky Road | a sandstone arch with a gold sun over it and pillars either side | a gold sun rising over them, half on each leaf, its rays fanning out, over sandstone panels studded with gold |
+| Sky Road | a temple pylon: two sloping towers painted with a king and a god, masts flying pennants, the striped cornice along their tops, the winged disc over the door, obelisks before it | gilded temple doors: the winged disc spread across their top, half on each leaf, a lapis panel with a gold ankh, a band of coloured panels and a striped dado |
 | Hell | basalt, horned with obsidian, runes glowing round the arch, basalt columns either side | charred black plates, the red glowing like lava in the seams between them, banded with iron and spiked |
 | Gallery of Hours | ivory, ringed in brass, a great clock face over it whose hands have come unstuck | half a great clock face on each leaf, meeting in the middle, and a brass gear |
 | Kelp Deep | rock crusted with coral, a scallop shell over it, sea fans and anemones, cliffs either side | a ship's door: weathered planks, a brass porthole glowing sea-green, barnacles, a starfish, kelp streaming up it |
@@ -509,7 +570,7 @@ rolls in slow waves:
 | Night Rooftops | paper sky lanterns drift up, faint aurora | a huge moon, strong aurora | purple night, hot-air balloons |
 | Hall of Doors | the books take flight | a tea party at dusk: teal-and-cream floor, teacups and teapots adrift | violet night, the shadows swap sides, clocks float past |
 | Glasshouse | butterflies over the beds, pink petals | dusk, rose glass, giant blooms in the beds | bioluminescent night, glowing spores, aurora |
-| Sky Road | flocks of birds | a ringed planet in a pink sky | whales swimming through the clouds |
+| Sky Road | ibises wheeling over the clouds | the night of Nut: the stars out over the lapis, a crescent moon, the winged sun sunk low and red | the boats of the sun sailing through the clouds |
 | Hell | an ember storm: more fire on the wind, the plain alight | the eclipse swells, its ring of fire burning hotter, ash falling thick | the colours begin to drift |
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
 | Kelp Deep | the twilight reef: blue dusk, the light from above fading, jellyfish glowing everywhere, plankton lit up in the water | the deep at midnight: almost no light from above, the anemones, jellyfish and plankton glowing | the colours begin to drift |
@@ -600,7 +661,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Night Rooftops | **Topaz** gold | honey gold against the night blue | topaz, a lozenge prism under a wedge-and-pyramid tip · a rough topaz nugget · pyrite, brassy cubes grown through each other · citrine, a quartz point smoky at its foot, clearing to gold at the tip · amber, a honey pebble with dark specks caught inside | a great topaz with a second grown from its foot |
 | Hall of Doors | **Emerald** green | the complement of the coral walls | an heirloom pendant — emerald cut in a gold bezel (the hall's doorknob brass) on a loop · a square asscher pendant · olivine, bright yellow-green, granular and rough · beryl, emerald's own six-sided prism, striated along its length · malachite, a rounded lump banded in rings of light and dark green | a larger pendant in a double rim |
 | Glasshouse | **Ruby** red | red against all that green and mint, like berries of red glass | a chunky rough ruby · a water-worn ruby pebble · garnet, deep wine red, grown as a ball of twelve rhombs · rhodonite, opaque pink seamed with black · zircon, an orange-red four-sided prism pointed at both ends | a ruby crystal in corundum's six-sided plate, stood up to show its face |
-| Sky Road | **Aquamarine** turquoise | the complement of all that amber — a splinter of clear sky | a long leaning double-terminated aquamarine shard · a squat sky diamond · turquoise, sky blue in a web of dark matrix · fluorite, pale sea-green octahedra zoned in rings | a fan of three splinters |
+| Sky Road | **Turquoise** | the stones of the pharaohs, sky blue against the gold and lapis | turquoise, sky blue in its web of dark matrix · lapis lazuli, the deep blue of the night of Nut flecked with gold · carnelian, the red of the sun · a long leaning double-terminated aquamarine shard | a scarab carved in turquoise, legs of gold, pushing the red disc of the sun up before it |
 | Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
 | Red Drift | **Moldavite** green | the only green under all that red, and every stone of it fell from the sky | moldavite, wrinkled bottle-green glass flung up by a meteorite strike · peridot, an eight-sided bipyramid · pallasite, meteorite iron studded with olivine · tektite, green glass beads grown together | a fallen star: five points of moldavite |
@@ -2171,7 +2232,8 @@ shadow (`flat`), or be water you can't stand on (`wade`). `b.toon(…, { water:
 true })` gives a surface the running-water shader, and ground pattern 6 is the
 forest's long grass, 7 Hell's ash (fissures glowing beyond the road), 8 ivory
 slabs with a brass clock-tick bezel (the Gallery's floor before the sand came
-in) and 10 the Gallery's sands (for all of them, pass the chunk distance as
+in), 10 the Gallery's sands, 11 the Red Drift's regolith and 12 the Sky
+Road's processional way (for all of them, pass the chunk distance as
 `p0` so they run on seamlessly). Pattern 10 goes with `b.ground(…, 10, {
 dunes: true })` on a strip laid out like the Gallery's `sandStrip()` (the
 vertex shader heaps it into drifts and piles), and reads the world's
@@ -2259,7 +2321,10 @@ regolith (pass the chunk distance as `p0`); and `def.planets: { shade, list:
 (degrees), ebb: [share, seconds, phase], wander: [az, el, seconds], spin,
 bands, tilt: [x, z], colors: [a, b, c], atmo: [colour, strength], ring: {
 inner, outer, colors, opacity } }` (build them with `b.planets(spec)`).
-`b.toon(…, { tumble: [x turns/s, z turns/s, height of its middle] })`
+`b.toon(…, { shelves: true })` draws shelves of books (see [The endless
+library](#the-endless-library)) on parts marked 0.7 or 0.75 (uv in metres),
+`skyFx.wings` spreads a winged sun's wings either side of the sun (`wingSpan`
+in sun radii), and `b.toon(…, { tumble: [x turns/s, z turns/s, height of its middle] })`
 tumbles a prop about its own middle rather than its base (an asteroid
 hanging over the road).
 

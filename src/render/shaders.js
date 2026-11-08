@@ -948,6 +948,11 @@ void main() {
       vUv.y += phase; // the pattern runs on across chunks (p0 = chunk distance)
     #endif
   #endif
+  #ifdef SHELVES
+    // a wall of books along the run runs on across chunks (its uv.x laid
+    // out along the run, p0 the chunk distance); the stacks across it don't
+    if (abs(fx.x - 0.7) < 0.02) vUv.x += phase;
+  #endif
   vFx = fx;
   vec3 col = color;
   #ifdef USE_INSTANCING_COLOR
@@ -1364,6 +1369,9 @@ float hash12(vec2 p) {
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
+float hashS(vec2 p) {
+  return hash12(p);
+}
 #ifdef CRUST
 // A textured crust for rock, charred wood and volcanic glass (Hell's
 // obstacles and stones). Each part picks its kind with its mark flag (fx.x:
@@ -1444,6 +1452,79 @@ float pleats(vec2 uv) {
   float sc = texture2D(uNoise, uv * vec2(9.0, 4.0)).g;
   float scar = smoothstep(0.7, 0.74, sc) * (1.0 - belly) * smoothstep(0.55, 0.9, uv.x);
   return k * (1.0 + scar * 0.45);
+}
+#endif
+#ifdef SHELVES
+#ifndef GROUND
+uniform float uMotion;
+#endif
+// Shelves of books (toon option shelves, on parts whose mark flag is 0.7 -
+// along the run - or 0.75 - across it; uv in metres, x along the shelf, y
+// up): a board every 0.62 m and a row of books standing on each, every one
+// its own width and height and its own leather - oxblood, navy, bottle
+// green, tan, black, a cream vellum now and then - its spine rounded in the
+// light, gilt bands at head and foot, now and then a paper label; above the
+// shorter ones the dark back of the shelf, and the board's front edge
+// catching the light. Where the spines would shimmer (far off, or rushing
+// past at speed) it settles into the shelf's own tone.
+vec3 bookCol(float h) {
+  if (h < 0.16) return vec3(0.46, 0.1, 0.08);
+  if (h < 0.3) return vec3(0.12, 0.17, 0.36);
+  if (h < 0.42) return vec3(0.12, 0.28, 0.16);
+  if (h < 0.55) return vec3(0.55, 0.36, 0.2);
+  if (h < 0.64) return vec3(0.08, 0.06, 0.06);
+  if (h < 0.74) return vec3(0.62, 0.18, 0.12);
+  if (h < 0.82) return vec3(0.82, 0.74, 0.58);
+  if (h < 0.9) return vec3(0.3, 0.12, 0.26);
+  return vec3(0.7, 0.5, 0.18);
+}
+vec3 bookSpines(vec2 p, float dist, float along) {
+  float sh = 0.62;
+  float row = floor(p.y / sh);
+  float fy = p.y - row * sh;
+  float bw = 0.105;
+  float u = p.x / bw + hashS(vec2(row, 3.7)) * 9.0;
+  float cell = floor(u);
+  float f = fract(u);
+  float h1 = hashS(vec2(cell, row));
+  float h2 = hashS(vec2(cell, row + 17.0));
+  float h3 = hashS(vec2(cell + 5.0, row - 3.0));
+  // books stand in sets - a run of a dozen or so volumes bound alike - so
+  // even where the spines blur together the shelves read as bands of colour
+  float su = u / 14.0 + hashS(vec2(row, 9.1)) * 3.0;
+  float setH = hashS(vec2(floor(su), row + 41.0));
+  vec3 setC = bookCol(setH) * (0.9 + 0.2 * hashS(vec2(floor(su), row + 7.0)));
+  float boardH = 0.05;
+  float bh = boardH + sh * mix(0.6 + 0.3 * h2, 0.78 + 0.08 * h2, step(0.35, setH));
+  vec3 back = vec3(0.07, 0.045, 0.035);
+  vec3 col = mix(setC, bookCol(h1), step(0.72, h1) * 0.85) * (0.85 + 0.3 * h3);
+  // the spine rounded in the light, a crease at each side
+  col *= 0.7 + 0.42 * sin(3.14159 * f);
+  // gilt bands at head and foot, a label in the middle now and then
+  float y = (fy - boardH) / (bh - boardH);
+  float gilt = step(0.35, h2) * (smoothstep(0.83, 0.85, y) * (1.0 - smoothstep(0.88, 0.9, y)) + smoothstep(0.1, 0.12, y) * (1.0 - smoothstep(0.15, 0.17, y)));
+  col = mix(col, vec3(0.92, 0.72, 0.32), gilt * 0.85);
+  float label = step(0.72, h3) * smoothstep(0.52, 0.54, y) * (1.0 - smoothstep(0.68, 0.7, y)) * smoothstep(0.18, 0.24, f) * (1.0 - smoothstep(0.76, 0.82, f));
+  col = mix(col, vec3(0.9, 0.84, 0.7), label);
+  // above the book, the shelf's dark back; a gap where a book's been taken
+  float gap = step(0.94, h3);
+  col = fy > bh || gap > 0.5 ? back : col;
+  // the board, its front edge catching the light
+  vec3 wood = vec3(0.36, 0.21, 0.12);
+  float board = 1.0 - step(boardH, fy);
+  col = mix(col, wood * (1.0 + 0.4 * smoothstep(0.0, boardH, fy)), board);
+  // settle into the set's own tone where the spines would shimmer, and
+  // into the shelf's where even the sets do
+  vec3 avg = mix(vec3(0.36, 0.23, 0.16), back, 0.15);
+  vec3 setAvg = mix(setC * 0.88, back, 0.15);
+  float fw = fwidth(u);
+  float soft = max(smoothstep(0.3, 0.9, fw), along * smoothstep(0.6, 2.4, uMotion / bw));
+  float setSoft = smoothstep(0.4, 1.2, fw / 14.0);
+  vec3 blur = mix(setAvg, avg, setSoft);
+  col = mix(col, mix(blur, wood, board * 0.5), soft);
+  // (and the rows themselves, once they're too fine to tell apart)
+  float rowSoft = smoothstep(0.25, 0.7, fwidth(p.y / sh));
+  return mix(col, avg * 0.9, rowSoft);
 }
 #endif
 #ifdef GROUND
@@ -1715,6 +1796,57 @@ vec3 groundColor(vec2 p, float dist) {
     return mix(c, mix(uGroundA, uGroundC, bed * 0.8 + 0.1), far * 0.5);
   #elif GROUND == 10
     return sandGround(p, dist, far);
+  #elif GROUND == 12
+    // The Sky Road: a processional way. Down its middle a band of lapis
+    // strewn with gold stars like the ceiling of a tomb, gilt-edged; either
+    // side of it great slabs of painted limestone, faintly veined; and along
+    // each edge a border of painted bands - red, gold, lapis, gold, green -
+    // the way a temple wall is framed. The bands all run along the road, so
+    // they never strobe; the stars and the slab joints smear at speed.
+    // (p.y runs on from chunk to chunk; every period divides 4096 m.)
+    float ax = abs(p.x);
+    float aa = fwidth(p.x) + 0.004;
+    vec2 cs = vec2(2.6, 3.2);
+    vec2 q = vec2(p.x + 1.3, p.y) / cs;
+    q.y += mod(floor(q.x), 2.0) * 0.5;
+    vec2 cell = floor(q);
+    float h = hash12(cell + 9.0);
+    vec3 c = mix(uGroundA, uGroundB, 0.3 + h * 0.5);
+    float vein = texture2D(uNoise, p * vec2(0.09375, 0.0390625) + h * 0.37).g;
+    c *= 0.94 + 0.12 * vein;
+    c = mix(mix(uGroundC, c, 0.6), c, mix(edgeMaskRun(fract(q), cs, 0.022), 1.0, far * 0.8));
+    // the lapis band and its stars
+    vec3 lapis = vec3(0.12, 0.22, 0.56);
+    vec3 gold = vec3(0.95, 0.76, 0.28);
+    float band = 1.0 - smoothstep(0.62 - aa, 0.62 + aa, ax);
+    vec2 sq = vec2(p.x / 0.62, p.y / 1.0);
+    vec2 sc = floor(sq);
+    vec2 sf = fract(sq) - 0.5;
+    sf.x += (hash12(sc + 3.0) - 0.5) * 0.3;
+    float ang = atan(sf.y, sf.x);
+    float r = length(sf * vec2(1.0, 0.62));
+    float star = 1.0 - smoothstep(0.06 + 0.07 * pow(0.5 + 0.5 * cos(ang * 5.0), 2.0), 0.08 + 0.07 * pow(0.5 + 0.5 * cos(ang * 5.0), 2.0) + aa * 2.0, r);
+    star *= 1.0 - smoothstep(0.08, 0.3, uMotion) * 0.6;
+    vec3 lap = mix(lapis, gold, star * 0.9);
+    c = mix(c, mix(lap, lapis * 1.1, far * 0.6), band);
+    float gilt = 1.0 - smoothstep(0.035, 0.035 + aa, abs(ax - 0.66));
+    c = mix(c, gold, gilt);
+    // the painted border along each edge
+    if (ax > 3.4) {
+      float bx = ax - 3.4;
+      vec3 bc = bx < 0.12 ? vec3(0.12, 0.08, 0.06)
+        : bx < 0.3 ? vec3(0.72, 0.22, 0.15)
+        : bx < 0.38 ? gold
+        : bx < 0.62 ? lapis
+        : bx < 0.7 ? gold
+        : bx < 0.88 ? vec3(0.2, 0.5, 0.34)
+        : vec3(0.12, 0.08, 0.06);
+      // a row of little upright bars in the lapis, like a frieze
+      float fr = step(0.38, bx) * step(bx, 0.62) * step(0.5, fract(p.y / 0.25)) * (1.0 - smoothstep(0.04, 0.1, uMotion));
+      bc = mix(bc, gold, fr * 0.6);
+      c = mix(c, bc, smoothstep(0.0, aa * 2.0, bx));
+    }
+    return c;
   #elif GROUND == 11
     // The Red Drift: regolith - half Mars, half moon. Rust-red sand drifted
     // in soft mottles, flats of grey-violet basalt showing through it,
@@ -1823,6 +1955,11 @@ void main() {
   #else
     vec3 base = vColor;
   #endif
+  #ifdef SHELVES
+    if (vFx.x > 0.68 && vFx.x < 0.77) {
+      base = bookSpines(vUv, dist, vFx.x < 0.72 ? 1.0 : 0.0) * mix(vec3(1.0), vColor, 0.25);
+    }
+  #endif
   #ifdef CRUST
     vec3 an = abs(n);
     an /= an.x + an.y + an.z;
@@ -1888,6 +2025,9 @@ void main() {
       }
     #else
       float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+      #ifdef SHELVES
+        if (vFx.x > 0.68 && vFx.x < 0.77) m = 0.0;
+      #endif
       base = mix(base, base * 0.64, m);
     #endif
   #endif
@@ -3926,6 +4066,8 @@ uniform float uTime;
 uniform vec4 uSkyFx2; // x sun rays, y cloud bands, z aurora, w planet ring (moon drawn full)
 // deep space (env.space): x nebula ribbons, y galaxies, z the starfield, w comets
 uniform vec4 uSkyFx3;
+// x a winged sun (skyFx.wings), y its span in sun radii
+uniform vec4 uSkyFx4;
 uniform vec3 uNeb0;
 uniform vec3 uNeb1;
 uniform vec3 uNeb2;
@@ -4074,6 +4216,62 @@ vec3 spaceSky(vec3 c, vec3 d) {
   }
   return c;
 }
+// The winged sun (skyFx.wings, the Sky Road): Ra's disc hung over the end
+// of the road with great feathered wings spread either side of it, as over
+// every temple door - a row of little covert feathers in lapis and red, a
+// band of green, then the long flight feathers hanging below, lapis and
+// gold by turns, each one outlined - in flat painted colour.
+vec3 wingedSun(vec3 c, vec3 d) {
+  vec3 rt = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
+  vec3 upv = cross(rt, uSunDir);
+  float R = sqrt(max(1.0 - uSkyFx.y * uSkyFx.y, 1e-6));
+  vec2 q = vec2(dot(d, rt), dot(d, upv)) / R;
+  float ax = abs(q.x);
+  float span = uSkyFx4.y;
+  if (ax < 1.05 || ax > span) return c;
+  float t = (ax - 1.05) / (span - 1.05);
+  // the wing's top edge rises off the disc and sweeps down to the tip; the
+  // flight feathers hang below it, longest near the body
+  float top = 0.55 + 0.35 * sin(t * 2.6) - 0.55 * t * t;
+  float bandY = top - 0.32;
+  float greenY = bandY - 0.22;
+  float featherN = 9.0 + span * 3.0;
+  float fi = floor(t * featherN);
+  float ff = fract(t * featherN);
+  float flen = (1.05 - 0.6 * t) * (0.85 + 0.15 * sin(fi * 2.3));
+  float tip = greenY - flen + 0.12 * (1.0 - abs(ff - 0.5) * 2.0);
+  float inWing = step(tip, q.y) * step(q.y, top);
+  if (inWing <= 0.0) return c;
+  float e = fwidth(q.y) * 1.5;
+  vec3 lapis = vec3(0.16, 0.3, 0.72);
+  vec3 gold = vec3(0.96, 0.76, 0.26);
+  vec3 red = vec3(0.76, 0.24, 0.17);
+  vec3 green = vec3(0.22, 0.56, 0.38);
+  vec3 col;
+  if (q.y > bandY) {
+    // coverts: little rounded scales, lapis and red in rows
+    float sx = t * featherN * 2.0;
+    float sy = (q.y - bandY) / 0.16;
+    float row = floor(sy);
+    float cx = fract(sx + row * 0.5) - 0.5;
+    float scale = 1.0 - smoothstep(0.38, 0.5, length(vec2(cx, fract(sy) - 0.3)));
+    col = mix(mod(row, 2.0) < 1.0 ? lapis : red, gold, 1.0 - scale);
+  } else if (q.y > greenY) {
+    col = green;
+    col = mix(col, gold, 1.0 - smoothstep(0.0, e + 0.02, abs(q.y - bandY + 0.02)));
+  } else {
+    // flight feathers, lapis and gold by turns, outlined
+    col = mod(fi, 2.0) < 1.0 ? lapis : gold;
+    float edge = 1.0 - smoothstep(0.0, fwidth(ff) * 1.5 + 0.04, min(ff, 1.0 - ff));
+    col = mix(col, vec3(0.12, 0.08, 0.06), edge * 0.8);
+  }
+  // a dark outline round the whole wing
+  float outline = 1.0 - smoothstep(0.0, e + 0.02, min(top - q.y, q.y - tip));
+  col = mix(col, vec3(0.12, 0.08, 0.06), outline * 0.85);
+  // lit warm by the sun behind it, a little hazed toward the tips
+  col = mix(col * 1.05, c, 0.12 + 0.25 * t);
+  return mix(c, col, inWing * uSkyFx4.x);
+}
 // Everything in the sky behind the sun: its gradient, the moon, stars, rays,
 // clouds, smoke and lightning, aurora.
 vec3 skyBack(vec3 d) {
@@ -4084,6 +4282,7 @@ vec3 skyBack(vec3 d) {
     float sun = smoothstep(uSkyFx.y - 0.00012, uSkyFx.y + 0.00012, sd);
     c = mix(c, uSunDisc, sun);
   }
+  if (uSkyFx4.x > 0.0 && sd > 0.7) c = wingedSun(c, d);
   if (uSkyFx.z < 1.0) {
     float md = dot(d, uMoonDir);
     float disc = smoothstep(uSkyFx.z - 0.00012, uSkyFx.z + 0.00012, md);
@@ -5370,7 +5569,7 @@ export function makeEnvUniforms(env) {
     uSkyTop: c(), uSkyHorizon: c(), uSkyBottom: c(),
     uSunDir: v3(), uSunColor: c(), uSunDisc: c(),
     uMoonDir: v3(), uMoonColor: c(),
-    uSkyFx: v4(), uSkyFx2: v4(), uSkyFx3: v40(),
+    uSkyFx: v4(), uSkyFx2: v4(), uSkyFx3: v40(), uSkyFx4: v40(),
     uNeb0: c(), uNeb1: c(), uNeb2: c(),
     uLightDir: v3(), uShadowTint: c(), uHiTint: c(), uLightK: v4(), uRim: v4(), uDapple: v4(), uWall: v4(),
     uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
@@ -5409,6 +5608,8 @@ export function writeEnvUniforms(u, env) {
   u.uSkyFx2.value.set(sk.rays || 0, sk.clouds || 0, sk.aurora || 0, sk.ring || 0);
   // deep space (env.space): x the nebula's ribbons, y spiral galaxies, z a
   // dense starfield all round, w comets; the nebula's three colours
+  // x: a winged sun (skyFx.wings: how much), y: its span (sun radii)
+  u.uSkyFx4.value.set(sk.wings || 0, sk.wingSpan || 7, 0, 0);
   const spc = env.space || {};
   u.uSkyFx3.value.set(spc.nebula || 0, spc.galaxies || 0, spc.stars || 0, spc.comets || 0);
   const neb = spc.colors || ['#ff6aa8', '#ff9a52', '#4a8adf'];
@@ -5543,6 +5744,8 @@ export function makeToonMaterial(env, o = {}) {
   if (o.wonky) defines.WONKY = '';
   if (o.flame) defines.FLAME = '';
   if (o.bark) defines.BARK = '';
+  // shelves of books on parts marked 0.7 (along the run) or 0.75 (across it)
+  if (o.shelves) defines.SHELVES = '';
   if (o.cloth) {
     defines.CLOTH = '';
     uniforms.uCloth = { value: new THREE.Vector4(...o.cloth) };
