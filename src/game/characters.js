@@ -61,7 +61,6 @@ export const CHARACTERS = [
     asset: 'assets/skater/',
     card: 'assets/characters/skater.webp',
     tint: ['#d9b3ff', '#7046c4'],
-    locked: true,
     make: (env, asset) => new Skater(env, asset),
   },
 ];
