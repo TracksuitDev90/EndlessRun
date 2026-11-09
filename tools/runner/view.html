@@ -45,6 +45,8 @@
       // (&style=pump|reach: the bunny keeps to one of his two runs;
       // flow|chill|low: the skater rides in one mood)
       if (q.get('style') && runner.holdStyle) runner.holdStyle(q.get('style'));
+      // (&sword=out|in: the samurai keeps his sword drawn, or sheathed)
+      if (q.get('sword') && runner.holdSword) runner.holdSword(q.get('sword'));
       runner.mode = pose === 'idle' || pose === 'bind' ? 'idle' : 'run';
       const scene = new THREE.Scene();
       scene.add(runner.root);

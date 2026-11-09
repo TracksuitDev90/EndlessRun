@@ -31,6 +31,7 @@ JOBS = [
     ('elder', 'elder-sheet.jpg', (8, 56, 380, 975), (242, 237, 234)),
     ('bunny', 'bunny-sheet.jpg', (0, 0, 428, 1000), (248, 242, 236)),
     ('skater', 'skater-sheet.jpg', (40, 0, 420, 1000), (251, 248, 243)),
+    ('samurai', 'samurai-sheet.jpg', (0, 8, 470, 1016), (248, 245, 240)),
 ]
 # patches painted out of a sheet before it's cut (sheet pixels: left, top,
 # right, bottom), filled down each column from the colours above and below:

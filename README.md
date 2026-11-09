@@ -13,7 +13,12 @@ then floating down on whatever he pulls out of his satchel; or Hazel, a cool
 skater girl in an oversized neon-lime tee and baggy black shorts, her long box
 braids up in a high ponytail, who doesn't run at all but rides her board —
 kicking off the road, carving, ducking down low and kickflipping over whatever's
-in her way —
+in her way; or Birch, a towering white tiger of a samurai in a near-black
+training kimono and charcoal hakama, a red obi round his waist and a katana at
+his hip, who runs like a big cat runs down its prey and moves like a water
+bender — every flash step across the lanes, every whirling leap trailing
+ribbons of water, and now and then he draws on the run and carries the blade
+low behind him —
 and run into the screen through a storybook world that never stops changing:
 scenery unfolds out of the ground like a pop-up book as you approach, and every
 half-minute or so a great doorway appears — through it you can already see the
@@ -1125,7 +1130,7 @@ Append to the URL:
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
-| `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`), over the one remembered — even one locked on the title screen |
+| `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`, `samurai`), over the one remembered — even one locked on the title screen |
 | `?companion=dragon` | who runs with you (`fox`, the default, or `dragon`), over the one remembered; `none` runs alone |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
@@ -1267,31 +1272,30 @@ through it.
 
 ## The runners
 
-Five runners, chosen on the title screen (and a sixth card held for whoever's
-next) — though for now one of them, Rowan, is back in the workshop being
-worked on: he's still in the game, his card dealt greyed out, but he can't be
+Six runners, chosen on the title screen — though for now one of them, Rowan,
+is back in the workshop being worked on: he's still in the game, his card dealt greyed out, but he can't be
 picked (see [Choosing who runs](#choosing-who-runs)); Hazel is back out of it
 and can be picked again. Each is sculpted offline (`tools/runner/`), skinned to the same skeleton
 and driven by the same core — lanes, jumps, slides, the IK running legs, weight
 and follow-through (`src/game/player.js`) — and each dresses it, hangs
 simulated sheets off it and moves in their own way (`wayfarer.js`,
-`explorer.js`, `elder.js`, `bunny.js`, `skater.js`; who they are, their card
-and how to make them live in `characters.js`).
+`explorer.js`, `elder.js`, `bunny.js`, `skater.js`, `samurai.js`; who they
+are, their card and how to make them live in `characters.js`).
 
-| | Rowan, the wayfarer | Wren, the explorer | Alder, the elder | Bramble, the tumbler | Hazel, the skater |
-|---|---|---|---|---|---|
-| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick | a short, bipedal brown rabbit, a faded cream muzzle, cheeks and chin, buck teeth, big round dark glasses; big ears pink inside, one upright and one bent over, through a yellow bucket hat; a cream short-sleeved shirt, brown suspenders on brass clips, billowy rust trousers gathered at the ankles; big bare rabbit feet, a fluffy tail; an olive satchel slung across him | an oversized neon-lime tee, baggy black skate shorts piped in white, white crew socks with a little badge, chunky white-and-grey skate shoes on platform soles; long box braids up in a high ponytail through a gold cuff, a few left down to frame her face; small gold hoops, thin bracelets; her board — a purple deck, lime chevrons underneath |
-| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet | slim and athletic, about six and a half heads tall, ~1.66 m to the crown (her ponytail rises over it), a round young face, stood a board's height (~10 cm) up off the road |
-| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth), the skirt of his robe (19×11) and of the under-robe under it (15×10); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles, each with its own weight, drag, stiffness and flutter, so they part and swing on their own); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings |
-| Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out | spring 38/s: a quick sideways hop, knees tucked, arms out | spring 30/s: a carve, the board leaning hard into it — out over her toes turning right, back on her heels turning left |
-| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the highest of all by far, and a little longer in the air (2.8 m up to the others' 1.6, 0.72 s to their 0.64); a rabbit's bound stretched out flat and twisted side-on, a long float down (just over a second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip, done side-on — he snaps round to face across the road and flips over head first down it — each to a side picked at random | the same airtime but higher (1.9 m: her board has to clear things too); an ollie, knees tucked right up and the board stuck to her feet, a kickflip or a heelflip, the board turning a whole flip under her as her feet lift out of its way |
-| Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces | a precision landing on springs: down onto the balls of his big feet, arms swung forward, and straight back up onto his toes, ears bouncing | deep into her knees on the board, arms swung down, and back up; a puff of dust off the wheels |
-| Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust | a dive roll: arms reaching for the road, tucked into a ball, over once and up into a crouch, in a little cloud of dust | ducked right down on the board, folded over her knees, her front hand on its rail and the back arm up behind |
-| Run | a bruiser's charge: hunched, head down, crouched low on bent knees, stomping along wide-footed with the knees driven high, rocking side to side, the elbows out and the arms pumping round in big loops | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | two, and every few seconds he changes from one to the other: bolt upright with his head thrown back and his fists pumping at his chest on quick little steps; or flung forward, arms swinging long and straight, in big bounding strides | she rides: side-on, never still — carving in a long slow S, the whole of her leaning out from the wheels over her toes and back on her heels, drifting across her lane, hips leading and chest, head and loose arms following on behind; pumping, shifting her weight, in one of three moods — and every few seconds she turns her front foot down the board and pushes off the road, hard, two or three times |
+| | Rowan, the wayfarer | Wren, the explorer | Alder, the elder | Bramble, the tumbler | Hazel, the skater | Birch, the samurai |
+|---|---|---|---|---|---|---|
+| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick | a short, bipedal brown rabbit, a faded cream muzzle, cheeks and chin, buck teeth, big round dark glasses; big ears pink inside, one upright and one bent over, through a yellow bucket hat; a cream short-sleeved shirt, brown suspenders on brass clips, billowy rust trousers gathered at the ankles; big bare rabbit feet, a fluffy tail; an olive satchel slung across him | an oversized neon-lime tee, baggy black skate shorts piped in white, white crew socks with a little badge, chunky white-and-grey skate shoes on platform soles; long box braids up in a high ponytail through a gold cuff, a few left down to frame her face; small gold hoops, thin bracelets; her board — a purple deck, lime chevrons underneath | a near-black training kimono crossed left over right in a deep V, wide sleeves to past the elbow; a reddish-brown obi knotted at the front, its two long ends hanging; loose charcoal hakama, pleated, gathered round his lower shins; his forearms bound in reddish-brown wraps; barefoot on big clawed paws; ivory fur, charcoal stripes, golden eyes under a scowling brow, a cheetah's dark tear lines, a dusty-rose nose, long pale whiskers, round ears; a long thick striped tail; a katana in a black lacquered scabbard through the obi at his left hip |
+| Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet | slim and athletic, about six and a half heads tall, ~1.66 m to the crown (her ponytail rises over it), a round young face, stood a board's height (~10 cm) up off the road | the tallest who stands up straight: ~1.9 m to his crown, his round ears nearer 2 m; about seven and a half heads tall, broad through the shoulders, heavy in the forearm and the calf, long in the leg |
+| Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth), the skirt of his robe (19×11) and of the under-robe under it (15×10); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles, each with its own weight, drag, stiffness and flutter, so they part and swing on their own); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings | no sheets: his tail and the obi's two hanging ends on ropes of particles (the tail held in a hunting cat's curve, firm at its root and loose at its tip), his ears on springs and twitching; the sword on a bone of its own, in its scabbard, his hand or anywhere between; ribbons of water off his hands and his blade (`ribbon.js`); dust off his sprint, landings and dashes |
+| Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out | spring 38/s: a quick sideways hop, knees tucked, arms out | spring 30/s: a carve, the board leaning hard into it — out over her toes turning right, back on her heels turning left | spring 46/s, the quickest of all: a flash step — a low, wide lunge across, the leg behind stretched long, the leading arm sweeping through in a whip of water (drawn: a cut) |
+| Jump | a plain arc; a stride leap, arms out like wings | the same apex and airtime, popped quicker and hung at the top; a split leap, a tucked back flip, a corkscrew twist or a front handspring | the plain arc, and two vaults: off the stick planted ahead, his knees tucked up as it sweeps back under him — or now and then a pole vault, up into a wobbly handstand right on top of it and over | the highest of all by far, and a little longer in the air (2.8 m up to the others' 1.6, 0.72 s to their 0.64); a rabbit's bound stretched out flat and twisted side-on, a long float down (just over a second) hanging from something out of his satchel that floats away when he lets it go, or a webster side flip, done side-on — he snaps round to face across the road and flips over head first down it — each to a side picked at random | the same airtime but higher (1.9 m: her board has to clear things too); an ollie, knees tucked right up and the board stuck to her feet, a kickflip or a heelflip, the board turning a whole flip under her as her feet lift out of its way | everyone's apex and airtime, but up it fast, hanging at the top, coming down hard; a whirl about himself (drawn: a full circle of the blade), a tucked front flip (drawn: coming down in an overhead cut), a flying lunge (drawn: the sword up in both hands and down as he lands) or a butterfly twist, laid out flat — each trailing water |
+| Landing | a stomp: a slow, heavy bounce, deep into his knees and back up once; a ring of dust, a thud through the camera | on springs: a quick crouch, then bouncing up onto her toes, arms flicking out, and a smaller bounce after | frail: the stick comes down first and takes his weight; his knees buckle deep and he wobbles back up in a couple of bounces | a precision landing on springs: down onto the balls of his big feet, arms swung forward, and straight back up onto his toes, ears bouncing | deep into her knees on the board, arms swung down, and back up; a puff of dust off the wheels | heavy: deep into his knees, arms swept down and out, a thud through the camera, a ring of dust off a hard one; deeper still out of the flip and the lunge, an arm thrown down toward the road |
+| Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust | a dive roll: arms reaching for the road, tucked into a ball, over once and up into a crouch, in a little cloud of dust | ducked right down on the board, folded over her knees, her front hand on its rail and the back arm up behind | an iai crouch: low on his back knee, his front knee deep, his chin up, his hand on the hilt — and now and then he draws rising out of it |
+| Run | a bruiser's charge: hunched, head down, crouched low on bent knees, stomping along wide-footed with the knees driven high, rocking side to side, the elbows out and the arms pumping round in big loops | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | two, and every few seconds he changes from one to the other: bolt upright with his head thrown back and his fists pumping at his chest on quick little steps; or flung forward, arms swinging long and straight, in big bounding strides | she rides: side-on, never still — carving in a long slow S, the whole of her leaning out from the wheels over her toes and back on her heels, drifting across her lane, hips leading and chest, head and loose arms following on behind; pumping, shifting her weight, in one of three moods — and every few seconds she turns her front foot down the board and pushes off the road, hard, two or three times | a big cat's sprint: low and driving, the heel kicked high and the knee driven through, his head level and still, his right arm pumping and his left hand on his scabbard; and now and then the sword drawn on the run and carried trailing low behind him, his left arm pumping, until he flicks it clean and slides it home |
 
 ### Choosing who runs
 
-![The title screen on a phone and on a wide screen, choosing Wren: the runners' cards three by two - Rowan's greyed out for now, the last a mystery still to come - the companions' badges under them](docs/runners.jpg)
+![The title screen on a phone and on a wide screen, choosing Birch: the runners' cards three by two - Rowan's greyed out for now - the companions' badges under them](docs/runners.jpg)
 
 The title screen deals a card for each runner, in a grid three by two: their
 front view, cut out of their reference sheet (`tools/characters/<id>-sheet.jpg`,
@@ -1299,7 +1303,7 @@ cut by `tools/characters/cards.py` into `assets/characters/<id>.webp`) and
 stood up out of a card washed in their colours like a pop-up book — a paper
 keyline and an ink shadow round the figure, a sunburst behind, their name on a
 paper plate — each popping up a little out of its card into the gap above it.
-The grid is always full: a slot no runner fills yet holds a mystery card —
+The grid is always full: a slot no runner fills yet (none, now) holds a mystery card —
 washed out in greys, a dashed edge, a big question mark standing up where the
 figure would, "coming soon" on its plate — that can't be picked (and that the
 arrow keys step over). A runner still being worked on (`locked` in
@@ -1314,8 +1318,10 @@ behind the cards (every runner is built, and their shaders compiled, at boot,
 so it's instant), and they say hello — a gust catches Rowan's cape, Wren's
 backpack pops and a page flutters out, Alder lifts his stick and thumps it
 down in a poof of sparks as a gust takes his beard, Bramble gives a happy
-little hop, ears springing up, tail going like anything, and Hazel pops a
-shove-it, her board spinning a whole turn under her. The arrow keys (or a
+little hop, ears springing up, tail going like anything, Hazel pops a
+shove-it, her board spinning a whole turn under her, and Birch draws in an
+iai flash — the blade whipping out in an arc of water — flicks it clean and
+slides it home. The arrow keys (or a
 sideways swipe) step through them in turn. On a tall screen the title camera
 stands back and looks down the road so the runner shows above the grid (the
 taller the screen, the further down it looks: the grid takes more of a
@@ -1431,18 +1437,19 @@ and out — then a smaller dip and a smaller bounce as it rings out.
 Her simulation costs about half his per frame (the hair grid is smaller than
 the cape's); her mesh is about 25k triangles to his 23k.
 
-To change a runner, edit their script and regenerate (about 15, 35, 65, 85
-and 35 seconds, in the order below), then look at them turned round like their
+To change a runner, edit their script and regenerate (about 15, 35, 65, 85,
+35 and 100 seconds, in the order below), then look at them turned round like their
 reference sheet in `tools/runner/view.html?runner=explorer` (also
 `&pose=idle|run|jump|slide|bind`, `&t=` seconds into it,
 `&trick=leap|flip|twist|handspring` (the elder's `hop|pole`, the bunny's
-`leap|float|webster`, the skater's `ollie|kickflip|heelflip`, and
+`leap|float|webster`, the skater's `ollie|kickflip|heelflip`, the samurai's
+`whirl|flip|leap|butterfly`, and
 `&item=umbrella|balloon|dandelion` for what the bunny floats on, `&turn=1|-1`
 which way his side flip turns), `&jt=`
 seconds into the jump or slide, `&side=1|-1` the slide's lead leg, `&carry=1`
 the elder picking up his stick as soon as he can, `&style=pump|reach` the bunny
 keeping to one of his two runs (`flow|chill|low`: the skater riding in one
-mood), `&speed=` how fast they run (m/s, 14 if not given; 12–28 in the game),
+mood), `&sword=out|in` the samurai keeping his sword drawn or sheathed, `&speed=` how fast they run (m/s, 14 if not given; 12–28 in the game),
 `&views=front,left,back,right,three`, `&zoom=`, `&y=`, `&follow=1` the cameras
 rising with them up through a jump):
 
@@ -1453,6 +1460,7 @@ python3 tools/runner/explorer.py   # the explorer -> assets/explorer/
 python3 tools/runner/elder.py      # the elder -> assets/elder/
 python3 tools/runner/bunny.py      # the bunny -> assets/bunny/
 python3 tools/runner/skater.py     # the skater -> assets/skater/
+python3 tools/runner/samurai.py    # the samurai -> assets/samurai/
 python3 tools/characters/cards.py  # the title screen's cards (or name some: cards.py bunny)
 ```
 
@@ -2131,6 +2139,163 @@ shoot through her legs (`onBoard`: there's a board between them). Her mesh is
 about 40k triangles, a quarter of them the braids; her simulation costs about
 what the elder's does per frame.
 
+### The samurai
+
+![Birch standing guard, his hand on his scabbard; sprinting; the iai draw, the blade whipping up out of the scabbard in an arc of water; running with it drawn, trailing low behind him; a flash step across the lanes, a whip of water off his hand; the whirl, drawn, a circle of the blade; the flying lunge; the butterfly twist, laid out flat in a ring of water; and the iai crouch, his hand on the hilt](docs/samurai.jpg)
+
+`tools/runner/samurai.py` sculpts him to his reference sheet
+(`tools/characters/samurai-sheet.jpg`) with `build.py`'s kit, as the others are:
+Birch (named for the tree whose white bark is barred in charcoal), a tall,
+heavily muscled white tiger with a cheetah's long build — about 1.9 m to his
+crown and nearer 2 m to the tips of his ears, seven and a half heads tall,
+broad through the shoulders, thick in the forearm and the calf, long in the
+leg. A broad feline head: a wide, flat brow with heavy ridges overhanging his
+eyes, full cheeks fringed with a ruff of tufts sweeping back and down, a
+broad muzzle on two whisker pads and a strong jaw, a dusty-rose nose in a
+rounded triangle, short round ears set wide on top. The shader paints the
+rest: ivory fur in short strokes, and the stripes — charcoal brown bands that
+waver and fork, each its own width, pointed where they run out, reaching
+round each limb from its outside so far and no further (`tgStripes`): rings
+down his forearms, hands and shins, over the backs of his paws, bars across
+his brow and crown with the tiger's dashes down the middle of his forehead,
+curving down his cheeks through the ruff, ringing his neck behind and fading
+round to a white throat, a few at the edges of his chest in the kimono's V,
+and rings down his tail to its dark tip. His face is drawn on his head as the
+others' are: almond eyes slanting up toward their outer corners, the iris
+gold all through them (lighter low down, a darker ring), a small round pupil
+fixed on you, the upper lid lowered flat across the top of each and a heavy
+dark mark pressed down over each from his nose outward in a V — a scowl that
+never lets up — dark rims all round them running out at the inner corners
+into a cheetah's tear lines down beside his muzzle; white above his eyes and
+over his muzzle and chin; rows of whisker spots; the mouth set hard, its
+corners turned down. Long pale whiskers sweep out from his pads (ribbons on
+his head, as the bunny's are). The backs of his ears are dark round a white
+spot, the insides pale.
+
+He wears traditional training clothes, not armour. A loose, near-black
+kimono-style top crossed left over right in a deep V over his chest — the V's
+fur recessed under the panels, a broad collar band (a shade lighter, two
+lines of stitching) running down the edges and round the back of his neck,
+the right panel stepping under the left — hanging straight from his chest,
+its skirt flaring over the top of the hakama to his thighs, wide sleeves
+ending past his elbows with the cloth rolled at their ends; a fine grain of
+weave through it all. A reddish-brown obi, its band laid over the kimono,
+knotted at the front, its two long ends hanging down the front of him. Loose
+charcoal hakama, very wide in the leg, pressed into knife pleats down the
+front, gathered and tied round his lower shins so that his striped ankles and
+big paws show below. His forearms are bound in reddish-brown wraps, turn over
+turn (each turn's edge dark, the fur showing through here and there between
+them). His hands are big loose fists, a dark claw at each fingertip; his
+paws are long and broad, four thick toes and a dewclaw, dark claws, the pads
+underneath. Through Hell's drain his obi and wraps keep their red — and his
+eyes their gold.
+
+**His sword.** A katana in a black lacquered scabbard rides through the obi
+at his left hip, its mouth forward at the obi and the rest of it angled back
+and down past his hip, worn edge up: a horn-gold collar round its mouth and a
+cap on its end, a knob on its side, the cord from it tucked up over the obi.
+The sword is sculpted in its own frame — a long oval hilt wrapped in a dark
+braid over pale ray-skin (the shader draws the lattice and the diamonds
+showing through it), a gold pommel cap and collar, a round gold guard, a gold
+collar on the blade, and the blade itself, meshed directly rather than as a
+field (it's long and razor-thin): a peaked spine swelling out to a ridge a
+third of the way across and fining to the edge, curving gently back, the edge
+sweeping up to meet the spine in a curved point; polished steel, dark along
+its flat and frosted white behind a wavy temper line along the edge. The
+scabbard rides on a bone of its own off his hips; the sword on another under
+`sim` (as the elder's stick is), posed every frame: in the scabbard, slid out
+of it along the blade's curve (an arc about a point far under its mouth, so
+the curved blade never cuts through the lacquer), in his right fist — the
+blade turned off the line of his thumb toward his knuckles by as much as the
+move wants (`placeSword`) — or between the two. His hands go where it needs
+them (`armTo`, a two-bone solve to a whole frame, the hand turned to grip): his
+left round the scabbard by its mouth, thumb up against the guard, whenever
+the sword's in it and his arm isn't wanted for anything else; his right on the
+hilt while he draws or sheathes; his left on the hilt below his right when he
+holds it in both.
+
+**He runs** like a big cat runs down its prey — long, driving strides, the
+heel kicked up high under his seat and the knee driven through, low over his
+hips in a deep lean — his head held level and still however hard his body
+works under it, his right arm pumping hard and tight, his left hand on his
+scabbard. Every so often (`SWORD`) he draws on the run: an iai draw, quick as
+anything — his right hand snaps across to the hilt, his thumb pushes the
+guard, the blade slides out along the scabbard's line, whips up clear and cuts
+down out to his right in an arc of water — and runs with it out, carried
+trailing low and level behind him, his left arm taking up the pumping; and in
+a while he flicks it clean (a snap of the blade out to his side), brings it
+across to the scabbard's mouth and slides it home. A draw or a sheathe only
+starts with his feet on the road and nothing else going on; he may draw rising
+out of a duck, too. His run throws up a puff of dust off a foot now and then
+as he drives off the road.
+
+**He moves like a water bender** — flowing, then brutally fast. His lanes are
+the quickest spring of anyone (46/s), and a lane change is a flash step: down
+into a low, wide lunge across, the leg behind stretched out long, leaning hard
+into it, the leading arm sweeping through flat across in front of him and the
+other flung back, a spray of dust off the foot he pushed away from; drawn, it's
+a cut across instead. **His jump** has everyone's apex and airtime, but he's up
+it fast, hangs at the top and comes down hard (the arc solved piecewise and
+exactly, as Wren's is) — and he has four, dealt so the same one never comes
+twice running, each keyed on how far through the jump he is:
+
+- **the whirl** — round about himself once, tucked tight as he winds into it
+  (knees up, arms wrapped across his chest), then flung open at the quickest of
+  it, his arms whipping out flat like ropes of water; drawn, his right arm
+  straight out holding the blade flat, a full circle of steel;
+- **the flip** — a tucked front somersault, knees to his chest, arms round his
+  shins, opening out at the bottom with his arms sweeping round and down like a
+  wave breaking; drawn, the sword up over his head as he opens, and brought
+  down in a cut as he lands;
+- **the flying lunge** — a huge stride through the air, the front knee driven
+  up high and the back leg trailing long, one palm pushing out ahead of him and
+  the other arm flowing out behind; drawn, the sword raised in both hands and
+  brought down as he lands;
+- **the butterfly twist** — thrown out flat, face down, and spun once round
+  about the line he's travelling along, legs scissored wide, arms flung out;
+  drawn, the blade at arm's length, a circle of it standing across the road.
+
+He lands heavy — deep into his knees, his arms swept down and out, a thud
+through the camera, a ring of dust off a hard landing; deeper still out of the
+flip and the lunge. **His duck** is an iai crouch: low on his back knee, up on
+its toes, his front foot planted well forward (both solved: `plantFoot`, the
+shared runner's two-bone leg solve for a foot put where a pose wants it), folded
+over his front knee with his chin up and his eyes ahead, his right hand on the
+hilt — or, drawn, a low cut forward as he goes down. Stood on the title screen
+he's tall and still, his weight even on both feet, his left hand on his
+scabbard, his chin a little down so he watches you from under his brow; his
+tail swings slowly, its end swishing, and an ear flicks now and then.
+
+**The water** (`src/game/ribbon.js`): ribbons of it whip off his hands as he
+sweeps them through a dash or a jump, and off the point of his blade as it
+cuts. Each is a trail of points left behind whatever it follows (a point on
+him, read every frame), carried on with a share of his own speed — so a cut's
+arc keeps its shape and only slowly streams back — drawn as a smooth curve
+through them, a crescent, fine at its head, fullest a third of the way down,
+thinning away to its tail (and growing to its width as it gets its length, so
+it never flashes out as a blob). The GPU turns each stretch to face you and
+draws it as water: a bright white heart, cool teal only at its very edges,
+streaks running down it as it flows, breaking up toward its tail; lit, fogged
+and graded with the world. Up to six at once, one draw call, none while
+nothing's flowing.
+
+**His tail and the obi's ends are ropes of particles** (`ropeStep`), simulated
+in the runner's space turned to the world's axes in fixed substeps, as Hazel's
+braids are: the tail's joints held toward a hunting cat's curve — out behind
+him and a little down as he runs, rising gently toward its end and streaming
+out straighter the faster he goes, swaying slowly side to side in a wave that
+runs down it; stood about, hanging in a long curve with its end curled up off
+the road — firmly near its root and loosely toward its tip, so the tip swings
+free; lashed across by a dash, flicked up by a spring and down on landing; the
+obi's ends not held at all, fluttering in the headwind. Both are swung by
+gravity, his own accelerations and the air, and kept off his legs in the
+hakama, his seat, his back, the kimono's skirt, the scabbard and the road;
+the bones follow. His ears swing on the shared springs, twitch now and then
+and lie back in a dash or a jump. In the Gallery's sand he leaves a big cat's
+pugmark — a broad, three-lobed pad and four oval toes, no claws. With the fox
+riding on his shoulder, the arm under her stays down. His mesh is about 49k
+triangles; his simulation costs less per frame than the skater's.
+
 ## The fox
 
 ![Sorrel: standing and sitting, and her face - round amber eyes, a button nose, a cheek ruff flaring out in points, white tufts in her ears, a cowlick; the mousing pounce from a run, arched over the top and down nose first along its flight, her brush streaming out behind; chasing her tail - pulling up, curling round after it and running on; the same in the run on the Cypress Lane; sitting by the runner on the title screen, and crossing the road on a slant](docs/fox.jpg)
@@ -2516,7 +2681,13 @@ src/game/                     game loop, player (the runners' shared core:
                               carve, moods, pushes, tricks, crouch and the
                               heel that lifts in it, braids, tee's hem and
                               the arms that reach for the rail and her
-                              pockets), kit (body geometry, sheet
+                              pockets), samurai (his palette, whiskers,
+                              sprint, flash step, whirl, flip, lunge and
+                              butterfly, iai crouch, the sword drawn,
+                              carried and sheathed and the arms that reach
+                              for it, his tail and the obi's ends on
+                              ropes, ears) and ribbon (the water that
+                              whips off his hands and his blade), kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset
                               loader, camera, course (world order),
                               chunk streaming, obstacle director, gem director
@@ -2541,6 +2712,8 @@ tools/runner/elder.py         offline sculpt of the elder -> assets/elder/
 tools/runner/bunny.py         offline sculpt of the bunny -> assets/bunny/
 tools/runner/skater.py        offline sculpt of the skater and her board
                               -> assets/skater/
+tools/runner/samurai.py       offline sculpt of the samurai, his scabbard
+                              and his sword -> assets/samurai/
 tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
 tools/runner/dragon.py        offline sculpt of the dragon -> assets/dragon/
 tools/runner/view.html        a runner turned round like their reference sheet

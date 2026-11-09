@@ -1252,8 +1252,29 @@ float pawPrint(vec2 q) {
   float rim = smoothstep(0.028, 0.005, sdf) * smoothstep(-0.004, 0.006, sdf);
   return inner * dig - rim * 0.3;
 }
+// A big cat's pugmark (the samurai's bare paws): a broad main pad, three
+// lobes along its back edge, and four oval toes in an arc ahead of it - no
+// claws (a cat's are drawn in as it walks); a little over life size.
+float pugmark(vec2 q) {
+  q /= 1.1;
+  vec2 m = q - vec2(0.0, -0.035);
+  float pad = (length(m / vec2(0.052, 0.04)) - 1.0) * 0.04;
+  // (the lobes: its back edge scalloped in three)
+  pad += 0.004 * (1.0 - cos(atan(m.x, -m.y) * 3.0)) * smoothstep(0.0, -0.03, m.y);
+  float toes = 9.0;
+  for (int k = 0; k < 4; k++) {
+    float x = (float(k) - 1.5) * 0.031;
+    vec2 t = q - vec2(x, 0.05 - 0.018 * abs(float(k) - 1.5) * abs(float(k) - 1.5) * 0.6);
+    toes = min(toes, (length(t / vec2(0.0135, 0.018)) - 1.0) * 0.0135);
+  }
+  float sdf = min(pad, toes);
+  float inner = smoothstep(0.003, -0.007, sdf);
+  float dig = mix(0.55, 1.0, smoothstep(-0.07, 0.06, q.y));
+  float rim = smoothstep(0.028, 0.005, sdf) * smoothstep(-0.004, 0.006, sdf);
+  return inner * dig - rim * 0.3;
+}
 float printShape(vec2 q, vec4 A, vec4 B, float fine) {
-  return A.w > 3.5 ? pawPrint(q) : A.w > 2.5 ? stickHole(q) : A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
+  return A.w > 4.5 ? pugmark(q) : A.w > 3.5 ? pawPrint(q) : A.w > 2.5 ? stickHole(q) : A.w > 1.5 ? furrow(q, B.x, B.y) : footprint(q, A.w, fine);
 }
 // The runner's footprints round p: how deep they press the sand here (m);
 // the slope they give it is added to grad (dh/dx, dh/dd).
@@ -3897,6 +3918,335 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#elif defined(SAMURAI)
+// --- the samurai -----------------------------------------------------------------
+// (palette: see COL in game/samurai.js; r is the rest position - he is
+// sculpted where he stands; see tools/runner/samurai.py. uRig[0]: x, y his
+// shoulder joint, z how far out his arms hang (rad), w his feet's x.)
+#define T_STRIPE 17
+#define T_LIGHT 18
+#define T_SHADE 19
+#define T_KIMONO_LIGHT 20
+#define T_KIMONO_DEEP 21
+#define T_IRIS_LIGHT 22
+#define T_IRIS 23
+#define T_INK 24
+#define T_MOUTH 25
+#define T_EAR_IN 26
+#define T_OBI_DEEP 27
+#define T_HAKAMA_DEEP 28
+#define T_STEEL_LIGHT 29
+#define T_PAD 30
+#define T_SAME 31
+float tgHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float tgNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(tgHash(i), tgHash(i + vec3(1, 0, 0)), f.x), mix(tgHash(i + vec3(0, 1, 0)), tgHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(tgHash(i + vec3(0, 0, 1)), tgHash(i + vec3(1, 0, 1)), f.x), mix(tgHash(i + vec3(0, 1, 1)), tgHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// Tiger stripes: dark bands across s (freq of them a metre), wavering and
+// forking as they go, each its own width, pointed at its ends - reaching
+// round from where across is 0 (the outside of a limb, his spine, the
+// middle of his brow) only so far toward |across| = 1, some further than
+// others, a little to one side or the other. Coverage, antialiased.
+float tgStripes(float s, float across, float freq, float seed, float w) {
+  float n = tgNoise(vec3(s * freq * 0.55, across * 2.2, seed)) - 0.5;
+  float n2 = tgNoise(vec3(s * freq * 1.7, across * 6.0, seed + 7.0)) - 0.5;
+  float v = s * freq + n * 0.85 + n2 * 0.3;
+  float id = floor(v);
+  float h = fract(sin(id * 12.9898 + seed * 78.233) * 43758.5453);
+  float h2 = fract(h * 7.13 + 0.31);
+  float reach = 0.42 + 0.62 * h2;
+  float a = abs(across + (h - 0.5) * 0.5);
+  float taper = 1.0 - smoothstep(reach * 0.35, reach, a);
+  float width = w * (0.55 + 0.7 * h) * pow(taper, 0.7);
+  float d = abs(fract(v) - 0.5) - width * 0.5;
+  // (a few split in two along part of their length)
+  float split = step(0.72, h) * smoothstep(0.2, 0.5, a) * band(fract(v) - 0.5, width * 0.12);
+  return fill(d) * (1.0 - split) * step(0.02, width);
+}
+// Painted fur: short strokes running down him, a shade deeper and lighter.
+vec3 tgFur(vec3 c, vec3 q, float k) {
+  float n = tgNoise(q * vec3(110.0, 42.0, 110.0)) * 0.6 + tgNoise(q * vec3(240.0, 95.0, 240.0) + 3.7) * 0.4;
+  c = mix(c, uPal[T_SHADE], smoothstep(0.55, 0.85, n) * 0.4 * k);
+  return mix(c, uPal[T_LIGHT], smoothstep(0.42, 0.15, n) * 0.45 * k);
+}
+// A stripe's colour: charcoal brown, a little warmer and softer at its
+// edges where the fur grows through.
+vec3 tgInk(vec3 c, float s, vec3 q) {
+  float n = tgNoise(q * 300.0);
+  vec3 st = mix(uPal[T_STRIPE], uPal[T_STRIPE] * 1.35 + 0.03, 0.35 * n);
+  return mix(c, st, s);
+}
+// Round a limb (axis down y through (cx, cz)): 0 on its outside (side: +1
+// for the right side), 1 on its inside, signed by front and back.
+float tgRound(vec3 r, float cx, float cz, float side) {
+  return atan(r.z - cz, (r.x - cx) * side) / 3.1416;
+}
+// --- his face, drawn on the front of his head: stern golden eyes, the brow
+// pressed down over them in a heavy V, a cheetah's dark tear line running
+// from each inner corner down beside his muzzle; white above the eyes,
+// rows of whisker spots, the dusty-rose nose, the mouth set hard, its
+// corners turned down; the tiger's marks over his brow and crown, curving
+// down his cheeks, ringing his neck.
+vec3 tgFace(vec3 c, vec3 r, vec4 d, inout float unlit) {
+  vec3 ink = uPal[T_INK];
+  vec2 f = vec2(abs(r.x), r.y);
+  float front = smoothstep(-0.075, -0.1, r.z);
+  // white: the muzzle, the chin and throat, above the eyes, the cheeks
+  // under the eyes
+  float muz = 1.0 - smoothstep(0.75, 1.05, length((f - vec2(0.024, 1.742)) / vec2(0.054, 0.04)));
+  float chin = 1.0 - smoothstep(0.7, 1.05, length((f - vec2(0.0, 1.708)) / vec2(0.06, 0.03)));
+  float throat = smoothstep(1.74, 1.66, r.y) * smoothstep(-0.02, -0.07, r.z) * (1.0 - smoothstep(0.03, 0.075, f.x));
+  float above = 1.0 - smoothstep(0.6, 1.0, length((f - vec2(0.05, 1.818)) / vec2(0.024, 0.011)));
+  float under = 1.0 - smoothstep(0.6, 1.0, length((f - vec2(0.06, 1.78)) / vec2(0.03, 0.016)));
+  float white = max(max(muz, chin), max(max(throat, above * front), under * front * 0.7));
+  c = mix(c, uPal[T_LIGHT], white * 0.85);
+  // the marks: bars across his brow and crown, from the middle out (a gap
+  // left down the middle of his forehead), round toward his ears
+  float ph = atan(r.z - 0.014, r.y - 1.835);
+  float crown = smoothstep(1.815, 1.84, r.y) * (1.0 - above);
+  float bars = tgStripes(ph * 0.11, r.x / 0.085, 52.0, 3.0, 0.38) * crown;
+  bars *= smoothstep(0.004, 0.012, f.x) + 0.6 * step(0.0, r.z);
+  // (the middle of the brow: three short dark dashes, like a brush's)
+  float mid = band(f.x - 0.0, 0.0028) * smoothstep(1.842, 1.848, r.y) * (1.0 - smoothstep(1.874, 1.88, r.y)) * front;
+  mid = max(mid, band(abs(r.x) - 0.014, 0.0024) * smoothstep(1.85, 1.856, r.y) * (1.0 - smoothstep(1.866, 1.872, r.y)) * front);
+  // down his cheeks and through the ruff, sweeping back and down
+  float side = smoothstep(0.06, 0.085, f.x) * smoothstep(1.83, 1.8, r.y);
+  float cheek = tgStripes(r.y + (f.x - 0.06) * 0.7 - r.z * 0.25, (r.z + 0.04) / 0.07, 46.0, 9.0, 0.34) * side * (1.0 - under * 0.8);
+  // ringing the neck behind, fading round to the white throat
+  float neck = tgStripes(r.y + 0.12 * r.z, atan(r.x, r.z) / 3.1416 * 1.6, 30.0, 4.0, 0.36) * smoothstep(1.735, 1.71, r.y) * (1.0 - throat);
+  float marks = max(max(bars, mid), max(cheek, neck * 0.9));
+  c = tgInk(c, marks, r);
+  if (front <= 0.0) return c;
+  // the eye: an almond, slanting up toward its outer corner
+  vec2 E = vec2(0.0455, 1.7995);
+  vec2 q = f - E;
+  q.y -= 0.3 * q.x;
+  float w = 0.0182;
+  float xn = clamp(q.x / w, -1.0, 1.0);
+  float yU = 0.0078 * (1.0 - xn * xn) * (1.0 + 0.12 * xn);
+  float yL = -0.0062 * (1.0 - xn * xn) * (1.0 - 0.25 * xn);
+  float dA = max(max(q.y - yU, yL - q.y), abs(q.x) - w);
+  // (stern: the upper lid lowered flat across the top of the eye)
+  float lidY = min(yU, 0.0032 - 0.0016 * xn);
+  float dS = max(dA, q.y - lidY);
+  float eye = fill(dS);
+  // the iris fills it: gold, lighter low down where the light comes through,
+  // a darker ring round its edge; a round dark pupil, small and fixed on
+  // you; a catch-light
+  vec2 ic = q - vec2(-0.0006, -0.0006);
+  float ir = length(ic);
+  vec3 iris = mix(uPal[T_IRIS_LIGHT], uPal[T_IRIS], smoothstep(-0.006, 0.004, ic.y));
+  iris = mix(iris, uPal[T_IRIS] * 0.55, smoothstep(0.0072, 0.0098, ir));
+  iris = mix(iris, ink, fill(ir - 0.0033));
+  c = mix(c, iris, eye);
+  float glint = fill(length(ic - vec2(0.0026, 0.0018)) - 0.0012) * eye;
+  c = mix(c, vec3(1.0), glint);
+  unlit = max(unlit, max(eye * 0.55, glint));
+  gKeep = max(gKeep, eye);
+  // (the lid's shadow over the top of the iris)
+  c *= 1.0 - 0.35 * smoothstep(lidY - 0.003, lidY, q.y) * eye;
+  // dark rims all round it, heavy along the lowered lid, running out at the
+  // inner corner into the tear line
+  float rim = band(dS, 0.0011 + 0.0011 * smoothstep(-0.004, 0.012, q.x)) * step(abs(q.x), w + 0.0015);
+  float lid = band(q.y - lidY, 0.0016 + 0.0008 * smoothstep(0.0, 0.016, q.x)) * step(abs(q.x), w + 0.001) * step(yL, q.y);
+  // the cheetah's tear line: from the inner corner down beside the bridge
+  // of his nose and over the whisker pad toward the corner of his mouth
+  float ty = clamp((E.y - 0.004 - r.y) / 0.064, 0.0, 1.0);
+  float tx = 0.0315 - 0.006 * ty + 0.016 * ty * ty;
+  float tear = band(f.x - tx, 0.0023 * (1.0 - 0.55 * ty) + 0.0004) * step(r.y, E.y - 0.003) * smoothstep(E.y - 0.074, E.y - 0.06, r.y);
+  // the brow: a heavy dark mark pressed down over each eye, low by his nose
+  // and rising to the outside - a scowl in a V
+  vec2 bq = f - vec2(0.046, 1.8155 + 0.36 * (f.x - 0.046));
+  float browW = 0.0034 * (1.0 - smoothstep(0.0, 0.03, f.x - 0.03)) + 0.0012;
+  float brow = band(bq.y, browW) * smoothstep(0.018, 0.024, f.x) * (1.0 - smoothstep(0.066, 0.072, f.x));
+  c = mix(c, ink, max(max(rim, lid), max(tear, brow * 0.92)));
+  // the whisker spots: rows of little dark dots on each pad
+  vec2 wq = f - vec2(0.03, 1.748);
+  float spots = 0.0;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 4; j++) {
+      vec2 o = vec2(0.008 + 0.0105 * float(j), 0.0105 - 0.0075 * float(i) - 0.0025 * float(j));
+      spots = max(spots, fill(length(wq - o + vec2(0.03, 0.0)) - 0.0016));
+    }
+  }
+  c = mix(c, uPal[T_STRIPE], spots * smoothstep(-0.12, -0.135, r.z) * 0.75);
+  // the mouth: down from the nose, parting along the bottom of each whisker
+  // pad, its corners turned down hard
+  float mz = smoothstep(-0.1, -0.115, r.z);
+  float phil = band(f.x, 0.0011) * step(1.727, r.y) * step(r.y, 1.756);
+  float ly = 1.7285 - 0.24 * f.x - 2.2 * f.x * f.x;
+  float lip = band(r.y - ly, 0.0015 + 0.0008 * smoothstep(0.0, 0.05, f.x)) * step(f.x, 0.056);
+  c = mix(c, uPal[T_MOUTH], max(phil, lip) * mz);
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    c = tgFur(c, r, 0.8);
+    // (his ruff's tufts a shade deeper toward their roots)
+    c = mix(c, uPal[T_SHADE], d.w * 0.25);
+    c = tgFace(c, r, d, unlit);
+  } else if (m == 2) {
+    // the nose: dusty rose, a darker rim and nostrils underneath, a shine
+    vec3 q = r - vec3(0.0, 1.772, -0.172);
+    c = mix(c, c * 0.72, smoothstep(0.0, -0.01, q.y) * 0.6);
+    vec2 nq = vec2(abs(q.x) - 0.009, q.y + 0.0065);
+    c = mix(c, uPal[T_MOUTH], fill(length(nq / vec2(0.006, 0.0028)) - 1.0) * smoothstep(-0.16, -0.168, r.z));
+    float hl = fill(length((q - vec3(0.0, 0.006, -0.008)) * vec3(0.7, 1.4, 1.0)) - 0.0032);
+    c = mix(c, vec3(1.0, 0.94, 0.92), hl * 0.4);
+    unlit = max(unlit, hl * 0.2);
+  } else if (m == 3) {
+    // the ears: dark behind with a white spot in the middle, pale and furred
+    // inside the dish
+    float back = 1.0 - smoothstep(0.25, 0.6, d.x);
+    vec3 dark = mix(uPal[T_STRIPE], uPal[T_STRIPE] * 1.4, tgNoise(r * 260.0) * 0.4);
+    float spot = 1.0 - smoothstep(0.28, 0.44, length(vec2(d.z * 1.1, (d.y - 0.5) * 1.6)));
+    vec3 outside = mix(dark, uPal[T_LIGHT], spot * 0.9);
+    // (pale fur at its very base, where it grows out of his head)
+    outside = mix(outside, base, smoothstep(0.22, 0.05, d.y));
+    vec3 inside = mix(uPal[T_EAR_IN], uPal[T_LIGHT], smoothstep(0.3, 0.75, abs(d.z)) * 0.7 + tgNoise(r * 400.0) * 0.25);
+    c = mix(inside, outside, back);
+  } else if (m == 5 || m == 9 || m == 10) {
+    // fur: his chest in the V, his forearms, his lower legs, his hands and
+    // paws - ivory, striped
+    c = tgFur(c, r, 0.7);
+    vec2 S = uRig[0].xy;
+    float ar = uRig[0].z;
+    float sx = r.x < 0.0 ? -1.0 : 1.0;
+    float st = 0.0;
+    if (r.y < 0.62) {
+      // a leg: rings down it from the outside, round toward the inside
+      float cx = sx * uRig[0].w;
+      float a = tgRound(r, cx, 0.01, sx);
+      st = tgStripes(r.y - 0.05 * r.z, abs(a) * 1.1 - 0.05, 30.0, 11.0 + sx, 0.34);
+      // (pale on the inside of the leg and down the front of the paw)
+      st *= smoothstep(0.06, 0.1, r.y + 0.3 * max(0.0, -r.z - 0.04)) * (m == 10 ? 0.85 : 1.0);
+      if (m == 10) {
+        // the paw: the pads underneath, the toes parted on top
+        c = mix(c, uPal[T_PAD], d.x * 0.9);
+        c = mix(c, uPal[T_SHADE] * 0.7, band(fract(d.y * 0.5) - 0.5, 0.06) * d.z * 0.7 * step(0.014, r.y));
+      }
+    } else if (abs(r.x) > 0.2 || r.y < 1.12) {
+      // an arm (and a hand): rings round it, from the outside
+      vec2 dn = vec2(sx * sin(ar), -cos(ar));
+      vec2 o = r.xy - vec2(sx * S.x, S.y);
+      float u = dot(o, dn);
+      float acr = dot(o, vec2(-dn.y, dn.x)) * sx;
+      float a = atan(r.z, acr) / 3.1416;
+      st = tgStripes(u, abs(a + 0.15) * 1.05, 26.0, 21.0 + sx, 0.32);
+      // (the palms and the fingers pale)
+      st *= m == 9 ? smoothstep(0.66, 0.62, u) * step(0.0, acr + 0.004) : 1.0;
+    } else {
+      // the chest in the V: pale down the middle, a few marks at its sides
+      float a = abs(r.x) / 0.08;
+      st = tgStripes(r.y - abs(r.x) * 0.4, 1.0 - a, 34.0, 5.0, 0.26) * smoothstep(0.035, 0.06, abs(r.x));
+      c = mix(c, uPal[T_LIGHT], 0.4 * (1.0 - smoothstep(0.0, 0.05, abs(r.x))));
+      // (the shadow of the kimono's edges over it)
+      float e = (0.078 - (1.648 - r.y) * 0.37) - abs(r.x);
+      c *= 1.0 - 0.28 * smoothstep(0.018, 0.0, e);
+    }
+    c = tgInk(c, st, r);
+  } else if (m == 11) {
+    // the tail: rings down it, wider toward the end, its tip dark
+    float s = d.x;
+    float wob = (tgNoise(r * 40.0) - 0.5) * 0.04;
+    float ring = tgStripes(s + wob, 0.0, 9.5 + 3.0 * d.y, 13.0, 0.36 + 0.24 * d.y);
+    c = tgFur(c, r, 0.6);
+    c = tgInk(c, max(ring, smoothstep(0.9, 0.95, d.y)), r);
+  } else if (m == 12) {
+    // claws: dark horn, paler toward the tips
+    c = mix(c, c * 2.2 + 0.08, smoothstep(0.4, 1.0, tgNoise(r * 900.0)) * 0.3);
+  } else if (m == 4) {
+    // the kimono (d: x on the body, y down the arm, z across the collar band
+    // (-1 off it), w inside a sleeve): heavy cotton, deeper in its folds; the
+    // collar band a shade lighter, two lines of stitching down it; the
+    // sleeves dark inside
+    float n = tgNoise(r * vec3(36.0, 14.0, 36.0));
+    c = mix(c, uPal[T_KIMONO_DEEP], smoothstep(0.5, 0.85, n) * 0.5);
+    c = mix(c, uPal[T_KIMONO_LIGHT], smoothstep(0.4, 0.15, n) * 0.25);
+    // (the weave: a fine grain across it)
+    c = mix(c, uPal[T_KIMONO_LIGHT], lines(r.y * 420.0 + sin(r.x * 300.0) * 0.3, 0.12) * 0.12);
+    if (d.z > -0.5) {
+      c = mix(c, uPal[T_KIMONO_LIGHT], 0.55);
+      float stitch = max(band(d.z - 0.22, 0.04), band(d.z - 0.78, 0.04)) * step(0.45, fract(r.y * 160.0));
+      c = mix(c, uPal[T_KIMONO_LIGHT] * 1.5 + 0.04, stitch * 0.6);
+      c = mix(c, uPal[T_KIMONO_DEEP] * 0.7, band(d.z, 0.05) + band(d.z - 1.0, 0.05));
+    }
+    c = mix(c, uPal[T_KIMONO_DEEP] * 0.6, d.w * 0.8);
+    // (the hem and the sleeves' ends, stitched)
+    float hem = band(r.y - 0.948, 0.0012) * d.x;
+    c = mix(c, uPal[T_KIMONO_LIGHT] * 1.3, hem * 0.7);
+  } else if (m == 6) {
+    // the hakama: charcoal, its knife pleats down the front pressed into
+    // dark creases, deeper in the folds, the gathered cuffs tied
+    float n = tgNoise(r * vec3(30.0, 10.0, 30.0));
+    c = mix(c, uPal[T_HAKAMA_DEEP], smoothstep(0.5, 0.85, n) * 0.5);
+    float pleat = lines(d.y * 7.0 / 6.2832 + 0.5, 0.05) * smoothstep(0.3, 0.6, cos(d.y)) * smoothstep(0.34, 0.5, r.y) * smoothstep(1.2, 1.05, r.y);
+    c = mix(c, uPal[T_HAKAMA_DEEP] * 0.75, pleat * 0.8);
+    c = mix(c, uPal[T_HAKAMA_DEEP] * 0.8, smoothstep(0.36, 0.3, r.y) * 0.4);
+    float tie = band(r.y - 0.305, 0.0035) * d.x;
+    c = mix(c, uPal[T_OBI_DEEP], tie * 0.9);
+  } else if (m == 7) {
+    // the obi: woven, faint lines along it, darker at its edges; its ends
+    // stitched across where they're hemmed
+    float n = tgNoise(r * vec3(60.0, 20.0, 60.0));
+    c = mix(c, uPal[T_OBI_DEEP], smoothstep(0.5, 0.85, n) * 0.35);
+    float edge = smoothstep(0.78, 0.95, abs(d.z)) * (1.0 - d.x);
+    c = mix(c, uPal[T_OBI_DEEP], edge * 0.7);
+    c = mix(c, uPal[T_OBI_DEEP], lines(d.z * 3.0, 0.06) * (1.0 - d.x) * 0.35);
+    c = mix(c, uPal[T_OBI_DEEP] * 0.8, d.x * smoothstep(0.38, 0.41, d.y) * 0.6);
+  } else if (m == 8) {
+    // the wraps: wound round in overlapping turns (d: x down the arm, y
+    // round it), the edge of each turn dark, the fur showing through here
+    // and there between them
+    float v = d.x * 70.0 + d.y / 6.2832;
+    float k = fract(v);
+    c = mix(c, uPal[T_OBI_DEEP], smoothstep(0.75, 0.98, k) * 0.7);
+    c = mix(c, c * 1.18, smoothstep(0.1, 0.4, k) * (1.0 - smoothstep(0.4, 0.7, k)) * 0.5);
+    float gap = step(0.62, tgNoise(vec3(floor(v) * 3.1, d.y * 1.6, 0.0))) * band(k - 0.92, 0.05);
+    vec3 fur = mix(uPal[5], uPal[T_STRIPE], step(0.55, tgNoise(r * 80.0)));
+    c = mix(c, fur, gap);
+  } else if (m == 13) {
+    // the scabbard: black lacquer, a long soft sheen along it
+    float sheen = smoothstep(0.35, 0.95, tgNoise(vec3(d.y * 6.0, d.x * 40.0, 0.0))) * 0.25;
+    c = mix(c, c * 2.6 + 0.05, sheen);
+  } else if (m == 14) {
+    // gold: the guard, the collars and caps
+    c = mix(c, c * 1.3 + 0.06, smoothstep(0.4, 0.8, tgNoise(r * 260.0)) * 0.4);
+  } else if (m == 15) {
+    // the hilt: dark braid wound over it in a lattice, the pale ray-skin
+    // showing through in little diamonds down each face
+    float u = d.y / 0.0205;
+    float a = atan(d.x, d.z) / 3.1416 * 2.0;
+    float d1 = abs(fract(u + a) - 0.5), d2 = abs(fract(u - a) - 0.5);
+    float win = fill(0.3 - min(d1, d2)) * step(abs(d.x), 0.011);
+    vec3 same = mix(uPal[T_SAME], uPal[T_SAME] * 0.85, tgNoise(r * 700.0));
+    c = mix(c, same, win * 0.9);
+    c = mix(c, c * 1.6, band(min(d1, d2) - 0.06, 0.02) * 0.4);
+  } else if (m == 16) {
+    // the blade: polished steel, dark and mirror-bright along its flat; the
+    // hardened edge frosted white behind a wavy temper line; the ridge line
+    float t = clamp((d.y - 0.05) / 0.72, 0.0, 1.0);
+    float c0 = -0.022 * t * t;
+    float zr = d.z - c0;
+    float hamon = 0.0035 + 0.0022 * sin(d.y * 120.0) + 0.001 * sin(d.y * 310.0 + 1.0);
+    float frost = smoothstep(-0.001, 0.001, zr - (0.0155 * (1.0 - 0.22 * t) - 0.0085 - hamon));
+    c = mix(uPal[16] * 0.62, uPal[T_STEEL_LIGHT], frost * 0.85);
+    float ridge = band(zr + 0.0155 * (1.0 - 0.22 * t) * 0.36, 0.0005);
+    c = mix(c, uPal[T_STEEL_LIGHT], ridge * 0.6);
+    unlit = max(unlit, 0.55);
+  }
+  return c;
+}
 #elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
 // brown eyes under relaxed lids (the upper lid sits a little over the iris, so
@@ -4291,6 +4641,10 @@ void main() {
   #elif defined(SKATER)
     // (her neon tee burns on through a drain, and her board's graphic)
     gKeep = (m == 3 || (m == 10 && vD.z < -0.5)) ? 1.0 : 0.0;
+  #elif defined(SAMURAI)
+    // (his red obi and wraps burn on through a drain - and his eyes: see
+    // tgFace)
+    gKeep = (m == 7 || m == 8) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -4319,6 +4673,10 @@ void main() {
     float soft = (m == 10 || m == 14) ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
   #elif defined(BUNNY) && defined(PROPS)
     float soft = 0.1;
+  #elif defined(SAMURAI)
+    // (fur takes the light softly; heavy cotton in soft gradients; steel,
+    // lacquer and gold crisp)
+    float soft = (m == 1 || m == 3 || m == 5 || m == 9 || m == 10 || m == 11) ? 0.11 : (m == 4 || m == 6) ? 0.09 : (m >= 13 && m <= 16) ? 0.035 : 0.06;
   #elif defined(SKATER)
     // (loose cotton in soft gradients; the board and the gold crisp)
     float soft = m == 3 ? 0.1 : m == 13 ? 0.08 : m == 4 ? 0.07 : m == 1 ? 0.12 : (m >= 9 && m <= 12) ? 0.035 : 0.065;
@@ -4374,6 +4732,8 @@ void main() {
   if (m == 10) {
   #elif defined(SKATER)
   if (m == 2 || m == 13) {
+  #elif defined(SAMURAI)
+  if (m == 99) {
   #else
   if (m == 2) {
   #endif
@@ -4419,6 +4779,8 @@ void main() {
     gKeep = (m == 4 || m == 10) ? 1.0 : 0.0;
   #elif defined(SKATER)
     gKeep = m == 3 ? 1.0 : 0.0;
+  #elif defined(SAMURAI)
+    gKeep = (m == 7 || m == 8) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -5135,6 +5497,60 @@ void main() {
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), alpha);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Ribbons of water whipping off the samurai (game/ribbon.js): trails of
+// points written by the CPU, each stretch turned to face you and widened
+// to its width there; drawn as a water bender's water - a bright, glassy
+// white heart, a cool teal toward its edges, streaks running down it as it
+// flows, thinning and breaking up toward its tail. Lit, fogged and graded
+// with the world.
+// ---------------------------------------------------------------------------
+const VS_RIBBON = COMMON + /* glsl */ `
+attribute vec3 aTan;
+attribute vec4 aRib; // x side (-1 / +1), y how far down it (+ its seed), z how much of it is left, w half its width (m)
+varying vec4 vRib;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 view = normalize(position - uCamPos);
+  vec3 side = cross(aTan, view);
+  float l = length(side);
+  side = l > 1e-4 ? side / l : vec3(0.0, 1.0, 0.0);
+  vec3 wp = position + side * aRib.x * aRib.w;
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  vRib = aRib;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_RIBBON = FS_HEAD + /* glsl */ `
+uniform vec3 uShadowTint;
+varying vec4 vRib;
+void main() {
+  float e = abs(vRib.x);
+  float u = fract(vRib.y);
+  float left = vRib.z;
+  if (left <= 0.0) discard;
+  // streaks running down it as it flows, breaking it up toward its tail
+  float flow = sin(vRib.y * 46.0 - uTime * 26.0 + vRib.x * 2.2) * 0.5 + 0.5;
+  float flow2 = sin(vRib.y * 97.0 - uTime * 41.0 - vRib.x * 3.1) * 0.5 + 0.5;
+  float body = smoothstep(1.0, 0.6 - 0.2 * flow, e);
+  float tail = smoothstep(0.0, 0.25, left);
+  float alpha = body * tail * (0.78 + 0.22 * flow) * mix(1.0, step(0.35, flow2), smoothstep(0.4, 0.85, u));
+  if (alpha < 0.02) discard;
+  // a white heart, a cool teal only at its very edges, brighter streaks
+  // running through it
+  vec3 teal = vec3(0.45, 0.8, 0.88);
+  vec3 col = mix(vec3(0.98, 1.0, 1.0), teal, smoothstep(0.45, 1.0, e) * 0.8);
+  col = mix(col, vec3(0.86, 0.95, 0.98), (1.0 - flow) * 0.35 * (1.0 - e));
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  col = atmos(col, v, dist, 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), alpha * 0.9);
 }
 `;
 
@@ -6425,7 +6841,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI' };
   const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
@@ -6702,6 +7118,18 @@ export function makeDustMaterial(env) {
     fragmentShader: FS_DUST,
     transparent: true,
     depthWrite: false,
+  });
+}
+
+// The samurai's ribbons of water (game/ribbon.js), lit by env.
+export function makeRibbonMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_RIBBON,
+    fragmentShader: FS_RIBBON,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
   });
 }
 
