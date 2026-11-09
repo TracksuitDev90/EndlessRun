@@ -1268,9 +1268,10 @@ through it.
 ## The runners
 
 Five runners, chosen on the title screen (and a sixth card held for whoever's
-next) — though for now two of them, Rowan and Hazel, are back in the workshop
-being worked on: they're still in the game, their cards dealt greyed out, but
-they can't be picked (see [Choosing who runs](#choosing-who-runs)). Each is sculpted offline (`tools/runner/`), skinned to the same skeleton
+next) — though for now one of them, Rowan, is back in the workshop being
+worked on: he's still in the game, his card dealt greyed out, but he can't be
+picked (see [Choosing who runs](#choosing-who-runs)); Hazel is back out of it
+and can be picked again. Each is sculpted offline (`tools/runner/`), skinned to the same skeleton
 and driven by the same core — lanes, jumps, slides, the IK running legs, weight
 and follow-through (`src/game/player.js`) — and each dresses it, hangs
 simulated sheets off it and moves in their own way (`wayfarer.js`,
@@ -1290,7 +1291,7 @@ and how to make them live in `characters.js`).
 
 ### Choosing who runs
 
-![The title screen on a phone and on a wide screen, choosing Wren: the runners' cards three by two - Rowan's and Hazel's greyed out for now, the last a mystery still to come - the companions' badges under them](docs/runners.jpg)
+![The title screen on a phone and on a wide screen, choosing Wren: the runners' cards three by two - Rowan's greyed out for now, the last a mystery still to come - the companions' badges under them](docs/runners.jpg)
 
 The title screen deals a card for each runner, in a grid three by two: their
 front view, cut out of their reference sheet (`tools/characters/<id>-sheet.jpg`,
@@ -1302,13 +1303,12 @@ The grid is always full: a slot no runner fills yet holds a mystery card —
 washed out in greys, a dashed edge, a big question mark standing up where the
 figure would, "coming soon" on its plate — that can't be picked (and that the
 arrow keys step over). A runner still being worked on (`locked` in
-`characters.js`: Rowan and Hazel, for now) is dealt too, but greyed out — the
+`characters.js`: Rowan, for now) is dealt too, but greyed out — the
 card washed in greys, their figure faded to graphite, a "soon" stamp on its
 corner — and can't be picked either: tapping it does nothing, the arrow keys
 step over it, and if they were the one remembered the title screen opens on
 the first who can be picked (Wren) instead. They're still built, so
-`?runner=wayfarer` (or `skater`) runs as them all the same, for working on
-them. The one you've picked stands taller, bobs and wears an orange seal, and a line
+`?runner=wayfarer` runs as him all the same, for working on him. The one you've picked stands taller, bobs and wears an orange seal, and a line
 about them sits under the grid. Picking one swaps the live runner on the road
 behind the cards (every runner is built, and their shaders compiled, at boot,
 so it's instant), and they say hello — a gust catches Rowan's cape, Wren's
