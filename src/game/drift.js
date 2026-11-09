@@ -72,9 +72,9 @@ export function boostArc() {
   return cached;
 }
 
-// The ordinary jump, in the same terms.
-export function plainArc() {
-  const J = CONFIG.jump;
+// The ordinary jump, in the same terms (a runner's own, J: their apex
+// height and airtime - the bunny springs higher and further than anyone).
+export function plainArc(J = CONFIG.jump) {
   const T = J.time;
   const V0 = (4 * J.height) / T;
   const G = (8 * J.height) / (T * T);

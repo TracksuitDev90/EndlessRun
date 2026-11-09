@@ -111,9 +111,10 @@ export class GemField {
   }
 
   // The jump at d: its airtime, when it's best over a hurdle, and the height
-  // of the feet through it (in low gravity, the boost's arc: see drift.js).
+  // of the feet through it (in low gravity, the boost's arc: see drift.js) -
+  // the runner's own jump, so a run of gems laid over one follows their arc.
   arcAt(d) {
-    return this.game.course.segAt(d).world.def.lowGravity ? boostArc() : plainArc();
+    return this.game.course.segAt(d).world.def.lowGravity ? boostArc() : plainArc(this.game.player?.feel?.jump);
   }
 
   spacing(v) {

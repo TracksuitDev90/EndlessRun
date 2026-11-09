@@ -3646,97 +3646,118 @@ float skNoise(vec3 p) {
   return mix(a, b, f.z);
 }
 // Her skin: warm and even, a shade deeper in its hollows (under the jaw,
-// round the knee), catching a soft sheen up high.
-vec3 skSkin(vec3 c, vec3 r) {
+// round the knee), catching a soft sheen up high. (Only a whisper of
+// mottling on her face: any more reads as dirt at the game's distance.)
+vec3 skSkin(vec3 c, vec3 r, float k) {
   float n = skNoise(r * 90.0);
-  c = mix(c, uPal[K_SKIN_DEEP], 0.12 * smoothstep(0.45, 0.8, n));
-  return mix(c, uPal[K_SKIN_LIGHT], 0.08 * smoothstep(0.5, 0.2, n));
+  c = mix(c, uPal[K_SKIN_DEEP], 0.12 * k * smoothstep(0.45, 0.8, n));
+  return mix(c, uPal[K_SKIN_LIGHT], 0.08 * k * smoothstep(0.5, 0.2, n));
 }
-// Her face, drawn on the front of her head: big almond eyes, dark brown,
-// under heavy lids lowered a little over the irises (cool, not much
-// impressed), a heavy upper lash line winging out at the corner; thick,
-// neat brows lying nearly flat over them; a small nose, its nostrils; full
-// lips, the lower one catching the light, closed in an even line.
+// Her face, drawn on the front of her head as her sheet draws it: big
+// almond-shaped eyes, warm brown irises filling most of them, under heavy
+// lids lowered over the tops of the irises (cool, not much impressed), a
+// bold upper lash line winging out at the corner; thick brows, arched toward
+// their outer ends; a small soft nose, its nostrils; full rosy-brown lips,
+// the lower one catching the light, closed in an even line.
 vec3 drawFace(vec3 base, vec3 r, vec4 d, inout float unlit) {
   float front = smoothstep(-0.05, -0.072, r.z);
   vec3 c = base;
   vec2 f = vec2(abs(r.x), r.y);
   vec3 ink = uPal[K_INK];
   // a sheen across the cheekbones and down the bridge of the nose
-  float cheek = 1.0 - smoothstep(0.3, 1.0, length((f - vec2(0.046, 1.488)) / vec2(0.02, 0.011)));
-  float bridge = (1.0 - smoothstep(0.0025, 0.006, f.x)) * smoothstep(1.462, 1.475, r.y) * (1.0 - smoothstep(1.5, 1.51, r.y));
-  c = mix(c, uPal[K_SKIN_LIGHT], (0.32 * cheek + 0.28 * bridge) * front);
-  // (a shade deeper under the jaw and the brow)
-  c = mix(c, uPal[K_SKIN_DEEP], 0.3 * smoothstep(1.425, 1.395, r.y) * smoothstep(-0.02, -0.06, r.z));
+  float cheek = 1.0 - smoothstep(0.2, 1.0, length((f - vec2(0.047, 1.493)) / vec2(0.019, 0.011)));
+  float bridge = (1.0 - smoothstep(0.0025, 0.006, f.x)) * smoothstep(1.47, 1.482, r.y) * (1.0 - smoothstep(1.505, 1.515, r.y));
+  c = mix(c, uPal[K_SKIN_LIGHT], (0.3 * cheek + 0.26 * bridge) * front);
+  // (a shade deeper under the jaw, and a warm blush over the cheeks)
+  c = mix(c, uPal[K_SKIN_DEEP], 0.28 * smoothstep(1.43, 1.405, r.y) * smoothstep(-0.02, -0.06, r.z));
+  float blush = 1.0 - smoothstep(0.0, 1.0, length((f - vec2(0.05, 1.48)) / vec2(0.022, 0.014)));
+  c = mix(c, uPal[K_LIP_LIGHT], 0.18 * blush * front);
   if (front <= 0.0) return c;
-  // the eye: an almond, its outer corner lifted
-  vec2 E = vec2(0.0328, 1.5045);
+  // the eye: a big almond, its outer corner lifted
+  vec2 E = vec2(0.0352, 1.5125);
   vec2 q = f - E;
-  q.y -= 0.16 * q.x;
-  float w = 0.0166;
+  q.y -= 0.14 * q.x;
+  float w = 0.0192;
   float xn = clamp(q.x / w, -1.0, 1.0);
-  float yU = 0.0086 * (1.0 - xn * xn) * (1.0 + 0.25 * xn);
-  float yL = -0.006 * (1.0 - xn * xn);
+  float yU = 0.0118 * (1.0 - xn * xn) * (1.0 + 0.18 * xn);
+  float yL = -0.0074 * (1.0 - xn * xn) * (1.0 - 0.15 * xn);
   float dA = max(max(q.y - yU, yL - q.y), abs(q.x) - w);
   // the heavy upper lid, lowered over the top of the iris
-  float lidY = yU * 0.55 - 0.0006;
+  float lidY = yU * 0.66 - 0.0004;
   float dS = max(dA, q.y - lidY);
   float eye = fill(dS) * front;
   c = mix(c, uPal[K_EYE], eye);
-  unlit = max(unlit, eye * 0.3);
-  // the iris (dark brown, a warmer ring), the pupil, a catch-light
-  vec2 ic = q - vec2(-0.0006, -0.0006);
+  unlit = max(unlit, eye * 0.45);
+  // the iris (warm brown, lighter low down where the light comes through, a
+  // dark ring round it), the pupil, two catch-lights
+  vec2 ic = q - vec2(-0.0012, -0.0004);
   float ir = length(ic);
-  vec3 iris = mix(uPal[K_IRIS] * 1.5 + 0.02, uPal[K_IRIS], smoothstep(0.002, 0.0062, ir));
-  iris = mix(iris, ink, fill(ir - 0.0029));
-  float inI = fill(max(ir - 0.0076, dS)) * front;
+  float IR = 0.0094;
+  vec3 iris = mix(uPal[K_IRIS] * 1.9 + 0.03, uPal[K_IRIS], smoothstep(-0.006, 0.004, ic.y));
+  iris = mix(iris, uPal[K_IRIS] * 0.45, smoothstep(IR - 0.0022, IR, ir));
+  iris = mix(iris, ink, fill(ir - 0.0034));
+  float inI = fill(max(ir - IR, dS)) * front;
+  // (the lid casts a soft shadow over the top of the iris and the white)
+  float lidSh = smoothstep(lidY - 0.0035, lidY, q.y);
   c = mix(c, iris, inI);
-  float glint = fill(length(ic - vec2(0.0022, 0.0018)) - 0.0012) * inI;
+  c *= 1.0 - 0.3 * lidSh * eye;
+  float glint = max(fill(length(ic - vec2(0.0033, 0.0022)) - 0.0017), 0.8 * fill(length(ic - vec2(-0.003, -0.0036)) - 0.0008)) * inI;
   c = mix(c, vec3(1.0), glint);
-  unlit = max(unlit, max(inI * 0.2, glint));
-  // the lid: its heavy lash line, winging out past the outer corner, and
-  // the fold over it
-  float lash = band(q.y - lidY, 0.0008 + 0.0009 * smoothstep(-0.01, 0.014, q.x)) * step(abs(q.x), w) * step(yL, q.y);
-  float wing = band(q.y - (lidY + (q.x - w * 0.8) * 0.45), 0.0009) * step(w * 0.8, q.x) * step(q.x, w + 0.004);
+  unlit = max(unlit, max(inI * 0.3, glint));
+  // the lid: its bold lash line, thickest toward the outer corner and
+  // winging out past it, and the fold of the lid over it
+  float lash = band(q.y - lidY, 0.0009 + 0.0011 * smoothstep(-0.012, 0.016, q.x)) * step(abs(q.x), w + 0.0004) * step(yL, q.y);
+  float wing = band(q.y - (lidY + (q.x - w * 0.8) * 0.5), 0.0011 * (1.0 - smoothstep(w, w + 0.0055, q.x)) + 0.0003) * step(w * 0.8, q.x) * step(q.x, w + 0.0055);
   c = mix(c, ink, max(lash, wing) * front);
-  float fold = band(q.y - (yU + 0.0032) * (1.0 - 0.15 * xn), 0.0006) * step(abs(q.x), w * 0.9);
-  c = mix(c, uPal[K_SKIN_DEEP] * 0.7, fold * front * 0.8);
-  float lower = band(q.y - yL, 0.0005) * step(abs(q.x), w * 0.75);
-  c = mix(c, uPal[K_SKIN_DEEP] * 0.6, lower * front * 0.6);
-  // brows: thick and neat, lying nearly flat, thinning toward the tail
-  vec2 bq = f - vec2(0.031, 1.5235);
-  bq.y -= 0.12 * bq.x - 90.0 * bq.x * bq.x * step(0.0, bq.x);
-  float bw = 0.0028 - 0.0016 * smoothstep(-0.01, 0.022, bq.x);
-  float brow = band(bq.y, bw) * step(-0.019, bq.x) * step(bq.x, 0.024);
-  float hairs = 0.75 + 0.25 * lines(bq.x * 900.0 + bq.y * 400.0, 0.3);
-  c = mix(c, mix(ink, uPal[2], 0.4), brow * front * hairs);
+  float fold = band(q.y - (yU + 0.0036) * (1.0 - 0.12 * xn), 0.0006) * step(abs(q.x), w * 0.85);
+  c = mix(c, uPal[K_SKIN_DEEP] * 0.75, fold * front * 0.75);
+  // (the lid itself a touch deeper, between the lash line and the fold)
+  float lid = step(lidY, q.y) * step(q.y, (yU + 0.0036) * (1.0 - 0.12 * xn)) * step(abs(q.x), w);
+  c = mix(c, uPal[K_SKIN_DEEP], lid * front * 0.25);
+  float lower = band(q.y - yL, 0.00055) * step(abs(q.x), w * 0.8) * smoothstep(-w, w * 0.2, q.x);
+  c = mix(c, ink, lower * front * 0.55);
+  // brows: thick and neat, rising to an arch two-thirds of the way out and
+  // falling to a fine tail
+  // (a parabola either side of the arch: flatter toward her nose, falling
+  // only a few millimetres to the tail - never down her cheek)
+  vec2 bq = f - vec2(0.0335, 1.536);
+  float bx = bq.x;
+  float ba = bx - 0.008;
+  bq.y -= 0.0032 - (ba > 0.0 ? 17.0 : 4.5) * ba * ba;
+  float bw = 0.0032 - 0.002 * smoothstep(0.0, 0.024, bx) + 0.0004 * smoothstep(-0.008, -0.018, bx);
+  float brow = band(bq.y, bw) * smoothstep(-0.0215, -0.019, bx) * (1.0 - smoothstep(0.022, 0.025, bx));
+  float hairs = 0.8 + 0.2 * lines(bx * 900.0 + bq.y * 400.0, 0.3);
+  c = mix(c, mix(ink, uPal[2], 0.35), brow * front * hairs);
   // the nostrils under the tip of her nose
-  vec2 nq = vec2(f.x - 0.0075, r.y - 1.4615);
-  float nos = fill(length(nq / vec2(0.0034, 0.0018)) - 1.0) * smoothstep(-0.085, -0.092, r.z);
-  c = mix(c, uPal[K_SKIN_DEEP] * 0.55, nos * 0.85);
-  // lips: full, the lower catching the light; closed in an even line
-  float mz = smoothstep(-0.066, -0.076, r.z);
-  vec2 lq = vec2(r.x, r.y - 1.433);
-  float bow = 0.0018 * (1.0 - smoothstep(0.0, 0.008, abs(lq.x)));
-  float up = (length(vec2(lq.x / 0.0225, (lq.y - 0.0062) / (0.0072 - bow * 0.6))) - 1.0);
-  float lo = (length(vec2(lq.x / 0.0205, (lq.y + 0.0058) / 0.0085)) - 1.0);
+  vec2 nq = vec2(f.x - 0.0074, r.y - 1.4658);
+  float nos = fill(length(nq / vec2(0.0033, 0.0017)) - 1.0) * smoothstep(-0.088, -0.094, r.z);
+  c = mix(c, uPal[K_SKIN_DEEP] * 0.55, nos * 0.8);
+  // lips: full, rosy brown, the lower catching the light; closed in an
+  // even line
+  float mz = smoothstep(-0.07, -0.08, r.z);
+  vec2 lq = vec2(r.x, r.y - 1.443);
+  float bow = 0.0016 * (1.0 - smoothstep(0.0, 0.008, abs(lq.x)));
+  float up = (length(vec2(lq.x / 0.0205, (lq.y - 0.0052) / (0.0062 - bow * 0.6))) - 1.0);
+  float lo = (length(vec2(lq.x / 0.0185, (lq.y + 0.0052) / 0.0074)) - 1.0);
   float lips = fill(min(up, lo) * 0.008) * mz;
-  vec3 lip = mix(uPal[K_LIP], uPal[K_LIP_LIGHT], smoothstep(-0.009, -0.002, lq.y) * (1.0 - smoothstep(-0.002, 0.0, lq.y)) * 0.0);
-  lip = mix(lip, uPal[K_LIP_LIGHT], 0.6 * (1.0 - smoothstep(0.0, 0.6, length(vec2(lq.x / 0.01, (lq.y + 0.0062) / 0.0035)))));
+  vec3 lip = mix(uPal[K_LIP], uPal[K_LIP_LIGHT], 0.35 * smoothstep(0.0, -0.008, lq.y));
+  lip = mix(lip, uPal[K_LIP_LIGHT] * 1.12, 0.6 * (1.0 - smoothstep(0.0, 0.7, length(vec2(lq.x / 0.009, (lq.y + 0.0055) / 0.003)))));
   c = mix(c, lip, lips);
-  float seam = band(lq.y + 0.0002 + 0.0012 * smoothstep(0.012, 0.02, abs(lq.x)), 0.0006) * step(abs(lq.x), 0.0195) * mz;
+  float seam = band(lq.y + 0.0002 + 0.001 * smoothstep(0.01, 0.018, abs(lq.x)), 0.0006) * step(abs(lq.x), 0.0185) * mz;
   c = mix(c, uPal[K_LIP] * 0.45, seam);
+  // (the face takes the light softly)
+  unlit = max(unlit, 0.22 * front);
   return c;
 }
 vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   vec3 c = base;
   if (m == 1) {
-    c = skSkin(c, r);
+    c = skSkin(c, r, 0.4);
     // (the inside of the ear a shade deeper)
     c = mix(c, uPal[K_SKIN_DEEP], d.y * 0.35 * smoothstep(0.004, -0.004, r.z - 0.018));
     c = drawFace(c, r, d, unlit);
   } else if (m == 5 || m == 8) {
-    c = skSkin(c, r);
+    c = skSkin(c, r, 1.0);
     if (m == 5) {
       // the crew socks: white, ribbed, a little square badge on the outside
       // near the top (blue round red), the cuff's ribs
@@ -3790,7 +3811,7 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     c = mix(c, uPal[K_TEE_LIGHT], 0.18 * smoothstep(0.45, 0.15, n));
     float rib = d.z * (0.7 + 0.3 * lines(atan(r.x, r.z) * 40.0, 0.22));
     c = mix(c, uPal[K_TEE_DEEP], 0.35 * rib);
-    float hem = 0.705 - 0.018 * clamp(r.z / 0.11, -1.0, 1.0) + 0.012 * smoothstep(0.09, 0.16, abs(r.x));
+    float hem = uRig[2].y - 0.018 * clamp(r.z / 0.11, -1.0, 1.0) + 0.012 * smoothstep(0.09, 0.16, abs(r.x));
     float stitch = band(r.y - hem - 0.016, 0.0007) * step(0.4, fract(atan(r.x, r.z) * 70.0)) * (1.0 - d.y);
     float sl = band(d.w - (uRig[2].x - 0.018), 0.0008) * step(0.4, fract(atan(r.y, r.z) * 60.0)) * step(0.6, d.y);
     c = mix(c, uPal[K_TEE_DEEP], max(stitch, sl) * 0.9);
@@ -3819,17 +3840,19 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     so = mix(so, uPal[K_TREAD], band(y - (uRig[1].z - 0.006), 0.0012));
     so = mix(so, uPal[K_TREAD] * 0.8, fill(y - 0.006));
     // panels: the toe cap, the heel counter, a stripe along the quarter
-    float toe = fill(r.z + 0.122 + max(0.0, y - 0.075) * 1.2);
-    float heel = fill(0.06 - r.z + max(0.0, y - 0.11) * 0.8);
-    float quarter = band(y - 0.085 - 0.25 * (r.z + 0.02), 0.009) * step(-0.06, r.z) * step(r.z, 0.05) * step(0.03, abs(x));
+    // (uRig[1].y, .w: the heel's and the toe's ends along it)
+    float tz = uRig[1].w + 0.066, hz = uRig[1].y - 0.056;
+    float toe = fill(r.z - tz + max(0.0, y - 0.07) * 1.2);
+    float heel = fill(hz - r.z + max(0.0, y - 0.105) * 0.8);
+    float quarter = band(y - 0.08 - 0.25 * (r.z + 0.04), 0.008) * step(-0.08, r.z) * step(r.z, hz) * step(0.028, abs(x));
     vec3 up = uPal[7];
     up = mix(up, uPal[K_PANEL], max(max(toe, heel), quarter));
-    up = mix(up, uPal[K_PANEL] * 0.92, band(r.z + 0.122 + max(0.0, y - 0.075) * 1.2, 0.0012));
+    up = mix(up, uPal[K_PANEL] * 0.92, band(r.z - tz + max(0.0, y - 0.07) * 1.2, 0.0012));
     // the laces up the instep and the tongue
-    float onT = step(r.z, -0.02 + (y - 0.1) * 0.2) * step(-0.125, r.z) * step(abs(x), 0.027) * step(0.095, y) * step(y, uRig[1].x);
+    float onT = step(r.z, -0.026 + (y - 0.095) * 0.2) * step(tz - 0.004, r.z) * step(abs(x), 0.025) * step(0.088, y) * step(y, uRig[1].x);
     float lace = max(band(abs(fract((r.z * 1.0 + x * 0.9) / 0.019 + 0.5) - 0.5), 0.12), band(abs(fract((r.z - x * 0.9) / 0.019 + 0.5) - 0.5), 0.12));
-    up = mix(up, vec3(0.99, 0.98, 0.96), lace * onT * step(abs(x), 0.022));
-    up = mix(up, uPal[K_TREAD] * 0.85, (band(abs(x) - 0.024, 0.0015) * onT));
+    up = mix(up, vec3(0.99, 0.98, 0.96), lace * onT * step(abs(x), 0.02));
+    up = mix(up, uPal[K_TREAD] * 0.85, (band(abs(x) - 0.022, 0.0015) * onT));
     float collar = smoothstep(uRig[1].x - 0.022, uRig[1].x - 0.01, r.y);
     up = mix(up, uPal[K_PANEL] * 1.03, collar * 0.6);
     c = mix(up, so, sole);
@@ -4298,7 +4321,7 @@ void main() {
     float soft = 0.1;
   #elif defined(SKATER)
     // (loose cotton in soft gradients; the board and the gold crisp)
-    float soft = m == 3 ? 0.1 : m == 13 ? 0.08 : m == 4 ? 0.07 : (m >= 9 && m <= 12) ? 0.035 : 0.055;
+    float soft = m == 3 ? 0.1 : m == 13 ? 0.08 : m == 4 ? 0.07 : m == 1 ? 0.12 : (m >= 9 && m <= 12) ? 0.035 : 0.065;
   #elif defined(BUNNY)
     // (fur takes the light softly; the billowy trousers in soft gradients)
     float soft = (m == 1 || m == 2 || m == 6 || m == 8 || m == 11) ? 0.1 : m == 4 ? 0.11 : (m == 12 || m == 14) ? 0.04 : 0.07;
