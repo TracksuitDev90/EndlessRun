@@ -1305,6 +1305,16 @@ export class Player {
     }
   }
 
+  // Place one foot - its ankle at (ax, ay, az), root space, the foot
+  // pitched by pitch (0 flat) - for a pose r whose hips are already set (a
+  // character's own stance: the samurai's crouch).
+  plantFoot(r, side, ax, ay, az, pitch = 0) {
+    _eul.set(-r[C.hipPitch], r[C.hipYaw], r[C.hipRoll]);
+    _hips.compose(_v3.set(r[C.hipX], r[C.hipY], 0), _qh.setFromEuler(_eul), _one);
+    _hipsInv.copy(_hips).invert();
+    this.solveLeg(r, side, side === 0 ? -1 : 1, ax, ay, az, pitch, -r[C.hipPitch], null);
+  }
+
   // Place both feet for run phase f (see GAIT) and solve the legs.
   runLegs(r, f, sp) {
     const { ANKLE_H, TOE_D, TOE_F } = this;

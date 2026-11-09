@@ -27,9 +27,9 @@ import { mulberry32 } from '../core/rng.js';
 
 const TAU = Math.PI * 2;
 // which print each runner leaves (see footprint in the shaders)
-const SOLE = { wayfarer: 0, explorer: 1, elder: 0, bunny: 4, skater: 1 };
+const SOLE = { wayfarer: 0, explorer: 1, elder: 0, bunny: 4, skater: 1, samurai: 5 };
 // how deep each presses a running footprint in (m)
-const DEPTH = { wayfarer: 0.03, explorer: 0.024, elder: 0.026, bunny: 0.02, skater: 0.024 };
+const DEPTH = { wayfarer: 0.03, explorer: 0.024, elder: 0.026, bunny: 0.02, skater: 0.024, samurai: 0.034 };
 // prints are let go this far behind the runner (m)
 const KEEP = 24;
 // the share of a wave's cycle it spends rolling up the beach
