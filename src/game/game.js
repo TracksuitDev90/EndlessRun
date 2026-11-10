@@ -42,6 +42,17 @@ export function lidPop(time, p0, every) {
   return { c: tt - cyc * every, pop: h < 0.15 ? 0 : h < 0.4 ? 0.4 : 1 };
 }
 
+// Who runs as the game starts, and who with (null: alone): the title screen's
+// last picks, with ?runner= and ?companion= over them. main.js loads these
+// two before the title screen, and everyone else behind it.
+export function startingRunner(params) {
+  return params.runner ? characterById(params.runner) : pickableById(readString('er.runner'));
+}
+export function startingCompanion(params) {
+  if (params.companion === 'none') return null;
+  return companionById(params.companion || readString('er.companion') || CONFIG.companion.id);
+}
+
 // Orchestrates one run: streaming, obstacles, the player, doorways between
 // worlds, the camera and the two-pass portal render.
 export class Game {
@@ -68,25 +79,29 @@ export class Game {
     this.chunks = new ChunkStreamer(this);
     this.obstacles = new ObstacleField(this);
     this.gems = new GemField(this);
-    // every runner you can pick is built up front (so picking one on the
-    // title screen is instant and never compiles a shader mid-game); only
-    // the one you picked is simulated and drawn
+    // every runner whose model is here is built before the title screen:
+    // whoever's about to run, at least (main.js loads them first; the rest
+    // of the cast arrive behind the title screen and are let in by
+    // admitRunner). Either way a runner can only be picked once they're
+    // built, their shaders compiled and everything of theirs on the GPU, so
+    // picking one is instant and never compiles a shader mid-game; only the
+    // one you picked is simulated and drawn
     this.runners = {};
-    for (const c of CHARACTERS) this.runners[c.id] = c.make(WORLD_DEFS[0].env, assets[c.id]);
-    // (a runner whose jump can keep them up longer asks first: see roadClear)
-    for (const r of Object.values(this.runners)) r.roomAhead = (sec) => this.roadClear(sec);
+    for (const c of CHARACTERS) if (assets[c.id]) this.runners[c.id] = this.makeRunner(c, assets[c.id]);
     // (?runner= runs as anyone, even one still locked; the one remembered
     // only if they can still be picked)
-    this.runnerId = (params.runner ? characterById(params.runner) : pickableById(readString('er.runner'))).id;
+    this.runnerId = startingRunner(params).id;
+    if (!this.runners[this.runnerId]) throw new Error(`the runner '${this.runnerId}' has not been loaded`);
     this.player = this.runners[this.runnerId];
-    // the animal who runs with you: every one you can pick built up front, as
+    // the animal who runs with you: built up front if their model's here, as
     // the runners are (?companion=none to run alone)
     this.companions = {};
     for (const c of COMPANIONS) if (companionAssets[c.id]) this.companions[c.id] = c.mind(this, c, c.make(WORLD_DEFS[0].env, companionAssets[c.id]));
     this.alone = params.companion === 'none';
-    const cdef = this.alone ? null : companionById(params.companion || readString('er.companion') || CONFIG.companion.id);
+    const cdef = startingCompanion(params);
     this.companionId = cdef && this.companions[cdef.id] ? cdef.id : null;
     this.companion = this.companionId ? this.companions[this.companionId] : null;
+    this.warming = null; // someone just arrived, waiting to be drawn once (see warm)
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     this.particles = new Particles();
@@ -121,6 +136,51 @@ export class Game {
     this.best = readNumber('er.best');
     this.ui.setBest(this.best);
     this.newRun(true);
+  }
+
+  makeRunner(c, asset) {
+    const r = c.make(WORLD_DEFS[0].env, asset);
+    // (a runner whose jump can keep them up longer asks first: see roadClear)
+    r.roomAhead = (sec) => this.roadClear(sec);
+    return r;
+  }
+
+  // --- the rest of the cast ------------------------------------------------------
+  // Someone whose model arrived after the loading screen (main.js, which only
+  // lets them in while the title screen's up): built now, then warmed up as
+  // precompile warms whoever was there at the start, and only then to be
+  // picked.
+  async admitRunner(c, asset) {
+    if (this.runners[c.id]) return;
+    const r = this.makeRunner(c, asset);
+    await this.warm(r.objects, (on) => r.forCompile?.(on), () => r.renderShadow(this.renderer));
+    this.runners[c.id] = r;
+  }
+
+  async admitCompanion(c, asset) {
+    if (this.companions[c.id]) return;
+    const m = c.mind(this, c, c.make(WORLD_DEFS[0].env, asset));
+    await this.warm(m.objects, (on) => m.forCompile(on), () => m.body.renderShadow(this.renderer));
+    this.companions[c.id] = m;
+  }
+
+  // Compile a newcomer's shaders - off the main thread, where the browser
+  // can - then draw everything of theirs once, out of sight, in a frame of
+  // the title screen (see render), so their buffers and textures are on the
+  // GPU and every program of theirs has been used before anyone can pick
+  // them: nothing of theirs is ever compiled or uploaded mid-run.
+  async warm(objects, forCompile, shadow) {
+    const scene = new THREE.Scene();
+    scene.add(...objects);
+    forCompile(true);
+    try {
+      if (this.renderer.compileAsync) await this.renderer.compileAsync(scene, this.cam.camera);
+      else this.renderer.compile(scene, this.cam.camera);
+      await new Promise((done) => (this.warming = { scene, shadow, done }));
+    } finally {
+      forCompile(false);
+      for (const o of objects) o.removeFromParent();
+    }
   }
 
   speedAt(t) {
@@ -877,6 +937,19 @@ export class Game {
     // (see render/caster.js)
     this.player.renderShadow(r);
     this.companion?.body.renderShadow(r);
+    // someone just arrived (see warm): their shadow's target allocated, and
+    // all of them drawn into one pixel that the clear below wipes - on the
+    // title screen only, where a long frame is never a missed jump
+    if (this.warming && this.state === 'title') {
+      const w = this.warming;
+      this.warming = null;
+      w.shadow();
+      r.setScissorTest(true);
+      r.setScissor(0, 0, 1, 1);
+      r.render(w.scene, camera);
+      r.setScissorTest(false);
+      w.done();
+    }
     r.clear(true, true, true);
     this.portal.depthMesh.visible = this.portal.active;
     if (this.portal.active) {

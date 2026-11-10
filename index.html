@@ -12,10 +12,127 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
+    <!-- Start fetching the model of whoever ran last time (and whoever ran
+         with them) now, alongside the code, not after all of it has loaded
+         and run: src/game/runner-asset.js picks these up. The game leaves the
+         hint (er.assets) whenever someone's picked; on a first visit it's the
+         two who run by default. (Ahead of the stylesheets: a script waits
+         for any before it.) -->
+    <script>
+      (function () {
+        var bases = ['assets/explorer/', 'assets/fox/'];
+        try {
+          if (/[?&](runner|companion|manual)\b/.test(location.search)) return;
+          var saved = JSON.parse(localStorage.getItem('er.assets') || 'null');
+          if (Array.isArray(saved)) {
+            bases = saved.filter(function (b) {
+              return typeof b === 'string' && /^assets\/[a-z0-9-]+\/$/.test(b);
+            });
+          }
+        } catch (e) {
+          /* storage unavailable: the defaults */
+        }
+        var early = (window.__erAssets = {});
+        bases.slice(0, 2).forEach(function (b) {
+          var e = (early[b] = { json: fetch(b + 'runner.json'), bin: fetch(b + 'runner.bin') });
+          // (a failure is the loader's to deal with, if it ever asks)
+          e.json.catch(function () {});
+          e.bin.catch(function () {});
+        });
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/style.css" />
+    <!-- The typeface comes from another server, and a stylesheet in the head
+         holds up both the first paint and the game's own script until it has
+         answered (or failed to: a slow or blocked font server would hold the
+         game up with it). So it's fetched as a stylesheet for print, which
+         holds nothing up, and switched over once it's here; the text shows in
+         the fallback serif until then, as it already did while the font file
+         itself loaded (display=swap). -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&display=swap"
+      media="print"
+      onload="this.media = 'all'"
+    />
+    <!-- Every module the game loads, fetched at once rather than found one
+         layer of imports at a time (see tools/preload.py, which writes this
+         list: run it after adding or removing a module). -->
+    <!-- modulepreload:start (written by tools/preload.py) -->
+    <link rel="modulepreload" href="vendor/three/three.module.min.js" />
+    <link rel="modulepreload" href="vendor/three/three.core.min.js" />
+    <link rel="modulepreload" href="src/config.js" />
+    <link rel="modulepreload" href="src/render/shaders.js" />
+    <link rel="modulepreload" href="src/render/textures.js" />
+    <link rel="modulepreload" href="src/game/game.js" />
+    <link rel="modulepreload" href="src/game/runner-asset.js" />
+    <link rel="modulepreload" href="src/game/characters.js" />
+    <link rel="modulepreload" href="src/game/companions.js" />
+    <link rel="modulepreload" href="src/core/input.js" />
+    <link rel="modulepreload" href="src/core/audio.js" />
+    <link rel="modulepreload" href="src/ui/ui.js" />
+    <link rel="modulepreload" href="src/core/pacer.js" />
+    <link rel="modulepreload" href="src/core/quality.js" />
+    <link rel="modulepreload" href="src/core/rng.js" />
+    <link rel="modulepreload" href="src/render/particles.js" />
+    <link rel="modulepreload" href="src/world/world.js" />
+    <link rel="modulepreload" href="src/world/index.js" />
+    <link rel="modulepreload" href="src/game/course.js" />
+    <link rel="modulepreload" href="src/game/chunks.js" />
+    <link rel="modulepreload" href="src/game/obstacles.js" />
+    <link rel="modulepreload" href="src/game/gems.js" />
+    <link rel="modulepreload" href="src/render/sparkles.js" />
+    <link rel="modulepreload" href="src/game/camera.js" />
+    <link rel="modulepreload" href="src/game/portal.js" />
+    <link rel="modulepreload" href="src/game/dream.js" />
+    <link rel="modulepreload" href="src/game/bubbles.js" />
+    <link rel="modulepreload" href="src/game/splash.js" />
+    <link rel="modulepreload" href="src/game/warp.js" />
+    <link rel="modulepreload" href="src/game/sands.js" />
+    <link rel="modulepreload" href="src/game/wayfarer.js" />
+    <link rel="modulepreload" href="src/game/explorer.js" />
+    <link rel="modulepreload" href="src/game/elder.js" />
+    <link rel="modulepreload" href="src/game/bunny.js" />
+    <link rel="modulepreload" href="src/game/skater.js" />
+    <link rel="modulepreload" href="src/game/samurai.js" />
+    <link rel="modulepreload" href="src/game/fox.js" />
+    <link rel="modulepreload" href="src/game/dragon.js" />
+    <link rel="modulepreload" href="src/game/companion.js" />
+    <link rel="modulepreload" href="src/game/flyer.js" />
+    <link rel="modulepreload" href="src/render/batch.js" />
+    <link rel="modulepreload" href="src/render/geo.js" />
+    <link rel="modulepreload" href="src/world/planets.js" />
+    <link rel="modulepreload" href="src/world/village.js" />
+    <link rel="modulepreload" href="src/world/rooftops.js" />
+    <link rel="modulepreload" href="src/world/corridor.js" />
+    <link rel="modulepreload" href="src/world/conservatory.js" />
+    <link rel="modulepreload" href="src/world/causeway.js" />
+    <link rel="modulepreload" href="src/world/forest.js" />
+    <link rel="modulepreload" href="src/world/hell.js" />
+    <link rel="modulepreload" href="src/world/time.js" />
+    <link rel="modulepreload" href="src/world/ocean.js" />
+    <link rel="modulepreload" href="src/world/space.js" />
+    <link rel="modulepreload" href="src/game/drift.js" />
+    <link rel="modulepreload" href="src/game/dust.js" />
+    <link rel="modulepreload" href="src/game/rig.js" />
+    <link rel="modulepreload" href="src/game/cloth.js" />
+    <link rel="modulepreload" href="src/game/kit.js" />
+    <link rel="modulepreload" href="src/game/outfit.js" />
+    <link rel="modulepreload" href="src/game/player.js" />
+    <link rel="modulepreload" href="src/game/spill.js" />
+    <link rel="modulepreload" href="src/game/sparks.js" />
+    <link rel="modulepreload" href="src/game/props.js" />
+    <link rel="modulepreload" href="src/game/seeds.js" />
+    <link rel="modulepreload" href="src/game/ribbon.js" />
+    <link rel="modulepreload" href="src/render/caster.js" />
+    <link rel="modulepreload" href="src/world/shapes.js" />
+    <link rel="modulepreload" href="src/world/whimsy.js" />
+    <link rel="modulepreload" href="src/world/gems.js" />
+    <link rel="modulepreload" href="src/world/lane-art.js" />
+    <link rel="modulepreload" href="src/world/hall-art.js" />
+    <!-- modulepreload:end -->
   </head>
   <body>
     <!-- the pearl icon's sheen (the Kelp Deep's counter), shared by every copy of it -->
