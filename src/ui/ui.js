@@ -12,6 +12,17 @@ function replay(el, cls) {
   el.classList.add(cls);
 }
 
+// The same, without the reflow, for what restarts in the middle of a run (a
+// forced layout in the middle of a frame, for every gem, is the game's time
+// spent on the page): the animation comes as twins in style.css - `cls` and
+// `cls-b`, the same keyframes under two names - and the element swaps one
+// for the other; a change of animation-name starts it from the top.
+function restart(el, cls) {
+  const on = el.classList.contains(cls);
+  el.classList.toggle(cls, !on);
+  el.classList.toggle(`${cls}-b`, on);
+}
+
 // how many cards the title screen's grid holds (three by two)
 const SLOTS = 6;
 
@@ -86,20 +97,26 @@ export class UI {
   // one picks them (it doesn't start the run). A runner still being worked
   // on (locked) is dealt greyed out, a 'soon' seal on them, and can't be
   // picked. The grid is always full: any slot no runner fills yet holds a
-  // mystery card, greyed out - someone's still to come.
-  setRunners(list, selected) {
+  // mystery card, greyed out - someone's still to come. ready(id): whether
+  // that runner's model has arrived (see main.js): one who hasn't yet is
+  // dealt all the same, washed out, three dots stamped on their corner until
+  // runnerReady; tapping them meanwhile picks them the moment they are
+  // (runnerWanted).
+  setRunners(list, selected, ready = () => true) {
     this.runnerDefs = Object.fromEntries(list.map((c) => [c.id, c]));
     const root = $('pick');
     root.textContent = '';
     this.cards = {};
     for (const c of list) {
       const b = document.createElement('button');
-      b.className = c.locked ? 'pick-card pick-locked' : 'pick-card';
+      const coming = !c.locked && !ready(c.id);
+      b.className = c.locked ? 'pick-card pick-locked' : coming ? 'pick-card pick-loading' : 'pick-card';
       b.type = 'button';
       b.dataset.id = c.id;
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-label', c.locked ? `${c.name}, ${c.title}: back soon` : `${c.name}, ${c.title}`);
       if (c.locked) b.setAttribute('aria-disabled', 'true');
+      if (coming) b.setAttribute('aria-busy', 'true');
       b.style.setProperty('--c1', c.tint[0]);
       b.style.setProperty('--c2', c.tint[1]);
       b.innerHTML =
@@ -107,7 +124,8 @@ export class UI {
         `<img class="pick-fig" src="${c.card}" alt="" draggable="false" />` +
         `<span class="pick-plate"><span class="pick-name"></span><span class="pick-title"></span></span>` +
         `<span class="pick-seal" aria-hidden="true">✓</span>` +
-        (c.locked ? `<span class="pick-soon" aria-hidden="true">soon</span>` : '');
+        (c.locked ? `<span class="pick-soon" aria-hidden="true">soon</span>` : '') +
+        (coming ? `<span class="pick-wait" aria-hidden="true"><i></i><i></i><i></i></span>` : '');
       b.querySelector('.pick-name').textContent = c.name;
       b.querySelector('.pick-title').textContent = c.title;
       b.title = c.locked ? `${c.name} is in the workshop - back soon` : c.blurb;
@@ -149,6 +167,21 @@ export class UI {
     }
   }
 
+  // A runner's model has arrived: their card comes to life.
+  runnerReady(id) {
+    const b = this.cards?.[id];
+    if (!b) return;
+    b.classList.remove('pick-loading', 'pick-wanted');
+    b.removeAttribute('aria-busy');
+    b.querySelector('.pick-wait')?.remove();
+  }
+
+  // Someone not here yet was tapped: their card shows it's been heard (they
+  // step in as soon as they arrive). id null: nobody's waited for any more.
+  runnerWanted(id) {
+    for (const [k, b] of Object.entries(this.cards || {})) b.classList.toggle('pick-wanted', k === id && b.classList.contains('pick-loading'));
+  }
+
   // The runner beside the one shown (dir -1 / +1), for the arrow keys and
   // sideways swipes on the title screen.
   runnerBeside(dir) {
@@ -159,18 +192,20 @@ export class UI {
 
   // The badges for who runs with you (see game/companions.js), under the
   // runners' cards: their portrait, name and what they are. Tapping one
-  // picks them.
-  setCompanions(list, selected) {
+  // picks them. (ready, companionReady, companionWanted: as for the runners.)
+  setCompanions(list, selected, ready = () => true) {
     const root = $('pals');
     for (const el of root.querySelectorAll('.pal')) el.remove();
     this.pals = {};
     for (const c of list) {
       const b = document.createElement('button');
-      b.className = 'pal';
+      const coming = !ready(c.id);
+      b.className = coming ? 'pal pal-loading' : 'pal';
       b.type = 'button';
       b.dataset.id = c.id;
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-label', `${c.name}, ${c.title}: ${c.blurb}`);
+      if (coming) b.setAttribute('aria-busy', 'true');
       b.title = c.blurb;
       b.style.setProperty('--c1', c.tint[0]);
       b.style.setProperty('--c2', c.tint[1]);
@@ -187,6 +222,17 @@ export class UI {
     }
     root.hidden = list.length < 2;
     this.showCompanion(selected, false);
+  }
+
+  companionReady(id) {
+    const b = this.pals?.[id];
+    if (!b) return;
+    b.classList.remove('pal-loading', 'pal-wanted');
+    b.removeAttribute('aria-busy');
+  }
+
+  companionWanted(id) {
+    for (const [k, b] of Object.entries(this.pals || {})) b.classList.toggle('pal-wanted', k === id && b.classList.contains('pal-loading'));
   }
 
   showCompanion(id, hop = true) {
@@ -233,7 +279,7 @@ export class UI {
       this.worldsShown = worlds;
       this.multEl.textContent = String(worlds);
       this.multEl.setAttribute('aria-label', worlds === 1 ? '1 world come through' : `${worlds} worlds come through`);
-      if (grew) replay(this.multEl, 'bump');
+      if (grew) restart(this.multEl, 'bump');
     }
   }
 
@@ -241,7 +287,7 @@ export class UI {
     const el = this.pops[this.popNext];
     this.popNext = (this.popNext + 1) % this.pops.length;
     el.textContent = `+${fmt.format(Math.round(points))}`;
-    replay(el, 'show');
+    restart(el, 'show');
   }
 
   // The gem counter under the score: bumps with each gem, and wears the
@@ -252,7 +298,7 @@ export class UI {
 
   gem(n) {
     this.setGems(n);
-    replay(this.gemPill, 'bump');
+    restart(this.gemPill, 'bump');
   }
 
   // (icon 'pearl': the world's gems are pearls, and every gem icon becomes one)
@@ -264,7 +310,7 @@ export class UI {
   }
 
   newBest() {
-    replay($('score-best'), 'show');
+    restart($('score-best'), 'show');
   }
 
   setBest(best) {
@@ -285,11 +331,9 @@ export class UI {
     const el = $('toast');
     el.querySelector('.num').textContent = num;
     el.querySelector('.name').textContent = name;
-    el.classList.remove('show');
-    void el.offsetWidth; // restart the animation
-    el.classList.add('show');
+    restart(el, 'show');
     clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => el.classList.remove('show'), 3600);
+    this.toastTimer = setTimeout(() => el.classList.remove('show', 'show-b'), 3600);
   }
 
   hint(kind) {
@@ -300,11 +344,9 @@ export class UI {
     const icon = el.querySelector('.hint-icon');
     icon.className = `hint-icon dir-${kind}`;
     icon.innerHTML = `<span>${kind === 'up' ? '↑' : kind === 'down' ? '↓' : '↔'}</span>`;
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
+    restart(el, 'show');
     clearTimeout(this.hintTimer);
-    this.hintTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    this.hintTimer = setTimeout(() => el.classList.remove('show', 'show-b'), 2200);
   }
 
   setInk(v) {

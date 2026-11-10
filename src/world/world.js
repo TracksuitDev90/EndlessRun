@@ -14,7 +14,7 @@ import {
   makeGemMaterial,
   makeGemGlowMaterial,
 } from '../render/shaders.js';
-import { P, part, merge, rgb } from '../render/geo.js';
+import { P, part, merge, rgbOf } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { Planets } from './planets.js';
 
@@ -186,7 +186,7 @@ export class World {
       it.sx = o.sx ?? s;
       it.sy = o.sy ?? s;
       it.sz = o.sz ?? s;
-      const c = typeof o.c === 'string' ? rgb(o.c) : o.c;
+      const c = typeof o.c === 'string' ? rgbOf(o.c) : o.c;
       it.r = c ? c[0] : 1;
       it.g = c ? c[1] : 1;
       it.b = c ? c[2] : 1;

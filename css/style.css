@@ -328,6 +328,71 @@ body:not(.touch) .touch-only {
   transform: rotate(8deg);
 }
 
+/* a runner whose model is still on its way (it loads behind the title
+   screen: see main.js): their card's dealt at once, washed out a little,
+   three dots stamped on its corner until they arrive - a moment, on most
+   connections. Tapped meanwhile, the stamp takes the card's colours: they'll
+   step in the moment they're here. */
+.pick-loading .pick-bg,
+.pick-loading[aria-checked='false'] .pick-bg {
+  filter: saturate(0.18) brightness(0.96);
+}
+.pick-loading .pick-fig,
+.pick-loading[aria-checked='false'] .pick-fig {
+  opacity: 0.5;
+}
+.pick-wait {
+  position: absolute;
+  top: -9px;
+  right: -10px;
+  display: flex;
+  gap: 3px;
+  padding: 6px 7px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  transform: rotate(8deg);
+  transition: background 0.25s ease;
+}
+.pick-wait i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: wait-dot 1.05s ease-in-out infinite;
+}
+.pick-wait i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.pick-wait i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.pick-wanted .pick-wait {
+  background: var(--c1);
+}
+.pal-loading .pal-face,
+.pal-loading[aria-checked='false'] .pal-face {
+  filter: saturate(0.15) brightness(0.97);
+}
+.pal-loading .pal-face img {
+  opacity: 0.5;
+}
+.pal-loading .pal-text {
+  opacity: 0.6;
+  animation: wait-text 1.05s ease-in-out infinite;
+}
+.pal-wanted {
+  background: var(--paper-2);
+}
+@keyframes wait-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+@keyframes wait-text {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.38; }
+}
+
 /* the mystery card: someone's still to come - washed out in greys, a big
    question mark standing up where they will, a dashed edge, nothing to
    pick */
@@ -679,8 +744,18 @@ body:not(.touch) .touch-only {
   font-variant-numeric: tabular-nums lining-nums;
   transform: rotate(-8deg);
 }
+/* (What the HUD restarts in the middle of a run - this bump, the gem pill's,
+   the score pops, 'new best!', the world's name, a hint - comes as a pair of
+   twins: the same animation under two names, `x` and `x-b`. To play one
+   again the element swaps one twin's class for the other's (restart in
+   ui.js), and a change of animation-name starts it from the top. The other
+   way to restart one - drop the class, make the page lay itself out, put it
+   back - forces a layout in the middle of a frame, once for every gem.) */
 .score-mult.bump {
   animation: bump 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.score-mult.bump-b {
+  animation: bump-b 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
 /* the gem counter: a smaller pill under the score, its gem in the world's colour */
 .gem-pill {
@@ -702,6 +777,9 @@ body:not(.touch) .touch-only {
 }
 .gem-pill.bump {
   animation: gem-bump 0.38s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.gem-pill.bump-b {
+  animation: gem-bump-b 0.38s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
 .gem-ic {
   width: 22px;
@@ -758,6 +836,9 @@ body:not(.touch) .touch-only {
 .pop.show {
   animation: pop 0.95s ease-out forwards;
 }
+.pop.show-b {
+  animation: pop-b 0.95s ease-out forwards;
+}
 .score-best {
   position: absolute;
   left: 4px;
@@ -776,6 +857,9 @@ body:not(.touch) .touch-only {
 }
 .score-best.show {
   animation: best 2.8s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+.score-best.show-b {
+  animation: best-b 2.8s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
 }
 .title-best {
   margin: 1.1em 0 0;
@@ -821,6 +905,9 @@ body:not(.touch) .touch-only {
 #toast.show {
   animation: toast 3.6s ease forwards;
 }
+#toast.show-b {
+  animation: toast-b 3.6s ease forwards;
+}
 
 /* --- tutorial hint ------------------------------------------------------- */
 #hint {
@@ -839,6 +926,9 @@ body:not(.touch) .touch-only {
 }
 #hint.show {
   animation: hint 2.2s ease forwards;
+}
+#hint.show-b {
+  animation: hint-b 2.2s ease forwards;
 }
 .hint-text {
   font-size: clamp(16px, 4.6vw, 22px);
@@ -1075,7 +1165,19 @@ body:not(.touch) .touch-only {
   78% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -6px); }
 }
+@keyframes toast-b {
+  0% { opacity: 0; transform: translate(-50%, 10px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  78% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
 @keyframes hint {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.95); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes hint-b {
   0% { opacity: 0; transform: translate(-50%, 10px) scale(0.95); }
   12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
   80% { opacity: 1; }
@@ -1086,7 +1188,17 @@ body:not(.touch) .touch-only {
   35% { transform: rotate(6deg) scale(1.4); }
   100% { transform: rotate(-8deg) scale(1); }
 }
+@keyframes bump-b {
+  0% { transform: rotate(-8deg) scale(1); }
+  35% { transform: rotate(6deg) scale(1.4); }
+  100% { transform: rotate(-8deg) scale(1); }
+}
 @keyframes gem-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+@keyframes gem-bump-b {
   0% { transform: scale(1); }
   40% { transform: scale(1.14); }
   100% { transform: scale(1); }
@@ -1101,7 +1213,20 @@ body:not(.touch) .touch-only {
   70% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-22px) scale(1); }
 }
+@keyframes pop-b {
+  0% { opacity: 0; transform: translateY(6px) scale(0.85); }
+  15% { opacity: 1; transform: translateY(0) scale(1.05); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-22px) scale(1); }
+}
 @keyframes best {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.7) rotate(-6deg); }
+  14% { opacity: 1; transform: translateY(0) scale(1.08) rotate(-3deg); }
+  24% { transform: scale(1) rotate(-3deg); }
+  82% { opacity: 1; transform: scale(1) rotate(-3deg); }
+  100% { opacity: 0; transform: translateY(-4px) scale(0.96) rotate(-3deg); }
+}
+@keyframes best-b {
   0% { opacity: 0; transform: translateY(-8px) scale(0.7) rotate(-6deg); }
   14% { opacity: 1; transform: translateY(0) scale(1.08) rotate(-3deg); }
   24% { transform: scale(1) rotate(-3deg); }
@@ -1166,7 +1291,9 @@ body:not(.touch) .touch-only {
   .pick-line.hop,
   .pick-card .pick-fig,
   .pick-card.hop .pick-fig,
-  .pal.hop .pal-face img {
+  .pal.hop .pal-face img,
+  .pick-wait i,
+  .pal-loading .pal-text {
     animation: none;
   }
   .logo span,
