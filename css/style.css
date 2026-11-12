@@ -106,47 +106,175 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: calc(9vh + var(--safe-top)) 16px calc(5vh + var(--safe-bottom));
+  padding: calc(5vh + var(--safe-top)) 16px calc(5vh + var(--safe-bottom));
   text-align: center;
   background: linear-gradient(to bottom, rgba(10, 30, 10, 0.35), rgba(10, 30, 10, 0) 38%, rgba(10, 30, 10, 0) 62%, rgba(10, 30, 10, 0.4));
 }
+/* The wordmark (built by ui.js): ENDLESS over RUN in a chunky display face,
+   every letter a cut-out set a little off true, in cream or the coat's
+   orange, with an ink keyline and a hard ink shadow like the cards below
+   it; speed lines trail off behind RUN, and a little ink ribbon under it
+   carries the tagline. --L is the size of the small word; everything else
+   in the lockup is measured from it, so the keyline stays the same weight
+   on both words. */
 .logo {
+  --L: clamp(34px, min(11.2vw, 6.3vh), 78px);
+  --line: calc(var(--L) * 0.17);
+  --drop-x: calc(var(--L) * 0.05);
+  --drop-y: calc(var(--L) * 0.1);
   margin: 0;
-  font-weight: 300;
-  font-size: clamp(26px, 7.2vw, 72px);
-  letter-spacing: 0.26em;
-  text-indent: 0.26em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Lilita One', 'Arial Black', 'Helvetica Neue', sans-serif;
+  font-weight: 400;
+  line-height: 1;
   white-space: nowrap;
-  text-transform: lowercase;
-  line-height: 1.1;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.25);
 }
-.logo span {
+.logo-row {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+.logo-small {
+  --fill: var(--white);
+  font-size: var(--L);
+  letter-spacing: 0.035em;
+  /* (a touch right, so ENDLESS sits over RUN rather than over its speed lines) */
+  margin-left: calc(var(--L) * 0.35);
+}
+.logo-big {
+  --fill: var(--coat);
+  font-size: calc(var(--L) * 1.95);
+  letter-spacing: 0.02em;
+  margin-top: calc(var(--L) * -0.3);
+  margin-left: calc(var(--L) * 0.55);
+  transform: rotate(-3deg);
+}
+.logo-ch {
+  position: relative;
+  z-index: 0;
   display: inline-block;
+  color: var(--fill);
   opacity: 0;
-  transform: translateY(14px) rotate(-4deg);
-  animation: unfold 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  transform: translateY(var(--lift)) rotate(var(--tilt));
+  animation: logo-pop 0.75s cubic-bezier(0.2, 1.5, 0.4, 1) calc(0.1s + var(--i) * 0.06s) both;
 }
-.logo span:nth-child(1) { animation-delay: 0.05s; }
-.logo span:nth-child(2) { animation-delay: 0.1s; }
-.logo span:nth-child(3) { animation-delay: 0.15s; }
-.logo span:nth-child(4) { animation-delay: 0.2s; }
-.logo span:nth-child(5) { animation-delay: 0.25s; }
-.logo span:nth-child(6) { animation-delay: 0.3s; }
-.logo span:nth-child(7) { animation-delay: 0.35s; }
-.logo span:nth-child(8) { animation-delay: 0.4s; }
-.logo span:nth-child(9) { animation-delay: 0.45s; }
-.logo span:nth-child(10) { animation-delay: 0.5s; }
-.logo span:nth-child(11) { animation-delay: 0.55s; }
-.logo span:nth-child(12) { animation-delay: 0.6s; }
-.logo span:nth-child(n + 13) { animation-delay: 0.65s; }
+.logo-gap {
+  width: 0.3em;
+}
+/* under each letter: its keyline, and under that its shadow */
+.logo-ch::before,
+.logo-ch::after {
+  content: attr(data-ch);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: var(--ink);
+  -webkit-text-stroke: var(--line) var(--ink);
+}
+.logo-ch::before {
+  transform: translate(var(--drop-x), var(--drop-y));
+}
+/* RUN never stops running: every few seconds its letters hop in turn */
+.logo-big .logo-ch {
+  animation:
+    logo-pop 0.75s cubic-bezier(0.2, 1.5, 0.4, 1) calc(0.1s + var(--i) * 0.06s) both,
+    logo-hop 3.6s ease-in-out calc(2s + var(--i) * 0.09s) infinite;
+}
+.logo-speed {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(var(--L) * 0.11);
+  margin-right: calc(var(--L) * 0.12);
+  transform: translateY(-44%);
+  opacity: 0;
+  animation: speed-in 0.5s ease-out 0.55s forwards;
+}
+.logo-speed i {
+  display: block;
+  height: calc(var(--L) * 0.17);
+  border-radius: 99px;
+  background: var(--white);
+  box-shadow:
+    0 0 0 calc(var(--line) * 0.45) var(--ink),
+    var(--drop-x) var(--drop-y) 0 calc(var(--line) * 0.45) var(--ink);
+}
+.logo-speed i:nth-child(1) { width: calc(var(--L) * 0.55); margin-right: calc(var(--L) * 0.12); }
+.logo-speed i:nth-child(2) { width: calc(var(--L) * 0.85); }
+.logo-speed i:nth-child(3) { width: calc(var(--L) * 0.4); margin-right: calc(var(--L) * 0.2); }
+@keyframes logo-pop {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em) scale(0.5) rotate(0deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(var(--lift)) rotate(var(--tilt));
+  }
+}
+@keyframes logo-hop {
+  0%, 14%, 100% {
+    opacity: 1;
+    transform: translateY(var(--lift)) rotate(var(--tilt));
+  }
+  6% {
+    opacity: 1;
+    transform: translateY(calc(var(--lift) - 0.09em)) rotate(calc(var(--tilt) * -1));
+  }
+}
+@keyframes speed-in {
+  from { opacity: 0; transform: translate(30%, -44%); }
+  to { opacity: 1; transform: translate(0, -44%); }
+}
 
+/* Small type over the scene wears an ink keyline (drawn under the letters,
+   so it never eats into them) and a hard ink drop, like the cards, so it
+   reads against any world: bright sky, snow, dark sea. */
+.howto-item,
+.begin,
+.pick-line,
+.pals-label {
+  -webkit-text-stroke: 3.5px var(--ink);
+  paint-order: stroke fill;
+  letter-spacing: 0.03em;
+  word-spacing: 0.08em;
+  text-shadow: 0 2.5px 0 var(--ink), 0 2px 12px rgba(20, 10, 4, 0.4);
+}
+
+/* the tagline, on an ink ribbon tucked under RUN */
 .tagline {
-  margin: 0.9em 0 0;
+  position: relative;
+  z-index: 1;
+  margin: calc(clamp(34px, min(11.2vw, 6.3vh), 78px) * 0.02) 0 0;
+  padding: 0.3em 0.95em 0.38em;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--paper);
   font-style: italic;
-  font-size: clamp(14px, 3.6vw, 20px);
-  opacity: 0.92;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.3);
+  font-weight: 700;
+  font-size: clamp(12px, 3.3vw, 16px);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transform: rotate(-2deg);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  animation: ribbon-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) 0.75s forwards;
+}
+.title-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+@keyframes ribbon-in {
+  from { opacity: 0; transform: rotate(-2deg) scaleX(0.6); }
+  to { opacity: 1; transform: rotate(-2deg); }
 }
 .title-bottom {
   display: flex;
@@ -156,25 +284,54 @@ button {
 }
 .howto {
   display: flex;
-  gap: clamp(14px, 5vw, 34px);
-  font-size: clamp(13px, 3.4vw, 16px);
+  align-items: flex-end;
+  gap: clamp(18px, 6vw, 38px);
+  font-size: clamp(14px, 3.7vw, 17px);
+  font-weight: 700;
 }
 .howto-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  opacity: 0.95;
+  gap: 7px;
 }
-.glyph {
-  font-size: 1.5em;
-  line-height: 1;
+/* the controls drawn as keys, each a chunky arrow on a paper cap */
+.key-pair {
+  display: flex;
+  gap: 6px;
 }
+.key {
+  display: grid;
+  place-items: center;
+  width: clamp(32px, 9vw, 40px);
+  height: clamp(32px, 9vw, 40px);
+  border: 2.5px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 2px 3px 0 var(--ink);
+}
+.key svg {
+  width: 68%;
+  height: 68%;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.key.down svg { transform: rotate(180deg); }
+.key.left svg { transform: rotate(-90deg); }
+.key.right svg { transform: rotate(90deg); }
 .begin {
-  font-size: clamp(16px, 4.4vw, 22px);
+  font-size: clamp(19px, 5.2vw, 26px);
+  font-weight: 700;
   font-style: italic;
-  animation: breathe 1.8s ease-in-out infinite;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.01em;
+  animation: breathe-soft 1.8s ease-in-out infinite;
+}
+@keyframes breathe-soft {
+  0%, 100% { opacity: 0.75; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.03); }
 }
 .touch .mouse-only,
 body:not(.touch) .touch-only {
@@ -460,9 +617,9 @@ body:not(.touch) .touch-only {
   margin: 0 0 clamp(12px, 2.4vh, 22px);
   min-height: 1.3em;
   font-style: italic;
-  font-size: clamp(12px, 3.3vw, 15px);
+  font-weight: 700;
+  font-size: clamp(13px, 3.6vw, 16px);
   color: var(--white);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
 }
 .pick-line.hop {
@@ -511,9 +668,8 @@ body:not(.touch) .touch-only {
 }
 .pals-label {
   font-style: italic;
+  font-weight: 700;
   font-size: clamp(13px, 3.4vw, 16px);
-  opacity: 0.92;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
 }
 .pal {
   display: inline-flex;
@@ -636,41 +792,38 @@ body:not(.touch) .touch-only {
   border-left: 4.5px solid var(--ink);
   border-right: 4.5px solid var(--ink);
 }
-.ic-sound {
-  position: relative;
-  width: 18px;
-  height: 16px;
+/* a speaker; struck through with a cross when the sound's off */
+.ic-speaker {
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.ic-sound::before {
-  content: '';
+.ic-speaker .spk-body {
+  fill: var(--ink);
+  stroke-width: 1.6;
+}
+.ic-speaker .spk-off,
+.muted .ic-speaker .spk-on {
+  display: none;
+}
+.muted .ic-speaker .spk-off {
+  display: inline;
+}
+.sound-toggle.muted {
+  background: var(--paper-2);
+}
+/* on the title screen it waits in the corner where the game keeps it */
+.title-sound {
   position: absolute;
-  left: 0;
-  top: 4px;
-  width: 6px;
-  height: 8px;
-  background: var(--ink);
-  clip-path: polygon(0 0, 50% 0, 100% -50%, 100% 150%, 50% 100%, 0 100%);
-  box-shadow: 0 0 0 0 var(--ink);
-}
-.ic-sound::after {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 2px;
-  width: 8px;
-  height: 12px;
-  border: 2.5px solid var(--ink);
-  border-left: none;
-  border-radius: 0 12px 12px 0;
-}
-.muted .ic-sound::after {
-  border: none;
-  width: 10px;
-  height: 2.5px;
-  top: 7px;
-  background: var(--ink);
-  transform: rotate(45deg);
-  border-radius: 2px;
+  top: calc(12px + var(--safe-top));
+  right: calc(12px + var(--safe-right));
+  width: 46px;
+  height: 46px;
 }
 
 #hud {
@@ -862,17 +1015,47 @@ body:not(.touch) .touch-only {
   animation: best-b 2.8s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
 }
 .title-best {
-  margin: 1.1em 0 0;
-  font-size: clamp(14px, 3.6vw, 18px);
-  letter-spacing: 0.12em;
-  text-transform: lowercase;
-  opacity: 0.95;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 3px 12px 3px 8px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 2px 3px 0 var(--ink);
+  color: var(--ink);
+  font-size: clamp(13px, 3.5vw, 17px);
+  line-height: 1.2;
+  opacity: 0;
+  animation: ribbon-in-flat 0.45s ease-out 0.95s forwards;
+}
+.title-best[hidden] {
+  display: none;
+}
+.best-ic {
+  width: 1.15em;
+  height: 1.15em;
+  fill: var(--coat);
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.best-label {
+  font-size: 0.72em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .title-best b {
-  font-weight: 600;
+  font-weight: 800;
   font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+}
+@keyframes ribbon-in-flat {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* --- world toast --------------------------------------------------------- */
@@ -1259,7 +1442,7 @@ body:not(.touch) .touch-only {
 /* short, narrow screens: smaller cards, so the runner still shows above them */
 @media (max-height: 720px) and (max-aspect-ratio: 5/4) {
   #title {
-    padding-top: calc(6vh + var(--safe-top));
+    padding-top: calc(3.5vh + var(--safe-top));
   }
   .pick {
     --w: clamp(76px, min(25vw, 13vh), 130px);
@@ -1285,6 +1468,10 @@ body:not(.touch) .touch-only {
   .title-bottom {
     margin-top: auto;
   }
+  /* (the runner has the middle to themselves here, so the logo can be bigger) */
+  .logo {
+    --L: clamp(30px, min(5.4vw, 8.4vh), 92px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1296,11 +1483,23 @@ body:not(.touch) .touch-only {
   .pal-loading .pal-text {
     animation: none;
   }
-  .logo span,
+  .logo-ch,
+  .logo-big .logo-ch,
+  .logo-speed,
+  .tagline,
+  .title-best,
   .begin,
   .loader-title {
     animation: none;
     opacity: 1;
-    transform: none;
+  }
+  .logo-ch {
+    transform: translateY(var(--lift)) rotate(var(--tilt));
+  }
+  .logo-speed {
+    transform: translateY(-44%);
+  }
+  .tagline {
+    transform: rotate(-2deg);
   }
 }

@@ -53,7 +53,7 @@
          itself loaded (display=swap). -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,700&family=Lilita+One&display=swap"
       media="print"
       onload="this.media = 'all'"
     />
@@ -164,9 +164,15 @@
 
       <div id="title" class="screen">
         <div class="title-top">
+          <!-- The wordmark: built letter by letter by ui.js (each letter a
+               cream or orange cut-out with an ink keyline and a hard ink
+               shadow, like the cards), the first word over the second. -->
           <h1 id="logo" class="logo">EndlessRun</h1>
           <p class="tagline">a run through worlds within worlds</p>
-          <p id="title-best" class="title-best" hidden>best <b id="title-best-num">0</b></p>
+          <p id="title-best" class="title-best" hidden>
+            <svg class="best-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8.5l4.6 3.6L12 4.5l4.4 7.6L21 8.5l-1.9 10H4.9z" /><path d="M5.2 21h13.6" /></svg>
+            <span class="best-label">best</span> <b id="title-best-num">0</b>
+          </p>
         </div>
         <div class="choose">
           <div id="pick" class="pick" role="radiogroup" aria-label="Choose who runs"></div>
@@ -175,13 +181,13 @@
         </div>
         <div class="title-bottom">
           <div class="howto">
-            <div class="howto-item"><span class="glyph">↑</span><span>jump</span></div>
-            <div class="howto-item"><span class="glyph">↓</span><span>slide</span></div>
-            <div class="howto-item"><span class="glyph">← →</span><span>dodge</span></div>
+            <div class="howto-item"><span class="key"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span><span>jump</span></div>
+            <div class="howto-item"><span class="key down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span><span>slide</span></div>
+            <div class="howto-item"><span class="key-pair"><span class="key left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span><span class="key right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span></span><span>dodge</span></div>
           </div>
           <div class="begin"><span class="touch-only">tap to begin</span><span class="mouse-only">click or press space to begin</span></div>
-          <button id="btn-sound-2" class="pill sound-toggle" aria-label="Toggle sound"><span class="ic-sound"></span><span id="sound-label">Sound on</span></button>
         </div>
+        <button id="btn-sound-2" class="round sound-toggle title-sound" aria-label="Mute sound" aria-pressed="false"><svg class="ic-speaker" viewBox="0 0 24 24" aria-hidden="true"><path class="spk-body" d="M3.5 9h3.8L12.5 4.6v14.8L7.3 15H3.5z" /><path class="spk-on" d="M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.8 7.8 0 0 1 0 11" /><path class="spk-off" d="M16 9.3l5 5.4M21 9.3l-5 5.4" /></svg></button>
       </div>
 
       <div id="scorebox" aria-live="off">
@@ -200,7 +206,7 @@
 
       <div id="hud">
         <button id="btn-pause" class="round" aria-label="Pause"><span class="ic-pause"></span></button>
-        <button id="btn-sound" class="round sound-toggle" aria-label="Toggle sound"><span class="ic-sound"></span></button>
+        <button id="btn-sound" class="round sound-toggle" aria-label="Mute sound" aria-pressed="false"><svg class="ic-speaker" viewBox="0 0 24 24" aria-hidden="true"><path class="spk-body" d="M3.5 9h3.8L12.5 4.6v14.8L7.3 15H3.5z" /><path class="spk-on" d="M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.8 7.8 0 0 1 0 11" /><path class="spk-off" d="M16 9.3l5 5.4M21 9.3l-5 5.4" /></svg></button>
       </div>
 
       <div id="toast"><span class="num"></span><span class="name"></span></div>
