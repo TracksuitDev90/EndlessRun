@@ -32,17 +32,49 @@ const HINTS = {
   side: { touch: 'Swipe left or right to dodge', keys: '←  →  or  A  D to dodge' },
 };
 
+// The title's wordmark, set like a game logo: the title split where its words
+// meet ("EndlessRun" -> ENDLESS over RUN), each letter its own cut-out so it
+// can sit a little off true, as if hand-set, and pop up in its turn. The
+// first word stands in cream; the last, twice the size, in the coat's orange,
+// leaning into the run with speed lines behind it. (Every letter carries its
+// own glyph in data-ch for the keyline and shadow layers drawn under it.)
+const LOGO_TILT = [-4, 3, -2, 4, -3, 2, -4, 3, -2, 4];
+const LOGO_LIFT = [0.02, -0.05, 0.03, -0.02, 0.05, -0.03, 0.02, -0.04, 0.03, -0.02];
+function buildLogo(logo, title) {
+  logo.textContent = '';
+  logo.setAttribute('aria-label', title);
+  const words = title.split(/(?<=[a-z])(?=[A-Z])|\s+/).filter(Boolean);
+  const rows = words.length > 1 ? [words.slice(0, -1).join(' '), words[words.length - 1]] : [title];
+  let n = 0;
+  rows.forEach((word, r) => {
+    const row = document.createElement('span');
+    row.className = `logo-row ${r === rows.length - 1 && rows.length > 1 ? 'logo-big' : 'logo-small'}`;
+    row.setAttribute('aria-hidden', 'true');
+    if (row.classList.contains('logo-big')) {
+      const lines = document.createElement('span');
+      lines.className = 'logo-speed';
+      lines.innerHTML = '<i></i><i></i><i></i>';
+      row.appendChild(lines);
+    }
+    [...word.toUpperCase()].forEach((ch, i) => {
+      const s = document.createElement('span');
+      s.className = ch === ' ' ? 'logo-ch logo-gap' : 'logo-ch';
+      s.textContent = ch;
+      s.dataset.ch = ch;
+      s.style.setProperty('--i', n++);
+      s.style.setProperty('--tilt', `${LOGO_TILT[(i + r * 3) % LOGO_TILT.length]}deg`);
+      s.style.setProperty('--lift', `${LOGO_LIFT[(i + r * 5) % LOGO_LIFT.length]}em`);
+      row.appendChild(s);
+    });
+    logo.appendChild(row);
+  });
+}
+
 export class UI {
   constructor(title) {
     this.coarse = window.matchMedia('(pointer: coarse)').matches;
     document.body.classList.toggle('touch', this.coarse);
-    const logo = $('logo');
-    logo.textContent = '';
-    for (const ch of title) {
-      const s = document.createElement('span');
-      s.textContent = ch;
-      logo.appendChild(s);
-    }
+    buildLogo($('logo'), title);
     document.title = title;
     this.inkEl = $('ink');
     this.inkValue = -1;
@@ -321,10 +353,11 @@ export class UI {
   setSound(muted) {
     for (const id of ['btn-sound', 'btn-sound-2']) {
       const el = $(id);
-      if (el) el.classList.toggle('muted', muted);
+      if (!el) continue;
+      el.classList.toggle('muted', muted);
+      el.setAttribute('aria-pressed', String(muted));
+      el.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
     }
-    const label = $('sound-label');
-    if (label) label.textContent = muted ? 'Sound off' : 'Sound on';
   }
 
   toast(num, name) {
