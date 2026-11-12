@@ -3619,6 +3619,11 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     c = mix(c, uPal[PT_LINE], gl * 0.6);
     float fr = max(ptFreckles(r, 95.0, 0.38), ptFreckles(r + 3.7, 160.0, 0.3) * 0.8);
     c = mix(c, uPal[PT_FRECKLE], fr * 0.6 * smoothstep(0.08, 0.3, d.x));
+    // a pink flush rising up the neck to the rim, broken by the mottling,
+    // the growth lines running pink into it
+    float flush = smoothstep(0.66, 0.96, d.x + (mott - 0.5) * 0.18);
+    c = mix(c, mix(uPal[PT_RIM_LIGHT], uPal[2], 0.5), flush * 0.55);
+    c = mix(c, uPal[PT_RIM_DEEP], gl * flush * 0.6);
     return c;
   }
   if (m == 2) {
@@ -3630,17 +3635,19 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     float u = q.x, v = dot(q, e2), h = dot(q, n);
     float th = atan(u, -v);
     float rho = length(vec2(u, v));
-    float R = 0.106 * (1.0 + 0.08 * cos(th) * cos(th)) + 0.014 + 0.005 * cos(th * 9.0);
+    float R = 0.106 * (1.0 + 0.08 * cos(th) * cos(th)) + 0.019 + 0.008 * cos(th * 9.0);
     float ridge = band(abs(fract(th * 64.0 / 6.2831853) - 0.5) - 0.5, 0.12);
     c = mix(c, uPal[PT_RIM_DEEP], smoothstep(0.002, -0.012, rho - R) * 0.75);
-    c = mix(c, uPal[PT_RIM_LIGHT], smoothstep(0.004, 0.014, h - 0.0055 * cos(th * 9.0)) * 0.6);
+    c = mix(c, uPal[PT_RIM_LIGHT], smoothstep(0.006, 0.018, h - 0.008 * cos(th * 9.0)) * 0.6);
     c = mix(c, uPal[PT_RIM_DEEP], ridge * 0.45);
     return c;
   }
   if (m == 3) {
     // the hollow: dark all the way down, a little warmth just under the rim
     float h = dot(r - vec3(0.0, 0.43, 0.0), vec3(0.0, 0.927, -0.375));
-    c = mix(c, uPal[PT_RIM_DEEP] * 0.45, smoothstep(-0.03, 0.0, h) * 0.7);
+    // the coral of the rim running down inside it, fading into the dark
+    c = mix(c, uPal[PT_RIM_DEEP] * 0.9, smoothstep(-0.05, -0.008, h) * 0.85);
+    c = mix(c, uPal[PT_RIM_DEEP] * 0.4, smoothstep(-0.09, -0.05, h) * (1.0 - smoothstep(-0.05, -0.02, h)) * 0.6);
     unlit = 0.6;
     if (r.z > 0.03) c = ptEyes(c, r, unlit);
     return c;
@@ -6107,7 +6114,7 @@ void main() {
 // ---------------------------------------------------------------------------
 const VS_DUST = COMMON + /* glsl */ `
 uniform vec2 uResolution;
-attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour, 5 a crumb of soil), w seed
+attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour, 5 a crumb of soil, 6 a big clear drop), w seed
 varying vec4 vDust;
 varying vec3 vWorld;
 varying vec3 vPos;
@@ -6134,9 +6141,10 @@ void main() {
   vec2 c = gl_PointCoord - 0.5;
   float r = length(c);
   // (drops of water are drawn like grit, spray like a puff)
-  float soil = step(4.5, vDust.z);
-  float grit = max(step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z)), soil);
-  float wet = step(1.5, vDust.z) * (1.0 - soil);
+  float soil = step(4.5, vDust.z) * (1.0 - step(5.5, vDust.z));
+  float drop = step(5.5, vDust.z);
+  float grit = max(max(step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z)), soil), drop);
+  float wet = step(1.5, vDust.z) * (1.0 - soil) * (1.0 - drop);
   float a = atan(c.y, c.x);
   // (the lumps stay inside the sprite, or its square would cut them off)
   float lump = (0.028 * sin(a * 5.0 + vDust.w * 6.3) + 0.016 * sin(a * 9.0 - vDust.w * 4.1)) * (1.0 - grit);
@@ -6152,13 +6160,18 @@ void main() {
   // water: white, a glassy teal shade beneath
   col = mix(col, mix(vec3(0.62, 0.84, 0.86), vec3(1.0), 0.4 + 0.6 * lit), wet);
   // vapour (a thruster's plume): bright white, a cold lilac shade beneath
-  float vap = step(3.5, vDust.z) * (1.0 - soil);
+  float vap = step(3.5, vDust.z) * (1.0 - soil) * (1.0 - drop);
   // (taking a little of the ground's colour where the dust is red)
   vec3 vapC = mix(vec3(0.7, 0.72, 0.95), vec3(1.0, 0.99, 0.97), 0.35 + 0.65 * lit);
   vapC = mix(vapC, dust * (0.75 + 0.35 * lit), clamp((0.62 - uDustPale) * 0.45, 0.0, 0.3));
   col = mix(col, vapC, vap);
   // soil: a rich brown crumb, lit from above
   col = mix(col, mix(vec3(0.24, 0.15, 0.09), vec3(0.5, 0.34, 0.2), 0.3 + 0.7 * lit), soil);
+  // a big drop: a little lens of water - a clear teal body, darker toward
+  // its rim, a bright glint up top
+  float glint = 1.0 - smoothstep(0.06, 0.13, length(c - vec2(-0.1, -0.12)));
+  vec3 dropC = mix(vec3(0.16, 0.45, 0.55), vec3(0.55, 0.86, 0.9), smoothstep(0.48, 0.1, r) * (0.4 + 0.6 * lit));
+  col = mix(col, mix(dropC, vec3(1.0), glint), drop);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);

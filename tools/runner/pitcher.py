@@ -183,9 +183,10 @@ def lip(p):
     # the neck's cut is an ellipse a little longer front to back
     R = NECK_RB * (1.0 + 0.08 * np.cos(th) ** 2) + 0.008
     sc = np.cos(th * SCALLOPS)
-    Rm = R + 0.006 + 0.005 * sc
-    h0 = 0.004 + 0.0055 * sc
-    return np.sqrt(((rho - Rm) / 1.3) ** 2 + (h - h0) ** 2) - 0.0122
+    # a full, rolled lip, flared out and ruffled up and down in scallops
+    Rm = R + 0.011 + 0.008 * sc
+    h0 = 0.005 + 0.008 * sc
+    return np.sqrt(((rho - Rm) / 1.5) ** 2 + (h - h0) ** 2) - 0.0165
 
 
 def shell(p):

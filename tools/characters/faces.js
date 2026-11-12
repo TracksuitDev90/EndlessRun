@@ -18,7 +18,7 @@ const out = path.join(__dirname, '..', '..', 'assets', 'characters');
 const JOBS = [
   ['fox', 'tools/runner/fox.html?pose=sit&views=three&bg=0&zoom=2.6&y=0.68&z=-0.3&up=0.15&t=3'],
   ['dragon', 'tools/runner/dragon.html?pose=stand&views=three&bg=0&zoom=3.2&y=1.42&fx=0.0&fz=-0.15&dist=5.2&up=0.15&t=3'],
-  ['pitcher', 'tools/runner/pitcher.html?pose=stand&views=front&bg=0&zoom=1.75&y=0.42&up=0.28&look=camera&t=2'],
+  ['pitcher', 'tools/runner/pitcher.html?pose=stand&views=front&bg=0&zoom=1.6&y=0.64&up=0.4&look=camera&t=2'],
 ];
 const only = process.argv.slice(2);
 
