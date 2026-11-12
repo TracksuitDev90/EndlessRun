@@ -1158,7 +1158,9 @@ export default {
     // the snow (ground pattern 15, toon options banks and snow): the share
     // of the flakes in the air under a dusting and at its deepest; how far
     // the dream lifts far drifts apart
-    snow: { fall: [0.3, 1], lift: 0 },
+    // (a share of the usual count of motes: snowing harder than anything
+    // floats in any other world)
+    snow: { fall: [1.7, 3.0], lift: 0 },
     sky: ['#55b4de', '#ffe6d4', '#c2dcf0'],
     bloom: ['#7fe3f2', '#ffffff', '#ffd9c2'],
     // a low sun ahead and a little to the right, pale peach
@@ -1182,8 +1184,8 @@ export default {
     pool: '#ffbe76',
     // (what's kicked up off this ground is powder)
     dustPale: 0.92,
-    // flurries, falling aslant
-    particles: { color: '#ffffff', size: 2.3, drift: [0.45, -1.15, 0.15], opacity: 0.9 },
+    // flurries, falling aslant: flakes laid over the picture, not light
+    particles: { color: '#ffffff', size: 4.4, drift: [0.45, -1.15, 0.15], opacity: 0.95, flake: 1 },
   },
 
   visits: [
@@ -1197,8 +1199,8 @@ export default {
         skyFx: { rays: 0.1, clouds: 0.75 },
         light: { shadow: [0.71, 0.73, 0.95], soft: 0.13, hiAmt: 0.4 },
         mist: { amount: 0.44 },
-        particles: { size: 2.6, drift: [0.5, -1.25, 0.15] },
-        particles2: { color: '#f4f8ff', size: 3.0, drift: [0, 0, 0], opacity: 0.4, still: 1 },
+        particles: { size: 4.7, drift: [0.5, -1.25, 0.15] },
+        particles2: { color: '#f4f8ff', size: 3.0, drift: [0, 0, 0], opacity: 0.4, still: 1, flake: 1 },
       },
     },
     // the blue hour, snowing hard: the windows bright, flakes hanging still
@@ -1215,8 +1217,8 @@ export default {
         grade: { exposure: 0.95, vignette: 0.32, tint: '#1a2462' },
         ground: ['#eef3ff', '#9ad6e8', '#2a76c4'],
         glowGain: 1.15,
-        particles: { size: 2.8, drift: [0.55, -1.3, 0.15] },
-        particles2: { color: '#ffffff', size: 4.2, drift: [0, 0, 0], opacity: 0.8, still: 1 },
+        particles: { size: 5.0, drift: [0.55, -1.3, 0.15] },
+        particles2: { color: '#ffffff', size: 4.2, drift: [0, 0, 0], opacity: 0.8, still: 1, flake: 1 },
       },
     },
     // ...and then the hanging flakes begin to rise: snow falling up through

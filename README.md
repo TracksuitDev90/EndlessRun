@@ -529,13 +529,20 @@ whose vertices carry how far they move once the snow lies deepest (a `snow`
 attribute, toon option `snow`): cornices along the glacier's top leaning
 further out, drifts swelling, boughs sagging, cabin roofs bulging over the
 eaves. The same option whitens whatever faces up, clinging to steeper faces
-the deeper it lies. The snowfall itself is the usual motes, a share of them
-in the air that grows with the snow (`env.snow.fall`).
+the deeper it lies. The snowfall itself is the usual motes, drawn as flakes
+laid over the picture rather than light added to it (`particles.flake`:
+white with a faint cool rim, so they show against the snow and the sky as
+well as the ice), and more of them in the air the deeper the snow
+(`env.snow.fall`, up to three times as many motes as float in any other
+world).
 
 The footprints are the Gallery's (game/sands.js): the same prints, pressed a
 little deeper the deeper the snow, shown only where there's snow to press
 (never on the bare ice), and each foot that comes down kicks up a small puff
-of powder — the runner's own dust, white off this ground.
+of powder — the runner's own dust, white off this ground. And the cold shows
+on their breath: every breath out (quicker the harder they run) a few faint
+wisps of vapour from their mouth, billowing off over their shoulders, rising
+a little and thinning as they're left behind.
 
 It never plays against you. The route stays flat and as fast as anywhere
 (nothing slippery, nothing slowing you down); nothing beside it is ever
@@ -2954,7 +2961,9 @@ ice on parts marked 0.2, and `crevasse: [width, depth, how fast its walls
 close in]` the mouth of a crack on parts marked 0.9 (uv in metres, y from its
 near lip to its far one). `def.dream: [[shape, colour], …]` holds the dream
 back on a world's early visits (one entry per visit, the last for every
-visit after); `particles.still: 1` stops a layer of motes dead in the air;
+visit after); `particles.still: 1` stops a layer of motes dead in the air,
+and `particles.flake: 1` draws them as snowflakes laid over the picture
+rather than as light;
 and `skyFx.range` stands a range of jagged mountains along the horizon.
 
 `gem` is the world's collectible: a `name`, a `color` (the HUD's little gem),

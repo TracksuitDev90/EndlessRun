@@ -5818,6 +5818,10 @@ uniform float uOpacity;
 // 0 a soft mote; 1 a bubble: a bright rim round a clear middle and a glint
 // up on one side (env.particles.ring)
 uniform float uRing;
+// 0 a mote of light, added onto what's behind it; 1 a snowflake, laid over
+// it (env.particles.flake) - white, a faint cool rim round it, so it shows
+// against snow as well as against the sky
+uniform float uFlake;
 varying float vAlpha;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
@@ -5829,7 +5833,11 @@ void main() {
     a = mix(a, rim * 0.85 + 0.12 * smoothstep(0.5, 0.3, r) + glint, uRing);
   }
   a *= vAlpha * uOpacity;
-  gl_FragColor = vec4(uColor * a, a);
+  // (blended premultiplied: with no alpha that's the additive glow these
+  // have always been - colour times alpha, squared, as it was - and with
+  // alpha, a flake laid over the scene)
+  vec3 flake = mix(uColor, vec3(0.66, 0.71, 0.9), smoothstep(0.12, 0.42, r) * 0.7);
+  gl_FragColor = vec4(mix(uColor * a * a, flake * a, uFlake), a * uFlake);
 }
 `;
 
@@ -7618,6 +7626,7 @@ export function makeParticleMaterial() {
     uOpacity: { value: 0.8 },
     uRing: { value: 0 },
     uStill: { value: 0 },
+    uFlake: { value: 0 },
   });
   return new THREE.ShaderMaterial({
     uniforms,
@@ -7625,6 +7634,10 @@ export function makeParticleMaterial() {
     fragmentShader: FS_PARTICLES,
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    // premultiplied (see FS_PARTICLES): additive glow or a flake laid over
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
   });
 }

@@ -104,7 +104,8 @@ export class Game {
     this.warming = null; // someone just arrived, waiting to be drawn once (see warm)
     this.cam = new ChaseCamera();
     this.portal = new Portal();
-    this.particles = new Particles();
+    // (room for more: the Frostbound Pass's snowfall, see updateSnow)
+    this.particles = new Particles(240, 99, 720);
     // a second layer some worlds use (env.particles2): Hell's falling ash
     // under its rising embers; invisible elsewhere
     this.particles2 = new Particles(320, 7);
