@@ -104,7 +104,8 @@ export class Game {
     this.warming = null; // someone just arrived, waiting to be drawn once (see warm)
     this.cam = new ChaseCamera();
     this.portal = new Portal();
-    this.particles = new Particles();
+    // (room for more: the Frostbound Pass's snowfall, see updateSnow)
+    this.particles = new Particles(240, 99, 720);
     // a second layer some worlds use (env.particles2): Hell's falling ash
     // under its rising embers; invisible elsewhere
     this.particles2 = new Particles(320, 7);
@@ -119,7 +120,8 @@ export class Game {
     // through a doorway into a world with env.warp, the jump to light speed
     this.warp = new Warp();
     // a world with env.sands: the runner's footprints in it, and the surf
-    // before a doorway into the sea (see sands.js)
+    // before a doorway into the sea (see sands.js); one with env.snow: their
+    // footprints in the snow, and the powder they kick up
     this.sands = new Sands();
 
     this.sceneMain = new THREE.Scene();
@@ -677,6 +679,46 @@ export class Game {
     if (this.next && this.door) this.next.u.uWonk.value = this.wonkOf(this.next, this.door.seg, 0);
   }
 
+  // --- snow settling ------------------------------------------------------------
+  // A world whose def says how (def.snowAt(visit, t): the Frostbound Pass) has
+  // snow settling on it all run long: a little deeper by the end of each
+  // visit than at its start, and a good deal deeper each time it comes round
+  // again. The course counts the visits - afresh every run, and straight
+  // through a Continue - so that is all the remembering it takes. How deep it
+  // lies now (0 a dusting, 1 as deep as it gets) goes to the world's shaders
+  // (uSnow.x: the snow on the route, its banks, every cap and drift) and
+  // thickens its snowfall (env.snow.fall: the share of the motes in the air
+  // under a dusting, and at the deepest). Seen through a doorway, it lies as
+  // it will the moment you step through.
+  snowOf(world, seg) {
+    if (!seg || !world.def.snowAt) return 0;
+    const t = Math.min(1, Math.max(0, (this.dist - seg.start) / Math.max(1, seg.end - seg.start)));
+    return world.def.snowAt(seg.visit || 0, t);
+  }
+
+  updateSnow() {
+    const seg = this.course.segAt(this.dist);
+    // (the runner through a doorway the camera hasn't followed them through
+    // yet: the world still on screen is the stretch before)
+    const here = seg.world === this.current ? seg : this.course.prevOf(seg);
+    const a = this.snowOf(this.current, here && here.world === this.current ? here : null);
+    this.current.u.uSnow.value.x = a;
+    let b = a;
+    if (this.next && this.door) {
+      b = this.snowOf(this.next, this.door.seg);
+      this.next.u.uSnow.value.x = b;
+    }
+    const fall = (world, lv) => {
+      const f = world.env.snow?.fall;
+      return f ? f[0] + (f[1] - f[0]) * lv : 1;
+    };
+    const fa = fall(this.current, a);
+    const fb = this.next && this.door ? fall(this.next, b) : fa;
+    // (blended on the run up to a doorway, as the motes themselves are)
+    const t = this.portal.active && this.door ? smooth01(55, 0, this.door.quadD - this.dist) : 0;
+    this.particles.density = this.particles2.density = fa + (fb - fa) * t;
+  }
+
   // --- doorways ---------------------------------------------------------------
   camDist() {
     return this.origin - this.cam.camera.position.z;
@@ -885,6 +927,7 @@ export class Game {
     shared.uCamPos.value.copy(this.cam.camera.position);
     this.updateDoor();
     this.updateWonk();
+    this.updateSnow();
     shared.uCamPos.value.copy(this.cam.camera.position);
 
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);

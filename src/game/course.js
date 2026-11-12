@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { makeDream } from './dream.js';
+import { makeDream, holdBack } from './dream.js';
 
 // The course is the sequence of worlds laid out along the track. Each
 // segment is a stretch of one world; a doorway stands at every boundary.
@@ -23,7 +23,18 @@ export class Course {
     const startIdx = Math.max(0, ids.indexOf(startId || ids[0]));
     this.lastId = ids[startIdx];
     const L = CONFIG.chunkLength;
-    this.segments.push({ world: this.byId.get(this.lastId), start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1, visit: this.nextVisit(this.lastId), dream: makeDream(rng, 1, dream) });
+    const world = this.byId.get(this.lastId);
+    const visit = this.nextVisit(this.lastId);
+    this.segments.push({ world, start: -L * 6, end: CONFIG.firstWorldLength, ordinal: 1, visit, dream: this.dreamFor(world, visit, 1) });
+  }
+
+  // The dream recipe for a stretch of `world`, the ordinal-th of the run and
+  // the visit-th time through it: dealt by depth, then held back if the
+  // world asks (def.dream, see holdBack). Pinned with ?dream=, it's left as
+  // dealt.
+  dreamFor(world, visit, ordinal) {
+    const recipe = makeDream(this.rng, ordinal, this.forcedDream);
+    return this.forcedDream === undefined ? holdBack(recipe, world.def.dream, visit) : recipe;
   }
 
   // How many times this world has already been run through this run.
@@ -51,7 +62,9 @@ export class Course {
       len = Math.round(len / L) * L;
       const id = this.nextWorldId();
       const ordinal = last.ordinal + 1;
-      this.segments.push({ world: this.byId.get(id), start: last.end, end: last.end + len, ordinal, visit: this.nextVisit(id), dream: makeDream(this.rng, ordinal, this.forcedDream) });
+      const world = this.byId.get(id);
+      const visit = this.nextVisit(id);
+      this.segments.push({ world, start: last.end, end: last.end + len, ordinal, visit, dream: this.dreamFor(world, visit, ordinal) });
     }
     // forget segments far behind
     while (this.segments.length > 2 && this.segments[1].end < d - 600) this.segments.shift();

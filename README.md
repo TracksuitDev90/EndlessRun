@@ -28,7 +28,10 @@ once you're deep enough they stop holding their shape: slowly at first, then
 roads corkscrew, forests melt, skies swirl like wet paint. Every doorway you
 come through is counted on a little orange door by your score, and makes the
 road, and every obstacle you clear, worth more — so the strangest stretches
-are the ones worth the most. Deepest of all, out past the sea, the door
+are the ones worth the most. Up out of the sea you come onto the ice of the
+Frostbound Pass, where the snow lies a little deeper every time you come
+back to it (see [The Frostbound Pass](#the-frostbound-pass-snow-that-stays));
+and deepest of all, over the pass, the door
 opens onto the stars: you jump to light speed and drop out of it onto a
 little red world where gravity barely holds you down — every jump a burst
 of a thruster that hurls you flying, every few steps a bound (see [Low
@@ -64,7 +67,8 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | VII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | VIII | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump (see [The sands of time](#the-sands-of-time)), your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — great gears turning behind the balustrades, pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, pocket watches dangling out of the sky on their chains, and dials, gears, hourglasses and little cogs adrift in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 | IX | **The Kelp Deep** — under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
-| X | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
+| X | **The Frostbound Pass** — a route of packed snow and bare blue ice through a glacier: towering cliffs of turquoise and cobalt ice either side, banded and cracked and capped with snow, frozen waterfalls down their faces, icicles, and now and then an enormous natural arch of ice right over the route; in places the canyon opens out — on one side, then both, then the other — onto a field of pack ice, plates of it up-ended along the pressure ridges, icebergs frozen into it, and jagged mountains far off; firs bowed under snow by the route, and here and there a small timber cabin, its windows lit amber. And the snow stays: it lies a little deeper by the end of every visit and a good deal deeper every time the run comes back round (see [The Frostbound Pass: snow that stays](#the-frostbound-pass-snow-that-stays)) | cold and clear: a low peach sun ahead, lavender shade, ice that holds the light, spindrift low over the snow; later, a snow sky, then the blue hour with the windows bright | the glacier canyon, the frozen lake under the mountain, the ice cave, the crack in the ice, the pack ice under the peaks, the snowy road between the firs |
+| XI | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
 
 The worlds always nest inward in that order, and every lap comes back round
 the same way, so you always know what's through the next door. They run in
@@ -75,8 +79,9 @@ deeper shade; then after dark, by lamplight — the Night Rooftops, and down
 off them into the endless library of the Hall of Doors; then the sun and its
 eclipse — the Sky Road of the sun, and Hell, where the sun has gone out; and
 last, out past the world — the heavenly Gallery of Hours, the sea lapping in
-through its doorway to the Kelp Deep, and out past the sea, the stars of the
-Red Drift. Then back round to the Cypress Lane.
+through its doorway to the Kelp Deep, up out of the sea onto the ice of the
+Frostbound Pass, and over the pass, the stars of the Red Drift. Then back
+round to the Cypress Lane.
 
 ### New York at night
 
@@ -497,6 +502,92 @@ long low moan a few seconds before it reaches the road (an obstacle's `call`).
 
 ![The Kelp Deep: kelp, coral and light shafts over the sand; a whale gliding across the path; the splash coming in — the sheet sliding off with its bright lip, then drops streaking down the lens; and the twilight reef on the second visit, a jellyfish glowing](docs/ocean.jpg)
 
+### The Frostbound Pass: snow that stays
+
+It is always snowing in the pass, and the snow stays. The first time
+through there's a light cover on the route — long patches of wind-packed
+snow over glacier ice scoured bare between them, cracked, feathered here and
+there with hoar frost — low banks either side, every rock, fence and cabin
+step plain to see, and a few flakes in the air. Come back round and the
+caps are thicker, the banks deeper, the rocks and fences half under and
+less of the ice showing; from the third time the drifts are great heaps,
+the cabins going under to their sills, the firs' boughs sagging under their
+pillows of snow, and it's snowing hard. It builds a little during each
+visit too. How deep it lies is counted by visits to the pass this run
+(`def.snowAt(visit, t)`; `Game.updateSnow` hands it to the shaders as
+`uSnow.x`), so it starts afresh with every new run and carries straight on
+through a Continue; it stops getting deeper once it's full.
+
+None of it is simulated. The route's cover is the ground pattern (15): how
+much of the ice shows is a threshold on a noise field that drops as the snow
+builds up, the snow's edge lit toward the light and throwing a cool shadow
+onto the ice the other way. The banks along the route are the ground strip
+heaped up by the vertex shader (toon option `banks`) — low and broken at
+first, a wall of drift later, and the route's only edge: no curbs, no
+markings. Everything else the snow settles on is an ordinary instanced mesh
+whose vertices carry how far they move once the snow lies deepest (a `snow`
+attribute, toon option `snow`): cornices along the glacier's top leaning
+further out, drifts swelling, boughs sagging, cabin roofs bulging over the
+eaves. The same option whitens whatever faces up, clinging to steeper faces
+the deeper it lies. The snowfall itself is the usual motes, drawn as flakes
+laid over the picture rather than light added to it (`particles.flake`:
+white with a faint cool rim, so they show against the snow and the sky as
+well as the ice), and more of them in the air the deeper the snow
+(`env.snow.fall`, up to three times as many motes as float in any other
+world).
+
+The footprints are the Gallery's (game/sands.js): the same prints, pressed a
+little deeper the deeper the snow, shown only where there's snow to press
+(never on the bare ice), and each foot that comes down kicks up a small puff
+of powder — the runner's own dust, white off this ground. And the cold shows
+on their breath: every breath out (quicker the harder they run) a few faint
+wisps of vapour from their mouth, billowing off over their shoulders, rising
+a little and thinning as they're left behind.
+
+It never plays against you. The route stays flat and as fast as anywhere
+(nothing slippery, nothing slowing you down); nothing beside it is ever
+stood so close that it reaches into it once it has grown (each prop is
+placed by its full-grown reach, measured from the geometry); and the
+obstacles take no part in it at all: each wears a fixed, modelled cap of
+snow, so what you see is what you can hit however deep the rest lies, a
+bar's underside stays on the duck line, and the obstacles stay dark timber,
+slate and deep-blue ice against the white. The great arches over the route
+spring from piers ten metres out and pass fifteen metres overhead, nothing
+like the low arch you slide under.
+
+The glacier ice is drawn in the toon shader (toon option `ice`, on parts
+marked 0.2): bands laid down year on year, tilted and wavering, each its
+own depth of blue, streaks of trapped air, and a light that never quite
+goes dark in the shade, a glow at the edges and a white flash off a facet
+turned just so. No refraction and no extra pass. The fissure you jump is a
+flat band across the route that the shader looks down into (toon option
+`crevasse`): where the eye's ray would land on its far wall tells it how
+deep to colour it, from pale ice at the lip down to blue-black, so it reads
+as a crack from far off.
+
+**The dream is held back here.** The first lap the pass is simply the pass,
+however far the run has already sunk into the dream (`def.dream` scales the
+recipe dealt for its stretch, by visit: see `holdBack` in game/dream.js).
+The second lap barely stirs it, and a few flakes hang where they are. From
+the third the dream comes in by degrees over the top of the snowfall, which
+goes on falling and settling beneath it: flakes hanging still all through
+the air (`particles.still`), then rising through the snow that's falling,
+and far off across the ice field the great drifts coming apart in slabs that
+lift off one another and hang there, rocking (`env.snow.lift`) — settling
+back together, like every warp of the dream, long before you reach them.
+
+**The obstacles:** a fallen trunk under snow and a low ridge of ice shards to
+jump, a glacial fissure right across the route; a snow-laden bough across two
+broken snags and a ledge of ice on two piers to slide under, a low arch of ice
+across the whole route; and ice pillars, great snowy boulders of slate and
+abandoned supply sleds to go around.
+
+**Its gems** are fire in the ice, the one warm colour in the pass: fire opal,
+sunstone glittering with copper, spessartine garnet, wulfenite tablets and
+honey calcite; the crown is a great fire opal in a ring of ice crystals.
+
+![The Frostbound Pass: the same stretch on the first four visits, the snow settling deeper each time; the low arch to slide under, the fissure to jump, the ridge of ice shards; and deep in the dream, far drifts lifting apart over the ice field](docs/frost.jpg)
+
 ### Low gravity: the Red Drift
 
 The Red Drift is the one world where the runner doesn't run the way they do
@@ -637,6 +728,7 @@ rolls in slow waves:
 | Sky Road | ibises wheeling over the clouds | the night of Nut: the stars out over the lapis, a crescent moon, the winged sun sunk low and red | the boats of the sun sailing through the clouds |
 | Hell | an ember storm: more fire on the wind, the plain alight | the eclipse swells, its ring of fire burning hotter, ash falling thick | the colours begin to drift |
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows | midnight: a star-sown sky, aurora, the clock faces glowing | the colours begin to drift |
+| Frostbound Pass | a snow sky: the light soft and flat, thicker snow, rocks and fences half buried — and a few flakes hanging where they are | the blue hour, snowing hard: the cabins' windows bright, great drifts, flakes hanging still all through the air, far drifts coming apart | the hanging flakes rise through the falling snow, the drifts lift well clear |
 | Kelp Deep | the twilight reef: blue dusk, the light from above fading, jellyfish glowing everywhere, plankton lit up in the water | the deep at midnight: almost no light from above, the anemones, jellyfish and plankton glowing | the colours begin to drift |
 | Red Drift | a comet shower: comets crossing the sky, the nebula burning hotter, UFOs zipping about far off | the violet night: the nebula gone to violet and teal, a paler sun, the dust pinker, astronauts adrift overhead | the colours begin to drift |
 
@@ -728,6 +820,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Sky Road | **Turquoise** | the stones of the pharaohs, sky blue against the gold and lapis | turquoise, sky blue in its web of dark matrix · lapis lazuli, the deep blue of the night of Nut flecked with gold · carnelian, the red of the sun · a long leaning double-terminated aquamarine shard | a scarab carved in turquoise, legs of gold, pushing the red disc of the sun up before it |
 | Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
+| Frostbound Pass | **Fire opal** orange | the one warm colour in the pass: fire in the ice, carrying from one end of a white-and-blue canyon to the other | fire opal, a rough orange lump lit from inside and flecked with gold · sunstone, a plate glittering with copper flecks · spessartine, a garnet's ball of rhombs in mandarin · wulfenite, thin square tablets grown through each other · honey calcite, a cleaved rhomb | a great fire opal in a ring of ice crystals |
 | Red Drift | **Moldavite** green | the only green under all that red, and every stone of it fell from the sky | moldavite, wrinkled bottle-green glass flung up by a meteorite strike · peridot, an eight-sided bipyramid · pallasite, meteorite iron studded with olivine · tektite, green glass beads grown together | a fallen star: five points of moldavite |
 | Kelp Deep | **Pearls**, iridescent, in every shade | lustrous and soft against all that teal and green, and the one gem the sea makes itself; the counter wears a pearl here | Akoya, white with a rosé glow · golden South Sea · pink freshwater, a button pearl with a blue-lavender sheen · Tahitian, peacock black shot with green and blue · a silver-grey drop · a cream baroque · a circled champagne pearl (see [Pearls](#pearls)) | a great pearl in an open scallop shell |
 
@@ -2699,7 +2792,8 @@ src/game/                     game loop, player (the runners' shared core:
                               bound) and warp (the jump to light speed);
                               sands (the footprints in the Gallery's sand and
                               the surf lapping up it before a doorway into the
-                              sea); the companion who runs with you
+                              sea, and the footprints and powder in the
+                              Frostbound Pass's snow); the companion who runs with you
                               (companions.js: who can; companion.js: the
                               mind of one who runs; fox.js: Sorrel's body,
                               gallop, poses, tail and ears; flyer.js: the
@@ -2847,6 +2941,30 @@ bond on parts marked 0.55 and a tower's grid of lit windows on parts marked
 swim2: [...], swim3: [...] })` swims a critter round its spot (see [Under the
 sea](#under-the-sea)); ground pattern 13 is mossy old stone pavers and 14 a
 tar-paper roof with puddles.
+
+The Frostbound Pass (see [above](#the-frostbound-pass-snow-that-stays)):
+ground pattern 15 is snow over glacier ice, for `b.ground(…, 15, { banks:
+true })` on a strip like its `snowStrip()` (the vertex shader heaps the
+banks along the route and the snowfield beyond; it reads the canyon's open
+stretches from `openAt`, which frost.js stands its cliffs by too). A world
+with `def.snowAt(visit, t)` (how deep the snow lies, 0..1, the visit-th time
+through, t of the way along) has it settling (`uSnow.x`, see
+`Game.updateSnow`), and `env.snow: { fall: [share of the motes in the air
+under a dusting, at the deepest], lift }` thins and thickens its snowfall and
+sets how far the dream lifts far drifts apart. `b.toon(…, { snow: [face up
+to hold it under a dusting, once it's deep, edge softness, how much] })` is a
+prop the snow settles on: whatever faces up whitens, and its vertices move
+by their `snow` attribute as it builds up (`settle(part, fn, slab)` in
+frost.js writes it; `slab` above 0 marks the pieces of a far drift the dream
+lifts apart). `ice: [banding, glints, how much light it holds]` draws glacier
+ice on parts marked 0.2, and `crevasse: [width, depth, how fast its walls
+close in]` the mouth of a crack on parts marked 0.9 (uv in metres, y from its
+near lip to its far one). `def.dream: [[shape, colour], …]` holds the dream
+back on a world's early visits (one entry per visit, the last for every
+visit after); `particles.still: 1` stops a layer of motes dead in the air,
+and `particles.flake: 1` draws them as snowflakes laid over the picture
+rather than as light;
+and `skyFx.range` stands a range of jagged mountains along the horizon.
 
 `gem` is the world's collectible: a `name`, a `color` (the HUD's little gem),
 its `stones` — each `{ name, weight, tints, parts(), texture }`, `weight`

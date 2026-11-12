@@ -13,11 +13,14 @@ function colorOf(s) {
 }
 
 export class Particles {
-  constructor(count = 240, seed = 99) {
+  // count: how many float about as a rule; room: how many there's room for,
+  // when a world asks for more (density over 1: the Frostbound Pass's
+  // snowfall). (The first `count` are the same motes whatever the room.)
+  constructor(count = 240, seed = 99, room = count) {
     const rnd = mulberry32(seed);
-    const pos = new Float32Array(count * 3);
-    const rand = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
+    const pos = new Float32Array(room * 3);
+    const rand = new Float32Array(room);
+    for (let i = 0; i < room; i++) {
       pos[i * 3] = rnd() * 30 - 15;
       pos[i * 3 + 1] = rnd() * 13;
       pos[i * 3 + 2] = rnd() * 98 - 92;
@@ -32,6 +35,13 @@ export class Particles {
     this.points.renderOrder = 5;
     this.color = new THREE.Color();
     this.from = null;
+    // how many of them are in the air (0..1: the Frostbound Pass's snowfall,
+    // thin at first and thickening as the snow settles - see Game.updateSnow;
+    // they're scattered at random, so any share of them is as evenly spread)
+    this.count = count;
+    this.room = room;
+    this.density = 1;
+    this.shown = -1;
   }
 
   // Blend appearance between two worlds' particle settings (every frame
@@ -42,6 +52,8 @@ export class Particles {
     u.uSize.value = a.size + (b.size - a.size) * t;
     u.uOpacity.value = a.opacity + (b.opacity - a.opacity) * t;
     u.uRing.value = (a.ring || 0) + ((b.ring || 0) - (a.ring || 0)) * t;
+    u.uStill.value = (a.still || 0) + ((b.still || 0) - (a.still || 0)) * t;
+    u.uFlake.value = (a.flake || 0) + ((b.flake || 0) - (a.flake || 0)) * t;
     u.uDrift.value.set(
       a.drift[0] + (b.drift[0] - a.drift[0]) * t,
       a.drift[1] + (b.drift[1] - a.drift[1]) * t,
@@ -51,5 +63,10 @@ export class Particles {
 
   update(dist) {
     this.material.uniforms.uDistMod.value = dist % 98;
+    const n = Math.min(this.room, Math.round(this.count * Math.max(0, this.density)));
+    if (n !== this.shown) {
+      this.shown = n;
+      this.points.geometry.setDrawRange(0, n);
+    }
   }
 }

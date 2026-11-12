@@ -4,7 +4,7 @@ import { metal } from './gems.js';
 import { shaftParts } from './whimsy.js';
 import { CONFIG } from '../config.js';
 
-// IX · The Kelp Deep — the last world, under the sea. A path of pale sand
+// IX · The Kelp Deep — under the sea. A path of pale sand
 // rippled by the current runs over the ocean floor between banks of coral
 // (brain coral, staghorn, table coral, lacy sea fans, tube sponges and
 // anemones waving in the current), forests of kelp towering up toward the

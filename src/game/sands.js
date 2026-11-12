@@ -24,6 +24,15 @@ import { mulberry32 } from '../core/rng.js';
 // is, how far this wave reached, the wet line it leaves (drying back), how
 // far its foam has been carried and how much lace it still carries. It
 // washes footprints away, and the runner splashes through it.
+//
+// Snow. A world whose env has `snow` (the Frostbound Pass, ground pattern 15)
+// takes the same footprints, pressed deeper the deeper the snow lies (the
+// shader shows them only where there's snow to press: never on the bare
+// ice), and each foot that comes down kicks up a little puff of powder - the
+// runner's own dust (game/dust.js), white off that ground. And the cold
+// shows on the runner's breath: with every breath out a faint puff from
+// their mouth (see breathe), carried back on the run, rising a little and
+// thinning as it drifts off.
 
 const TAU = Math.PI * 2;
 // which print each runner leaves (see footprint in the shaders)
@@ -44,6 +53,10 @@ const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const _q = new THREE.Vector3();
 const _p = new THREE.Vector3();
+const _iq = new THREE.Quaternion();
+const _v2 = new THREE.Vector3();
+// how far ahead of the head bone each runner's mouth is (m)
+const MOUTH = { wayfarer: 0.14, explorer: 0.12, elder: 0.14, bunny: 0.2, skater: 0.12, samurai: 0.16 };
 
 export class Sands {
   constructor() {
@@ -75,6 +88,8 @@ export class Sands {
     this.wasGrounded = true;
     this.furrow = null;
     this.tracks = null;
+    this.snow = -1;
+    this.breathT = 0.3;
     // the surf
     this.sea = 0;
     this.doorD = 0;
@@ -182,8 +197,11 @@ export class Sands {
   update(dt, game) {
     const world = game.current;
     if (world !== this.world) this.enter(world);
-    if (!world.env.sands) return;
+    if (!world.env.sands && !world.env.snow) return;
+    // (how deep the snow lies, if this is snow: 0 a dusting .. 1; else -1)
+    this.snow = world.env.snow ? world.u.uSnow.value.x : -1;
     const p = game.player;
+    if (this.snow >= 0) this.breathe(dt, game);
     const running = game.state === 'running' && p.mode === 'run' && !p.crashed && game.speed > 2;
     const onSand = p.grounded && (p.groundY || 0) < 0.05;
     const wet = this.wetAt(p.x, game.dist);
@@ -258,6 +276,78 @@ export class Sands {
     pr.w = 0;
     pr.depth = (DEPTH[game.runnerId] ?? 0.03) * deep;
     pr.flip = side ? 1 : -1;
+    if (this.snow >= 0) {
+      pr.depth *= 1.15 + 0.5 * this.snow;
+      if (deep > 1 || Math.random() < 0.5 + 0.5 * this.snow) this.powder(game, ball, deep);
+    }
+  }
+
+  // Hot breath in the cold: every so often - quicker the harder they run, a
+  // little uneven, as breathing is - a puff out of the runner's mouth, a
+  // little ahead of their head, the way they're facing. It leaves at most of
+  // their own speed, so it hangs just behind them for a moment, and blooms,
+  // rises and thins away: kept faint, two or three wisps a breath.
+  breathe(dt, game) {
+    const p = game.player;
+    if (!p.dust || !p.b?.head || p.crashed || game.state === 'paused') return;
+    this.breathT -= dt;
+    if (this.breathT > 0) return;
+    const r = Math.random;
+    const pace = Math.min(1, Math.max(0, game.speed / 24));
+    this.breathT = (1.1 - 0.45 * pace) * (0.85 + 0.3 * r());
+    // (the head's in the runner's own space, as the dust is; so is the way
+    // they're running)
+    const head = _q.setFromMatrixPosition(p.b.head.matrixWorld);
+    const run = _w.set(p.vx, 0, -Math.max(game.speed, 0.01)).applyQuaternion(_iq.copy(p.root.quaternion).invert());
+    const fwd = _p.copy(run).normalize();
+    if (game.speed < 0.5) fwd.set(0, 0, 1).applyQuaternion(_iq);
+    const mouth = head.addScaledVector(fwd, MOUTH[game.runnerId] ?? 0.13);
+    mouth.y += 0.06;
+    const n = 2 + (r() < 0.5 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      // (out of the mouth and down a little, then carried along at most of
+      // their pace: from where they stand it streams back past them)
+      // (vapour, the dust's kind 4: white, a cold lilac shade beneath, and the
+      // air slows it gently, so it hangs by them a moment before it's left)
+      // (each wisp of a breath billows off to one side or the other and up
+      // a little, so from behind it shows round the head and shoulders)
+      const side = (i % 2 ? 1 : -1) * (0.35 + 0.35 * r());
+      _v.copy(run).multiplyScalar(0.9 + 0.05 * r());
+      _v.addScaledVector(fwd, 0.35 + 0.3 * r());
+      _v.x += side;
+      _v.y += 0.22 + 0.22 * r();
+      _v.z += (r() - 0.5) * 0.1;
+      const at = _v2.copy(mouth).addScaledVector(fwd, 0.03 * i);
+      at.x += side * 0.08;
+      p.dust.emit(at, _v, 0.09 + 0.035 * r(), 4, 0.44 + 0.12 * r(), 1.6, 1.6);
+    }
+  }
+
+  // Powder kicked up where a foot comes down in the snow (at `at`, in the
+  // runner's own space): a small puff thrown back and up - a ring of them,
+  // and a few flecks flung higher, off a landing. (Flecks are the dust's
+  // drops of water: white, as snow is.)
+  powder(game, at, power) {
+    const p = game.player;
+    if (!p.dust) return;
+    const r = Math.random;
+    const run = _w.set(p.vx, 0, -game.speed).applyQuaternion(_iq.copy(p.root.quaternion).invert());
+    const land = power > 1;
+    const n = land ? 5 : 1 + (r() < 0.35 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      _v.copy(run).multiplyScalar(0.22 + 0.2 * r());
+      _v.x += (r() - 0.5) * (land ? 2.6 : 1.2);
+      _v.y += 0.3 + 0.7 * r() * power;
+      _v.z += 0.25 + 0.5 * r();
+      p.dust.emit(_p.set(at.x + (r() - 0.5) * 0.14, 0.05, at.z + (r() - 0.5) * 0.14), _v, (0.12 + 0.07 * r()) * (land ? 1.4 : 1), false, 0.45 + 0.2 * r(), 0.7, 0.8);
+    }
+    for (let i = land ? 3 : 0; i > 0; i--) {
+      _v.copy(run).multiplyScalar(0.3 + 0.2 * r());
+      _v.x += (r() - 0.5) * 2.2;
+      _v.y += 1.2 + 1.4 * r();
+      _v.z += 0.3 + 0.6 * r();
+      p.dust.emit(_p.set(at.x + (r() - 0.5) * 0.15, 0.04, at.z + (r() - 0.5) * 0.15), _v, 0.035 + 0.03 * r(), 2);
+    }
   }
 
   hole(game, at, wet) {
