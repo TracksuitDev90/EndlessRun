@@ -35,6 +35,7 @@ const numeral = (n) => NUMERALS[n - 1] || String(n);
 // (it pops at POP_AT), and how hard this one pops (0 it stays shut, 0.4 a
 // burp, 1 flung wide).
 const POP_AT = 0.42;
+const _at = { x: 0, y: 0, h: 0 }; // (scratch for Game.collide)
 export function lidPop(time, p0, every) {
   const tt = time + p0 * 0.15915 * every;
   const cyc = Math.floor(tt / every);
@@ -497,25 +498,58 @@ export class Game {
   }
 
   // --- hits -----------------------------------------------------------------
+  // The body is swept along the whole step, not just tested where it ends up:
+  // through the part of the step it overlaps an obstacle along the road, at
+  // where it really was across the lanes and how high it was then (see
+  // Player.sweptAt). So a dodge just past a wall, a jump taken a hair late or
+  // a slide that ends just as you come out from under a bar go the same way
+  // at 30 fps, at 60 or through a hitch - and a hit is told apart (head-on, or
+  // clipped from the side) by how it happened, not by where the frame ended.
   collide() {
     const p = this.player;
     if (p.invulnT > 0 || p.crashed || this.god) return;
     const pw = CONFIG.player.halfWidth;
     const pd = CONFIG.player.halfDepth;
-    // swept along the distance covered this frame so slow frames can't tunnel
-    const z0 = Math.min(this.prevDist, this.dist) - pd;
+    const a = this.prevDist;
+    const span = Math.max(0, this.dist - a);
+    const z0 = Math.min(a, this.dist) - pd;
     const z1 = this.dist + pd;
-    const prevFront = this.prevDist + pd;
-    const y0 = p.y;
-    const y1 = p.y + p.height;
+    const prevFront = a + pd;
+    const at = _at;
     for (const o of this.obstacles.records) {
       if (o.hit || (o.grace && o.grace > this.time)) continue;
       if (z1 < o.d || z0 > o.d + o.len) continue;
-      const dx = Math.abs(p.x - o.x);
-      if (dx >= o.hw + pw) continue;
-      if (y1 <= o.y0 || y0 >= o.y1) continue;
+      // the stretch of the step the body overlaps it along the road, looked at
+      // every 5 cm or so of it
+      let sa = 1, sb = 1;
+      if (span > 1e-6) {
+        sa = Math.max(0, Math.min(1, (o.d - pd - a) / span));
+        sb = Math.max(0, Math.min(1, (o.d + o.len + pd - a) / span));
+      }
+      const n = Math.min(48, Math.ceil(((sb - sa) * span) / 0.05));
+      let dx = 0, first = false, touched = false, over = false;
+      for (let i = 0; i <= n; i++) {
+        p.sweptAt(n ? sa + ((sb - sa) * i) / n : sb, at);
+        dx = Math.abs(at.x - o.x);
+        if (dx >= o.hw + pw) continue;
+        // a hurdle they were coming down onto (or were already up on, or
+        // stepped onto) when they got over it: they land on it, never in it -
+        // just as Player.update lands them, by where they were when they got
+        // there rather than wherever a long frame happened to end
+        if (!over) {
+          over = true;
+          if (o.kind === 'L' && !o.wade && at.y >= o.y1 - CONFIG.player.stepUp && (p.grounded || p.vy <= 0)) break;
+        }
+        if (at.y + at.h <= o.y0 || at.y >= o.y1) continue;
+        touched = true;
+        first = i === 0;
+        break;
+      }
+      if (!touched) continue;
 
-      const frontal = prevFront <= o.d + 0.05;
+      // head-on: the body ran into its front this step (rather than coming
+      // at it from the side, or from above or below)
+      const frontal = first && prevFront <= o.d + 0.05;
       const glancing = dx > 0.62;
       o.group.hit = true;
       // dropping into water from a mistimed jump trips you just like running in

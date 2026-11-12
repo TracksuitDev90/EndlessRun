@@ -14,6 +14,9 @@ export const CONFIG = {
     halfDepth: 0.3,
     height: 1.5,
     slideHeight: 0.72,
+    // how far below the top of a hurdle they can come down on it, or run
+    // into it, and still find themselves standing on it
+    stepUp: 0.3,
   },
 
   // Speed in m/s eases from start toward max: v = max - (max - start) * e^(-t / ramp)
@@ -77,7 +80,8 @@ export const CONFIG = {
   // lane changes follow a critically damped spring of this rate (1/s): about
   // 80% of the way across in 0.1 s, settled in 0.2 s (higher = snappier)
   laneSpring: 32,
-  inputBuffer: 0.16, // seconds a jump pressed in mid-air is remembered
+  inputBuffer: 0.16, // seconds a jump pressed in mid-air is remembered (to the moment they touch down)
+  ledgeGrace: 0.1, // seconds after running off the top of something a jump still takes off from it
 
   // Score: every meter run is worth `perMeter` points times the depth you're
   // at (1 in the first world, 2 through the first doorway, …; the badge on

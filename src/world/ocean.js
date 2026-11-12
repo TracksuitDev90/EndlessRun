@@ -25,9 +25,10 @@ import { CONFIG } from '../config.js';
 //
 // Obstacles: a dome of brain coral, a giant clam gaping on the sand and a
 // sunken treasure chest to jump (a reef ridge across the whole path); an arch
-// of rock crusted with coral to slide under — and the whale: a humpback
-// swimming across the path, gliding in from one side as you come and right
-// over the road the moment you reach it, its belly on the duck line (slide);
+// of rock crusted with coral to slide under — and the whale: a humpback, a
+// blue whale or a sperm whale swimming across the path, gliding in from one
+// side as you come and right over the road the moment you reach it, its
+// belly on the duck line (slide);
 // and a clump of kelp, a tower of coral and a great sea fan to go around.
 
 const TAU = Math.PI * 2;
@@ -57,6 +58,12 @@ const C = {
   whale: '#1d4460',
   whaleHi: '#3a7290',
   whaleBelly: '#d8e8e4',
+  blue: '#47708e',
+  blueHi: '#80a8c2',
+  blueBelly: '#c4d2cc',
+  sperm: '#3d4450',
+  spermHi: '#5a636f',
+  spermBelly: '#78818b',
   jelly: '#ffb27a',
   jellyRim: '#ff6f8f',
   jellyArm: '#a476e0',
@@ -651,15 +658,26 @@ function turtleParts() {
   return parts;
 }
 
-// The whale: a humpback built tail to snout along +x (see CROSS) — its
-// belly kept level on the duck line across the whole road (it only rises
-// toward the flukes and the snout), its back below the camera's eye; long
-// pale flippers out past the road on the head's side, the flukes out past it
-// on the tail's, knobbly tubercles on its head, a little dorsal hump, pleats
-// down its throat (see PLEATS) and countershading, dark above, pale beneath.
-const WHALE_X0 = -9.6;
-const WHALE_X1 = 6.6;
+// The whales: three kinds, each built tail to snout along +x (see CROSS) —
+// a humpback, a blue whale and a sperm whale, each its own shape, not a
+// recolour. Every one keeps the same bargain with the runner: across the
+// road (|x| under WHALE_ROAD, which allows for the little it glides while
+// you're under it) its belly lies level on the duck line, and nothing of it
+// comes any lower, nor reaches further along the road than the bar you
+// slide under (WHALE_HALF either side of its middle) below the top of that
+// bar; so its underside is where its hitbox is. Above that line it's all
+// whale: a deep, rounded body, its back well up over the road, the head and
+// flukes out past either side of it. The camera looks at its near flank and
+// along its back, so that's where each kind shows itself: the humpback
+// stocky, knobbled about the head, with long pale flippers and a little hump
+// of a fin; the blue long and sleek, slate-blue dappled paler, a broad flat
+// head and a tiny fin far back; the sperm whale dark and wrinkled, its huge
+// blunt box of a head a third of it, a narrow jaw slung beneath, a hump and
+// a row of knuckles down its back.
 const WHALE_BELLY = CONFIG.duckLine + 0.09;
+const WHALE_ROAD = 4.0;
+const WHALE_HALF = 1.75;
+const WHALE_TOP = 3.4; // (the top of a bar's hitbox: nothing can reach above it)
 function key(table, s) {
   for (let i = 1; i < table.length; i++) {
     if (s <= table[i][0]) {
@@ -670,29 +688,67 @@ function key(table, s) {
   }
   return table[table.length - 1][1];
 }
-const W_H = [[0, 0.12], [0.1, 0.3], [0.3, 0.72], [0.48, 1.0], [0.62, 1.04], [0.8, 0.95], [0.92, 0.66], [1, 0.22]];
-const W_W = [[0, 0.1], [0.1, 0.28], [0.3, 1.02], [0.48, 1.62], [0.62, 1.74], [0.8, 1.64], [0.92, 1.26], [1, 0.46]];
-const W_B = [[0, 2.15], [0.12, 1.75], [0.3, WHALE_BELLY], [0.9, WHALE_BELLY], [1, WHALE_BELLY + 0.32]];
-function whaleProfile(x) {
-  const s = Math.min(1, Math.max(0, (x - WHALE_X0) / (WHALE_X1 - WHALE_X0)));
-  const h = key(W_H, s);
-  return { s, h, w: key(W_W, s), yc: key(W_B, s) + h };
+// Each kind: where its tail tip and snout lie (x0, x1); along it (s, 0 at
+// the tail tip to 1 at the snout) its half-height H, half-breadth W and the
+// height of its underside B; how its cross-section is shaped (crown: the
+// curve over its back, rounder below 1, flatter above; belly: the same
+// under it; square: how boxy its sides); its colours and how high up its
+// pale underside reaches (line); and its skin (mark 0.6: the throat pleats
+// and scars, see PLEATS; 0.5, wrinkles).
+const B0 = WHALE_BELLY;
+const WHALES = {
+  humpback: {
+    x0: -9.6, x1: 6.6,
+    H: [[0, 0.12], [0.1, 0.34], [0.3, 0.92], [0.48, 1.26], [0.62, 1.32], [0.8, 1.2], [0.92, 0.84], [1, 0.26]],
+    W: [[0, 0.1], [0.1, 0.3], [0.3, 1.06], [0.48, 1.64], [0.62, 1.74], [0.8, 1.66], [0.92, 1.3], [1, 0.5]],
+    B: [[0, 2.15], [0.12, 1.75], [0.3, B0], [0.9, B0], [1, B0 + 0.32]],
+    crown: (s) => (s > 0.78 ? 1.35 : 1), belly: 0.72, square: () => 1,
+    back: C.whale, hi: C.whaleHi, under: C.whaleBelly, line: [-0.5, 0.05], mark: 0.6,
+  },
+  blue: {
+    x0: -10.6, x1: 8.4,
+    H: [[0, 0.1], [0.08, 0.26], [0.3, 0.84], [0.5, 1.16], [0.66, 1.22], [0.82, 1.12], [0.93, 0.82], [1, 0.34]],
+    W: [[0, 0.1], [0.08, 0.24], [0.3, 0.92], [0.5, 1.46], [0.66, 1.62], [0.82, 1.68], [0.93, 1.56], [1, 0.86]],
+    B: [[0, 2.0], [0.14, 1.62], [0.33, B0], [0.81, B0], [0.93, B0 + 0.18], [1, B0 + 0.46]],
+    crown: (s) => 1 + 0.7 * sstep(0.74, 0.9, s), belly: 0.66, square: () => 1,
+    back: C.blue, hi: C.blueHi, under: C.blueBelly, line: [-0.62, -0.1], mark: 0.6, dapple: 1,
+  },
+  sperm: {
+    x0: -8.4, x1: 8.6,
+    H: [[0, 0.12], [0.1, 0.32], [0.3, 0.96], [0.5, 1.2], [0.62, 1.16], [0.72, 1.3], [0.9, 1.4], [0.975, 1.3], [1, 0.4]],
+    W: [[0, 0.1], [0.1, 0.28], [0.3, 1.04], [0.5, 1.58], [0.64, 1.5], [0.76, 1.32], [0.92, 1.24], [0.975, 1.12], [1, 0.4]],
+    B: [[0, 2.05], [0.12, 1.7], [0.25, B0], [0.75, B0], [0.86, B0 + 0.28], [1, B0 + 0.62]],
+    crown: (s) => 1 - 0.5 * sstep(0.66, 0.78, s), belly: 0.62, square: (s) => 1 - 0.5 * sstep(0.66, 0.78, s),
+    back: C.sperm, hi: C.spermHi, under: C.spermBelly, line: [-0.9, -0.35], mark: 0.5,
+  },
+};
+function whaleProfile(x, K = WHALES.humpback) {
+  const s = Math.min(1, Math.max(0, (x - K.x0) / (K.x1 - K.x0)));
+  const h = key(K.H, s);
+  return { s, h, w: key(K.W, s), yc: key(K.B, s) + h };
 }
-function whaleParts() {
-  const NX = 46;
+// The point on its skin at x, a (0..1) of the way round from the spine.
+function whaleSkin(K, x, a, lift = 1) {
+  const { s, h, w, yc } = whaleProfile(x, K);
+  const th = a * TAU;
+  const cy = Math.cos(th);
+  const sy = Math.sin(th);
+  const yy = cy >= 0 ? Math.pow(cy, K.crown(s)) : -Math.pow(-cy, K.belly);
+  const zz = Math.sign(sy) * Math.pow(Math.abs(sy), K.square(s));
+  return [x, yc + yy * h * lift, zz * w * lift];
+}
+function whaleBody(K) {
+  const NX = 52;
   const NA = 28;
   const pos = [];
   const uvs = [];
   for (let i = 0; i <= NX; i++) {
+    // (closer together toward the snout and the tail, where it turns)
     const t = i / NX;
-    const x = WHALE_X0 + (WHALE_X1 - WHALE_X0) * t;
-    const { s, h, w, yc } = whaleProfile(x);
+    const s = 0.65 * t + 0.35 * (0.5 - 0.5 * Math.cos(Math.PI * t));
+    const x = K.x0 + (K.x1 - K.x0) * s;
     for (let j = 0; j <= NA; j++) {
-      const th = (j / NA) * TAU;
-      const cy = Math.cos(th);
-      // a fuller, flatter belly; a flatter crown on the head
-      const yy = cy >= 0 ? Math.pow(cy, s > 0.78 ? 1.35 : 1) : -Math.pow(-cy, 0.72);
-      pos.push(x, yc + yy * h, Math.sin(th) * w);
+      pos.push(...whaleSkin(K, x, j / NA));
       uvs.push(s, j / NA);
     }
   }
@@ -721,87 +777,195 @@ function whaleParts() {
     nrm.setXYZ(a, nx / l, ny / l, nz / l);
     nrm.setXYZ(b, nx / l, ny / l, nz / l);
   }
-  // its throat and belly pleated, and above that countershaded
-  const body = paint(part(g, '#ffffff', { mark: 0.6 }), (x, y) => {
-    const { h, yc } = whaleProfile(x);
+  // countershaded, dark above and pale beneath (a blue whale dappled paler
+  // all over, in soft blotches)
+  const back = rgb(K.back);
+  const hi = rgb(K.hi);
+  const under = rgb(K.under);
+  return paint(part(g, '#ffffff', { mark: K.mark }), (x, y, z) => {
+    const { h, yc } = whaleProfile(x, K);
     const k = (y - yc) / Math.max(h, 0.05);
-    return lerp3(rgb(C.whaleBelly), lerp3(rgb(C.whale), rgb(C.whaleHi), sstep(0.5, 1, k) * 0.35), sstep(-0.5, 0.05, k));
-  });
-  const parts = [body];
-  // the flippers, long and narrow, dark above and pale beneath, reaching
-  // out past the road on the head's side (never over a lane)
-  for (const side of [-1, 1]) {
-    const fin = P.sphere(1, 14, 6);
-    fin.scale(2.2, 0.09, 0.36);
-    // tapering to the tip, the knobbled leading edge toward the head
-    const fp = fin.attributes.position;
-    for (let i = 0; i < fp.count; i++) {
-      const u = (fp.getX(i) + 2.2) / 4.4;
-      let z = fp.getZ(i) * (1.15 - 0.6 * u * u);
-      if (z * side < -0.12) z *= 1 + 0.14 * Math.sin(fp.getX(i) * 8);
-      fp.setZ(i, z);
+    let c = lerp3(under, lerp3(back, hi, sstep(0.5, 1, k) * 0.35), sstep(K.line[0], K.line[1], k));
+    if (K.dapple) {
+      const n = Math.sin(x * 2.3 + z * 1.7) * Math.sin(x * 1.1 - y * 2.9 + 1.3) + 0.5 * Math.sin(x * 4.1 + y * 3.3 - z * 2.2);
+      c = lerp3(c, hi, sstep(0.45, 0.95, n) * 0.55);
     }
-    fin.computeVertexNormals();
-    const root = new THREE.Vector3(5.0, WHALE_BELLY + 0.5, side * 1.35);
-    const ry = side > 0 ? -1.78 : 1.78;
-    const dir = new THREE.Vector3(Math.cos(-0.14), Math.sin(-0.14), 0).applyAxisAngle(UP, ry);
-    parts.push(twoTone(part(fin, null, { x: root.x + dir.x * 2.1, y: root.y + dir.y * 2.1, z: root.z + dir.z * 2.1, ry, rz: -0.14 }), C.whale, '#e6eeea'));
+    return c;
+  });
+}
+// A flipper: a long flattened blade off root, swept back (sweep, radians
+// from straight out toward the tail) and drooping (droop), tapering to its
+// tip; knobbled along its leading edge (a humpback's). Dark above, pale
+// beneath.
+function whaleFlipper(parts, { root, side, len, width, thick = 0.09, sweep = 0.2, droop = 0.14, knobs = false, top, under }) {
+  const fin = P.sphere(1, 14, 6);
+  fin.scale(len, thick, width);
+  const fp = fin.attributes.position;
+  for (let i = 0; i < fp.count; i++) {
+    const u = (fp.getX(i) + len) / (2 * len);
+    let z = fp.getZ(i) * (1.15 - 0.6 * u * u);
+    if (knobs && z * side < -0.12) z *= 1 + 0.14 * Math.sin(fp.getX(i) * 8);
+    fp.setZ(i, z);
   }
-  // the line of its mouth, from the snout back under the eye
+  fin.computeVertexNormals();
+  const ry = Math.atan2(-side * Math.cos(sweep), -Math.sin(sweep));
+  const dir = new THREE.Vector3(Math.cos(-droop), Math.sin(-droop), 0).applyAxisAngle(UP, ry);
+  const r = len * 0.95;
+  parts.push(twoTone(part(fin, null, { x: root[0] + dir.x * r, y: root[1] + dir.y * r, z: root[2] + dir.z * r, ry, rz: -droop }), top, under));
+}
+// The flukes: flat and level, spread either side of the tail stock - swept
+// back (sweep) to their tips (span out), the trailing edge bowed (bow) and
+// scalloped (scallop, a humpback's) in to the notch.
+function whaleFlukes(parts, K, { span = 2.45, sweep = 1.45, trail = 0.95, notch = 0.85, bow = 0.25, scallop = 0, sx = 1.25, sz = 1.3, top, under }) {
+  const N = 14;
+  const pts = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    pts.push([0.2 - (0.2 + sweep) * Math.pow(u, 1.7), span * Math.sin((u * Math.PI) / 2)]);
+  }
+  for (let i = 1; i <= N; i++) {
+    const v = i / N;
+    const x = -sweep + (sweep - trail) * v + bow * Math.sin(Math.PI * v) - scallop * Math.pow(Math.abs(Math.sin(v * Math.PI * 5)), 3) * (1 - v);
+    pts.push([x, span * (1 - v) + 0.12 * v]);
+  }
+  const sh = new THREE.Shape();
+  sh.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], pts[i][1]);
+  sh.lineTo(-notch, 0);
+  for (let i = pts.length - 1; i >= 1; i--) sh.lineTo(pts[i][0], -pts[i][1]);
+  sh.closePath();
+  const g = P.extrude(sh, 0.16, 1);
+  g.rotateX(-Math.PI / 2);
+  g.scale(sx, 1, sz);
+  const fy = key(K.B, 0) + key(K.H, 0);
+  parts.push(twoTone(part(g, null, { x: K.x0 + 0.25, y: fy }), top, under));
+}
+// Its eyes, low on the head toward the corner of the mouth.
+function whaleEyes(parts, K, x, a, white = '#e8eee8', r = 0.13) {
+  for (const side of [-1, 1]) {
+    const [, y, z] = whaleSkin(K, x, side > 0 ? a : 1 - a, 0.97);
+    parts.push(part(P.sphere(r, 8, 6), white, { x, y, z, sz: 0.5, outline: 0 }));
+    parts.push(part(P.sphere(r * 0.62, 8, 6), '#0a141a', { x: x + 0.01, y, z: z + side * 0.04, sz: 0.5, outline: 0 }));
+  }
+}
+// The line of its mouth, from the snout back under the eye.
+function whaleMouth(parts, K, { from, to, drop, color = '#0e2232' }) {
   for (const side of [-1, 1]) {
     const pts = [];
     for (let i = 0; i <= 8; i++) {
-      const x = 6.45 - i * 0.36;
-      const { yc, h, w } = whaleProfile(x);
-      const k = -0.05 - 0.28 * (i / 8);
-      pts.push([x, yc + h * k, side * w * Math.sqrt(1 - k * k) * 1.01]);
+      const x = from + (to - from) * (i / 8);
+      const k = -0.05 - drop * (i / 8);
+      const a = Math.acos(k) / TAU;
+      const [, y, z] = whaleSkin(K, x, side > 0 ? a : 1 - a, 1.01);
+      pts.push([x, y, z]);
     }
-    for (let i = 0; i < pts.length - 1; i++) rod(parts, pts[i], pts[i + 1], 0.028, '#0e2232', 0);
+    for (let i = 0; i < pts.length - 1; i++) rod(parts, pts[i], pts[i + 1], 0.028, color, 0);
   }
-  // the flukes, out past the road on the tail's side
-  {
-    const s = new THREE.Shape();
-    s.moveTo(0.2, 0);
-    s.bezierCurveTo(0.1, 1.0, -0.6, 2.1, -1.45, 2.45);
-    s.bezierCurveTo(-1.0, 1.6, -0.75, 0.6, -0.95, 0.12);
-    s.lineTo(-0.85, 0);
-    s.lineTo(-0.95, -0.12);
-    s.bezierCurveTo(-0.75, -0.6, -1.0, -1.6, -1.45, -2.45);
-    s.bezierCurveTo(-0.6, -2.1, 0.1, -1.0, 0.2, 0);
-    const g2 = P.extrude(s, 0.16, 10);
-    g2.rotateX(-Math.PI / 2);
-    g2.scale(1.25, 1, 1.3);
-    const fy = key(W_B, 0) + key(W_H, 0);
-    parts.push(twoTone(part(g2, null, { x: WHALE_X0 + 0.25, y: fy }), C.whale, '#e6eeea'));
+}
+
+function humpbackParts() {
+  const K = WHALES.humpback;
+  const parts = [whaleBody(K)];
+  // the long flippers, pale, knobbled along their leading edge, reaching
+  // out past the road on the head's side
+  for (const side of [-1, 1]) {
+    whaleFlipper(parts, { root: [5.25, B0 + 0.55, side * 1.3], side, len: 2.2, width: 0.36, sweep: 0.12, droop: 0.12, knobs: true, top: C.whaleHi, under: '#eef4f0' });
   }
-  // the dorsal hump
+  whaleMouth(parts, K, { from: 6.45, to: 3.6, drop: 0.28 });
+  // the flukes, out past the road on the tail's side: scalloped, white
+  // beneath
+  whaleFlukes(parts, K, { scallop: 0.09, top: C.whale, under: '#eef2ee' });
+  // the little fin on its hump
   {
-    const { yc, h } = whaleProfile(-4.6);
-    parts.push(part(P.cone(0.5, 0.55, 6), C.whale, { x: -4.6, y: yc + h * 0.98, sz: 0.3, rz: 0.55 }));
+    const { yc, h } = whaleProfile(-4.4, K);
+    parts.push(part(P.sphere(0.55, 8, 5), C.whale, { x: -4.2, y: yc + h * 0.9, sx: 1.2, sy: 0.42, sz: 0.34 }));
+    parts.push(part(P.cone(0.5, 0.55, 6), C.whale, { x: -4.6, y: yc + h * 1.0, sz: 0.3, rz: 0.55 }));
   }
   // tubercles over the head and chin, the eyes, barnacles on the chin
   const rnd = seeded(41);
-  for (let i = 0; i < 14; i++) {
-    const x = 4.0 + rnd() * 2.3;
-    const { yc, h, w } = whaleProfile(x);
-    const z = (rnd() - 0.5) * w * 0.9;
-    const top = yc + h * Math.pow(Math.max(0, 1 - (z / w) * (z / w)), 0.5) * 0.98;
-    parts.push(part(P.sphere(0.09, 6, 4), C.whaleHi, { x, y: top, z, sy: 0.7, outline: 0.4 }));
+  for (let i = 0; i < 16; i++) {
+    const x = 3.9 + rnd() * 2.4;
+    const [, y, z] = whaleSkin(K, x, (rnd() - 0.5) * 0.28, 0.98);
+    parts.push(part(P.sphere(0.09, 6, 4), C.whaleHi, { x, y, z, sy: 0.7, outline: 0.4 }));
   }
+  whaleEyes(parts, K, 4.55, 0.3);
   for (const side of [-1, 1]) {
-    const x = 4.65;
-    const { yc, h, w } = whaleProfile(x);
-    const y = yc - h * 0.32;
-    const z = side * w * Math.sqrt(1 - 0.32 * 0.32) * 0.97;
-    parts.push(part(P.sphere(0.13, 8, 6), '#e8eee8', { x, y, z, sz: 0.5, outline: 0 }));
-    parts.push(part(P.sphere(0.08, 8, 6), '#0a141a', { x: x + 0.01, y, z: z + side * 0.04, sz: 0.5, outline: 0 }));
     for (let i = 0; i < 5; i++) {
       const bx = 5.4 + rnd() * 1.0;
-      const p = whaleProfile(bx);
-      parts.push(part(P.sphere(0.07 + rnd() * 0.05, 6, 4), C.barnacle, { x: bx, y: p.yc - p.h * (0.4 + rnd() * 0.3), z: side * p.w * 0.88, outline: 0.3 }));
+      const [, y, z] = whaleSkin(K, bx, side > 0 ? 0.3 + rnd() * 0.08 : 0.7 - rnd() * 0.08, 0.97);
+      parts.push(part(P.sphere(0.07 + rnd() * 0.05, 6, 4), C.barnacle, { x: bx, y, z, outline: 0.3 }));
     }
   }
   return parts;
+}
+
+function blueParts() {
+  const K = WHALES.blue;
+  const parts = [whaleBody(K)];
+  // small slender flippers, pale-tipped, out past the road on the head's side
+  for (const side of [-1, 1]) {
+    whaleFlipper(parts, { root: [5.7, B0 + 0.5, side * 1.4], side, len: 1.15, width: 0.24, thick: 0.07, sweep: 0.55, droop: 0.2, top: C.blue, under: '#dfe8e4' });
+  }
+  whaleMouth(parts, K, { from: 8.3, to: 5.0, drop: 0.34 });
+  // broad flukes, smooth-edged, barely notched
+  whaleFlukes(parts, K, { span: 2.2, sweep: 1.25, trail: 0.85, notch: 0.8, bow: 0.18, sx: 1.2, sz: 1.25, top: C.blue, under: '#b8c8cc' });
+  // a tiny fin far back, and the splash guard ridged in front of its blowholes
+  {
+    const { yc, h } = whaleProfile(-6.2, K);
+    parts.push(part(P.cone(0.32, 0.42, 6), C.blue, { x: -6.3, y: yc + h * 0.98, sz: 0.24, rz: 0.75 }));
+    const p = whaleProfile(6.4, K);
+    parts.push(part(P.sphere(0.5, 8, 5), C.blueHi, { x: 6.4, y: p.yc + p.h * 0.97, sx: 0.9, sy: 0.16, sz: 0.34 }));
+    for (const side of [-1, 1]) parts.push(part(P.sphere(0.06, 6, 4), '#16303e', { x: 6.05, y: p.yc + p.h * 0.99, z: side * 0.14, sx: 1.6, outline: 0 }));
+  }
+  whaleEyes(parts, K, 5.75, 0.31);
+  return parts;
+}
+
+function spermParts() {
+  const K = WHALES.sperm;
+  const parts = [whaleBody(K)];
+  // small paddles of flippers, held in against its flanks just behind the
+  // head (they never reach out over the road past its body)
+  for (const side of [-1, 1]) {
+    const [, y, z] = whaleSkin(K, 2.0, side > 0 ? 0.33 : 0.67, 0.9);
+    whaleFlipper(parts, { root: [2.0, y, z], side, len: 0.75, width: 0.3, thick: 0.08, sweep: 1.32, droop: 0.1, top: C.sperm, under: C.spermBelly });
+  }
+  // the narrow lower jaw slung under the great head, pale-lipped, and the
+  // mouth's line along it
+  for (const side of [-1, 1]) {
+    const pts = [];
+    for (let i = 0; i <= 6; i++) {
+      const x = 8.0 - i * 0.55;
+      const { yc, h } = whaleProfile(x, K);
+      pts.push([x, Math.max(B0 + 0.14, yc - h * 0.98 + 0.02), side * (0.18 + 0.05 * i)]);
+    }
+    for (let i = 0; i < pts.length - 1; i++) rod(parts, pts[i], pts[i + 1], 0.13, '#d9dad4', 0.4);
+  }
+  // the blowhole, an S off to the left at the very front of the head
+  {
+    const { yc, h } = whaleProfile(8.2, K);
+    parts.push(part(P.sphere(0.14, 8, 5), '#1a1e26', { x: 8.2, y: yc + h * 0.96, z: -0.35, sx: 0.5, sy: 0.3, ry: 0.5, outline: 0 }));
+  }
+  // a low hump, then a row of knuckles down toward the flukes
+  {
+    const { yc, h } = whaleProfile(-2.0, K);
+    parts.push(part(P.sphere(0.6, 8, 5), C.sperm, { x: -2.0, y: yc + h * 0.86, sx: 1.25, sy: 0.5, sz: 0.4 }));
+    for (let i = 0; i < 4; i++) {
+      const x = -3.3 - i * 0.75;
+      const p = whaleProfile(x, K);
+      parts.push(part(P.sphere(0.24 - i * 0.03, 6, 4), C.sperm, { x, y: p.yc + p.h * 0.94, sx: 1.3, sy: 0.6, sz: 0.6 }));
+    }
+  }
+  // broad triangular flukes, a straight trailing edge, deeply notched
+  whaleFlukes(parts, K, { span: 2.3, sweep: 1.15, trail: 1.15, notch: 0.72, bow: 0.02, sx: 1.15, sz: 1.2, top: C.sperm, under: C.spermBelly });
+  // a small eye, low and far back on the head, near the corner of the jaw
+  whaleEyes(parts, K, 4.4, 0.36, '#8a8f96', 0.1);
+  return parts;
+}
+
+// The whale seen far off, out in the blue (the humpback).
+function whaleParts() {
+  return humpbackParts();
 }
 
 // --- obstacles --------------------------------------------------------------------
@@ -1377,7 +1541,10 @@ export default {
     b.toon('ridge', ridgeGeo(), { cap: 10, anim: 'popEarly', ink: 0.04 });
     b.toon('arch', archGeo(0.95), { cap: 24, anim: 'popEarly', ink: 0.045 });
     // (the whale swims in from far off rather than unfolding)
-    b.toon('whale', merge(whaleParts()).translate(0, 0, -1.75), { cap: 10, ink: 0.05, pleats: true, cross: WHALE_CROSS });
+    // (three kinds; the same swim, song and shadow - see the HW obstacles)
+    b.toon('whale', merge(humpbackParts()).translate(0, 0, -WHALE_HALF), { cap: 6, ink: 0.05, pleats: true, cross: WHALE_CROSS });
+    b.toon('whaleBlue', merge(blueParts()).translate(0, 0, -WHALE_HALF), { cap: 6, ink: 0.05, pleats: true, cross: WHALE_CROSS });
+    b.toon('whaleSperm', merge(spermParts()).translate(0, 0, -WHALE_HALF), { cap: 6, ink: 0.05, pleats: true, cross: WHALE_CROSS });
     b.shadow('whaleShadow', { cap: 10, plane: { w: 15.5, d: 4.8, x: -1.4, z: -1.75 }, cross: WHALE_CROSS });
     b.toon('kelpW', kelpWallGeo(), { cap: 24, anim: 'popEarly', ink: 0.03, current: [0.7, 0.6, 0.35, 0.4] });
     b.toon('tower', towerGeo(), { cap: 24, anim: 'popEarly', ink: 0.045 });
@@ -1404,7 +1571,12 @@ export default {
     LW: { name: 'ridge', len: 1.3 },
     // (it casts its own shadow, gliding with it)
     // (it sings as it comes)
-    HW: { name: 'whale', with: ['whaleShadow'], len: 3.5, flat: true, call: 'whale' },
+    // (a humpback, a blue whale or a sperm whale, never the same twice running)
+    HW: [
+      { name: 'whale', with: ['whaleShadow'], len: 3.5, flat: true, call: 'whale' },
+      { name: 'whaleBlue', with: ['whaleShadow'], len: 3.5, flat: true, call: 'whale' },
+      { name: 'whaleSperm', with: ['whaleShadow'], len: 3.5, flat: true, call: 'whale' },
+    ],
   },
 
   chunk(ctx) {

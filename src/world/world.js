@@ -122,7 +122,7 @@ export class World {
   markObstacles() {
     const o = this.def.obstacles || {};
     const names = new Set();
-    for (const spec of [...(o.L || []), ...(o.H || []), ...(o.W || []), o.LW, o.HW, o.SW]) {
+    for (const spec of [...(o.L || []), ...(o.H || []), ...(o.W || []), o.LW, o.HW, o.SW].flat()) {
       if (!spec) continue;
       names.add(spec.name);
       if (spec.frame) names.add(spec.frame);
