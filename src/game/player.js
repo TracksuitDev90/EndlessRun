@@ -368,6 +368,7 @@ export class Player {
 
   // --- state ------------------------------------------------------------------
   reset() {
+    this.from = { dt: 0, x: 0, vx: 0, y: 0, h: CONFIG.player.height, slide: 0 };
     this.lane = 1;
     this.prevLane = 1;
     this.x = CONFIG.laneX[1];
@@ -377,6 +378,7 @@ export class Player {
     this.grounded = true;
     this.slideT = 0;
     this.jumpBuffer = 0;
+    this.ledgeT = 0;
     this.slideQueued = false;
     this.stumbleT = 0;
     this.invulnT = 0;
@@ -458,7 +460,9 @@ export class Player {
       // (in low gravity a bound is no more than a lope: the thruster fires
       // from it as from the ground; and while a boost hangs, it can fire
       // again)
-      if (this.grounded || this.bounding) this.takeOff();
+      // (and just off the end of something they were running along, as if
+      // from its edge: see ledgeGrace)
+      if (this.grounded || this.bounding || this.ledgeT > 0) this.takeOff();
       else if (this.drift && this.rethrusts > 0 && this.vy <= CONFIG.drift.boost.hover) this.rethrust();
       else this.jumpBuffer = CONFIG.inputBuffer;
     } else if (a === 'down') {
@@ -799,6 +803,7 @@ export class Player {
     this.slideT = 0;
     this.slideQueued = false;
     this.jumpBuffer = 0;
+    this.ledgeT = 0;
     this.jumpT = 0;
     this.jumpSide = -this.jumpSide;
   }
@@ -866,6 +871,32 @@ export class Player {
     this.prevLane = this.lane;
   }
 
+  // The body part-way through the last update (s: 0 at its start, 1 at its
+  // end): across the lanes on the same spring, solved exactly; up and down on
+  // the straight line between where it rose or fell from and to (within a few
+  // millimetres of the arc at 30 fps; where the fall took them, not where a
+  // landing set them down); and ducked for as long as the slide still ran.
+  // (A slide begun on landing counts from the end of the step.)
+  sweptAt(s, out) {
+    const F = this.from;
+    if (s >= 1 || !(F.dt > 0)) {
+      out.x = this.x;
+      out.y = this.y;
+      out.h = this.height;
+      return out;
+    }
+    const t = s * F.dt;
+    if (this.crashed) out.x = this.x;
+    else {
+      const w = this.feel.laneSpring;
+      const d = F.x - CONFIG.laneX[this.lane];
+      out.x = CONFIG.laneX[this.lane] + (d + (F.vx + w * d) * t) * Math.exp(-w * t);
+    }
+    out.y = Math.max(0, F.y + ((Number.isNaN(F.fall) ? this.y : F.fall) - F.y) * s);
+    out.h = F.h < this.height && t >= F.slide ? this.height : F.h;
+    return out;
+  }
+
   // In the air: (exact for constant gravity: the same arc and airtime at any
   // frame rate). A character may shape their own arc (see Explorer).
   fall(dt) {
@@ -874,6 +905,16 @@ export class Player {
   }
 
   update(dt, speed, groundAt) {
+    // where this step starts from (see sweptAt: the game checks the body for
+    // hits all along the step, not only where it ends up)
+    const F = this.from;
+    F.dt = dt;
+    F.x = this.x;
+    F.vx = this.vx;
+    F.y = this.y;
+    F.h = this.height;
+    F.slide = this.slideT;
+    F.fall = NaN;
     this.time += dt;
     this.speed = speed;
     // lanes: a critically damped spring toward the lane, solved exactly (the
@@ -896,7 +937,9 @@ export class Player {
     // vertical
     const ground = groundAt ? groundAt(this.x) : 0;
     this.groundY = ground;
-    if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
+    const held = this.jumpBuffer > 0;
+    if (held) this.jumpBuffer -= dt;
+    if (this.ledgeT > 0) this.ledgeT -= dt;
     // (the cape, hair and beard grow light along with them)
     this.gk = damp(this.gk, this.lowG ? CONFIG.drift.gk : 1, 3, dt);
     if (this.dust) this.dust.g = this.lowG ? 6 : 16;
@@ -912,8 +955,10 @@ export class Player {
         this.vy -= g * dt;
         this.boundT += dt;
       } else this.fall(dt);
+      // (where the step took them, before any landing sets them down on top)
+      F.fall = this.y;
       // land only when arriving from above; running into a ledge is a hit, not a mantle
-      if (this.y <= ground && this.vy <= 0 && prevY >= ground - 0.3) {
+      if (this.y <= ground && this.vy <= 0 && prevY >= ground - CONFIG.player.stepUp) {
         this.y = ground;
         // (how hard: a plain jump lands at 1, a fast-fall slams in harder;
         // in low gravity they come down softer, a bound softest)
@@ -923,13 +968,18 @@ export class Player {
         this.landClock = 0;
         this.vy = 0;
         this.grounded = true;
+        this.ledgeT = 0;
         this.drift = false;
         this.bounding = false;
         this.onLand(this.landHit);
         if (low || this.lowG) this.landLow(ground, wasBound, this.landHit);
+        // (a jump pressed in the air is remembered for inputBuffer up to the
+        // moment the feet touch down, wherever in the step that was - not
+        // up to the end of the step: the same at 30 fps as at 60)
+        const down = prevY - F.fall > 1e-6 ? Math.min(1, Math.max(0, (prevY - ground) / (prevY - F.fall))) : 1;
         if (this.crashed) {
           // stay down
-        } else if (this.jumpBuffer > 0) {
+        } else if (held && this.jumpBuffer + (1 - down) * dt > 0) {
           this.takeOff();
         } else if (this.slideQueued) {
           this.slideQueued = false;
@@ -939,11 +989,12 @@ export class Player {
     } else if (this.y > ground + 0.02) {
       // walked off the top of something (in low gravity, drifting down)
       this.grounded = false;
+      this.ledgeT = CONFIG.ledgeGrace;
       this.vy = 0;
       this.vyOff = this.vyPose;
       this.drift = this.lowG;
       this.rethrusts = 0;
-    } else if (ground - this.y < 0.3) {
+    } else if (ground - this.y < CONFIG.player.stepUp) {
       this.y = ground;
     }
     if (!this.grounded && this.y < 0) {

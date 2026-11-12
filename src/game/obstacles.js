@@ -128,6 +128,7 @@ export class ObstacleField {
     const o = CONFIG.obstacles;
     this.nextD = startD + (tutorial ? o.firstAtTutorial : o.firstAt);
     this.tutorial = tutorial ? TUTORIAL.slice() : [];
+    this.wideTurn = undefined;
     this.untilBreather = rng.int(o.breatherEvery[0], o.breatherEvery[1]);
   }
 
@@ -279,7 +280,7 @@ export class ObstacleField {
     const laid = { d, end: d, lanes, hint: row.hint || null };
     this.rows.push(laid);
     if (row.wide) {
-      const spec = row.wide === 'L' ? defs.LW : defs.HW;
+      const spec = this.wideSpec(row.wide === 'L' ? defs.LW : defs.HW, d);
       const group = this.group(world, d, spec.len, row.hint, CONFIG.score.wide);
       this.putSpec(world, group, spec, 0, d, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
       if (!spec.flat) this.shadow(world, group, 0, d, spec.len, 8.6, row.wide === 'L' ? 0.9 : 2.2);
@@ -312,6 +313,20 @@ export class ObstacleField {
       maxLen = Math.max(maxLen, spec.len);
     }
     return maxLen;
+  }
+
+  // A full-width obstacle's spec. A world may give a few (the Kelp Deep's
+  // whales): then it's never the same one twice running - stepping on one or
+  // two by a hash of where it lies, not by the layout's own dice, so the same
+  // seed still lays out the same road.
+  wideSpec(spec, d) {
+    if (!Array.isArray(spec)) return spec;
+    const n = spec.length;
+    let h = Math.sin(d * 12.9898 + 78.233) * 43758.5453;
+    h -= Math.floor(h);
+    if (this.wideTurn === undefined) this.wideTurn = Math.floor(h * n);
+    else this.wideTurn = (this.wideTurn + (n > 2 && h < 0.5 ? 2 : 1)) % n;
+    return spec[this.wideTurn];
   }
 
   // Total points of the groups that have fallen behind the player since the
@@ -393,14 +408,18 @@ export class ObstacleField {
     return rec;
   }
 
-  // Highest LOW-obstacle top the player could be standing on.
+  // Highest LOW-obstacle top the player could be standing on: wherever their
+  // body is over it at all - the same box the hits are tested in, so they can
+  // never be standing on it one moment and stumbling into it the next (running
+  // off its end, or stepping sideways off it).
   groundAt(x, dist) {
     let h = 0;
     const pw = CONFIG.player.halfWidth;
+    const pd = CONFIG.player.halfDepth;
     for (const o of this.records) {
       if (o.kind !== 'L' || o.hit || o.wade) continue;
-      if (dist < o.d - 0.25 || dist > o.d + o.len + 0.25) continue;
-      if (Math.abs(x - o.x) > o.hw + pw - 0.15) continue;
+      if (dist < o.d - pd || dist > o.d + o.len + pd) continue;
+      if (Math.abs(x - o.x) >= o.hw + pw) continue;
       if (o.y1 > h) h = o.y1;
     }
     return h;

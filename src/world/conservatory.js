@@ -199,6 +199,51 @@ function glassGeo() {
   return merge(parts);
 }
 
+// A monstera leaf, len long and w wide, its foot at the origin and its tip
+// toward +z, face up: a flattened oval given a little life - arching along
+// its midrib so the tip droops, its two halves lifting a little either side
+// of the rib (a shallow V), and the lobes round its edge each tipped up or
+// down a touch, no two leaves alike. Its uv lies flat across its face (x
+// across it, 0.5 down the midrib; y from its foot to its tip) for the veins
+// painted on it (mark 0.35: see LEAF in shaders.js).
+function monsteraLeaf(len, w, rnd) {
+  const g = P.sphere(0.5, 12, 6);
+  const pos = g.attributes.position;
+  const uv = g.attributes.uv;
+  const T = 0.07 / 1.15;
+  const arch = 0.14 + rnd() * 0.1;
+  const fold = 0.1 + rnd() * 0.08;
+  const tilt = Array.from({ length: 12 }, () => (rnd() - 0.5) * 0.36);
+  for (let i = 0; i < pos.count; i++) {
+    const nx = pos.getX(i) * 2;
+    const ny = pos.getY(i) * 2;
+    const nz = pos.getZ(i) * 2;
+    const t = (nz + 1) / 2;
+    const ax = Math.abs(nx);
+    const lobe = tilt[Math.round(uv.getX(i) * 12) % 12];
+    const lift = -arch * t * t + fold * Math.pow(ax, 1.3) + lobe * ax * ax * (nx * nx + nz * nz);
+    pos.setXYZ(i, (nx * w) / 2, (ny * T * len) / 2 + lift * len, t * len);
+    uv.setXY(i, nx * 0.5 + 0.5, t);
+  }
+  g.computeVertexNormals();
+  // (the sphere's seam and poles: copies of one point share one normal)
+  const nrm = g.attributes.normal;
+  const at = new Map();
+  for (let i = 0; i < pos.count; i++) {
+    const k = `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+    if (!at.has(k)) at.set(k, []);
+    at.get(k).push(i);
+  }
+  for (const list of at.values()) {
+    if (list.length < 2) continue;
+    let x = 0, y = 0, z = 0;
+    for (const i of list) (x += nrm.getX(i)), (y += nrm.getY(i)), (z += nrm.getZ(i));
+    const l = Math.hypot(x, y, z) || 1;
+    for (const i of list) nrm.setXYZ(i, x / l, y / l, z / l);
+  }
+  return g;
+}
+
 function monsteraParts({ size = 1, leaves = 7, seed = 3, y0 = 0 }) {
   const rnd = seeded(seed);
   const parts = [];
@@ -208,10 +253,14 @@ function monsteraParts({ size = 1, leaves = 7, seed = 3, y0 = 0 }) {
     const r = (0.55 + rnd() * 0.3) * size;
     const lean = 0.4 + rnd() * 0.5;
     parts.push(part(P.cyl(0.025 * size, 0.03 * size, h - y0, 4), C.leafDeep, { x: Math.sin(a) * r * 0.45, y: y0 + (h - y0) / 2, z: Math.cos(a) * r * 0.45, rz: Math.sin(a) * 0.35, rx: Math.cos(a) * 0.35, outline: 0 }));
-    parts.push(part(P.sphere(0.5 * size, 8, 5), null, {
+    // (set where the old flat oval was, its middle at the stalk's head; the
+    // midrib's arch takes a little of the lean)
+    const L = 1.15 * size * 0.5 * 2;
+    const leaf = monsteraLeaf(L, 0.9 * size, seeded(seed * 97 + i * 13 + 1)).translate(0, 0, -L / 2);
+    parts.push(part(leaf, null, {
       x: Math.sin(a) * r, y: h, z: Math.cos(a) * r,
-      sx: 0.9, sy: 0.07, sz: 1.15, ry: a, rx: lean,
-      grad: [C.leafDeep, C.leaf, h - 0.3, h + 0.2], tint: 1,
+      ry: a, rx: lean * 0.8,
+      grad: [C.leafDeep, C.leaf, h - 0.3, h + 0.2], tint: 1, mark: 0.35,
     }));
   }
   return parts;
@@ -975,7 +1024,7 @@ export default {
     // down from the arches: the far stretch isn't drawn - see GROW below)
     const SPROUT = [2, 50, 96, 0];
     b.toon('fern', merge(bushParts({ r: 0.62, lo: C.fern, hi: C.fernHi }).slice(0, 2)), { cap: 300, anim: SPROUT, marks: [2, 1.6], wobble: [0.01, 0, 1.6, 0] });
-    b.toon('monstera', merge(monsteraParts({ size: 1.2, leaves: 7, seed: 5 })), { cap: 160, anim: SPROUT, wobble: [0.012, 0, 1.3, 0] });
+    b.toon('monstera', merge(monsteraParts({ size: 1.2, leaves: 7, seed: 5 })), { cap: 160, anim: SPROUT, wobble: [0.012, 0, 1.3, 0], leaf: true });
     b.toon('potCypress', merge([...potParts({ r: 0.5, h: 0.75 }), ...cypressParts({ h: 4.4, r: 0.75, lo: C.leafDeep, hi: C.leafHi, trunkH: 1.2, seg: 8 }).map((g) => g.translate(0, 0.7, 0))]), { cap: 80, anim: 'pop', marks: [3, 2.4], wobble: [0.0015, 0, 1.1, 0] });
     b.toon('orangeTree', merge(orangeTreeParts()), { cap: 40, anim: 'pop', marks: [2.2, 2] });
     b.toon('vineLong', merge(vineGeo(2.6, 1)), { cap: 200, anim: SPROUT, wobble: [0.03, 0, 1.0, 0] });
@@ -1018,7 +1067,7 @@ export default {
     b.toon('planterLong', planterBoxGeo(7.6), { cap: 10, anim: 'popEarly' });
     b.toon('hangingBasket', hangingBasketGeo(0.98, 2), { cap: 24, anim: 'popEarly' });
     b.toon('vineCurtain', hangingBasketGeo(3.95, 6), { cap: 10, anim: 'popEarly' });
-    b.toon('bigMonstera', bigMonsteraGeo(), { cap: 24, anim: 'popEarly', wobble: [0.006, 0, 1.2, 0] });
+    b.toon('bigMonstera', bigMonsteraGeo(), { cap: 24, anim: 'popEarly', wobble: [0.006, 0, 1.2, 0], leaf: true });
     b.toon('bigOrange', merge(orangeTreeParts({ potR: 0.72, canopy: 1.2, trunk: 1.3 })).translate(0, 0, -0.75), { cap: 24, anim: 'popEarly', marks: [2.2, 2] });
     b.toon('pottingBench', pottingBenchGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('flytrapTrough', flytrapTroughGeo(), { cap: 24, anim: 'popEarly', wobble: [0.01, 0, 1.6, 0] });

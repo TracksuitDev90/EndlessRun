@@ -1828,6 +1828,30 @@ float pleats(vec2 uv) {
   return k * (1.0 + scar * 0.45);
 }
 #endif
+#ifdef LEAF
+// A big leaf's face (toon option leaf, on parts whose mark flag is 0.35;
+// uv.x across it, 0.5 down its midrib, uv.y from its foot to its tip - see
+// monsteraLeaf in conservatory.js): a pale midrib, and pale veins running out
+// from it either side, curving on toward the tip as they go, the blade a
+// shade deeper between them by the rib and a shade lighter toward its edge.
+// Where the lines would shimmer (far off) it settles into the leaf's tone.
+// Returns how much to scale the part's colour.
+float leafVeins(vec2 uv) {
+  float ax = abs(uv.x - 0.5) * 2.0;
+  float fw = fwidth(uv.x) + fwidth(uv.y);
+  float far = smoothstep(0.05, 0.14, fw);
+  float mid = 1.0 - smoothstep(0.016, 0.016 + fw, abs(uv.x - 0.5));
+  mid *= smoothstep(0.02, 0.1, uv.y) * (1.0 - smoothstep(0.86, 0.97, uv.y));
+  float g = (uv.y - 0.3 * ax * ax) * 7.0 + 0.25;
+  float fg = fwidth(g);
+  float f = fract(g);
+  float side = 1.0 - smoothstep(0.05, 0.05 + fg * 1.5, abs(f - 0.5));
+  side *= smoothstep(0.06, 0.16, ax) * (1.0 - smoothstep(0.72, 0.92, ax)) * smoothstep(0.08, 0.2, uv.y);
+  float between = 0.5 + 0.5 * cos(f * 6.2832);
+  float k = 1.0 + 0.2 * mid + 0.1 * side - 0.06 * between * (1.0 - ax) + 0.07 * ax * ax;
+  return mix(k, 1.0, far);
+}
+#endif
 #ifdef BRICK
 // Brick (toon option brick, on parts whose mark flag is 0.55): laid in
 // running bond in world space on whichever wall it's on, each brick its own
@@ -2533,6 +2557,12 @@ void main() {
       float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x * markK;
       #ifdef SHELVES
         if (vFx.x > 0.68 && vFx.x < 0.77) m = 0.0;
+      #endif
+      #ifdef LEAF
+        if (abs(vFx.x - 0.35) < 0.02) {
+          m = 0.0;
+          base *= leafVeins(vUv);
+        }
       #endif
       #ifdef BRICK
         if (abs(vFx.x - 0.55) < 0.02) {
@@ -7148,6 +7178,7 @@ export function makeToonMaterial(env, o = {}) {
   if (o.shelves) defines.SHELVES = '';
   // brick in running bond on parts marked 0.55 (see brickBond)
   if (o.brick) defines.BRICK = '';
+  if (o.leaf) defines.LEAF = '';
   if (o.cloth) {
     defines.CLOTH = '';
     uniforms.uCloth = { value: new THREE.Vector4(...o.cloth) };
