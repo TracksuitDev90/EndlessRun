@@ -48,18 +48,51 @@ export function scaleColor(c, k) {
   return [A[0] * k, A[1] * k, A[2] * k];
 }
 
+// Level of detail for the round primitives while a prop is being built (see
+// lod): their segment counts are scaled by it, never below `min` (nor above
+// what was asked). A prop seen in the dozens at once - a glasshouse bed's
+// ferns, a lane's fences - loses nothing you can see at a run's distance and
+// pace by being built a little coarser, and the scene that's full of them
+// draws in a good deal less time.
+let DETAIL = 1;
+const seg = (n, min) => (DETAIL === 1 ? n : Math.min(n, Math.max(min, Math.round(n * DETAIL))));
+
+// Build a prop (fn returns its geometry or parts) at detail k (0..1).
+export function lod(k, fn) {
+  const was = DETAIL;
+  DETAIL = k;
+  try {
+    return fn();
+  } finally {
+    DETAIL = was;
+  }
+}
+
 // Primitive constructors (raw three geometries; finalize with part()).
 export const P = {
   box: (w, h, d, ws = 1, hs = 1, ds = 1) => new THREE.BoxGeometry(w, h, d, ws, hs, ds),
-  cyl: (rt, rb, h, seg = 10, hs = 1, open = false, start = 0, len = Math.PI * 2) =>
-    new THREE.CylinderGeometry(rt, rb, h, seg, hs, open, start, len),
-  cone: (r, h, seg = 10) => new THREE.ConeGeometry(r, h, seg),
-  sphere: (r, ws = 10, hs = 8) => new THREE.SphereGeometry(r, ws, hs),
+  cyl: (rt, rb, h, n = 10, hs = 1, open = false, start = 0, len = Math.PI * 2) =>
+    new THREE.CylinderGeometry(rt, rb, h, seg(n, 5), hs, open, start, len),
+  cone: (r, h, n = 10) => new THREE.ConeGeometry(r, h, seg(n, 5)),
+  sphere: (r, ws = 10, hs = 8) => new THREE.SphereGeometry(r, seg(ws, 6), seg(hs, 4)),
   ico: (r, detail = 0) => new THREE.IcosahedronGeometry(r, detail),
   dodeca: (r) => new THREE.DodecahedronGeometry(r, 0),
-  lathe: (pts, seg = 10) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg),
-  capsule: (r, len, cap = 3, radial = 8) => new THREE.CapsuleGeometry(r, len, cap, radial),
-  torus: (R, r, rs = 6, ts = 16, arc = Math.PI * 2) => new THREE.TorusGeometry(R, r, rs, ts, arc),
+  lathe: (pts, n = 10) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg(n, 6)),
+  capsule: (r, len, cap = 3, radial = 8) => new THREE.CapsuleGeometry(r, len, seg(cap, 2), seg(radial, 5)),
+  torus: (R, r, rs = 6, ts = 16, arc = Math.PI * 2) => new THREE.TorusGeometry(R, r, seg(rs, 4), seg(ts, 8), arc),
+  // A thin flat bar seen only face-on (a leaf's vein, a stripe): a box's
+  // front and back without its four edges - a third of the triangles.
+  slab: (w, h, d) => {
+    const x = w / 2, y = h / 2, z = d / 2;
+    const g = new THREE.BufferGeometry();
+    // prettier-ignore
+    g.setAttribute('position', new THREE.Float32BufferAttribute([-x, -y, z, x, -y, z, x, y, z, -x, y, z, x, -y, -z, -x, -y, -z, -x, y, -z, x, y, -z], 3));
+    // prettier-ignore
+    g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1], 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1], 2));
+    g.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+    return g;
+  },
   plane: (w, h, ws = 1, hs = 1) => new THREE.PlaneGeometry(w, h, ws, hs),
   extrude: (shape, depth, curveSegments = 12) => {
     const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments });

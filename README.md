@@ -639,13 +639,16 @@ gravity, but not the slow motion low gravity usually is — they're *hurled*:
   anywhere else (`CONFIG.drift.gk`).
 
 **What's in the way** keeps the game's grammar, in the world's own shapes:
-asteroids tumbling low over the dust and heaps of red boulders to boost over
-(a belt of asteroids right across the road); UFOs — silver saucers, their
+asteroids come down in the dust, each sunk in the crater it punched, and
+heaps of red boulders to boost over (a belt of asteroids right across the
+road) — everything you jump sits on the ground; UFOs — silver saucers, their
 rims strung with lights, spinning and bobbing, a glowing dome on top — and
-great asteroids hanging at head height to stay low under, skimming under
-them (or, if you're flying, driving yourself down out of the air in time);
-red rock pillars and crystal-crowned spires to go round; and a mothership
-right across the road. It's a **breather**, gentler still than the Cypress
+great asteroids held up in a ring of light, hanging at head height to stay
+low under, each throwing a pool of cyan light on the open dust beneath it,
+skimming under them (or, if you're flying, driving yourself down out of the
+air in time); red rock pillars and crystal-crowned spires to go round; and a
+squadron of three saucers flying abreast, one over each lane, strung
+together rim to rim by beams of light, right across the road. It's a **breather**, gentler still than the Cypress
 Lane — laid at less of the run's difficulty, further apart, only the
 simplest patterns and lone obstacles most of all (its `calm` settings) — so
 there's room to fly; and a boost hangs three times as long as a jump, so the

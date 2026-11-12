@@ -9,7 +9,7 @@ import {
   grapefruitCartGeo, appleCartGeo, peachCartGeo, fruitStandGeo, exoticStandGeo, busTimetableGeo,
   shopfrontParts, marketStallGeo, busShelterGeo, benchGeo, postboxGeo, bikeGeo, gardenFenceGeo,
 } from './lane-art.js';
-import { groundStrip } from '../render/geo.js';
+import { groundStrip, lod } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
 // I · The Cypress Lane — tall bullet-shaped cypresses in lime and deep green,
@@ -363,15 +363,15 @@ export default {
     b.toon('houseA', houseGeo({ w: 2.9, h: 5.0, d: 3.0, roofH: 1.9, floors: 2, cols: 2, lit: 0.25, chimney: true, seed: 11 }), { cap: 80, anim: 'pop', marks: [1, 1] });
     b.toon('houseB', houseGeo({ w: 3.8, h: 4.1, d: 3.3, roofH: 2.0, floors: 2, cols: 3, lit: 0.3, chimney: false, seed: 23 }), { cap: 80, anim: 'pop', marks: [1, 1] });
     // the neighbourhood: shops, a market stall, the bus stop, street furniture
-    b.toon('shopGrocer', shopGeo('grocer', 31), { cap: 24, anim: 'pop', marks: [1, 1] });
-    b.toon('shopBakery', shopGeo('bakery', 37), { cap: 24, anim: 'pop', marks: [1, 1] });
-    b.toon('stall', marketStallGeo(0), { cap: 16, anim: 'pop', marks: [2, 2] });
-    b.toon('stallB', marketStallGeo(1), { cap: 16, anim: 'pop', marks: [2, 2] });
+    b.toon('shopGrocer', lod(0.6, () => shopGeo('grocer', 31)), { cap: 24, anim: 'pop', marks: [1, 1] });
+    b.toon('shopBakery', lod(0.6, () => shopGeo('bakery', 37)), { cap: 24, anim: 'pop', marks: [1, 1] });
+    b.toon('stall', lod(0.6, () => marketStallGeo(0)), { cap: 16, anim: 'pop', marks: [2, 2] });
+    b.toon('stallB', lod(0.6, () => marketStallGeo(1)), { cap: 16, anim: 'pop', marks: [2, 2] });
     b.toon('shelter', busShelterGeo(), { cap: 8, anim: 'pop', marks: [2, 2] });
     b.toon('bench', benchGeo(), { cap: 24, anim: 'pop' });
     b.toon('postbox', postboxGeo(), { cap: 16, anim: 'pop' });
-    b.toon('bike', bikeGeo(), { cap: 16, anim: 'pop', ink: 0.03 });
-    b.toon('fence', gardenFenceGeo(), { cap: 40, anim: 'pop', marks: [2.4, 2] });
+    b.toon('bike', lod(0.65, () => bikeGeo()), { cap: 16, anim: 'pop', ink: 0.03 });
+    b.toon('fence', lod(0.55, () => gardenFenceGeo()), { cap: 40, anim: 'pop', marks: [2.4, 2] });
     b.toon('cypress', merge(cypressParts({ h: 9.6, r: 1.5, lo: C.leafLo, hi: C.leafHi, trunk: C.trunk, seg: 9 })), { cap: 420, anim: 'pop', marks: [3, 2.6], wobble: [0.0007, 0, 1.2, 0], ink: 0.05 });
     b.toon('cypressFar', merge(cypressParts({ h: 9.6, r: 1.5, lo: C.leafLo, hi: C.leafHi, trunk: C.trunk, seg: 7, mark: 0.6 })), { cap: 260, anim: 'pop', marks: [3, 2.6], ink: 0 });
     b.toon('lamp', merge(lanternPostParts({ h: 3.1, pole: C.frame })), { cap: 40, anim: 'pop' });
@@ -396,15 +396,15 @@ export default {
     b.toon('crates', orangeCratesGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
     b.toon('raspberries', raspberryBedGeo(), { cap: 16, anim: 'popEarly', marks: [2.4, 2] });
     b.toon('baskets', fruitBasketsGeo(), { cap: 16, anim: 'popEarly', marks: [3, 3] });
-    b.toon('melons', melonCrateGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
+    b.toon('melons', lod(0.75, () => melonCrateGeo()), { cap: 16, anim: 'popEarly', marks: [2, 2] });
     b.toon('berries', berryFlatsGeo(), { cap: 16, anim: 'popEarly', marks: [2, 2] });
-    b.toon('timetable', busTimetableGeo(), { cap: 24, anim: 'popEarly', marks: [2, 2] });
+    b.toon('timetable', lod(0.7, () => busTimetableGeo()), { cap: 24, anim: 'popEarly', marks: [2, 2] });
     b.toon('pergola', pergolaGeo(), { cap: 10, anim: 'popEarly', marks: [2.2, 1.6] });
-    b.toon('grapefruitCart', grapefruitCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
-    b.toon('appleCart', appleCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
-    b.toon('peachCart', peachCartGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
-    b.toon('fruitStand', fruitStandGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
-    b.toon('exoticStand', exoticStandGeo(), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('grapefruitCart', lod(0.75, () => grapefruitCartGeo()), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('appleCart', lod(0.75, () => appleCartGeo()), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('peachCart', lod(0.75, () => peachCartGeo()), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('fruitStand', lod(0.75, () => fruitStandGeo()), { cap: 12, anim: 'popEarly', marks: [2, 2] });
+    b.toon('exoticStand', lod(0.75, () => exoticStandGeo()), { cap: 12, anim: 'popEarly', marks: [2, 2] });
     b.toon('topiary', topiaryGeo(), { cap: 16, anim: 'popEarly', marks: [3, 2.6] });
 
     // threshold

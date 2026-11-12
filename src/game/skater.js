@@ -876,7 +876,7 @@ export class Skater extends Player {
     // fast-fall, or landing early, just hurries it round)
     // (only while she's up, or the jump's pose is still fading: before any
     // jump, how far through one she is means nothing)
-    const air = !this.grounded || this.w.jump > 0.01;
+    const air = (!this.grounded && !this.bounding) || this.w.jump > 0.01;
     const fp = flipping && air ? ease(smooth(0.13, 0.62, u)) : 0;
     const flip = fp * TAU * (trick === 'heelflip' ? -1 : 1);
     // the shove-it on the title screen

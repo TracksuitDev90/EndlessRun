@@ -2,6 +2,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, rgb, gateFrameParts, gateTop, moved, rod, leafParts } from './shapes.js';
 import { metal } from './gems.js';
 import { shaftParts } from './whimsy.js';
+import { lod } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 
 // IX · The Kelp Deep — under the sea. A path of pale sand
@@ -1502,21 +1503,21 @@ export default {
     b.toon('staghorn', merge(staghornParts({ seed: 5, color: '#ffffff', tip: '#ffffff', tint: 1 })), { cap: 50, anim: 'pop', ink: 0.03 });
     b.toon('table', merge(tableParts({ seed: 2, color: '#ffffff', tint: 1 })), { cap: 40, anim: 'pop', ink: 0.035 });
     b.toon('sponge', merge(spongeParts({ seed: 3, color: '#ffffff', tint: 1 })), { cap: 40, anim: 'pop', ink: 0.03 });
-    b.toon('fanSmall', merge(fanParts({ seed: 7, color: '#ffffff', tint: 1 })), { cap: 40, anim: 'pop', ink: 0.03 });
+    b.toon('fanSmall', lod(0.65, () => merge(fanParts({ seed: 7, color: '#ffffff', tint: 1 }))), { cap: 40, anim: 'pop', ink: 0.03 });
     b.toon('rockSmall', merge([boulder({ r: 0.8, sy: 0.6, seed: 3 })]), { cap: 50, anim: 'pop', ink: 0.04 });
-    b.toon('reef', merge(reefParts(1)), { cap: 30, anim: 'pop', ink: 0.035 });
-    b.toon('reefB', merge(reefParts(6)), { cap: 30, anim: 'pop', ink: 0.035 });
+    b.toon('reef', lod(0.65, () => merge(reefParts(1))), { cap: 30, anim: 'pop', ink: 0.035 });
+    b.toon('reefB', lod(0.65, () => merge(reefParts(6))), { cap: 30, anim: 'pop', ink: 0.035 });
     b.toon('kelp', merge(kelpParts({ h: 13, seed: 3, flat: true })), { cap: 70, anim: 'rise', ink: 0, side: THREE.DoubleSide, current: [0.9, 0.55, 0.32, 0.5] });
     b.toon('kelpB', merge(kelpParts({ h: 17, stalks: 4, blades: 13, seed: 8, flat: true })), { cap: 50, anim: 'rise', ink: 0, side: THREE.DoubleSide, current: [1.1, 0.48, 0.28, 0.6] });
-    b.toon('stack', merge(stackParts({ seed: 2 })), { cap: 30, anim: 'liftFar', ink: 0.05 });
+    b.toon('stack', lod(0.65, () => merge(stackParts({ seed: 2 }))), { cap: 30, anim: 'liftFar', ink: 0.05 });
     b.toon('stackB', merge(stackParts({ seed: 9, h: 10 })), { cap: 30, anim: 'liftFar', ink: 0.05 });
     b.toon('rockArch', merge(rockArchParts()), { cap: 6, anim: 'liftFar', ink: 0.05 });
     // schools: silver fish streaming by, dark shoals in the distance, bait
     // balls milling, and columns of bubbles from vents in the reef
     const silver = () => fishParts({ len: 0.42 });
     const dark = () => fishParts({ len: 0.6, back: C.fishDark, belly: '#2a5a62', deep: 0.42 });
-    b.toon('school', schoolGeo({ n: 70, mode: 0, L: 36, H: 1.4, W: 2.2, make: silver, seed: 3 }), { cap: 30, ink: 0, school: [3.2, 36, 1.8, 0] });
-    b.toon('schoolDark', schoolGeo({ n: 46, mode: 0, L: 44, H: 2.4, W: 3.4, make: dark, seed: 7 }), { cap: 24, ink: 0, school: [2.4, 44, 3, 0] });
+    b.toon('school', lod(0.6, () => schoolGeo({ n: 70, mode: 0, L: 36, H: 1.4, W: 2.2, make: silver, seed: 3 })), { cap: 30, ink: 0, school: [3.2, 36, 1.8, 0] });
+    b.toon('schoolDark', lod(0.6, () => schoolGeo({ n: 46, mode: 0, L: 44, H: 2.4, W: 3.4, make: dark, seed: 7 })), { cap: 24, ink: 0, school: [2.4, 44, 3, 0] });
     b.toon('baitball', schoolGeo({ n: 110, mode: 1, L: 40, H: 1.6, R: 3, make: () => fishParts({ len: 0.26 }), seed: 11 }), { cap: 10, ink: 0, school: [3.6, 40, 0, 1] });
     b.toon('bubbles', schoolGeo({ n: 26, mode: 2, L: 14, W: 0.5, make: (r) => [part(P.sphere(0.05 + r() * 0.07, 6, 4), '#e8fffa', { emit: 0.7, outline: 0 })], seed: 5 }), { cap: 16, ink: 0, school: [1.8, 14, 0, 2] });
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', ink: 0.018, side: THREE.DoubleSide, jelly: [0.5, 0.16, 1.0, 0.35], fly: [0, 0, 1.0, 0.1] });
@@ -1526,8 +1527,8 @@ export default {
     // of eight, flinging themselves into barrel rolls; octopuses jetting in
     // spurts; seahorses bobbing and darting about the seagrass
     b.toon('seaLion', merge(seaLionParts()), { cap: 16, anim: 'lift', ink: 0.03, swim: [0.95, 5, 0.8, 2.4], swim2: [0.5, 1, 1.7, 0.35], swim3: [0.45, 1, 0] });
-    b.toon('octopus', merge(octopusParts(3)), { cap: 16, anim: 'lift', ink: 0.028, swim: [0.9, 2.3, 0.6, 1.2], swim2: [0.3, 0, 1.2, 0.13], swim3: [0.7, 1, 1] });
-    b.toon('seahorse', merge(seahorseParts()), { cap: 40, anim: 'lift', ink: 0.022, swim: [1.0, 1.2, 0.35, 0.6], swim2: [0.12, 0, 1.0, 0.18], swim3: [0.55, 0, 2] });
+    b.toon('octopus', lod(0.7, () => merge(octopusParts(3))), { cap: 16, anim: 'lift', ink: 0.028, swim: [0.9, 2.3, 0.6, 1.2], swim2: [0.3, 0, 1.2, 0.13], swim3: [0.7, 1, 1] });
+    b.toon('seahorse', lod(0.65, () => merge(seahorseParts())), { cap: 40, anim: 'lift', ink: 0.022, swim: [1.0, 1.2, 0.35, 0.6], swim2: [0.12, 0, 1.0, 0.18], swim3: [0.55, 0, 2] });
     b.toon('whaleFar', merge(whaleParts()), { cap: 4, anim: 'liftFar', ink: 0.04, pleats: true, cross: [0, 1.3, 0.9, 0], fly: [0, 0, 3, 0.04] });
     b.beam('ray', merge(shaftParts({ len: 44, r0: 0.5, r1: 2.4, dir: RAY })), { cap: 60, anim: 'pop', wobble: [0.0011, 0, 0.3, 0] });
     b.glow('glow', { cap: 90, anim: 'pop' });

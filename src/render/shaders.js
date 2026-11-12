@@ -2139,8 +2139,60 @@ vec3 groundColor(vec2 p, float dist) {
     // grass creeping in over the edges in streaks along the path
     float tuft = texture2D(uNoise, vec2(p.x * 1.6, p.y * 0.375)).g;
     float dirt = 1.0 - smoothstep(-0.3, 0.05, edge + (tuft - 0.5) * 0.7);
+    // the grass isn't one even sward: broad patches of deeper moss and
+    // brighter clover drift through it (32 m and 8 m swells)
+    float swell = texture2D(uNoise, p * 0.03125 + 0.17).g * 0.65 + texture2D(uNoise, p * 0.125 + 0.53).g * 0.35;
+    c *= mix(0.8, 1.16, smoothstep(0.28, 0.72, swell));
+    float mossy = smoothstep(0.6, 0.78, texture2D(uNoise, p * 0.0625 + 0.71).g);
+    c = mix(c, uGroundA * vec3(0.78, 0.95, 0.72), mossy * 0.55 * (1.0 - far));
+    // the path: packed darker down the middle where the feet go, dry and pale
+    // at its shoulders, and grained with the noise
     vec3 earth = uGroundC * (0.85 + texture2D(uNoise, p * 0.25).g * 0.3);
+    float mid = abs(p.x - wander) / pw;
+    earth *= mix(0.84, 1.1, smoothstep(0.15, 0.85, mid)) * (0.92 + 0.16 * texture2D(uNoise, vec2(p.x * 2.0, p.y * 0.5) + 0.4).g);
+    // roots of the great trees snaking across it, now and then (one in three
+    // 8 m stretches), each lit along its top edge
+    float rcell = floor(p.y * 0.125);
+    float rh = hash12(vec2(rcell, 17.0));
+    float ry = (rcell + 0.25 + 0.5 * hash12(vec2(rcell, 29.0))) * 8.0 + sin(p.x * 1.7 + rh * 6.0) * 0.28 + (p.x - wander) * (rh - 0.5) * 0.5;
+    float rw = (0.07 + 0.05 * rh) * (1.0 - smoothstep(0.3, 1.25, mid) * 0.55);
+    float rd = p.y - ry;
+    float raa = fwidth(p.y) * 1.5;
+    float root = (1.0 - smoothstep(rw - raa, rw + raa, abs(rd))) * step(0.62, rh);
+    vec3 rootC = mix(uGroundC * 0.42, uGroundC * 1.35 + vec3(0.04, 0.03, 0.02), smoothstep(-rw, rw, -rd));
+    earth = mix(earth * (1.0 - 0.35 * (1.0 - smoothstep(rw, rw + 0.12, abs(rd))) * step(0.62, rh)), rootC, root);
+    // pebbles: small and round, a lit top, a dark rim where they sit
+    vec2 pq = p / 0.25;
+    vec2 pc = floor(pq);
+    float ph = hash12(pc + 61.0);
+    vec2 po = vec2(hash12(pc + 2.3), hash12(pc + 8.9)) * 0.6 + 0.2;
+    vec2 pd = (fract(pq) - po) * vec2(1.0, 1.35);
+    float pr = 0.12 + 0.12 * hash12(pc + 4.4);
+    float pl = length(pd);
+    float paa = fwidth(pq.x) * 1.2;
+    float peb = (1.0 - smoothstep(pr - paa, pr + paa, pl)) * step(0.86, ph);
+    vec3 stoneC = mix(vec3(0.36, 0.37, 0.33), vec3(0.62, 0.6, 0.52), hash12(pc + 9.0)) * (0.75 + 0.5 * smoothstep(pr, -pr, pd.y + pd.x * 0.3));
+    earth = mix(earth * (1.0 - 0.45 * (1.0 - smoothstep(pr, pr * 1.6, pl)) * step(0.86, ph)), stoneC, peb);
+    // fallen leaves littering the path and drifting in at its edges: little
+    // pointed ovals turned every way, olive, ochre and rust
+    vec2 lq = p / 0.5;
+    vec2 lc = floor(lq);
+    float lh = hash12(lc + 83.0);
+    vec2 lo = vec2(hash12(lc + 5.1), hash12(lc + 12.7)) * 0.6 + 0.2;
+    float la = hash12(lc + 31.0) * 6.2832;
+    vec2 ld = fract(lq) - lo;
+    ld = vec2(cos(la) * ld.x - sin(la) * ld.y, sin(la) * ld.x + cos(la) * ld.y);
+    float lw = 0.11 * (1.0 - (ld.x / 0.24) * (ld.x / 0.24));
+    float laa = fwidth(lq.x) * 1.2;
+    float leafM = (1.0 - smoothstep(lw - laa, lw + laa, abs(ld.y))) * step(abs(ld.x), 0.24);
+    vec3 leafC = lh > 0.86 ? vec3(0.55, 0.3, 0.12) : lh > 0.72 ? vec3(0.62, 0.48, 0.18) : vec3(0.34, 0.38, 0.14);
+    leafC *= 0.8 + 0.35 * smoothstep(-0.2, 0.2, ld.x) - 0.25 * (1.0 - smoothstep(0.0, 0.015, abs(ld.y)));
+    float onPath = smoothstep(-0.6, 0.1, -edge + 0.35);
+    float showLeaf = leafM * step(0.58, lh) * onPath * (1.0 - soften * 0.6);
+    earth = mix(earth, leafC, showLeaf * (1.0 - far));
     c = mix(c, earth, dirt * (1.0 - far * 0.4));
+    // and leaves blown in over the grass at the path's edge
+    c = mix(c, leafC, showLeaf * (1.0 - dirt) * 0.8 * (1.0 - far));
     // wildflowers dotted through the grass (not on the path)
     vec2 fq = p / 0.5;
     vec2 fc = floor(fq);
