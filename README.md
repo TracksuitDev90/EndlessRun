@@ -47,7 +47,11 @@ dragon — iridescent scales, deer's antlers, a feathered mane and plume —
 flies beside you, flowing after her own head like a ribbon in the wind,
 swimming through the air, sailing over carts and slipping under beams, now
 and then loop-the-looping or corkscrewing ahead, and always keeping out of
-your way (see [The dragon](#the-dragon)).
+your way (see [The dragon](#the-dragon)). Or Nep, a little pitcher plant —
+a squat lime pitcher with a coral rim, two yellow eyes peering out of the
+dark inside him from under a big floppy leaf — scampers along on his root
+feet, the water in him sloshing over the rim and crumbs of soil shaking
+loose behind him (see [The pitcher plant](#the-pitcher-plant)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -1227,7 +1231,7 @@ Append to the URL:
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`, `samurai`), over the one remembered — even one locked on the title screen |
-| `?companion=dragon` | who runs with you (`fox`, the default, or `dragon`), over the one remembered; `none` runs alone |
+| `?companion=dragon` | who runs with you (`fox`, the default, `dragon` or `pitcher`), over the one remembered; `none` runs alone |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
@@ -1431,7 +1435,7 @@ round window washed in their colours, their name and what they are. Picking
 one swaps the companion beside the runner (both are built and compiled at
 boot, as the runners are) and they say hello — the fox hops, the dragon
 twirls up into the air round where she stood and settles back on her hind
-legs. That pick is remembered too.
+legs, the pitcher plant hops and splashes. That pick is remembered too.
 
 ### The explorer
 
@@ -2569,7 +2573,8 @@ runs, how she crosses the road, how long chasing her tail takes and how
 seldom, how often she gets ideas, how long she rides, how often and how
 eagerly she fetches) live in `CONFIG.companion`; `?companion=none`
 runs alone. Companions are listed in `src/game/companions.js` — the fox is
-the first, the dragon the second — each with its body and its mind:
+the first, the dragon the second, the pitcher plant the third — each with
+its body and its mind:
 `companion.js` is the mind of one who runs (written for any animal on its
 feet: a new one needs its body, a sculpt and a module like `fox.js` taking
 the same frame context), `flyer.js` the mind of one who flies (see the
@@ -2745,6 +2750,112 @@ sail over a wall, how far in from the screen's edges she keeps, her rests
 between ideas, the twirl she says hello with, the loop, the corkscrew and her
 fetching) live in `CONFIG.companion.flyer`.
 
+## The pitcher plant
+
+![Nep: from the front, three-quarters, behind and his left side, his eyes peering out from under his leaf; running and swerving across the road, water slopping over his rim; a leap, the leaf lifting off his mouth and flopping back; a twirl; sitting by the runner on the title screen, and on the road - trailing back past the runner, facing you, and scouting ahead](docs/pitcher.jpg)
+
+Nep is a pitcher plant, and he runs with you whoever you pick: small and
+squat, a rounded pear of a pitcher in lime and yellow-green, hurrying to keep
+up on his root feet. There's no face on him — his eyes, two warm yellow ovals,
+peer out of the dark hollow inside him, from under a big floppy leaf he wears
+over his mouth like a hat. Like Sorrel he's almost all for show, and like her
+he fetches gems: he runs with her mind (`src/game/companion.js`), bent to his
+body.
+
+**Sculpted like the others.** `tools/runner/pitcher.py` builds him with
+`build.py`'s kit, after his reference paintings: the pear of a pitcher (a
+round bulb and a neck rising out of it, shallow growth lines grooved up it)
+with its mouth cut on a slant, tipped forward so you see into it from the
+front, and a rolled lip round it, scalloped and ruffled; and it's a real
+vessel — its wall a shell round a hollow that runs down into the bulb, the
+water standing in it a disc of its own. An oversized, lopsided leaf (broader
+on one side, its edges cupped down over him, its tip curled up, a notch
+bitten out of one edge) flops over his mouth from a stem that hooks up over
+his back, running across him on a diagonal so its broad edge hangs over the
+front of his mouth and its tip off one side — his eyes peep out from under
+it. Two slender tendrils curl out of his sides for arms; a sprig of little
+leaves grows out of his right side; his feet are short stumps of root splayed
+into rootlets on the road, a side-shoot off each, the left a little shorter
+and more knotted than the right. About 0.65 m to the top of the stem's hook —
+a head shorter than the fox. Skinned to a little skeleton: the pot, the
+water, the stem, the leaf (and its tip), three joints down each tendril, the
+sprig, and a leg and a foot each side (hung off his body, not the pot, so
+they never squash with it). To change him, edit the script and regenerate
+(about a minute), then look at him in `tools/runner/pitcher.html`
+(`?pose=stand|sit|run|leap|hop|whirl|peek`, `&turn=` to run swerving across
+the road, `&look=camera`, `&views=`, `&strip=` and the rest, as the fox's
+viewer; the camera follows him up a jump):
+
+```sh
+python3 tools/runner/pitcher.py   # -> assets/pitcher/
+```
+
+**Painted** (`PITCHER` in `CHAR_DETAIL`): the pitcher lime, warming to yellow
+round his middle and the front of his belly, a deeper green low down and up
+his neck, mottled; light growth lines running up it, curving as they rise;
+freckles. The rim coral pink, fine ridges across the lip, deeper toward the
+inside and lighter along its rolled top. The hollow dark all the way down,
+with a little warmth just under the rim, and on its back wall his eyes:
+two yellow ovals with pale hearts, glowing softly in the dark (unlit, so
+they shine whatever the light). He blinks, squeezes them shut in happy arcs,
+narrows them when he's startled and looks about with them. His leaves are
+green, yellower down the middle, a light midrib and veins running out from it
+toward the tip, darker toward the edges and freckled with rust along them, a
+fine yellow-brown line round the edge, paler beneath. His tendrils go
+orange-brown at the tips; his roots are streaked brown bark, paler toward the
+rootlets' ends. The water inside glints where it moves. His rim, his leaf and
+his eyes keep their colour through Hell's drain.
+
+**How he moves** (`src/game/pitcher.js`). He scampers: short root feet
+pattering quick under him (quicker the faster he goes — a dozen steps a
+second at full tilt — and the stride stays short), each planted
+while it carries him and then lifted and swung through, rolled up off its
+heel as it leaves the road, the leg drawn out or squashed to reach (it's a
+root: it gives). His round body bobs up on every step and rocks from one
+foot to the other, waddling a little; he leans into his run, against every
+push and pull, and into his turns. He squashes down into the wind-up for a
+jump and into a landing, stretches on the way up, sinks low when he slinks;
+his feet hang toes-down in the air.
+
+His leaf is on springs, floppy (lightly damped, so it bounces): lifted a
+little by the headwind as he runs, flopping with every step, lifted off his
+mouth on a jump and slapped down on the landing, swung out through a turn and
+lagging behind his twirls; pressed down when he's startled. Every few
+seconds he lifts it on purpose to peek out from under it — and when he's
+looking at something, when he's pleased, and wide when he goes for a gem (he
+catches it in his mouth and claps the leaf shut on it). His tendrils are
+chains of three springs, the outer joints looser: swinging against his
+steps, thrown up when he drops and down when he's driven up, flung up when
+he jumps or he's pleased, curled in when he's startled. The sprig jiggles.
+
+The water in him sloshes: its surface is a damped pendulum, tipped against
+every push, turn and stop he makes (as water lies in an accelerating cup)
+and overshooting, heaved by every jolt — and the water's bone tips with it,
+so you can see it slop about inside him when his leaf's up. Where it climbs
+the wall too high it spills over the rim there: drops slopped over now and
+then as he runs (more the faster he goes), a run of them over the outside of
+a sharp turn, a burst on a jump and a bigger one on a landing, a splash when
+he claps his leaf shut on a gem, and a ring of them flung out all round when
+he twirls. Every drop leaves the rim with his speed, so they arc out and fall
+behind him onto the road. (Under the sea, nothing spills.) And crumbs of soil
+shake loose from his roots: a few on every footfall, left on the road behind
+him as he scampers on, now and then one dropping off a foot as it swings
+through, and a scatter when he lands. Drops and crumbs are the runners' dust
+(`src/game/dust.js`; the crumbs are its kind 5, a rich brown), one draw call.
+
+**His mind** is the fox's, on his own tunables (`CONFIG.companion.pitcher`,
+over hers: a little heavier, hopping lower) and his own size and mouth (on
+top: he catches gems in it). He scouts ahead and looks back at you, drops
+back and dashes past, shoots out between your legs, and fetches; he never
+rides on your shoulder (he'd soak you) and never pounces; instead of chasing
+a tail he hasn't got, he pulls up and twirls round once on his own roots,
+the water flying — a little more often than she chases hers. Everything the
+fox does to keep safe, he does. On the title screen he sits beside the
+runner, looking about (and up at you, his leaf lifting); when you pick a
+runner he hops to say hello. `tools/companion/audit.js` checks him as it
+does her (`node tools/companion/audit.js "?manual&seed=2&companion=pitcher"
+150`): over two and a half minutes of play he touches nothing.
+
 ## Project layout
 
 ```
@@ -2802,7 +2913,9 @@ src/game/                     game loop, player (the runners' shared core:
                               gallop, poses, tail and ears; flyer.js: the
                               mind of one who flies; dragon.js: Iris's body,
                               her spine laid along her flight, swim, poses,
-                              legs, whiskers and frills)
+                              legs, whiskers and frills; pitcher.js: Nep's
+                              body, scamper, leaf, tendrils, sloshing water
+                              and the soil off his roots)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/elder.py         offline sculpt of the elder -> assets/elder/
@@ -2813,10 +2926,13 @@ tools/runner/samurai.py       offline sculpt of the samurai, his scabbard
                               and his sword -> assets/samurai/
 tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
 tools/runner/dragon.py        offline sculpt of the dragon -> assets/dragon/
+tools/runner/pitcher.py       offline sculpt of the pitcher plant -> assets/pitcher/
 tools/runner/view.html        a runner turned round like their reference sheet
 tools/runner/fox.html         the fox turned round, posed, or as a film strip
 tools/runner/dragon.html      the dragon turned round, posed, flying, or as a
                               film strip
+tools/runner/pitcher.html     the pitcher plant turned round, posed, or as a
+                              film strip (drops and crumbs and all)
 tools/companion/audit.js      plays the game unseen, checking the companion
                               never touches an obstacle (and that one who
                               flies keeps out of your way)

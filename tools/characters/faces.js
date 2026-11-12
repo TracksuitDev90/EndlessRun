@@ -1,11 +1,12 @@
 // The companions' portraits for their badges on the title screen: each
 // one's head rendered from its own sculpt and shader (tools/runner/fox.html,
-// dragon.html) on a clear background, cropped to it and written to
+// dragon.html, pitcher.html) on a clear background, cropped to it and written to
 // assets/characters/<id>-face.webp.
 //
 // Serve the repository root (python3 -m http.server 8000), then:
 //
-//   node tools/characters/faces.js
+//   node tools/characters/faces.js            # every portrait
+//   node tools/characters/faces.js pitcher    # just these
 //
 // (needs Playwright, and Python with Pillow for the crop.)
 const { chromium } = require('playwright');
@@ -17,11 +18,13 @@ const out = path.join(__dirname, '..', '..', 'assets', 'characters');
 const JOBS = [
   ['fox', 'tools/runner/fox.html?pose=sit&views=three&bg=0&zoom=2.6&y=0.68&z=-0.3&up=0.15&t=3'],
   ['dragon', 'tools/runner/dragon.html?pose=stand&views=three&bg=0&zoom=3.2&y=1.42&fx=0.0&fz=-0.15&dist=5.2&up=0.15&t=3'],
+  ['pitcher', 'tools/runner/pitcher.html?pose=stand&views=front&bg=0&zoom=1.75&y=0.42&up=0.28&look=camera&t=2'],
 ];
+const only = process.argv.slice(2);
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  for (const [id, url] of JOBS) {
+  for (const [id, url] of JOBS.filter(([id]) => !only.length || only.includes(id))) {
     const page = await browser.newPage({ viewport: { width: 360, height: 360 }, deviceScaleFactor: 2 });
     await page.goto(base + url);
     await page.waitForFunction(() => window.__ready, null, { timeout: 120000 });

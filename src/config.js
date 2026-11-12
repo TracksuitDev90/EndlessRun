@@ -130,7 +130,7 @@ export const CONFIG = {
   },
 
   // The companion who runs with you (see game/companions.js): who it is by
-  // default ('fox' or 'dragon'; 'none' to run alone; the title screen's
+  // default ('fox', 'dragon' or 'pitcher'; 'none' to run alone; the title screen's
   // pick, then ?companion=, override it). The fox (game/companion.js): her
   // gravity (m/s²) and
   // how long she winds up before each kind of jump (s), how high she leaps
@@ -162,6 +162,16 @@ export const CONFIG = {
     rest: [1.2, 3.2],
     ride: [2.6, 4.6],
     fetch: { every: [7, 14], reach: [6, 26], chance: 0.6, mischief: 0.15 },
+    // The pitcher plant (game/pitcher.js) runs with the same mind, on these
+    // over the fox's: a little heavier, hopping lower, never pouncing; his
+    // twirl (water flung out all round) a touch quicker and more often.
+    pitcher: {
+      gravity: 24,
+      windup: { leap: 0.12, pounce: 0.2, hop: 0.09 },
+      leap: 1.1,
+      pounceEvery: 1e9,
+      whirl: { dur: 0.72, every: 26 },
+    },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
     // body streams back in (m/s: base + a share of your pace; less of it and
     // she coils and ripples more, more and she streams out straighter); how

@@ -2,12 +2,15 @@ import { Fox } from './fox.js';
 import { Dragon } from './dragon.js';
 import { Companion } from './companion.js';
 import { Flyer } from './flyer.js';
+import { Pitcher } from './pitcher.js';
+import { CONFIG } from '../config.js';
 
 // Who can run with you, picked on the title screen. Each has their sculpted
 // asset (tools/runner/), a name and a line about them, the portrait and
 // colours of their badge on the title screen, the class that dresses and
 // moves them (make) and their mind (mind: companion.js for one who runs,
-// flyer.js for one who flies). The first is the default (CONFIG.companion.id
+// flyer.js for one who flies; tune, hw, mouth and beats bend the runner's
+// mind to a different body). The first is the default (CONFIG.companion.id
 // picks; the title screen's pick, then ?companion=, override it; 'none' runs
 // alone).
 export const COMPANIONS = [
@@ -32,6 +35,24 @@ export const COMPANIONS = [
     tint: ['#8fe3e6', '#3b56c4'],
     make: (env, asset) => new Dragon(env, asset),
     mind: (game, def, body) => new Flyer(game, def, body),
+  },
+  {
+    id: 'pitcher',
+    name: 'Nep',
+    title: 'the pitcher plant',
+    blurb: 'scampers · sloshes · fetches gems',
+    asset: 'assets/pitcher/',
+    face: 'assets/characters/pitcher-face.webp',
+    tint: ['#d9ec6a', '#e0786a'],
+    make: (env, asset) => new Pitcher(env, asset),
+    // (he runs with the fox's mind, on his own tunables: smaller, rounder,
+    // his mouth on top; no riding on your shoulder - he'd soak you - and
+    // no mousing pounce; a twirl instead of chasing a tail he hasn't got)
+    mind: (game, def, body) => new Companion(game, def, body),
+    tune: CONFIG.companion.pitcher,
+    hw: 0.19,
+    mouth: [0.1, 0.44],
+    beats: { ride: 0, pounce: 0, whirl: 1.4 },
   },
 ];
 
