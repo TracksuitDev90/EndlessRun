@@ -72,7 +72,13 @@ export class Companion {
     this.game = game;
     this.def = def;
     this.body = body;
-    this.C = CONFIG.companion;
+    // (a companion other than the fox can bring its own tunables over hers,
+    // its own size and where its mouth is, and how keen it is on each of
+    // her ideas: see companions.js)
+    this.C = def.tune ? { ...CONFIG.companion, ...def.tune } : CONFIG.companion;
+    this.hw = def.hw ?? HW;
+    this.mouth = def.mouth ?? MOUTH;
+    this.keen = def.beats || {};
     this.later = [];
     this.reset(true);
   }
@@ -211,6 +217,8 @@ export class Companion {
     b.wet = g.current?.def.env.bubbles ? 1 : 0;
     b.earBias = this.mood.earsBack;
     b.update(dt, this.ctx);
+    // (whatever he's shed this frame - drops, crumbs - left in the world)
+    b.after?.(this.pz, g.dist, !!g.player?.lowG);
   }
 
   // --- placing her ---------------------------------------------------------------
@@ -400,6 +408,7 @@ export class Companion {
       ['under', this.openRoad(p.x, 2.2) && p.grounded && !p.sliding && g.speed > 8 && !p.small && !p.onBoard ? 2.4 : 0],
       ['ride', this.openRoad(p.x, 3.2) && p.grounded && !p.sliding && !g.stumbleWindow && !p.small ? 2.6 : 0],
     ];
+    for (const o of opts) if (this.keen[o[0]] !== undefined) o[1] *= this.keen[o[0]];
     if (this.lastBeat) for (const o of opts) if (o[0] === this.lastBeat) o[1] *= 0.25;
     let total = 0;
     for (const o of opts) total += o[1];
@@ -657,22 +666,22 @@ export class Companion {
     this.lookAt = { x: gem.x, y: gem.y, dz: gem.d - g.dist };
     // spring to meet it at the top of the hop (a low gem she just snaps up)
     const vf = Math.max(g.speed + this.vdz, 1);
-    const need = gem.y - MOUTH[1] - 0.06;
+    const need = gem.y - this.mouth[1] - 0.06;
     if (this.grounded && !F.hopped && need > 0.12 && Math.abs(this.x - gem.x) < 0.5) {
       const H = need + 0.08;
       const v0 = Math.sqrt(2 * this.C.gravity * H);
       const tUp = v0 / this.C.gravity;
-      const gap = gem.d - (df + MOUTH[0]);
+      const gap = gem.d - (df + this.mouth[0]);
       if (gap > 0 && gap < vf * (tUp + this.C.windup.hop) + 0.3 && this.canLeapAt(this.x, tUp * 2.1 + this.C.windup.hop)) {
         F.hopped = true;
         this.jump(H, 'hop');
       }
     }
     // jaws open as she closes in
-    const near = gem.d - (df + MOUTH[0]);
+    const near = gem.d - (df + this.mouth[0]);
     this.body.jawOpen = near < vf * 0.18 && near > -0.4 ? 0.8 : 0;
     // caught?
-    const mx = this.x, my = this.y + MOUTH[1] + (this.grounded ? 0 : 0.06), md = df + MOUTH[0];
+    const mx = this.x, my = this.y + this.mouth[1] + (this.grounded ? 0 : 0.06), md = df + this.mouth[0];
     const prev = md - vf * dt - 0.05;
     if (gem.d >= prev - 0.35 && gem.d <= md + 0.4 && Math.abs(gem.x - mx) < 0.5 && Math.abs(gem.y - my) < 0.45) {
       this.body.jawOpen = 0;
@@ -703,7 +712,7 @@ export class Companion {
     let best = null;
     for (const o of this.game.obstacles.records) {
       if (o.d + o.len < d0 || o.d > d1 || kinds.indexOf(o.kind) < 0) continue;
-      if (Math.abs(x - o.x) > o.hw + HW) continue;
+      if (Math.abs(x - o.x) > o.hw + this.hw) continue;
       if (!best || o.d < best.d) best = o;
     }
     return best;
@@ -784,7 +793,7 @@ export class Companion {
     const cross = vf * 0.42 + 1.6;
     // (between two lanes, both count)
     let tight = room[here];
-    for (let l = 0; l < 3; l++) if (Math.abs(this.x - LANES[l]) < CONFIG.obstacleHalfWidth + HW + 0.05) tight = Math.min(tight, room[l]);
+    for (let l = 0; l < 3; l++) if (Math.abs(this.x - LANES[l]) < CONFIG.obstacleHalfWidth + this.hw + 0.05) tight = Math.min(tight, room[l]);
     const reach = (l) => {
       const a = Math.min(here, l), b = Math.max(here, l);
       for (let k = a + 1; k < b; k++) if (room[k] < cross * (k === a + 1 || k === b - 1 ? 1 : 1.5)) return false;

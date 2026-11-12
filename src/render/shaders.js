@@ -3530,6 +3530,169 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#elif defined(PITCHER)
+// --- Nep, the pitcher plant -----------------------------------------------------------
+// (on the pitcher d: x how far up it (0 the bottom, 1 the rim), y how far
+// round; on a leaf x across it (-1..1, + toward its wide side), y along it (0
+// the stalk, 1 the tip), z how far in from its edge (m), w which face (1 the
+// top); on the vines and roots y how far along them. r: the rest position.
+// See tools/runner/pitcher.py.)
+#define PT_YELLOW 13
+#define PT_LINE 14
+#define PT_FRECKLE 15
+#define PT_RIM_DEEP 16
+#define PT_RIM_LIGHT 17
+#define PT_VEIN 18
+#define PT_UNDER 19
+#define PT_RUST 20
+#define PT_TIP 21
+#define PT_ROOT_DARK 22
+#define PT_ROOT_LIGHT 23
+#define PT_EYE 24
+#define PT_EYE_IN 25
+#define PT_DEEP 26
+#define PT_WATER_LIGHT 27
+#define PT_GLOW 28
+// x eyes open (0 shut .. 1), y how happily they're squeezed shut (arcs), zw
+// where they look (across, up; -1..1)
+uniform vec4 uFace;
+float ptHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float ptNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(ptHash(i), ptHash(i + vec3(1, 0, 0)), f.x), mix(ptHash(i + vec3(0, 1, 0)), ptHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(ptHash(i + vec3(0, 0, 1)), ptHash(i + vec3(1, 0, 1)), f.x), mix(ptHash(i + vec3(0, 1, 1)), ptHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// Freckles: little round spots scattered over a surface, a few of them
+// bigger (cells of a jittered grid at rest position r, scale k).
+float ptFreckles(vec3 r, float k, float share) {
+  vec3 g = r * k;
+  vec3 i = floor(g);
+  float h = ptHash(i + 17.0);
+  vec3 c = i + 0.25 + 0.5 * vec3(ptHash(i), ptHash(i + 3.1), ptHash(i + 7.7));
+  float rad = mix(0.07, 0.17, ptHash(i + 9.3) * ptHash(i + 9.3));
+  return fill(length(g - c) - rad) * step(1.0 - share, h);
+}
+// His eyes: two warm yellow ovals glowing on the back wall of the hollow,
+// looking out from the dark. They blink (uFace.x), squeeze shut in happy
+// arcs (uFace.y) and look about (uFace.zw).
+vec3 ptEyes(vec3 c, vec3 r, inout float unlit) {
+  vec3 E = vec3(0.032, 0.444, 0.086);
+  vec2 look = uFace.zw * vec2(0.006, 0.004);
+  vec2 e = vec2(abs(r.x) - E.x - look.x * sign(r.x), r.y - E.y - look.y);
+  float open = clamp(uFace.x, 0.0, 1.0) * (1.0 - uFace.y);
+  float hw = 0.0118, hh = 0.0188 * mix(0.12, 1.0, open);
+  float d = (length(e / vec2(hw, hh)) - 1.0) * min(hw, hh);
+  // a soft glow round them in the dark
+  float halo = exp(-max(length(e / vec2(hw * 1.9, hh * 1.5 + 0.004)) - 0.5, 0.0) * 2.4) * 0.5;
+  c = mix(c, uPal[PT_GLOW], halo * 0.55);
+  float eye = fill(d);
+  vec3 col = mix(uPal[PT_EYE], uPal[PT_EYE_IN], smoothstep(0.0, -0.006, d));
+  // happy: shut tight in arcs, bowed up
+  float x = clamp(e.x / hw, -1.0, 1.0);
+  float arc = band(e.y + 0.004 - 0.009 * (1.0 - x * x), 0.0026) * step(abs(e.x), hw * 1.05);
+  float happy = smoothstep(0.3, 0.7, uFace.y);
+  c = mix(c, col, max(eye * (1.0 - happy), arc * happy));
+  unlit = max(unlit, max(max(eye * (1.0 - happy), arc * happy), halo * 0.8));
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    // the pitcher: lime, warming to yellow round his middle and the front of
+    // his belly, deeper green low down and up the neck; mottled; light
+    // growth lines running up it, curving as they rise; freckles
+    float ang = atan(r.x, -r.z);
+    float mid = exp(-pow((d.x - 0.42) / 0.3, 2.0));
+    float front = 0.5 + 0.5 * cos(ang);
+    float mott = ptNoise(r * 26.0) * 0.6 + ptNoise(r * 70.0) * 0.4;
+    c = mix(c, uPal[PT_YELLOW], clamp(mid * (0.35 + 0.45 * front) + (mott - 0.5) * 0.5, 0.0, 1.0) * 0.85);
+    c = mix(c, uPal[PT_DEEP], (smoothstep(0.32, 0.0, d.x) * 0.5 + smoothstep(0.7, 1.0, d.x) * 0.3) * (0.6 + 0.4 * mott));
+    float a = ang * 11.0 / 6.2831853 + 0.55 * sin(r.y * 14.0 + 0.6) * smoothstep(0.06, 0.2, r.y);
+    float gl = band(abs(fract(a + 0.5) - 0.5), 0.05 + 0.03 * (1.0 - d.x)) * smoothstep(0.06, 0.18, d.x) * smoothstep(1.0, 0.82, d.x);
+    c = mix(c, uPal[PT_LINE], gl * 0.6);
+    float fr = max(ptFreckles(r, 95.0, 0.38), ptFreckles(r + 3.7, 160.0, 0.3) * 0.8);
+    c = mix(c, uPal[PT_FRECKLE], fr * 0.6 * smoothstep(0.08, 0.3, d.x));
+    return c;
+  }
+  if (m == 2) {
+    // the rim: coral pink, fine ridges running across the lip, deeper toward
+    // the inside, lighter along its rolled top
+    vec3 q = r - vec3(0.0, 0.43, 0.0);
+    vec3 n = vec3(0.0, 0.927, -0.375);
+    vec3 e2 = cross(n, vec3(1.0, 0.0, 0.0));
+    float u = q.x, v = dot(q, e2), h = dot(q, n);
+    float th = atan(u, -v);
+    float rho = length(vec2(u, v));
+    float R = 0.106 * (1.0 + 0.08 * cos(th) * cos(th)) + 0.014 + 0.005 * cos(th * 9.0);
+    float ridge = band(abs(fract(th * 64.0 / 6.2831853) - 0.5) - 0.5, 0.12);
+    c = mix(c, uPal[PT_RIM_DEEP], smoothstep(0.002, -0.012, rho - R) * 0.75);
+    c = mix(c, uPal[PT_RIM_LIGHT], smoothstep(0.004, 0.014, h - 0.0055 * cos(th * 9.0)) * 0.6);
+    c = mix(c, uPal[PT_RIM_DEEP], ridge * 0.45);
+    return c;
+  }
+  if (m == 3) {
+    // the hollow: dark all the way down, a little warmth just under the rim
+    float h = dot(r - vec3(0.0, 0.43, 0.0), vec3(0.0, 0.927, -0.375));
+    c = mix(c, uPal[PT_RIM_DEEP] * 0.45, smoothstep(-0.03, 0.0, h) * 0.7);
+    unlit = 0.6;
+    if (r.z > 0.03) c = ptEyes(c, r, unlit);
+    return c;
+  }
+  if (m == 4) {
+    // a leaf: green, yellower down the middle, a light midrib and veins
+    // running out from it toward the tip, darker toward the edges and freckled
+    // with rust along them, a fine yellow-brown line round its edge; paler
+    // beneath
+    float t = d.y, x = d.x;
+    float edge = d.z;
+    float mott = ptNoise(r * 40.0) * 0.6 + ptNoise(r * 120.0) * 0.4;
+    c = mix(c, uPal[PT_YELLOW], smoothstep(0.75, 0.0, abs(x)) * 0.22 * smoothstep(0.0, 0.3, t));
+    c = mix(c, uPal[PT_DEEP], smoothstep(0.35, 1.0, abs(x)) * 0.35 + (mott - 0.5) * 0.3);
+    float rib = band(x, 0.035 * (1.0 - 0.75 * t) + 0.006);
+    float va = (t - abs(x) * 0.42) * 8.0;
+    float vein = band(abs(fract(va) - 0.5) - 0.5, 0.045) * step(0.08, abs(x)) * smoothstep(0.96, 0.7, abs(x)) * step(0.05, t) * step(t, 0.93);
+    float fine = band(ptNoise(r * vec3(160.0, 160.0, 160.0)) - 0.5, 0.025) * 0.35;
+    c = mix(c, uPal[PT_VEIN], max(max(rib * 0.85, vein * 0.6), fine * smoothstep(0.1, 0.4, abs(x))));
+    float rust = smoothstep(0.014, 0.0, edge) * smoothstep(0.55, 0.75, ptNoise(r * 90.0 + 3.0));
+    rust = max(rust, ptFreckles(r, 120.0, 0.12) * smoothstep(0.03, 0.006, edge));
+    c = mix(c, uPal[PT_RUST], rust * 0.75);
+    c = mix(c, mix(uPal[PT_YELLOW], uPal[PT_RUST], 0.45), fill(edge - 0.0022) * 0.7);
+    c = mix(c, uPal[PT_UNDER] * (0.85 + 0.3 * mott), (1.0 - d.w) * 0.65);
+    return c;
+  }
+  if (m == 5) {
+    // the vines: green, streaked along, going orange-brown at the tips
+    float s = ptNoise(r * vec3(90.0, 260.0, 90.0));
+    c = mix(c, uPal[PT_DEEP], smoothstep(0.55, 0.25, s) * 0.3);
+    c = mix(c, uPal[PT_TIP], smoothstep(0.78, 0.98, d.y));
+    return c;
+  }
+  if (m == 6) {
+    // the roots: brown bark, streaked, darker in its cracks, paler toward
+    // the rootlets' tips
+    vec3 sc = d.y > 0.35 ? vec3(160.0, 300.0, 160.0) : vec3(260.0, 70.0, 260.0);
+    float s = ptNoise(r * sc) * 0.7 + ptNoise(r * 600.0) * 0.3;
+    c = mix(c, uPal[PT_ROOT_DARK], smoothstep(0.42, 0.2, s) * 0.7);
+    c = mix(c, uPal[PT_ROOT_LIGHT], smoothstep(0.62, 0.85, s) * 0.5 + smoothstep(0.6, 1.0, d.y) * 0.3);
+    return c;
+  }
+  if (m == 7) {
+    // the water standing in him: dark in the hollow, glinting where it moves
+    float w = ptNoise(vec3(r.xz * 60.0, uTime * 1.7)) * 0.6 + ptNoise(vec3(r.xz * 150.0, uTime * 2.9)) * 0.4;
+    float g = smoothstep(0.66, 0.8, w);
+    c = mix(c, uPal[PT_WATER_LIGHT], g * 0.8);
+    unlit = g * 0.6;
+    return c;
+  }
+  return c;
+}
 #elif defined(ITEMS)
 // --- the things that fly out of the explorer's backpack -------------------------
 // (d: x, y across the part, z which face: 1 the front, 2 the back, 0 an edge)
@@ -5086,6 +5249,10 @@ void main() {
     // (his red obi and wraps burn on through a drain - and his eyes: see
     // tgFace)
     gKeep = (m == 7 || m == 8) ? 1.0 : 0.0;
+  #elif defined(PITCHER)
+    // (his coral rim, his leaf and the eyes in the dark keep their colour
+    // through a drain)
+    gKeep = (m == 2 || m == 3 || m == 4) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -5121,6 +5288,9 @@ void main() {
   #elif defined(SKATER)
     // (loose cotton in soft gradients; the board and the gold crisp)
     float soft = m == 3 ? 0.1 : m == 13 ? 0.08 : m == 4 ? 0.07 : m == 1 ? 0.12 : (m >= 9 && m <= 12) ? 0.035 : 0.065;
+  #elif defined(PITCHER)
+    // (a waxy, rounded pitcher in soft gradients; the leaves a little softer)
+    float soft = (m == 4) ? 0.12 : (m == 6) ? 0.06 : 0.085;
   #elif defined(BUNNY)
     // (fur takes the light softly; the billowy trousers in soft gradients)
     float soft = (m == 1 || m == 2 || m == 6 || m == 8 || m == 11) ? 0.1 : m == 4 ? 0.11 : (m == 12 || m == 14) ? 0.04 : 0.07;
@@ -5175,6 +5345,9 @@ void main() {
   if (m == 2 || m == 13) {
   #elif defined(SAMURAI)
   if (m == 99) {
+  #elif defined(PITCHER)
+  // (a waxy sheen on his pitcher and his leaves where they face the light)
+  if (m == 1 || m == 4 || m == 2) {
   #else
   if (m == 2) {
   #endif
@@ -5222,6 +5395,8 @@ void main() {
     gKeep = m == 3 ? 1.0 : 0.0;
   #elif defined(SAMURAI)
     gKeep = (m == 7 || m == 8) ? 1.0 : 0.0;
+  #elif defined(PITCHER)
+    gKeep = (m == 2 || m == 3 || m == 4) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -5932,7 +6107,7 @@ void main() {
 // ---------------------------------------------------------------------------
 const VS_DUST = COMMON + /* glsl */ `
 uniform vec2 uResolution;
-attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour), w seed
+attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour, 5 a crumb of soil), w seed
 varying vec4 vDust;
 varying vec3 vWorld;
 varying vec3 vPos;
@@ -5959,8 +6134,9 @@ void main() {
   vec2 c = gl_PointCoord - 0.5;
   float r = length(c);
   // (drops of water are drawn like grit, spray like a puff)
-  float grit = step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z));
-  float wet = step(1.5, vDust.z);
+  float soil = step(4.5, vDust.z);
+  float grit = max(step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z)), soil);
+  float wet = step(1.5, vDust.z) * (1.0 - soil);
   float a = atan(c.y, c.x);
   // (the lumps stay inside the sprite, or its square would cut them off)
   float lump = (0.028 * sin(a * 5.0 + vDust.w * 6.3) + 0.016 * sin(a * 9.0 - vDust.w * 4.1)) * (1.0 - grit);
@@ -5976,11 +6152,13 @@ void main() {
   // water: white, a glassy teal shade beneath
   col = mix(col, mix(vec3(0.62, 0.84, 0.86), vec3(1.0), 0.4 + 0.6 * lit), wet);
   // vapour (a thruster's plume): bright white, a cold lilac shade beneath
-  float vap = step(3.5, vDust.z);
+  float vap = step(3.5, vDust.z) * (1.0 - soil);
   // (taking a little of the ground's colour where the dust is red)
   vec3 vapC = mix(vec3(0.7, 0.72, 0.95), vec3(1.0, 0.99, 0.97), 0.35 + 0.65 * lit);
   vapC = mix(vapC, dust * (0.75 + 0.35 * lit), clamp((0.62 - uDustPale) * 0.45, 0.0, 0.3));
   col = mix(col, vapC, vap);
+  // soil: a rich brown crumb, lit from above
+  col = mix(col, mix(vec3(0.24, 0.15, 0.09), vec3(0.5, 0.34, 0.2), 0.3 + 0.7 * lit), soil);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
@@ -7361,7 +7539,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', pitcher: 'PITCHER' };
   const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);

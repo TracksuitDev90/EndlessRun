@@ -10,12 +10,14 @@ import { makeDustMaterial } from '../render/shaders.js';
 // the air is clear. (The same points can be water instead: drops flung up
 // and spray, splashing through the surf in the Gallery's sands; or, in low
 // gravity, the white vapour of a thruster's plume - kind 4 - driven back in
-// a jet that the thin air barely slows.)
-
-const MAX = 64;
+// a jet that the thin air barely slows; or, kind 5, crumbs of soil shaken
+// off the pitcher plant's roots.)
 
 export class Dust {
-  constructor(env) {
+  // max: how many there's room for at once
+  constructor(env, max = 64) {
+    const MAX = max;
+    this.max = MAX;
     this.pos = new Float32Array(MAX * 3);
     this.dust = new Float32Array(MAX * 4);
     const geo = new THREE.BufferGeometry();
@@ -44,7 +46,7 @@ export class Dust {
   // default), and scales on how long it lasts (life) and how far it blooms
   // (grow).
   emit(p, v, size, grit = false, alpha = -1, life = 1, grow = 1) {
-    if (this.queued >= MAX) return;
+    if (this.queued >= this.max) return;
     const q = this.queue[this.queued++];
     q.p.copy(p);
     q.v.copy(v);
@@ -59,12 +61,12 @@ export class Dust {
     for (let i = 0; i < this.queued; i++) {
       const q = this.queue[i];
       const it = this.p[this.next];
-      this.next = (this.next + 1) % MAX;
+      this.next = (this.next + 1) % this.max;
       const w = q.p.applyQuaternion(root.quaternion).add(root.position);
       const v = q.v.applyQuaternion(root.quaternion);
       it.live = true;
       it.kind = q.kind;
-      it.falls = q.kind === 1 || q.kind === 2;
+      it.falls = q.kind === 1 || q.kind === 2 || q.kind === 5;
       it.x = w.x;
       it.y = w.y;
       it.d = dist - (w.z - z);
