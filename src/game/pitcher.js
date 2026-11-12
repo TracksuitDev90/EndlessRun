@@ -12,13 +12,16 @@ import { Dust } from './dust.js';
 // hooked stem; tendril arms, a sprig of little leaves, root feet. Drawn with
 // the runners' illustrated shader (PITCHER in CHAR_DETAIL).
 //
-// Nothing here decides where he goes - that's the companion's mind
-// (companion.js, the same one the fox has), which hands him a place in the
-// world, how fast he's moving over the ground and what he's doing each
-// frame. This module turns that into a plant hurrying to keep up:
-//   - a scamper: short root feet pattering quick under him, his round body
-//     bobbing up on every step and rocking from one foot to the other,
-//     leaning into his run and into his turns;
+// Nothing here decides where he goes - that's his mind (sprout.js, built on
+// the runners' companion.js), which hands him a place in the world, how fast
+// he's moving over the ground, what he's doing each frame and his flourishes
+// (act: totter, shake, bask, flail, sway). This module turns that into a
+// plant doing his best to keep up, drawn half as big again as he's sculpted:
+//   - a waddle: unhurried steps on short root feet, his round body bobbing
+//     up on every step and rocking from root to root - top-heavy, so the
+//     rocking is a loose spring and he wobbles on after it; leaning into his
+//     run and into his turns; tottering, shaking himself off, basking with
+//     his face to the sun, flailing as he hurries, swaying as he dances;
 //   - his leaf on springs: flopping with every step, lifted by the headwind
 //     and on a jump, slapped down on a landing, swinging out through a turn
 //     and lagging behind his twirls - and now and then lifted on purpose,
@@ -29,8 +32,8 @@ import { Dust } from './dust.js';
 //     turn and stop, heaved by every step and jolt), spilling over the rim
 //     where it rises too high: drops and splashes on the run, more on a
 //     sharp turn, a burst on a jump or a landing, flung out in a ring when he
-//     twirls;
-//   - crumbs of soil shaken loose from his roots on every footfall,
+//     twirls or shakes, and whenever a wobble dips his rim;
+//   - chunky crumbs of soil shaken loose from his roots on every footfall,
 //     trailing behind him; a scatter of them when he lands.
 
 export const COL = {
@@ -59,6 +62,10 @@ export const COL = {
   28: '#d6a43a', // the eyes' glow in the dark
   30: '#f6f7c4', // sheen
 };
+
+// He's sculpted small and drawn half as big again: big enough to read his
+// water and his soil from behind the runner.
+export const SCALE = 1.5;
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const _v = new THREE.Vector3();
@@ -108,14 +115,17 @@ export class Pitcher {
     this.buildSkeleton();
     this.buildLook();
     this.buildShadow();
-    this.dust = new Dust(this.u, 120);
+    this.dust = new Dust(this.u, 240);
     this.S = {};
-    for (const k of ['lift', 'leafRoll', 'leafYaw', 'tip', 'stem', 'sprigX', 'sprigZ', 'heave', 'slX', 'slZ', 'squash', 'yaw', 'lean', 'side']) this.S[k] = new Sway();
+    for (const k of ['lift', 'leafRoll', 'leafYaw', 'tip', 'stem', 'sprigX', 'sprigZ', 'heave', 'slX', 'slZ', 'squash', 'yaw', 'lean', 'side', 'wobR', 'wobP']) this.S[k] = new Sway();
     this.arms = [0, 1].map(() => Array.from({ length: 3 }, () => ({ up: new Sway(), fwd: new Sway() })));
     this.wS = { run: new Spring(), stand: new Spring(1), sit: new Spring(), air: new Spring() };
     this.w = { run: 0, stand: 1, sit: 0, air: 0 };
     this.low = new Spring();
     this.faceU.value.set(1, 0, 0, 0);
+    // his flourishes, set by his mind (sprout.js): totter, shake, bask,
+    // flail, sway (0..1) and swayDir, idle
+    this.act = {};
     this.reset();
   }
 
@@ -284,9 +294,10 @@ export class Pitcher {
       this.yawRate += (d / dt - this.yawRate) * (1 - Math.exp(-dt * 20));
     }
     this.prevYaw = yaw;
-    // the scamper: quick little steps, quicker the faster he goes
+    // the waddle: unhurried steps, a little quicker the faster he goes (and
+    // in a flap when he's hurrying to catch up)
     const run = this.mode === 'run';
-    this.freq = clamp(2.6 + 0.2 * this.speed, 2.2, 7.2);
+    this.freq = clamp(1.5 + 0.11 * this.speed, 1.7, 3.9) * (1 + 0.45 * (this.act.flail || 0));
     const ph0 = this.phase;
     this.phase = (this.phase + dt * (run ? this.freq : 0)) % 1;
     this.stepped = run ? [crossed(ph0, this.phase, 0), crossed(ph0, this.phase, 0.5)] : [false, false];
@@ -302,7 +313,7 @@ export class Pitcher {
     // (startled, his eyes go narrow; looking at something, they look at it)
     const lx = this.lookAt ? clamp(-this.lookAt.x / Math.max(0.3, Math.hypot(this.lookAt.x, this.lookAt.z)), -1, 1) * this.lookW : 0;
     const ly = this.lookAt ? clamp(this.lookAt.y / Math.max(0.5, Math.hypot(this.lookAt.x, this.lookAt.z)), -1, 1) * this.lookW : 0;
-    this.faceU.value.set(clamp(1 - bl * 1.2, 0, 1) * (1 - 0.35 * clamp(this.earBias, 0, 1)), clamp(this.happy, 0, 1), -lx, ly);
+    this.faceU.value.set(clamp(1 - bl * 1.2, 0, 1) * (1 - 0.35 * clamp(this.earBias, 0, 1)), clamp(Math.max(this.happy, (this.act.bask || 0) * 1.2), 0, 1), -lx, ly);
 
     // now and then he lifts his leaf to peek out from under it
     this.peekT -= dt;
@@ -368,12 +379,23 @@ export class Pitcher {
     // swings, sloshes and flops)
     _qi.copy(this.root.quaternion).invert();
     const acc = this.accL.copy(this.acc).applyQuaternion(_qi);
-    const bob = run * (0.012 + 0.012 * Math.min(sp, 1)) * Math.abs(Math.sin(ph));
-    const rock = run * (0.12 + 0.05 * Math.min(sp, 1)) * Math.sin(ph) + 0.06 * this.wag * Math.sin(t * 9);
-    const waddle = run * 0.1 * Math.sin(ph + 0.4) + 0.05 * this.wag * Math.sin(t * 9 + 1);
+    const A = this.act;
+    const tot_ = A.totter || 0, shk = A.shake || 0, bask = A.bask || 0, sway = A.sway || 0, idle = A.idle || 0;
+    const bob = run * (0.016 + 0.012 * Math.min(sp, 1)) * Math.abs(Math.sin(ph));
+    // he rocks from root to root - and it doesn't stop when the step does:
+    // he's top-heavy, full of water, and wobbles on (a loosely damped
+    // spring, so every step and every push sets him swaying)
+    const rockT = run * (0.17 + 0.06 * Math.min(sp, 1)) * Math.sin(ph) + 0.06 * this.wag * Math.sin(t * 9)
+      + tot_ * 0.34 * Math.sin(t * 5.4) + sway * 0.3 * (A.swayDir || 0) + idle * 0.13 * Math.sin(t * 2.3)
+      + shk * 0.12 * Math.sin(t * TAU * 6.5 + 1);
+    const rock = clamp(S.wobR.step(rockT, 2.1, 0.16, -acc.x * 0.05, dt), -0.5, 0.5);
+    const waddle = run * 0.12 * Math.sin(ph + 0.4) + 0.05 * this.wag * Math.sin(t * 9 + 1) + shk * 0.6 * Math.sin(t * TAU * 6.5)
+      + sway * 0.25 * (A.swayDir || 0) + idle * 0.12 * Math.sin(t * 1.15 + 0.5);
     // leaning into his run (and into a turn, against its pull), and back
-    // when he pulls up
-    const lean = S.lean.step(run * (0.14 + 0.1 * Math.min(sp, 1)) + clamp(-acc.z * 0.012, -0.2, 0.2) - 0.08 * sit, 3, 0.7, 0, dt);
+    // when he pulls up; back to turn his face to the sun; nodding about
+    // when he totters
+    const leanT = run * (0.1 + 0.08 * Math.min(sp, 1)) + clamp(-acc.z * 0.012, -0.2, 0.2) - 0.08 * sit - 0.28 * bask + tot_ * 0.13 * Math.sin(t * 3.7) + idle * 0.05 * Math.sin(t * 4.6);
+    const lean = clamp(S.lean.step(leanT, 1.9, 0.22, 0, dt), -0.45, 0.45);
     const side = S.side.step(clamp(acc.x * 0.01, -0.22, 0.22), 2.6, 0.55, 0, dt);
     // squash and stretch: down into the wind-up and a landing, up on the
     // way up, low when he's slinking (and every step a little)
@@ -407,7 +429,7 @@ export class Pitcher {
     // a landing, flopping with every step; lifted to peek out, to catch a
     // gem, when he's curious or pleased; pressed down when he's startled
     const wind = Math.min(sp, 1.2);
-    let lift = 0.03 + 0.07 * wind * run + 0.26 * this.peek * (1 - air) + 0.14 * this.lookW + 0.1 * this.happy - 0.28 * clamp(this.earBias, 0, 1.2) - 0.18 * low;
+    let lift = 0.03 + 0.07 * wind * run + 0.75 * bask + 0.15 * (A.flail || 0) * Math.sin(t * 15) + 0.26 * this.peek * (1 - air) + 0.14 * this.lookW + 0.1 * this.happy - 0.28 * clamp(this.earBias, 0, 1.2) - 0.18 * low;
     if (m === 'air') {
       const p = clamp(this.airT / Math.max(0.05, this.airDur), 0, 1);
       lift += 0.12 + 0.14 * (1 - p);
@@ -421,8 +443,8 @@ export class Pitcher {
     // (his own acceleration up or down throws it: up a step, it lags down;
     // down into a landing, it flops on down)
     const fl = S.lift.step(lift + tw, 2.4, 0.24, -acc.y * 0.9 + acc.z * 0.4, dt);
-    const fr = S.leafRoll.step(0.06 * Math.sin(t * 1.3), 2.0, 0.2, acc.x * 0.8 - this.yawRate * 0.6, dt);
-    const fy = S.leafYaw.step(0, 1.8, 0.25, -this.yawRate * 2.2 + acc.x * 0.4, dt);
+    const fr = S.leafRoll.step(0.06 * Math.sin(t * 1.3), 2.0, 0.2, acc.x * 0.8 - this.yawRate * 0.6 - S.wobR.v * 9, dt);
+    const fy = S.leafYaw.step(0, 1.8, 0.25, -this.yawRate * 2.2 + acc.x * 0.4 - S.yaw.v * 12, dt);
     const tip = S.tip.step(fl * 0.35, 3.2, 0.25, -acc.y * 0.9, dt);
     const L = this.rig.leaf;
     _ax.fromArray(L.across);
@@ -521,10 +543,15 @@ export class Pitcher {
       const J = this.arms[i];
       // swinging opposite the foot on its side
       const swing = run * 0.45 * Math.sin(ph + (i === 0 ? Math.PI : 0));
+      const A = this.act;
       let up = -0.15 + 0.85 * air + 0.55 * this.happy * (0.6 + 0.4 * Math.sin(t * 11 + i * 2)) - 0.35 * ce + 0.1 * sit - 0.25 * clamp(this.earBias, 0, 1);
+      // (up to the sun when he basks; flailing when he hurries; flung out
+      // as he totters and shakes; waving about as he sways)
+      up += 0.9 * (A.bask || 0) + (A.flail || 0) * 0.7 * Math.sin(t * 17 + i * Math.PI) + (A.totter || 0) * 0.5 * Math.sin(t * 5.4 + i * Math.PI) + (A.shake || 0) * 0.6;
+      up += (A.idle || 0) * 0.25 * Math.sin(t * 2.3 + i * Math.PI) + (A.sway || 0) * 0.4 * (A.swayDir || 0) * s;
       up += 0.3 * clamp(this.jawOpen, 0, 1);
       if (this.twitch[1] < 0.3 && i === 1) up += Math.sin((this.twitch[1] / 0.3) * Math.PI) * 0.5;
-      const back = -0.35 * run;
+      const back = -0.35 * run + (this.act.flail || 0) * 0.9 * Math.sin(t * 13 + i * 2);
       for (let j = 0; j < 3; j++) {
         const loose = 1 + j * 0.6;
         const freq = 3.4 - j * 0.7;
@@ -561,29 +588,33 @@ export class Pitcher {
     if (this.wet || dt <= 0) return;
     // how high it climbs the wall (m above where it lies), and where
     const R = this.rig.water.r;
-    const tilt = Math.hypot(sx, sz);
+    // (the water lies level: when he leans, his rim dips toward it on that
+    // side - so every wobble slops some out)
+    _v.set(0, 1, 0).applyQuaternion(b.pot.quaternion);
+    const ex = sx + _v.x * 1.3, ez = sz + _v.z * 1.3;
+    const tilt = Math.hypot(ex, ez);
     const rise = tilt * R + Math.abs(hv) * 0.06;
-    // (and a twirl flings it out all round)
-    const fling = Math.max(0, Math.abs(this.yawRate) - 5) * 0.012;
-    // spills: more the higher it climbs; a few on any step at a good pace
-    let rate = Math.max(0, rise - 0.035) * 420 + fling * 420;
+    // (and a twirl or a shake flings it out all round)
+    const fling = Math.max(0, Math.abs(this.yawRate) - 5) * 0.012 + (this.act.shake || 0) * 0.12;
+    // spills: more the higher it climbs; a few on any step
+    let rate = Math.max(0, rise - 0.026) * 700 + fling * 420;
     // (every step jolts it: a drop or two slopped over now and then, more
     // the faster he goes)
     if (this.stepped[0] || this.stepped[1]) {
       const k = run * clamp(this.speed / 12, 0.3, 1.3);
-      if (Math.random() < 0.5 * k) rate += (1 + (Math.random() < 0.35 * k ? 1 : 0)) / dt;
+      if (Math.random() < 0.8 * k) rate += (1 + (Math.random() < 0.5 * k ? 1 : 0) + (Math.random() < 0.25 * k ? 1 : 0)) / dt;
     }
-    if (this.landed) rate += (6 + 10 * this.landHit) / dt;
+    if (this.landed) rate += (10 + 14 * this.landHit) / dt;
     if (this.snapped) rate += 6 / dt;
     this.spillAcc += rate * dt;
     let n = 0;
-    while (this.spillAcc >= 1 && n < 14) {
+    while (this.spillAcc >= 1 && n < 18) {
       this.spillAcc -= 1;
       n++;
       // where on the rim: the high side of the slosh, or anywhere (a jolt,
       // a twirl)
       let ang;
-      if (tilt > 0.04 && Math.random() < 0.8) ang = Math.atan2(sx, -sz) + (Math.random() - 0.5) * 1.3;
+      if (tilt > 0.04 && Math.random() < 0.8) ang = Math.atan2(ex, -ez) + (Math.random() - 0.5) * 1.3;
       else ang = Math.random() * TAU;
       this.spill(ang, fling, hv);
     }
@@ -601,14 +632,16 @@ export class Pitcher {
     _p.add(this.mouthC).applyMatrix4(b.pot.matrixWorld);
     // out over the rim and up; carried along with him (in his own frame)
     _v.set(Math.sin(ang), 0, -Math.cos(ang)).applyQuaternion(b.pot.quaternion);
-    const out = 0.5 + Math.random() * 0.8 + fling * 40;
+    const out = 0.7 + Math.random() * 1.1 + fling * 40;
     _v.multiplyScalar(out);
-    _v.y = 0.8 + Math.random() * 1.4 + Math.max(0, -hv) * 3;
+    _v.y = 1.0 + Math.random() * 1.6 + Math.max(0, -hv) * 3;
     _qi.copy(this.root.quaternion).invert();
     _v2.copy(this.vel).applyQuaternion(_qi).multiplyScalar(0.9);
     _v.add(_v2);
-    const big = Math.random() < 0.25;
-    this.dust.emit(_p, _v, big ? 0.042 + Math.random() * 0.022 : 0.022 + Math.random() * 0.014, 2);
+    const big = Math.random() < 0.3;
+    this.emit(_p, _v, big ? 0.085 + Math.random() * 0.035 : 0.05 + Math.random() * 0.025, 6);
+    // (and a puff of spray off the bigger splashes)
+    if (big && Math.random() < 0.4) this.emit(_p, _v.multiplyScalar(0.5), 0.12, 3, 0.4, 0.6, 0.8);
   }
 
   // Crumbs of soil shaken loose from his roots: a few on every footfall,
@@ -619,8 +652,23 @@ export class Pitcher {
     for (let i = 0; i < 2; i++) {
       const g = this.legs[i];
       let n = 0;
-      if (this.stepped[i] && Math.random() < 0.35 + 0.5 * Math.min(sp, 1)) n = 1 + (Math.random() < 0.4 * Math.min(sp, 1) ? 1 : 0);
-      if (this.landed) n += 2 + Math.round(this.landHit * 2);
+      if (this.stepped[i]) {
+        n = 2 + Math.floor(Math.random() * (1.5 + 2 * Math.min(sp, 1)));
+        // (each footfall thumps up a little puff off the road too)
+        _p.copy(g.plant);
+        _p.y = 0.03;
+        _v.set(g.s * 0.3, 0.4, 0.5);
+        this.emit(_p, _v, 0.24 + 0.1 * Math.random(), 0, 0.5, 0.75, 0.9);
+      }
+      if (this.landed) {
+        n += 6 + Math.round(this.landHit * 5);
+        _p.copy(g.plant);
+        _p.y = 0.04;
+        _v.set(g.s * 0.8, 0.5, 0);
+        this.emit(_p, _v, 0.32 + 0.1 * this.landHit, 0, 0.55, 0.9, 1.1);
+      }
+      // (a shake rattles it off his roots)
+      if ((this.act.shake || 0) > 0.3 && Math.random() < dt * 22) n++;
       for (let k = 0; k < n; k++) {
         _p.copy(g.plant);
         _p.x += g.s * (Math.random() * 0.05 - 0.01);
@@ -628,9 +676,9 @@ export class Pitcher {
         _p.y = 0.02 + Math.random() * 0.02;
         // kicked up and back off the planted foot (it's still on the road:
         // nothing of his speed goes with them)
-        _v.set(g.s * (Math.random() * 0.5), 0.5 + Math.random() * 1.1, 0.4 + Math.random() * 0.8);
-        if (this.landed) _v.set(g.s * (0.3 + Math.random() * 0.9), 0.6 + Math.random() * 1.2, (Math.random() - 0.5) * 1.2);
-        this.dust.emit(_p, _v, 0.014 + Math.random() * 0.012, 5);
+        _v.set(g.s * (Math.random() * 0.8), 0.8 + Math.random() * 1.5, 0.5 + Math.random() * 1.0);
+        if (this.landed) _v.set(g.s * (0.4 + Math.random() * 1.3), 0.9 + Math.random() * 1.6, (Math.random() - 0.5) * 1.8);
+        this.emit(_p, _v, 0.045 + Math.random() * 0.04, 5);
       }
       // (and now and then one drops off a foot as it swings through)
       if (g.lift > 0.01 && Math.random() < dt * 3 * run) {
@@ -638,9 +686,15 @@ export class Pitcher {
         _p.y = Math.max(0.02, _p.y - 0.01);
         _v.copy(this.vel).applyQuaternion(_qi).multiplyScalar(0.7);
         _v.y = 0.2;
-        this.dust.emit(_p, _v, 0.012, 5);
+        this.emit(_p, _v, 0.04, 5);
       }
     }
+  }
+
+  // A drop, a crumb or a puff at p (his own sculpted space: drawn half as
+  // big again), moving at v (m/s, in his frame).
+  emit(p, v, size, kind, alpha = -1, life = 1, grow = 1) {
+    this.dust.emit(p.multiplyScalar(SCALE), v, size, kind, alpha, life, grow);
   }
 
   // After the frame: his drops and crumbs, left in the world (track
@@ -655,13 +709,14 @@ export class Pitcher {
   place(pos, q, ground = 0, shadow = 1) {
     this.root.position.copy(pos);
     this.root.quaternion.copy(q);
+    this.root.scale.setScalar(SCALE);
     if (this.spin) {
       _q.setFromAxisAngle(_UP, this.spin);
       this.root.quaternion.multiply(_q);
     }
     const h = Math.max(0, pos.y - ground);
-    const r = 0.6;
-    this.cast.aim(pos.x - r, pos.x + r, pos.y - 0.05, pos.y + 0.75, pos.z - r, pos.z + r, ground, pos.x, pos.z, {
+    const r = 0.6 * SCALE;
+    this.cast.aim(pos.x - r, pos.x + r, pos.y - 0.05, pos.y + 0.75 * SCALE, pos.z - r, pos.z + r, ground, pos.x, pos.z, {
       alpha: 0.95 * clamp(1 - h * 0.2, 0.5, 1) * shadow,
       contact: 0.34 * clamp(1 - h * 3, 0, 1) * shadow,
       reach: 0.18,

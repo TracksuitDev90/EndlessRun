@@ -11,7 +11,8 @@ import { makeDustMaterial } from '../render/shaders.js';
 // and spray, splashing through the surf in the Gallery's sands; or, in low
 // gravity, the white vapour of a thruster's plume - kind 4 - driven back in
 // a jet that the thin air barely slows; or, kind 5, crumbs of soil shaken
-// off the pitcher plant's roots.)
+// off the pitcher plant's roots, and kind 6, the big clear drops of water
+// slopped out of him.)
 
 export class Dust {
   // max: how many there's room for at once
@@ -66,7 +67,7 @@ export class Dust {
       const v = q.v.applyQuaternion(root.quaternion);
       it.live = true;
       it.kind = q.kind;
-      it.falls = q.kind === 1 || q.kind === 2 || q.kind === 5;
+      it.falls = q.kind === 1 || q.kind === 2 || q.kind === 5 || q.kind === 6;
       it.x = w.x;
       it.y = w.y;
       it.d = dist - (w.z - z);

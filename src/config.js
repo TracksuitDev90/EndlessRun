@@ -162,15 +162,22 @@ export const CONFIG = {
     rest: [1.2, 3.2],
     ride: [2.6, 4.6],
     fetch: { every: [7, 14], reach: [6, 26], chance: 0.6, mischief: 0.15 },
-    // The pitcher plant (game/pitcher.js) runs with the same mind, on these
-    // over the fox's: a little heavier, hopping lower, never pouncing; his
-    // twirl (water flung out all round) a touch quicker and more often.
+    // The pitcher plant (game/pitcher.js, his mind game/sprout.js), over
+    // the fox's: heavier, hopping lower, never pouncing; slower to surge
+    // ahead or drop back and slower across the road (he keeps pace, no
+    // more); never far ahead; resting longer between ideas, and fetching
+    // less often.
     pitcher: {
-      gravity: 24,
-      windup: { leap: 0.12, pounce: 0.2, hop: 0.09 },
-      leap: 1.1,
+      gravity: 22,
+      windup: { leap: 0.1, pounce: 0.2, hop: 0.1 },
+      leap: 1.15,
       pounceEvery: 1e9,
-      whirl: { dur: 0.72, every: 26 },
+      ahead: 5,
+      behind: -2.6,
+      surge: [-4.5, 6],
+      lateral: { slant: 0.34, dodge: 0.66, base: 0.55, acc: 8.5, accDodge: 30, accAir: 5 },
+      rest: [1.8, 3.8],
+      fetch: { every: [10, 18], reach: [6, 24], chance: 0.5, mischief: 0.08 },
     },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
     // body streams back in (m/s: base + a share of your pace; less of it and

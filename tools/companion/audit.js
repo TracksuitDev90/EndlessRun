@@ -95,12 +95,14 @@ const { chromium } = require('playwright');
         if (deg > 30) out.heading.over30++;
         if (deg > 45) out.heading.over45++;
       }
-      // her body, rump to nose; her back's height above her feet
+      // her body, rump to nose; her back's height above her feet (or a
+      // companion's own extent, as companions.js gives it)
       const df = g.dist + c.dz;
+      const X = c.def.extent || { front: 0.55, back: 0.4, side: 0.12, top: 0.62 };
       for (const o of g.obstacles.records) {
-        if (df + 0.55 < o.d || df - 0.4 > o.d + o.len) continue;
-        if (Math.abs(c.x - o.x) > o.hw + 0.12) continue;
-        const y0 = c.y, y1 = c.y + 0.62;
+        if (df + X.front < o.d || df - X.back > o.d + o.len) continue;
+        if (Math.abs(c.x - o.x) > o.hw + X.side) continue;
+        const y0 = c.y, y1 = c.y + X.top;
         if (o.kind === 'W' || (o.kind === 'L' && y0 < o.y1 - 0.05) || (o.kind === 'H' && y1 > o.y0)) {
           out.touchFrames++;
           const at = (i / 60).toFixed(1);

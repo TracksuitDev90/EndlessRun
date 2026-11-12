@@ -3,6 +3,7 @@ import { Dragon } from './dragon.js';
 import { Companion } from './companion.js';
 import { Flyer } from './flyer.js';
 import { Pitcher } from './pitcher.js';
+import { Sprout } from './sprout.js';
 import { CONFIG } from '../config.js';
 
 // Who can run with you, picked on the title screen. Each has their sculpted
@@ -40,19 +41,20 @@ export const COMPANIONS = [
     id: 'pitcher',
     name: 'Nep',
     title: 'the pitcher plant',
-    blurb: 'scampers · sloshes · fetches gems',
+    blurb: 'wobbles · sloshes · keeps up (just)',
     asset: 'assets/pitcher/',
     face: 'assets/characters/pitcher-face.webp',
     tint: ['#d9ec6a', '#e0786a'],
     make: (env, asset) => new Pitcher(env, asset),
-    // (he runs with the fox's mind, on his own tunables: smaller, rounder,
-    // his mouth on top; no riding on your shoulder - he'd soak you - and
-    // no mousing pounce; a twirl instead of chasing a tail he hasn't got)
-    mind: (game, def, body) => new Companion(game, def, body),
+    // (a mind of his own - sprout.js: slower, wobblier, never far from you -
+    // built on the runner's for reading the road; his own tunables over
+    // the fox's, his size, and his mouth on top)
+    mind: (game, def, body) => new Sprout(game, def, body),
     tune: CONFIG.companion.pitcher,
-    hw: 0.19,
-    mouth: [0.1, 0.44],
-    beats: { ride: 0, pounce: 0, whirl: 1.4 },
+    hw: 0.27,
+    mouth: [0.12, 0.66],
+    // (how far his pot reaches, for tools/companion/audit.js)
+    extent: { front: 0.26, back: 0.26, side: 0.24, top: 0.98 },
   },
 ];
 
