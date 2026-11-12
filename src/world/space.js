@@ -3,7 +3,7 @@ import { P, part, merge, rgb, rockParts, gateFrameParts, gateTop, leafParts } fr
 import { crystal, crystalPoint, nugget, lumps, bipyramid } from './gems.js';
 import { CONFIG } from '../config.js';
 
-// X · The Red Drift — out among the stars, on a little world of red dust:
+// XI · The Red Drift — the last world, out among the stars, on a little world of red dust:
 // regolith half Mars and half moon, rust-red sand and grey basalt flats
 // pocked with craters, under a sky that is the whole universe - stars all
 // the way round, a nebula flowing across it in ribbons of pink, orange and

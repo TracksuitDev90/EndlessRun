@@ -247,6 +247,11 @@ class WorldBuilder {
   // Opaque toon prop with optional ink outline.
   // o: { cap, ink (width, 0 = none), anim, wobble, marks, side, order, stencil }
   toon(name, geometry, o = {}) {
+    // (a prop the snow settles on needs every vertex's share of it, if only
+    // nothing: an attribute left unbound reads w = 1, a slab that lifts)
+    if (o.snow && !geometry.attributes.snow) {
+      geometry.setAttribute('snow', new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count * 4), 4));
+    }
     const mat = makeToonMaterial(this.u, o);
     const ink = o.ink === 0 ? null : makeInkMaterial(mat, o.ink ?? 0.045);
     const b = o.kinds ? new KindBatch(name, geometry, mat, ink, o.cap ?? 64) : new Batch(name, geometry, mat, ink, o.cap ?? 64);

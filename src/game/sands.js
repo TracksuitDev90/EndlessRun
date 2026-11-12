@@ -24,6 +24,12 @@ import { mulberry32 } from '../core/rng.js';
 // is, how far this wave reached, the wet line it leaves (drying back), how
 // far its foam has been carried and how much lace it still carries. It
 // washes footprints away, and the runner splashes through it.
+//
+// Snow. A world whose env has `snow` (the Frostbound Pass, ground pattern 15)
+// takes the same footprints, pressed deeper the deeper the snow lies (the
+// shader shows them only where there's snow to press: never on the bare
+// ice), and each foot that comes down kicks up a little puff of powder - the
+// runner's own dust (game/dust.js), white off that ground.
 
 const TAU = Math.PI * 2;
 // which print each runner leaves (see footprint in the shaders)
@@ -44,6 +50,7 @@ const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const _q = new THREE.Vector3();
 const _p = new THREE.Vector3();
+const _iq = new THREE.Quaternion();
 
 export class Sands {
   constructor() {
@@ -75,6 +82,7 @@ export class Sands {
     this.wasGrounded = true;
     this.furrow = null;
     this.tracks = null;
+    this.snow = -1;
     // the surf
     this.sea = 0;
     this.doorD = 0;
@@ -182,7 +190,9 @@ export class Sands {
   update(dt, game) {
     const world = game.current;
     if (world !== this.world) this.enter(world);
-    if (!world.env.sands) return;
+    if (!world.env.sands && !world.env.snow) return;
+    // (how deep the snow lies, if this is snow: 0 a dusting .. 1; else -1)
+    this.snow = world.env.snow ? world.u.uSnow.value.x : -1;
     const p = game.player;
     const running = game.state === 'running' && p.mode === 'run' && !p.crashed && game.speed > 2;
     const onSand = p.grounded && (p.groundY || 0) < 0.05;
@@ -258,6 +268,37 @@ export class Sands {
     pr.w = 0;
     pr.depth = (DEPTH[game.runnerId] ?? 0.03) * deep;
     pr.flip = side ? 1 : -1;
+    if (this.snow >= 0) {
+      pr.depth *= 1.15 + 0.5 * this.snow;
+      if (deep > 1 || Math.random() < 0.5 + 0.5 * this.snow) this.powder(game, ball, deep);
+    }
+  }
+
+  // Powder kicked up where a foot comes down in the snow (at `at`, in the
+  // runner's own space): a small puff thrown back and up - a ring of them,
+  // and a few flecks flung higher, off a landing. (Flecks are the dust's
+  // drops of water: white, as snow is.)
+  powder(game, at, power) {
+    const p = game.player;
+    if (!p.dust) return;
+    const r = Math.random;
+    const run = _w.set(p.vx, 0, -game.speed).applyQuaternion(_iq.copy(p.root.quaternion).invert());
+    const land = power > 1;
+    const n = land ? 5 : 1 + (r() < 0.35 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      _v.copy(run).multiplyScalar(0.22 + 0.2 * r());
+      _v.x += (r() - 0.5) * (land ? 2.6 : 1.2);
+      _v.y += 0.3 + 0.7 * r() * power;
+      _v.z += 0.25 + 0.5 * r();
+      p.dust.emit(_p.set(at.x + (r() - 0.5) * 0.14, 0.05, at.z + (r() - 0.5) * 0.14), _v, (0.12 + 0.07 * r()) * (land ? 1.4 : 1), false, 0.45 + 0.2 * r(), 0.7, 0.8);
+    }
+    for (let i = land ? 3 : 0; i > 0; i--) {
+      _v.copy(run).multiplyScalar(0.3 + 0.2 * r());
+      _v.x += (r() - 0.5) * 2.2;
+      _v.y += 1.2 + 1.4 * r();
+      _v.z += 0.3 + 0.6 * r();
+      p.dust.emit(_p.set(at.x + (r() - 0.5) * 0.15, 0.04, at.z + (r() - 0.5) * 0.15), _v, 0.035 + 0.03 * r(), 2);
+    }
   }
 
   hole(game, at, wet) {

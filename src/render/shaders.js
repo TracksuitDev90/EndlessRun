@@ -365,7 +365,63 @@ float sandHeight(vec2 p, out float slip) {
 #endif
 `;
 
-const VS_OBJECT = COMMON + SANDS_VS + /* glsl */ `
+// The Frostbound Pass's snow (env.snow; ground pattern 15, toon options banks
+// and snow). Track coordinates, as the sands': p.x across the route, p.y along
+// the run (the chunk distance, mod 4096 — every period here divides it).
+// Needs uNoise declared first.
+const FROST_COMMON = /* glsl */ `
+float frostN(vec2 q) { return texture2D(uNoise, q).g; }
+// Where the canyon opens out on this side of the route (0 walled in by the
+// glacier, 1 open onto the ice field): the left opens first, then both, then
+// the right, then the walls close in again — every 512 m (frost.js stands its
+// cliffs by the same rule: see openAt there).
+float openAt(float d, float side) {
+  return smoothstep(0.56, 0.74, 0.5 + 0.5 * sin(d * 0.01227185 + (side < 0.0 ? 0.4 : 2.4)));
+}
+`;
+const FROST_VS = /* glsl */ `
+#if defined(BANKS) || defined(SNOW)
+// Snow settling (env.snow, see Game.updateSnow): x how much has built up (0 a
+// dusting, 1 as deep as it gets), y how far the dream lifts far drifts apart
+uniform vec4 uSnow;
+#endif
+#ifdef SNOW
+// How far each vertex moves, in the prop's own space, by the time the snow
+// lies as deep as it gets (caps thicken, drifts swell, laden boughs sag); and
+// in w, which slab of a far drift it is (0 the one that stays on the ground:
+// see the lift, below).
+attribute vec4 snow;
+#endif
+#ifdef BANKS
+uniform sampler2D uNoise;
+// x how deep the snow lies here (m)
+varying vec2 vSnowH;
+` + FROST_COMMON + /* glsl */ `
+// The snow's height at p. Nothing on the route itself; along each edge of it
+// a bank (the route's boundary: low and broken at first, a wall of drift once
+// the snow lies deep), its crest wandering in and out and rising and falling;
+// beyond that the snowfield, blown into long dunes — or, where the canyon
+// opens out, sinking away to the flat of the ice field, which the wind keeps
+// scoured.
+float snowHeight(vec2 p) {
+  float ax = abs(p.x);
+  if (ax < 4.1) return 0.0;
+  float side = p.x < 0.0 ? -1.0 : 1.0;
+  float lv = uSnow.x;
+  float n1 = frostN(vec2(p.y * 0.015625 + side * 0.31, 0.17 + side * 0.23));
+  float n2 = frostN(vec2(p.y * 0.0625 + side * 0.53, 0.61));
+  float crest = 5.5 + (n1 - 0.5) * 1.5;
+  float hb = mix(0.36, 1.4, lv) * (0.68 + 0.64 * n2);
+  float open = openAt(p.y, side) * smoothstep(7.0, 10.5, ax);
+  float dune = frostN(vec2(p.x * 0.03125 + 0.4, p.y * 0.03125 + side * 0.2));
+  float field = (mix(0.12, 0.8, lv) * (0.5 + dune) + lv * 1.5 * smoothstep(0.5, 0.85, dune)) * (1.0 - open);
+  float h = hb * smoothstep(4.15, crest, ax);
+  return mix(h, field, smoothstep(crest, crest + 3.0, ax));
+}
+#endif
+`;
+
+const VS_OBJECT = COMMON + SANDS_VS + FROST_VS + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uWobble;
 uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
@@ -547,6 +603,10 @@ void main() {
       gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
       return;
     }
+  #endif
+  #ifdef SNOW
+    // the snow that has settled on it so far
+    lp += snow.xyz * uSnow.x;
   #endif
   #ifdef SCHOOL
     {
@@ -923,6 +983,20 @@ void main() {
       vSand = vec2(slip, h);
     }
   #endif
+  #ifdef BANKS
+    {
+      // the snow banked along the route and lying over the field (see
+      // snowHeight): the strip is laid flat, uv in metres (y along the run,
+      // from p0); its normal from the slope of the snow
+      vec2 sp = vec2(lp.x, uv.y + phase);
+      float h = snowHeight(sp);
+      float hx = snowHeight(sp + vec2(0.3, 0.0));
+      float hd = snowHeight(sp + vec2(0.0, 0.3));
+      lp.y += h;
+      ln = normalize(vec3((h - hx) / 0.3, 1.0, (hd - h) / 0.3));
+      vSnowH = vec2(h, 0.0);
+    }
+  #endif
   #ifdef THREAD
     {
       // its head falls from the cornice when the sand starts to run, and
@@ -962,6 +1036,18 @@ void main() {
     wp += off;
     pivot += off;
   }
+  #ifdef SNOW
+    if (uSnow.y > 0.0 && snow.w > 0.0) {
+      // deep in the dream, far off, a drift comes apart in slabs that lift
+      // off one another and hang there, rocking; they settle back together
+      // well before the runner reaches them (past the stretch of road that's
+      // kept true, like every other warp of the dream)
+      float k = smoothstep(max(44.0, uBend.z), max(130.0, uBend.z + 86.0), aP) * uSnow.y;
+      float bob = sin(uTime * 0.45 + phase * 2.0 + snow.w * 1.9);
+      wp.y += k * snow.w * (2.3 + 0.7 * bob);
+      wp.x += k * snow.w * 0.5 * sin(uTime * 0.21 + phase * 3.0 + snow.w);
+    }
+  #endif
   #ifdef CROSS
     {
       // right across the road when the runner is under it, gliding in from
@@ -1166,8 +1252,26 @@ const SANDS_FS = /* glsl */ `
 // how much a puddle on the roof gives back the sky (see pattern 14)
 float gSheen = 0.0;
 #endif
-#if GROUND == 10
+#if GROUND == 10 || GROUND == 15
+// The runner's footprints (game/sands.js), pressed into the Gallery's sand
+// and into the Frostbound Pass's snow alike.
 #define PRINTS ${PRINTS}
+// each footprint: x, d (track m, mod 4096), heading (rad, toward +x), kind
+// (0 a boot, 1 a trainer, 2 a slide's furrow); and its length (a furrow's),
+// width (a furrow's), depth (m), and 1 or -1 (a right or a left foot)
+uniform vec4 uPrintA[PRINTS];
+uniform vec4 uPrintB[PRINTS];
+// x the runner (track m), y how far back the prints go (m), z how many
+uniform vec4 uPrintZone;
+// the relief the pattern gives the ground (added to its normal), and how
+// much of the sky it gives back (wet sand bared by the backwash; bare ice)
+vec3 gBump = vec3(0.0);
+float gSheen = 0.0;
+float wrapD(float a) {
+  return mod(a + 2048.0, 4096.0) - 2048.0;
+}
+#endif
+#if GROUND == 10
 uniform vec4 uShore;
 ` + SANDS_COMMON + /* glsl */ `
 // the swash: x its front (m before the doorway), y how far this wave
@@ -1181,25 +1285,13 @@ uniform vec4 uSurf3;
 uniform vec3 uSeaShallow;
 uniform vec3 uSeaDeep;
 uniform vec3 uSeaFoam;
-// each footprint: x, d (track m, mod 4096), heading (rad, toward +x), kind
-// (0 a boot, 1 a trainer, 2 a slide's furrow); and its length (a furrow's),
-// width (a furrow's), depth (m), and 1 or -1 (a right or a left foot)
-uniform vec4 uPrintA[PRINTS];
-uniform vec4 uPrintB[PRINTS];
-// x the runner (track m), y how far back the prints go (m), z how many
-uniform vec4 uPrintZone;
 #ifdef DUNES
 varying vec2 vSand;
 #else
 const vec2 vSand = vec2(0.0);
 #endif
-// the relief the pattern gives the sand (added to its normal), and how much
-// wet sand bared by the backwash glistens
-vec3 gBump = vec3(0.0);
-float gSheen = 0.0;
-float wrapD(float a) {
-  return mod(a + 2048.0, 4096.0) - 2048.0;
-}
+#endif
+#if GROUND == 10 || GROUND == 15
 // A footprint, q in its own frame (m: y toward the toe, x to the outside of
 // the foot): how deep it presses the sand (1 at the deepest; the rim of sand
 // squeezed up round it below 0). kind 0 a hiking boot's lugs, 1 a trainer's
@@ -1304,6 +1396,8 @@ float printsAt(vec2 p, float fine, inout vec2 grad) {
   }
   return deep;
 }
+#endif
+#if GROUND == 10
 // the swash's front rolls along in lobes (as in game/sands.js)
 float surfLobes(float x) {
   return uSurf3.y * (0.7 * sin(0.42 * x + uSurf2.y) + 0.45 * sin(1.07 * x + uSurf2.z) + 0.2 * sin(2.3 * x + uSurf2.w));
@@ -1449,6 +1543,168 @@ vec3 sandGround(vec2 p, float dist, float far) {
 #endif
 `;
 
+// Ground pattern 15, the Frostbound Pass (inside FS_TOON's GROUND block, after
+// the footprints): a route of wind-packed snow lying in long patches over
+// blue glacier ice, the ice scoured bare between them — and less and less of
+// it showing as the snow settles (uSnow.x) — cracked, and feathered here and
+// there with hoar frost; either side a bank of drifted snow (heaped up by the
+// vertex shader: toon option banks, see snowHeight), the route's only edge;
+// beyond it the snowfield or, where the canyon opens out, pack ice in plates
+// with dark water in the leads between them. The runner's footprints press
+// into the snow (never the ice), and the bare ice gives back the sky.
+const FROST_FS = /* glsl */ `
+#if GROUND == 15
+#ifdef BANKS
+varying vec2 vSnowH;
+#else
+const vec2 vSnowH = vec2(0.0);
+#endif
+` + FROST_COMMON + /* glsl */ `
+// how thickly the snow lies on the route at p: long streaks of it, laid along
+// the run by the wind (the ice shows wherever this falls short of what has
+// settled so far)
+float snowLie(vec2 p, float n1, float n2) {
+  return frostN(p * vec2(0.09375, 0.03125) + 0.67) * 0.62 + n2 * 0.23 + n1 * 0.15;
+}
+// A frond of hoar frost grown across the ice from the origin along +y, len
+// long: a stem, and barbs raking off it either side, shorter toward its tip.
+// aa: how soft its lines are (a pixel, and a share of the frame's travel).
+float frond(vec2 q, float len, float aa) {
+  float t = q.y / len;
+  if (t < 0.0 || t > 1.0) return 0.0;
+  float axq = abs(q.x);
+  float reach = len * 0.34 * (1.0 - t * t) * smoothstep(0.0, 0.12, t);
+  if (axq > reach + 0.05) return 0.0;
+  float stem = 1.0 - smoothstep(0.016, 0.016 + aa, axq);
+  float bf = abs(fract((q.y - axq * 0.8) / 0.15) - 0.5) * 0.15;
+  float barb = (1.0 - smoothstep(0.012, 0.012 + aa, bf)) * (1.0 - smoothstep(reach * 0.72, reach, axq));
+  return max(stem, barb) * (1.0 - smoothstep(0.85, 1.0, t));
+}
+// here and there on the bare ice, a spray of three of them from one point
+float hoar(vec2 p, float aa) {
+  vec2 g = p / 2.6;
+  vec2 c = floor(g);
+  float h = hash12(c + 7.3);
+  if (h < 0.38) return 0.0;
+  vec2 d = (fract(g) - (vec2(hash12(c + 1.9), hash12(c + 4.7)) * 0.3 + 0.35)) * 2.6;
+  float cov = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float a = h * 6.2831 + fk * 2.0944 + (hash12(c + fk * 3.1 + 0.7) - 0.5) * 1.1;
+    vec2 dir = vec2(sin(a), cos(a));
+    vec2 q = vec2(d.x * dir.y - d.y * dir.x, dot(d, dir));
+    q.x += q.y * q.y * 0.3 * (hash12(c + fk + 13.0) - 0.5);
+    cov = max(cov, frond(q, 0.5 + 0.4 * hash12(c + fk * 5.7 + 2.0), aa));
+  }
+  return cov;
+}
+// Pack ice: x how far a point is from the lead between its plate and the
+// next (0 in the water), y the plate's own number.
+vec2 packIce(vec2 g) {
+  vec2 c = floor(g);
+  vec2 f = fract(g);
+  float d1 = 9.0;
+  float d2 = 9.0;
+  float id = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 o = vec2(float(i), float(j));
+      vec2 pt = o + 0.5 + 0.76 * (vec2(hash12(c + o + 3.1), hash12(c + o + 11.7)) - 0.5);
+      float d = length(pt - f);
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+        id = hash12(c + o + 23.0);
+      } else if (d < d2) {
+        d2 = d;
+      }
+    }
+  }
+  return vec2(d2 - d1, id);
+}
+vec3 frostGround(vec2 p, float dist, float far) {
+  float ax = abs(p.x);
+  float side = p.x < 0.0 ? -1.0 : 1.0;
+  float lv = uSnow.x;
+  // how much ground a pixel covers here (m), for what must fade with distance
+  float fw = fwidth(p.x) + fwidth(p.y);
+  float near = 1.0 - smoothstep(0.02, 0.07, fw);
+  float n1 = frostN(p * 0.0625);
+  float n2 = frostN(p * 0.25 + 0.31);
+  // the ice: turquoise, milky where it's frosted over and deepening to cobalt
+  // where it's clear; pressure cracks wander through it along the noise's
+  // contours, most of them healed white, a few still open and dark
+  vec3 ice = mix(uGroundB, uGroundC, smoothstep(0.3, 0.8, n1 * 0.5 + n2 * 0.5));
+  float f = frostN(p * 0.046875 + 0.13) * 0.72 + frostN(p * 0.1875 + 0.57) * 0.28;
+  float wl = fwidth(f) * 1.3 + 0.002;
+  float healed = 1.0 - smoothstep(0.004, 0.004 + wl, abs(f - 0.5));
+  float split = 1.0 - smoothstep(0.003, 0.003 + wl, abs(f - 0.63));
+  ice = mix(ice, vec3(0.88, 0.97, 1.0), healed * 0.5 * (1.0 - far));
+  ice = mix(ice, uGroundC * 0.6, split * 0.55 * (1.0 - far));
+  // the snow on the route: patches of it over the ice, more of the ice
+  // covered the more has settled; all snow once off the route
+  float cov = snowLie(p, n1, n2);
+  // (eased: the second visit still shows streaks of it, the third little)
+  float th = 0.56 - 0.2 * lv * lv;
+  float e = 0.028 + fw * 0.25;
+  float snow = smoothstep(th - e, th + e, cov);
+  float off = smoothstep(4.0, 4.5, ax);
+  // it lies proud of the ice, thicker the more has settled: toward the light
+  // its edge is lit, and away from it, it throws a cool shadow onto the ice
+  // (p.y runs along the run, toward -z)
+  vec2 L2 = normalize(vec2(uLightDir.x, -uLightDir.z) + vec2(1e-4, 0.0));
+  vec2 pl = p + L2 * (0.14 + 0.3 * lv);
+  float snowL = smoothstep(th - e, th + e, snowLie(pl, frostN(pl * 0.0625), frostN(pl * 0.25 + 0.31)));
+  ice = mix(ice, ice * uShadowTint * 0.94, snowL * (1.0 - snow) * (1.0 - off) * 0.65);
+  snow = max(snow, off);
+  // white, a breath of lavender in its hollows; the wind has drawn it into
+  // low ridges that run along the route (so they never strobe)
+  vec3 sc = uGroundA * (0.975 + 0.04 * n2);
+  sc = mix(sc, sc * vec3(0.9, 0.925, 1.0), smoothstep(0.6, 0.25, n1) * 0.3);
+  float rx = p.x * 1.1 + (n1 - 0.5) * 3.0 + sin(p.y * 0.19635) * 0.5 + (n2 - 0.5) * 0.8;
+  float rk = (1.0 - far * 0.8) * (1.0 - smoothstep(0.25, 0.6, fwidth(rx)));
+  float rf = fract(rx);
+  float lee = smoothstep(0.78, 0.93, rf) * (1.0 - smoothstep(0.95, 1.0, rf));
+  sc *= 1.0 + (0.02 * rf - 0.05 * lee) * rk;
+  sc *= 1.0 + 0.035 * snow * (1.0 - snowL) * (1.0 - off);
+  // a cool shade where the bank meets the route
+  sc *= 1.0 - 0.06 * (1.0 - smoothstep(0.0, 0.45, abs(ax - 4.3)));
+  // hoar frost feathering the bare ice
+  if (snow < 0.97 && near > 0.0) {
+    float hf = hoar(p, fw * 1.2 + uMotion * 0.3);
+    ice = mix(ice, vec3(0.93, 0.985, 1.0), hf * 0.6 * near * (1.0 - 0.5 * smoothstep(0.1, 0.5, uMotion)));
+  }
+  vec3 c = mix(ice, sc, snow);
+  // the ice field, out past the bank where the canyon opens: plates of pack
+  // ice, each its own white, its broken edge showing turquoise, dark water
+  // in the leads between
+  float open = openAt(p.y, side) * smoothstep(7.5, 10.5, ax + (n2 - 0.5) * 2.5);
+  float bare = 1.0 - snow;
+  if (open > 0.0) {
+    vec2 pk = packIce(p / 6.0 + (vec2(n2, n1) - 0.5) * 0.3);
+    float aa = fw * 0.25;
+    float lead = 1.0 - smoothstep(0.03, 0.03 + aa, pk.x);
+    float rim = 1.0 - smoothstep(0.03, 0.13 + aa, pk.x);
+    vec3 plate = uGroundA * mix(vec3(0.9, 0.93, 1.0), vec3(1.0), pk.y) * (0.96 + 0.06 * n2);
+    plate = mix(plate, mix(uGroundB, vec3(0.3, 0.8, 0.9), 0.5), rim * 0.85);
+    plate = mix(plate, uGroundC * 0.42, lead);
+    c = mix(c, plate, open);
+    bare = mix(bare, max(rim * 0.6, lead), open);
+  }
+  // the runner's footprints, pressed into the snow, cool in their hollows
+  vec2 grad = vec2(0.0);
+  float deep = printsAt(p, smoothstep(0.004, 0.015, fw), grad) * snow;
+  c = mix(c, c * uShadowTint * 0.94, clamp(deep * 22.0, 0.0, 0.8));
+  gBump = vec3(-grad.x, 0.0, grad.y) * snow;
+  // the odd crystal catching the light
+  float sh = hash12(floor(p * 26.0));
+  c += step(0.9965, sh) * (0.5 + 0.5 * sin(uTime * 4.0 + sh * 400.0)) * near * snow * 0.3;
+  gSheen = bare;
+  return mix(c, mix(uGroundA, uGroundB, 0.25), far * 0.4);
+}
+#endif
+`;
+
 const FS_TOON = FS_HEAD + /* glsl */ `
 uniform vec3 uLightDir;
 uniform vec3 uShadowTint;
@@ -1460,6 +1716,27 @@ uniform vec4 uWall;   // wall-cast shadow: x wall x (signed), y wall top, z run 
 uniform sampler2D uMarks;
 uniform sampler2D uNoise;
 uniform vec2 uMarkRepeat;
+// Snow settling (env.snow, see Game.updateSnow): x how much has built up (0 a
+// dusting, 1 as deep as it gets)
+uniform vec4 uSnow;
+#ifdef SNOW
+// Snow lying on whatever faces up (toon option snow): x how squarely a face
+// must look up to hold it while there's only a dusting, y once it lies deep,
+// z how soft its edge is, w how much of it (0: none, the prop only moves)
+uniform vec4 uSnowCap;
+#endif
+#ifdef ICE
+// Glacier ice (toon option ice, on parts whose mark flag is 0.2): x how
+// strongly it's banded, y its glints, z how much light it holds (its shade
+// never quite dark, a glow at its edges)
+uniform vec4 uIce;
+#endif
+#ifdef CREVASSE
+// The mouth of a crevasse (toon option crevasse, on parts whose mark flag is
+// 0.9; uv in metres, y from its near lip to its far one): x how wide it is,
+// y how deep, z how fast its walls close in on each other (m per m down)
+uniform vec4 uCrev;
+#endif
 ` + CAUSTIC + /* glsl */ `
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -1702,7 +1979,7 @@ float edgeMaskRun(vec2 f, vec2 size, float w) {
   if (uMotion <= aa) return min(along, smoothstep(w - aa, w + aa, e.y));
   return min(along, 1.0 - runLine(e.y, w, aa));
 }
-` + SANDS_FS + /* glsl */ `
+` + SANDS_FS + FROST_FS + /* glsl */ `
 vec3 groundColor(vec2 p, float dist) {
   float far = smoothstep(25.0, 140.0, dist);
   vec3 avg = mix(uGroundA, uGroundB, 0.5);
@@ -1994,6 +2271,8 @@ vec3 groundColor(vec2 p, float dist) {
     return mix(c, mix(uGroundA, uGroundC, bed * 0.8 + 0.1), far * 0.5);
   #elif GROUND == 10
     return sandGround(p, dist, far);
+  #elif GROUND == 15
+    return frostGround(p, dist, far);
   #elif GROUND == 12
     // The Sky Road: a processional way. Down its middle a band of lapis
     // strewn with gold stars like the ceiling of a tomb, gilt-edged; either
@@ -2141,10 +2420,11 @@ void main() {
   float dist = length(v);
   #ifdef GROUND
     vec3 base = groundColor(vUv, dist) * vColor;
-    #if GROUND == 10
+    #if GROUND == 10 || GROUND == 15
       // the sand's own relief (footprints, the lip of the loose sand), and a
       // soft form shading so its drifts and piles read in any light: lighter
       // turned toward the light than the flat floor is, shaded turned away
+      // (and the same for the Frostbound Pass's snow and its banks)
       n = normalize(n + gBump);
       float sl = dot(n, uLightDir) - uLightDir.y;
       base *= mix(0.86, 1.06, smoothstep(-0.35, 0.2, sl));
@@ -2157,6 +2437,34 @@ void main() {
     if (vFx.x > 0.68 && vFx.x < 0.77) {
       base = bookSpines(vUv, dist, vFx.x < 0.72 ? 1.0 : 0.0) * mix(vec3(1.0), vColor, 0.25);
     }
+  #endif
+  // (ice and the mouth of a crevasse wear no scribble marks)
+  float markK = 1.0;
+  #ifdef ICE
+    float isIce = step(abs(vFx.x - 0.2), 0.02);
+    if (isIce > 0.0) {
+      // glacier ice, laid down in bands year on year, tilted and wavering: a
+      // darker line between one and the next, each band its own depth of
+      // blue, and paler streaks of trapped air running through it. (Along
+      // the run every scale is a multiple of 1/512, so nothing jumps when
+      // the world re-bases.) Where the bands would shimmer it settles into
+      // the ice's own tone.
+      float w1 = texture2D(uNoise, vPos.xz * 0.0546875 + vPos.y * 0.03).g;
+      float sy = vPos.y * 0.5 + vPos.x * 0.09 + vPos.z * 0.0546875 + (w1 - 0.5) * 2.2;
+      float bf = fract(sy);
+      float fwB = fwidth(sy);
+      float soft = smoothstep(0.25, 0.7, fwB);
+      float line = (1.0 - smoothstep(0.03, 0.03 + fwB * 1.5, min(bf, 1.0 - bf))) * (1.0 - soft);
+      float tone = mix(hash12(vec2(mod(floor(sy), 28.0), 3.7)), 0.5, soft);
+      base *= 1.0 + ((tone - 0.5) * 0.2 - line * 0.16) * uIce.x;
+      float air = texture2D(uNoise, vec2(vPos.x * 0.09 + vPos.z * 0.0546875, vPos.y * 0.9)).g;
+      base = mix(base, base * 1.12 + 0.03, smoothstep(0.62, 0.78, air) * 0.5 * uIce.x * (1.0 - soft));
+    }
+    markK = 1.0 - isIce;
+  #endif
+  #ifdef CREVASSE
+    float isCrev = step(0.85, vFx.x);
+    markK *= 1.0 - isCrev;
   #endif
   #ifdef CRUST
     vec3 an = abs(n);
@@ -2211,7 +2519,7 @@ void main() {
       } else if (abs(vFx.x - 0.3) < 0.02) {
         base *= endGrain(vUv);
       } else {
-        float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+        float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x * markK;
         base = mix(base, base * 0.64, m);
       }
     #elif defined(PLEATS)
@@ -2222,7 +2530,7 @@ void main() {
         base = mix(base, base * 0.64, m);
       }
     #else
-      float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x;
+      float m = texture2D(uMarks, vUv * uMarkRepeat).a * vFx.x * markK;
       #ifdef SHELVES
         if (vFx.x > 0.68 && vFx.x < 0.77) m = 0.0;
       #endif
@@ -2237,6 +2545,16 @@ void main() {
       #endif
       base = mix(base, base * 0.64, m);
     #endif
+  #endif
+  #ifdef SNOW
+    {
+      // snow lying on whatever faces up, its edge ragged; the more has
+      // settled, the steeper the faces it clings to
+      float sn = texture2D(uNoise, vPos.xz * 0.109375 + vPos.y * 0.07).g;
+      float th = mix(uSnowCap.x, uSnowCap.y, uSnow.x);
+      float lying = smoothstep(th, th + uSnowCap.z, n.y + (sn - 0.5) * 0.3) * uSnowCap.w * step(vFx.y, 0.5);
+      base = mix(base, vec3(0.955, 0.972, 1.0) * (0.97 + 0.05 * sn), lying);
+    }
   #endif
 
   vec3 V = v / dist;
@@ -2275,6 +2593,47 @@ void main() {
       // with the sky
       if (gSheen > 0.0) col = mix(col, skyColor(reflect(V, vec3(0.0, 1.0, 0.0))) * 1.1 + 0.05, gSheen * 0.28);
     #endif
+    #if GROUND == 15
+      // bare ice gives back the sky, more and more toward the horizon
+      if (gSheen > 0.0) col = mix(col, skyColor(reflect(V, vec3(0.0, 1.0, 0.0))) * 1.05 + 0.04, gSheen * (0.1 + 0.5 * pow(1.0 - abs(V.y), 4.0)));
+    #endif
+  #endif
+  #ifdef ICE
+    if (isIce > 0.0) {
+      // ice holds the light: its shade is never quite dark, its edges glow,
+      // and a facet turned just so flashes white. (No refraction: one more
+      // term in the same pass.)
+      col = mix(col, base * mix(shade, vec3(1.0), 0.5), 0.6 * uIce.z);
+      float gl = pow(max(dot(reflect(V, n), uLightDir), 0.0), 26.0);
+      float fr = pow(1.0 - abs(dot(n, V)), 2.5);
+      col += vec3(0.86, 0.97, 1.0) * gl * 0.8 * uIce.y + mix(uRim.rgb, vec3(0.5, 0.92, 1.0), 0.6) * fr * 0.24 * uIce.z;
+    }
+  #endif
+  #ifdef CREVASSE
+    if (isCrev > 0.0) {
+      // The mouth of a crevasse, a flat band across the route: what shows in
+      // it is worked out from where the eye's ray would land on its far wall
+      // (the walls lean in on each other going down) - the pale lip, then
+      // turquoise, cobalt, and blue-black far down - so it reads as a line of
+      // bright ice from far off and opens into the deep as you come up to it.
+      float W = uCrev.x;
+      float s0 = clamp(vUv.y, 0.0, W);
+      float fz = max(-V.z, 0.05);
+      float dn = max(-V.y, 0.02);
+      float tau = (W - s0) / (fz + uCrev.z * dn);
+      float dep = dn * tau;
+      float wn = texture2D(uNoise, vec2((vPos.x + V.x * tau) * 0.125, dep * 0.11)).g;
+      float k = clamp(dep / uCrev.y + (wn - 0.5) * 0.22, 0.0, 1.0);
+      // (kept dark on purpose, so a crack reads as a crack from far off: a
+      // sliver of pale ice at the lip, then straight down into the blue)
+      vec3 cw = mix(vec3(0.7, 0.95, 0.99), vec3(0.16, 0.62, 0.84), smoothstep(0.0, 0.08, k));
+      cw = mix(cw, vec3(0.06, 0.26, 0.66), smoothstep(0.08, 0.35, k));
+      cw = mix(cw, vec3(0.02, 0.05, 0.2), smoothstep(0.3, 0.85, k));
+      // strata down the wall
+      float band = abs(fract(dep * 1.7 + wn * 1.5) - 0.5);
+      cw *= 1.0 - 0.16 * (1.0 - smoothstep(0.04, 0.1, band)) * (1.0 - k);
+      col = cw * mix(uShadowTint, vec3(1.0), 0.75);
+    }
   #endif
 
   #ifdef CRUST
@@ -4993,7 +5352,8 @@ uniform float uTime;
 uniform vec4 uSkyFx2; // x sun rays, y cloud bands, z aurora, w planet ring (moon drawn full)
 // deep space (env.space): x nebula ribbons, y galaxies, z the starfield, w comets
 uniform vec4 uSkyFx3;
-// x a winged sun (skyFx.wings), y its span in sun radii
+// x a winged sun (skyFx.wings), y its span in sun radii, z a range of
+// mountains along the horizon (skyFx.range: how high they stand)
 uniform vec4 uSkyFx4;
 uniform vec3 uNeb0;
 uniform vec3 uNeb1;
@@ -5266,6 +5626,41 @@ vec3 skyBack(vec3 d) {
     vec3 cc = mix(uSkyHorizon, vec3(1.0), 0.55) + uSunColor * pow(max(sd, 0.0), 3.0) * 0.6;
     c = mix(c, cc, band * uSkyFx2.y);
   }
+  if (uSkyFx4.z > 0.0 && d.y < uSkyFx4.z * 1.3) {
+    // A range of jagged mountains along the horizon, far beyond everything
+    // (skyFx.range, the Frostbound Pass: they stand at the end of the canyon
+    // and through its arches, and never come any nearer): horns and saddles,
+    // snow on all but their feet, each slope lit if it faces the sun's side
+    // of the sky and in the sky's own blue shade if not, sinking into the
+    // haze toward the horizon. In front of the sun and the clouds.
+    float r1 = texture2D(uNoise, vec2(az * 0.31 + 0.2, 0.21)).g;
+    float r2 = texture2D(uNoise, vec2(az * 1.27, 0.63)).g;
+    // (a skyline of horns and saddles: big peaks, smaller ones on their
+    // shoulders, and a jagged edge on all of them)
+    float tx = az * 7.0 + r1 * 4.0;
+    float fx = fract(tx);
+    float horn = 1.0 - abs(fx * 2.0 - 1.0);
+    float tx2 = az * 19.0 + r2 * 3.0;
+    float horn2 = 1.0 - abs(fract(tx2) * 2.0 - 1.0);
+    float jag = texture2D(uNoise, vec2(az * 9.0, 0.37)).g;
+    float h = uSkyFx4.z * (0.12 + 0.3 * r1 + pow(horn, 1.6) * (0.35 + 0.4 * r2) + 0.16 * horn2 + 0.08 * jag);
+    float e = fwidth(d.y) * 1.2;
+    float m = 1.0 - smoothstep(h - e, h + e, d.y);
+    if (m > 0.0) {
+      // (carried on down below the horizon, so the ground always meets them)
+      float up = max(d.y, 0.0) / max(h, 1e-3);
+      float sunAz = atan(uSunDir.x, -uSunDir.z);
+      float lit = smoothstep(-0.25, 0.25, (fx < 0.5 ? -1.0 : 1.0) * (sunAz - az));
+      float line = texture2D(uNoise, vec2(az * 6.0, d.y * 9.0)).g;
+      float snowy = smoothstep(0.26, 0.4, up + (line - 0.5) * 0.4);
+      vec3 rock = mix(uSkyTop, vec3(0.4, 0.43, 0.76), 0.6) * mix(0.8, 1.05, lit);
+      vec3 snow = mix(mix(uSkyTop, vec3(0.82, 0.86, 1.0), 0.65), mix(vec3(1.0), uSunColor, 0.3), lit);
+      vec3 mc = mix(rock, snow, snowy);
+      // (haze: thick at their feet, and a breath of it over the whole range)
+      mc = mix(mc, c, 0.12 + 0.55 * (1.0 - smoothstep(0.0, 0.55, up)));
+      c = mix(c, mc, m);
+    }
+  }
   if (uSkyFx.w > 0.0) {
     // a ceiling of smoke rolling over the sky, lit from beneath by the fires
     // on the horizon and opening onto a band of glow just above it; dry
@@ -5395,12 +5790,15 @@ uniform float uDistMod;
 uniform float uSize;
 uniform float uPixelRatio;
 uniform vec3 uDrift;
+// 1: they hang dead still where they are - no sway, no twinkle (snowflakes
+// stopped in the air: env.particles.still)
+uniform float uStill;
 attribute float aRand;
 varying float vAlpha;
 void main() {
   vec3 p = position;
   p += uDrift * uTime * (0.6 + aRand * 0.8);
-  p.x += sin(uTime * 0.7 + aRand * 30.0) * 0.6;
+  p.x += sin(uTime * 0.7 + aRand * 30.0) * 0.6 * (1.0 - uStill);
   p.z += uDistMod;
   p.z = mod(p.z + 92.0, 98.0) - 92.0;
   p.y = mod(p.y, 13.0);
@@ -5409,7 +5807,7 @@ void main() {
   wp = bendPos(wp);
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_PointSize = uSize * (0.5 + aRand) * uPixelRatio * (40.0 / max(-mv.z, 1.0));
-  vAlpha = smoothstep(-92.0, -60.0, p.z) * smoothstep(6.0, 1.0, p.z) * (0.55 + 0.45 * sin(uTime * (1.0 + aRand * 3.0) + aRand * 50.0));
+  vAlpha = smoothstep(-92.0, -60.0, p.z) * smoothstep(6.0, 1.0, p.z) * mix(0.55 + 0.45 * sin(uTime * (1.0 + aRand * 3.0) + aRand * 50.0), 0.85, uStill);
   vAlpha *= smoothstep(1.5, 4.5, -mv.z); // no giant blobs drifting across the lens
   gl_Position = projectionMatrix * mv;
 }
@@ -6572,6 +6970,10 @@ export function makeEnvUniforms(env) {
     uPrintA: { value: Array.from({ length: PRINTS }, () => new THREE.Vector4()) },
     uPrintB: { value: Array.from({ length: PRINTS }, () => new THREE.Vector4()) },
     uPrintZone: v40(),
+    // Snow settling (env.snow, the Frostbound Pass): x how much has built
+    // up, written every frame by Game.updateSnow; y how far the dream lifts
+    // far drifts apart (env.snow.lift)
+    uSnow: v40(),
   };
   writeEnvUniforms(u, env);
   return u;
@@ -6594,7 +6996,7 @@ export function writeEnvUniforms(u, env) {
   // deep space (env.space): x the nebula's ribbons, y spiral galaxies, z a
   // dense starfield all round, w comets; the nebula's three colours
   // x: a winged sun (skyFx.wings: how much), y: its span (sun radii)
-  u.uSkyFx4.value.set(sk.wings || 0, sk.wingSpan || 7, 0, 0);
+  u.uSkyFx4.value.set(sk.wings || 0, sk.wingSpan || 7, sk.range || 0, 0);
   const spc = env.space || {};
   u.uSkyFx3.value.set(spc.nebula || 0, spc.galaxies || 0, spc.stars || 0, spc.comets || 0);
   const neb = spc.colors || ['#ff6aa8', '#ff9a52', '#4a8adf'];
@@ -6657,6 +7059,9 @@ export function writeEnvUniforms(u, env) {
   setColor(u.uSeaShallow.value, sw[0]);
   setColor(u.uSeaDeep.value, sw[1]);
   setColor(u.uSeaFoam.value, sw[2]);
+  // (how much snow has settled, uSnow.x, is the game's to say: see
+  // Game.updateSnow)
+  u.uSnow.value.y = env.snow ? env.snow.lift || 0 : 0;
   // a draining world starts in full colour: game.js saps it when you come
   // through its doorway
   u.uDrain.value.set(env.drain ? 1 : 0, DRAIN_NONE, 0, 0);
@@ -6799,6 +7204,30 @@ export function makeToonMaterial(env, o = {}) {
   // the threads of sand falling onto the piles ([height they fall from,
   // radius])
   if (o.dunes) defines.DUNES = '';
+  // the Frostbound Pass (env.snow): a ground strip heaped into banks along
+  // the route and dunes beyond (banks); a prop the snow settles on - its
+  // vertices move by their `snow` attribute as it builds up, and what faces
+  // up is whitened: snow: [how squarely a face must look up to hold it under
+  // a dusting, and once it lies deep, how soft its edge, how much] (true:
+  // the usual; a last 0: the prop only moves); glacier ice on parts marked
+  // 0.2: ice: [banding, glints, how much light it holds]; and the mouth of a
+  // crevasse on parts marked 0.9: crevasse: [width, depth, how fast its
+  // walls close in]
+  if (o.banks) defines.BANKS = '';
+  if (o.snow) {
+    defines.SNOW = '';
+    const c = o.snow === true ? [] : o.snow;
+    uniforms.uSnowCap = { value: new THREE.Vector4(c[0] ?? 0.8, c[1] ?? 0.35, c[2] ?? 0.2, c[3] ?? 1) };
+  }
+  if (o.ice) {
+    defines.ICE = '';
+    const c = o.ice === true ? [] : o.ice;
+    uniforms.uIce = { value: new THREE.Vector4(c[0] ?? 1, c[1] ?? 1, c[2] ?? 1, 0) };
+  }
+  if (o.crevasse) {
+    defines.CREVASSE = '';
+    uniforms.uCrev = { value: new THREE.Vector4(o.crevasse[0], o.crevasse[1] ?? 5, o.crevasse[2] ?? 0.18, 0) };
+  }
   if (o.thread) {
     defines.THREAD = '';
     uniforms.uThread = { value: new THREE.Vector4(o.thread[0], o.thread[1], 0, 0) };
@@ -6817,7 +7246,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -7188,6 +7617,7 @@ export function makeParticleMaterial() {
     uColor: { value: new THREE.Color(1, 1, 1) },
     uOpacity: { value: 0.8 },
     uRing: { value: 0 },
+    uStill: { value: 0 },
   });
   return new THREE.ShaderMaterial({
     uniforms,

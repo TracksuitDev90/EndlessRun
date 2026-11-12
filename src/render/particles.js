@@ -32,6 +32,12 @@ export class Particles {
     this.points.renderOrder = 5;
     this.color = new THREE.Color();
     this.from = null;
+    // how many of them are in the air (0..1: the Frostbound Pass's snowfall,
+    // thin at first and thickening as the snow settles - see Game.updateSnow;
+    // they're scattered at random, so any share of them is as evenly spread)
+    this.count = count;
+    this.density = 1;
+    this.shown = count;
   }
 
   // Blend appearance between two worlds' particle settings (every frame
@@ -42,6 +48,7 @@ export class Particles {
     u.uSize.value = a.size + (b.size - a.size) * t;
     u.uOpacity.value = a.opacity + (b.opacity - a.opacity) * t;
     u.uRing.value = (a.ring || 0) + ((b.ring || 0) - (a.ring || 0)) * t;
+    u.uStill.value = (a.still || 0) + ((b.still || 0) - (a.still || 0)) * t;
     u.uDrift.value.set(
       a.drift[0] + (b.drift[0] - a.drift[0]) * t,
       a.drift[1] + (b.drift[1] - a.drift[1]) * t,
@@ -51,5 +58,10 @@ export class Particles {
 
   update(dist) {
     this.material.uniforms.uDistMod.value = dist % 98;
+    const n = Math.round(this.count * Math.min(1, Math.max(0, this.density)));
+    if (n !== this.shown) {
+      this.shown = n;
+      this.points.geometry.setDrawRange(0, n);
+    }
   }
 }

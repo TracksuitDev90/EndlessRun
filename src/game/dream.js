@@ -117,6 +117,26 @@ export function makeDream(rng, ordinal, forced) {
   return r;
 }
 
+// A world can hold the dream back on its early visits (def.dream, one entry
+// per visit and the last for every visit after: [how much of the shape warps
+// it lets through, how much of the colour trip], each 0..1 — the Frostbound
+// Pass comes up true the first time round however deep the run has got,
+// barely stirs the second, and only then lets the dream in by degrees). The
+// recipe dealt for that stretch, scaled down: it still blends into its
+// neighbours' on the run up to each doorway, like a lucid world's.
+const SHAPES = ['twist', 'waves', 'melt', 'breathe'];
+const COLOURS = ['rings', 'swirl', 'neon', 'hue', 'sat', 'trip'];
+export function holdBack(recipe, gate, visit) {
+  if (!gate || !gate.length) return recipe;
+  const [shape, colour] = gate[Math.min(visit || 0, gate.length - 1)];
+  if (shape >= 1 && colour >= 1) return recipe;
+  const r = { ...recipe };
+  for (const k of SHAPES) r[k] *= shape;
+  for (const k of COLOURS) r[k] *= colour;
+  r.level *= Math.max(shape, colour);
+  return r;
+}
+
 // The colours a world's doorway bloom is made of (env.bloom, or its door, its
 // sky and its light), each pushed a little more vivid so the bloom reads as
 // colour, not as a dimming of the picture.
