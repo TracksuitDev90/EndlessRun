@@ -973,7 +973,9 @@ export class Bunny extends Player {
     if (tilt !== 0) turnAbout(b, _q.setFromAxisAngle(AX, tilt), TILT_PIVOT);
     // (the bound's twist side-on: the whole stretched-out shape of him turned
     // about the upright through his middle)
-    const twist = this.twist * this.w.jump * live;
+    // (flying, in low gravity, he's laid out flat along the line of flight:
+    // no twist side-on)
+    const twist = this.twist * this.w.jump * live * (1 - (this.flyW || 0));
     if (twist !== 0) turnAbout(b, _q.setFromAxisAngle(AY, twist), TILT_PIVOT);
     const pitch = (this.spins.pitch.value % TAU) * live;
     if (pitch !== 0) turnAbout(b, _q.setFromAxisAngle(AX, pitch), this.spins.pitch.pivot, ROLL_FWD);
@@ -983,7 +985,12 @@ export class Bunny extends Player {
     // springs - so the flip, turning about his own front-to-back, turns him
     // over head first down the road, the way he's going - and turns back
     // once he's down (after the flip's turn, so it turns the flip with him)
-    const faceTo = this.trick === 'webster' && !this.grounded && this.mode === 'run' ? -this.jumpSide * FACE.turn : 0;
+    // (only for a jump: a low-gravity bound off the dust is no jump, it's
+    // his run - he faces the way he's going through it; and in a boost he
+    // turns back to face ahead once the flip's done, not hang side-on for
+    // the whole of the long float over the top)
+    const flipping = this.spins.roll.value !== this.spins.roll.to;
+    const faceTo = this.trick === 'webster' && !this.grounded && !this.bounding && this.mode === 'run' && (!this.drift || flipping) ? -this.jumpSide * FACE.turn : 0;
     this.face = this.faceS.step(faceTo, faceTo ? FACE.in : FACE.out, 0.8, dt);
     const face = this.face * live;
     if (Math.abs(face) > 1e-4) turnAbout(b, _q.setFromAxisAngle(AY, face), FLIP_PIVOT);

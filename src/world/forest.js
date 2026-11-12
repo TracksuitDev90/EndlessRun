@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, moved, rod, gateFrameParts, gateTop, leafParts } from './shapes.js';
+import { P, part, merge, moved, rod, rgb, gateFrameParts, gateTop, leafParts } from './shapes.js';
 import { shaftParts } from './whimsy.js';
 import { crystal, stone, crystalPoint, rough, nugget, octahedron } from './gems.js';
 import { groundStrip } from '../render/geo.js';
@@ -120,7 +120,7 @@ function seeded(seed) {
 
 // --- plants -------------------------------------------------------------------
 // A clump of grass blades: thin open cones, flattened to face the camera.
-function grassParts({ n = 14, h = [0.9, 1.6], spread = 0.4, w = 0.05, seed = 1, lo = C.grassLo, hi = C.grassHi } = {}) {
+function grassParts({ n = 14, h = [0.9, 1.6], spread = 0.4, w = 0.05, seed = 1, lo = C.grassLo, hi = C.grassHi, seeds = false } = {}) {
   const rnd = seeded(seed);
   const parts = [];
   for (let i = 0; i < n; i++) {
@@ -129,27 +129,106 @@ function grassParts({ n = 14, h = [0.9, 1.6], spread = 0.4, w = 0.05, seed = 1, 
     const rr = Math.sqrt(rnd()) * spread;
     const g = P.cyl(0, w * (0.7 + rnd() * 0.6), bh, 3, 1, true);
     g.translate(0, bh / 2, 0);
+    // (not every blade the same green: some sun-bleached toward straw at the
+    // tip, some deeper, so a clump has depth to it)
+    const r3 = rnd();
+    const tip = r3 < 0.2 ? '#d2cf78' : r3 < 0.45 ? '#6f9a34' : hi;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+    const rz = (rnd() - 0.5) * 0.8;
     parts.push(part(g, null, {
-      x: Math.cos(a) * rr, z: Math.sin(a) * rr, sz: 0.35,
-      ry: (rnd() - 0.5) * 1.2, rx: (rnd() - 0.5) * 0.5, rz: (rnd() - 0.5) * 0.8,
-      grad: [lo, hi, 0, h[1]], outline: 0,
+      x, z, sz: 0.35,
+      ry: (rnd() - 0.5) * 1.2, rx: (rnd() - 0.5) * 0.5, rz,
+      grad: [lo, tip, 0, h[1]], outline: 0,
     }));
+    // now and then a blade gone to seed, its head nodding
+    if (seeds && r3 > 0.86) parts.push(part(P.sphere(0.03, 5, 3), '#c8b878', { x: x - Math.sin(rz) * bh, y: bh * Math.cos(rz) + 0.02, z, sx: 0.7, sy: 2.2, sz: 0.7, rz: rz * 1.3, outline: 0.3 }));
   }
   return parts;
 }
 
-// A fern: long narrow fronds arching out of a crown.
+// A fern: long fronds arching out of a crown, each a stalk (the rachis) with
+// leaflets (pinnae) set alternately along it, longest a third of the way out
+// and tapering to the tip, swept forward, dark at the stalk and catching the
+// light at their tips - so it reads as a fern, not a leaf-shaped blob.
+const FROND_SEG = 9;
+function frondGeo(L, seed) {
+  const rnd = seeded(seed);
+  const pos = [];
+  const shade = []; // per vertex: 0 the stalk, 1 a leaflet's tip
+  const lift = 0.32 + rnd() * 0.2; // how high it arches
+  const droop = 0.55 + rnd() * 0.35; // how far its tip falls back
+  // the stalk's line: out along +z, rising then falling
+  const at = (t) => [0, L * (lift * Math.sin(Math.PI * 0.62 * t) - droop * 0.35 * t * t), L * t];
+  const tri = (a, sa, b, sb, c, sc) => {
+    // both faces, so it reads from above and below
+    pos.push(...a, ...b, ...c, ...a, ...c, ...b);
+    shade.push(sa, sb, sc, sa, sc, sb);
+  };
+  for (let k = 0; k < FROND_SEG; k++) {
+    const t0 = k / FROND_SEG;
+    const t1 = (k + 1) / FROND_SEG;
+    const a = at(t0);
+    const b = at(t1);
+    // leaflet length: longest a third of the way out, small at the tip
+    const tm = (t0 + t1) / 2;
+    const span = L * 0.2 * Math.sin(Math.PI * Math.min(1, tm * 1.25 + 0.08)) * (0.85 + rnd() * 0.3);
+    for (const sd of [-1, 1]) {
+      // alternate: the left leaflets half a step on from the right
+      const off = sd < 0 ? 0.5 : 0;
+      const u0 = Math.min(1, t0 + off / FROND_SEG);
+      const u1 = Math.min(1, t1 + off / FROND_SEG);
+      const p0 = at(u0);
+      const p1 = at(u1);
+      const tip = [sd * span, (p0[1] + p1[1]) / 2 - span * 0.18, (p0[2] + p1[2]) / 2 + span * 0.55];
+      tri(p0, 0, tip, 1, p1, 0.15);
+    }
+    // the stalk itself, a thin ribbon
+    const w = 0.012 * L * (1 - t0 * 0.7);
+    tri([-w, a[1], a[2]], 0, [w, a[1], a[2]], 0, [0, b[1], b[2]], 0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  // (soft toon lighting: lean the normals up, so a frond is lit like the
+  // mound of foliage it's part of rather than flickering facet by facet)
+  const n = g.attributes.normal;
+  for (let i = 0; i < n.count; i++) {
+    const x = n.getX(i) * 0.45, y = n.getY(i) * 0.45 + 0.55, z = n.getZ(i) * 0.45;
+    const l = Math.hypot(x, y, z) || 1;
+    n.setXYZ(i, x / l, y / l, z / l);
+  }
+  g.userData.shade = shade;
+  return g;
+}
+
 function fernParts({ n = 8, len = 1.0, seed = 2 } = {}) {
   const rnd = seeded(seed);
   const parts = [];
+  const lo = rgb(C.fern);
+  const hi = rgb(C.fernHi);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * 6.283 + rnd() * 0.4;
     const L = len * (0.75 + rnd() * 0.5);
-    parts.push(part(P.sphere(0.5, 6, 3), null, {
-      x: Math.cos(a) * L * 0.42, y: 0.1 + L * 0.22, z: Math.sin(a) * L * 0.42,
-      sx: 0.17, sy: 0.035, sz: L, ry: Math.PI / 2 - a, rx: -(0.35 + rnd() * 0.35),
-      grad: [C.fern, C.fernHi, 0, L * 0.55], outline: 0.6,
-    }));
+    const g = frondGeo(L, seed * 31 + i);
+    const shade = g.userData.shade;
+    const pg = part(g, null, { x: Math.cos(a) * 0.06, y: 0.04, z: Math.sin(a) * 0.06, ry: Math.PI / 2 - a, outline: 0 });
+    // dark down the stalk, bright at the leaflets' tips, a little brighter
+    // further out along the frond (and each frond its own shade)
+    const col = pg.attributes.color.array;
+    const pp = pg.attributes.position.array;
+    const k = 0.85 + rnd() * 0.3;
+    for (let v = 0; v < shade.length; v++) {
+      const out = Math.min(1, Math.hypot(pp[v * 3] - Math.cos(a) * 0.06, pp[v * 3 + 2] - Math.sin(a) * 0.06) / L);
+      const t = Math.min(1, shade[v] * 0.75 + out * 0.35);
+      for (let c = 0; c < 3; c++) col[v * 3 + c] = (lo[c] * 0.7 + (hi[c] - lo[c] * 0.7) * t) * k;
+    }
+    parts.push(pg);
+  }
+  // the crown it springs from, curled fiddleheads and all
+  parts.push(part(P.sphere(0.09 * len, 6, 4), null, { y: 0.05, sy: 0.7, grad: [C.mud, C.fern, 0, 0.1], outline: 0.4 }));
+  for (let i = 0; i < 2; i++) {
+    const a = rnd() * 6.283;
+    parts.push(part(P.torus(0.035 * len, 0.012 * len, 3, 8, Math.PI * 1.5), C.fernHi, { x: Math.cos(a) * 0.05, y: 0.16 * len, z: Math.sin(a) * 0.05, ry: a, outline: 0.3 }));
   }
   return parts;
 }
@@ -286,13 +365,79 @@ function boulderGeo(r, seed, detail = 1) {
 }
 
 // A boulder sitting on the ground (bottom near y = 0), mossy on top.
-function rockPart({ r, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, seed = 1, detail = 1, moss = true, ry = 0, tint = 0 }) {
+// Painted face by face, the way a hand would: grey stone in patches of
+// lighter and darker, the odd crack and fleck of pale lichen, darker down
+// toward the ground it sits in; the moss only where the stone faces the sky,
+// its edge ragged, brighter where it's highest. And on a big one, cushions
+// of moss heaped up on top, so its outline is moss on stone, not one smooth
+// green egg.
+const STONE = [rgb('#4a4f47'), rgb('#7d8574'), rgb('#5c5f52')];
+const MOSS = [rgb('#284a1a'), rgb('#4f7d26'), rgb('#86b23a')];
+const LICHEN = rgb('#b9c39a');
+function hashF(x, y, z) {
+  const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+  return h - Math.floor(h);
+}
+function rockPart({ r, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, seed = 1, detail = 1, moss = true, ry = 0, tint = 0, cushions = true }) {
   const cy = y + r * sy * 0.78;
-  return part(boulderGeo(r, seed, detail), null, {
+  const g = part(boulderGeo(r, seed, detail), null, {
     x, y: cy, z, sx, sy, sz, ry, tint,
-    grad: moss ? [C.rockLo, C.mossHi, cy - r * sy * 0.2, cy + r * sy * 1.05] : [C.rockLo, C.rockHi, cy - r * sy, cy + r * sy],
+    grad: [C.rockLo, C.rockHi, cy - r * sy, cy + r * sy],
     mark: moss ? 0.55 : 0.2,
   });
+  const pos = g.attributes.position.array;
+  const nor = g.attributes.normal.array;
+  const col = g.attributes.color.array;
+  const y0 = cy - r * sy, y1 = cy + r * sy;
+  // (vertex by vertex, keyed on where each one is - the faces that share a
+  // corner share its colour, so the patches blend over the stone rather
+  // than breaking it into facets)
+  for (let v = 0; v < pos.length; v += 3) {
+    const px = pos[v] - x, py = pos[v + 1], pz = pos[v + 2] - z;
+    const ny = nor[v + 1];
+    const k = 1 / r;
+    const h1 = hashF(Math.round(px * k * 9) + seed, Math.round(py * k * 9), Math.round(pz * k * 9));
+    const n2 = 0.5 + 0.5 * Math.sin(px * k * 3.1 + seed) * Math.sin(py * k * 2.7 + 1.3) * Math.sin(pz * k * 3.4 + seed * 0.7);
+    const up = Math.min(1, Math.max(0, (py - y0) / (y1 - y0)));
+    // stone: broad soft patches, the odd dark crack and fleck of lichen
+    const sa = STONE[0], sb = STONE[1], sc = STONE[2];
+    const t = n2;
+    let c = [sa[0] + (sb[0] - sa[0]) * t, sa[1] + (sb[1] - sa[1]) * t, sa[2] + (sb[2] - sa[2]) * t];
+    if (h1 > 0.9) c = [c[0] * 0.62, c[1] * 0.62, c[2] * 0.62];
+    else if (h1 < 0.06 && moss) c = [(c[0] + LICHEN[0]) / 2, (c[1] + LICHEN[1]) / 2, (c[2] + LICHEN[2]) / 2];
+    else if (h1 < 0.25) c = [(c[0] + sc[0]) / 2, (c[1] + sc[1]) / 2, (c[2] + sc[2]) / 2];
+    // moss where it faces up, its edge ragged
+    const m = moss ? Math.min(1, Math.max(0, (ny + (n2 - 0.5) * 0.6 + (h1 - 0.5) * 0.2 - 0.36) / 0.24)) : 0;
+    if (m > 0) {
+      const mt = Math.min(1, n2 * 0.6 + up * 0.6);
+      const lit = 0.85 + 0.25 * up;
+      for (let i = 0; i < 3; i++) {
+        const mc = mt < 0.5 ? MOSS[0][i] + (MOSS[1][i] - MOSS[0][i]) * mt * 2 : MOSS[1][i] + (MOSS[2][i] - MOSS[1][i]) * (mt - 0.5) * 2;
+        c[i] = c[i] + (mc * lit - c[i]) * m;
+      }
+    }
+    // darker down where it sits in the ground
+    const ao = 0.6 + 0.4 * Math.min(1, up * 1.6);
+    for (let i = 0; i < 3; i++) col[v + i] = c[i] * ao;
+  }
+  if (!moss || !cushions || detail < 1 || r < 0.45) return g;
+  // moss cushions heaped on the top
+  const rnd = seeded(seed * 13 + 5);
+  const out = [g];
+  const n = 3 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * 6.283;
+    const e = 0.5 + rnd() * 0.45; // how far up toward the crown
+    const dx = Math.cos(a) * Math.cos(e * 1.2), dz = Math.sin(a) * Math.cos(e * 1.2), dy = Math.sin(e * 1.2);
+    const cr = r * (0.26 + rnd() * 0.18);
+    const px = x + dx * r * sx * 0.86, py = cy + dy * r * sy * 0.9, pz = z + dz * r * sz * 0.86;
+    out.push(part(P.sphere(cr, 7, 4), null, {
+      x: px, y: py, z: pz, sx: 1.15, sy: 0.42, sz: 1.0,
+      rz: -Math.atan2(dx, dy) * 0.8, rx: Math.atan2(dz, dy) * 0.8, ry: rnd() * 6.28,
+      grad: [C.moss, C.mossHi, py - cr * 0.4, py + cr * 0.45], mark: 0.75, outline: 0.55, tint,
+    }));
+  }
+  return merge(out);
 }
 
 // --- water ----------------------------------------------------------------------
@@ -863,7 +1008,7 @@ export default {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 6);
     b.toon('floor', groundStrip(420, 16, C.floor, 8, { y: -0.03, mark: 0.45 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
     b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 520, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
-    b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a' })), { cap: 260, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
+    b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a', seeds: true })), { cap: 260, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
     b.toon('grassTuft', merge(grassParts({ n: 8, h: [0.2, 0.42], spread: 0.22, w: 0.035, seed: 8 })), { cap: 260, ink: 0, anim: 'popLate', wobble: [0.12, 0, 1.9, 0] });
     b.toon('fern', merge(fernParts({ n: 9, len: 1.1, seed: 5 })), { cap: 160, anim: 'pop', wobble: [0.04, 0, 1.3, 0], ink: 0 });
     b.toon('flowers', merge(flowerPatchParts({ seed: 6 })), { cap: 120, anim: 'pop', marks: [2, 2], wobble: [0.08, 0, 1.6, 0], ink: 0 });

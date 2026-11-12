@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { P, part, merge, rgb, rockParts, gateFrameParts, gateTop, leafParts } from './shapes.js';
+import { P, part, merge, moved, rgb, rockParts, gateFrameParts, gateTop, leafParts } from './shapes.js';
 import { crystal, crystalPoint, nugget, lumps, bipyramid } from './gems.js';
 import { CONFIG } from '../config.js';
 
@@ -18,11 +18,13 @@ import { CONFIG } from '../config.js';
 // jump is a boost - a burst of a thruster flings the runner up and on, they
 // hang flying over the top and drift back down - and on the ground they
 // take a few steps and bound off in a long low lope. Obstacles: asteroids
-// tumbling low over the dust and boulders to boost over; UFOs and big
-// asteroids hanging at head height to stay low under (skim under them, or
-// drive yourself down out of the air in time); rock pillars and crystal
-// spires to go round. A belt of asteroids across the whole road, and a
-// mothership.
+// come down in the dust, sunk in their craters, and boulders to boost over
+// (everything you jump sits on the ground); UFOs and big asteroids held up
+// in a ring of light, hanging at head height, to stay low under - each
+// lighting the open dust beneath it cyan (skim under them, or drive
+// yourself down out of the air in time); rock pillars and crystal spires to
+// go round. A belt of asteroids across the whole road, and a squadron of
+// three saucers flying abreast over it.
 //
 // Coming in through its doorway the runner jumps to light speed (env.warp,
 // see game/warp.js) - and drops out of it onto the red dust.
@@ -341,20 +343,42 @@ function astronautGeo() {
 }
 
 // --- obstacles ----------------------------------------------------------------------
-const OB_Y = 0.08; // a low asteroid floats this far off the dust
 
-// An asteroid tumbling low over the dust: boost over it.
+// An asteroid come down in the dust: boost over it. It sits sunk in the
+// fresh crater it punched (craterLow, laid with it), still rolling over in
+// it - grounded, so it never reads as one of the rocks hanging at head
+// height that you stay low under.
+const LOW_R = 0.46;
+const LOW_Y = LOW_R * 0.8;
 function asteroidLowGeo(seed) {
-  return merge([asteroidPart(0.43, seed, { y: OB_Y + 0.43 })]).translate(0, 0, -0.45);
+  return merge([asteroidPart(LOW_R, seed, { y: LOW_Y })]).translate(0, 0, -0.45);
+}
+// Its crater: a raised rim of thrown-up regolith, darker scorched dust in the
+// bowl, and ejecta scattered round it.
+function craterLowGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [
+    part(P.cyl(0.78, 0.86, 0.03, 18), C.rustLo, { y: 0.012, outline: 0 }),
+    part(P.torus(0.74, 0.11, 5, 18), null, { y: 0.03, rx: Math.PI / 2, sy: 1, sz: 0.5, grad: [C.rust, C.rustHi, 0, 0.09], outline: 0.5 }),
+  ];
+  for (let i = 0; i < 7; i++) {
+    const a = rnd() * 6.283;
+    const d = 0.95 + rnd() * 0.45;
+    parts.push(part(P.dodeca(0.05 + rnd() * 0.05), null, { x: Math.cos(a) * d, y: 0.03, z: Math.sin(a) * d * 0.8, grad: [C.basalt, C.basaltHi, 0, 0.08], outline: 0.5 }));
+  }
+  return merge(parts).translate(0, 0, -0.45);
 }
 
-// A belt of them across the whole road, hovering.
+// A belt of them come down right across the road, sunk in the dust.
 function asteroidBeltGeo() {
   const parts = [];
   for (let i = 0; i < 7; i++) {
     const x = -3.6 + i * 1.2;
     const r = i % 2 ? 0.4 : 0.44;
-    parts.push(asteroidPart(r, 50 + i, { x, y: OB_Y + r + (i % 3) * 0.02, z: (i % 2 ? 0.15 : -0.1) }));
+    const z = i % 2 ? 0.15 : -0.1;
+    parts.push(asteroidPart(r, 50 + i, { x, y: r * 0.8 + (i % 3) * 0.02, z }));
+    // (each sunk in the dust it threw up: down on the ground, to boost over)
+    parts.push(part(P.torus(r * 1.35, 0.08, 4, 14), null, { x, y: 0.03, z, rx: Math.PI / 2, grad: [C.rust, C.rustHi, 0, 0.07], outline: 0.5 }));
   }
   return merge(parts).translate(0, 0, -0.5);
 }
@@ -388,20 +412,28 @@ function ufoGeo() {
   return merge(ufoParts()).translate(0, UFO_Y, -0.8);
 }
 
-// The mothership: a great flattened saucer right across the road, rows of
-// lights, a long glowing dome, engines glowing under it.
-function mothershipGeo() {
-  const parts = [
-    part(P.sphere(1, 36, 14), null, { sx: 4.9, sy: 0.4, sz: 1.2, y: UFO_Y + 0.4, grad: [C.hullDark, C.hullHi, UFO_Y, UFO_Y + 0.8] }),
-    part(P.torus(1, 0.05, 6, 48), C.hullDark, { sx: 4.85, sz: 1.17, y: UFO_Y + 0.4, rx: Math.PI / 2, outline: 0.5 }),
-    part(new THREE.SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), C.dome, { sx: 2.1, sy: 0.55, sz: 0.62, y: UFO_Y + 0.7, emit: 0.5 }),
-  ];
-  const lights = [C.cyan, C.gold, C.pink];
-  for (let i = 0; i < 18; i++) {
-    const a = (i / 18) * Math.PI * 2;
-    parts.push(part(P.sphere(0.08, 8, 6), lights[i % 3], { x: Math.cos(a) * 4.85, y: UFO_Y + 0.4, z: Math.sin(a) * 1.17, emit: 1, outline: 0.4 }));
+// A squadron right across the road: three saucers flying in formation, one
+// over each lane - each as round as the lone UFO, not one saucer stretched
+// to the width of the road - the middle one a touch ahead, strung together
+// rim to rim by crackling beams of light at the height of their rims (so
+// the whole row reads as one thing to duck under, and nothing of it comes
+// below the duck line).
+function ufoFleetGeo() {
+  const parts = [];
+  const lanes = CONFIG.laneX;
+  for (let i = 0; i < 3; i++) {
+    const z = i === 1 ? -0.2 : 0.1;
+    parts.push(...moved(ufoParts(i === 1 ? 1.06 : 0.98), { x: lanes[i], y: UFO_Y, z }));
   }
-  for (const x of [-2.8, 0, 2.8]) parts.push(part(P.cyl(0.42, 0.46, 0.04, 18), C.cyan, { x, y: UFO_Y + 0.02, emit: 1, outline: 0 }));
+  // the beams between them, and a node of light where each meets a rim
+  for (let i = 0; i < 2; i++) {
+    const x0 = lanes[i] + 0.98, x1 = lanes[i + 1] - 1.0;
+    const len = x1 - x0;
+    for (const dy of [0, 0.12]) {
+      parts.push(part(P.cyl(0.03, 0.03, len, 5), C.cyan, { x: (x0 + x1) / 2, y: UFO_Y + 0.25 + dy, z: -0.05, rz: Math.PI / 2, emit: 1, outline: 0 }));
+    }
+    for (const x of [x0, x1]) parts.push(part(P.sphere(0.08, 8, 6), C.cyan, { x, y: UFO_Y + 0.31, z: -0.05, emit: 1, outline: 0.4 }));
+  }
   return merge(parts).translate(0, 0, -0.9);
 }
 
@@ -410,6 +442,22 @@ const BIG_R = 0.95;
 const BIG_Y = UFO_Y + BIG_R * 1.06;
 function asteroidHighGeo(seed) {
   return merge([asteroidPart(BIG_R, seed, { y: BIG_Y, detail: 1, lump: 0.16 })]).translate(0, 0, -0.8);
+}
+
+// The field holding it up: a glowing ring round its waist with three
+// beacons on it, level and steady while the rock turns over inside it, so
+// a rock up at head height never reads as one down in the dust.
+function holdRingGeo() {
+  // (tipped up toward you, so you see it as a ring, not edge-on as a line)
+  const R = BIG_R * 1.3;
+  const tilt = 0.42;
+  const parts = [part(P.torus(R, 0.085, 6, 40), C.cyan, { rx: Math.PI / 2, emit: 1, outline: 0.5 })];
+  parts.push(part(P.torus(R * 0.86, 0.035, 4, 40), '#ffffff', { rx: Math.PI / 2, emit: 1, outline: 0 }));
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + 0.4;
+    parts.push(part(P.sphere(0.15, 10, 8), i % 2 ? C.pink : C.gold, { x: Math.cos(a) * R, z: Math.sin(a) * R, emit: 1, outline: 0.5 }));
+  }
+  return merge(moved(parts, { y: BIG_Y, rx: tilt })).translate(0, 0, -0.8);
 }
 
 // A rock pillar (go round): a tall hoodoo of red rock.
@@ -485,6 +533,13 @@ function hatchLeaf({ W, H, z, f }) {
   out.push(part(P.box(0.1, H - 0.6, 0.07), '#b89cff', { x: W - 0.2, y: H / 2, z: at(0.07), emit: 1, outline: 0 }));
   return out;
 }
+
+// A pool of the cyan light under something hanging at head height (n: one
+// under each lane for a squadron across the road).
+const underLight = (n) => (put, rng, { x, d }) => {
+  const xs = n === 3 ? CONFIG.laneX : [x];
+  for (const px of xs) put('underLight', px, 0.045, d + 0.8, { sx: 2.3, sz: 2.6, c: [1, 1, 1] });
+};
 
 export default {
   id: 'space',
@@ -604,18 +659,23 @@ export default {
     b.shadow('shadow', { cap: 140, anim: 'pop' });
 
     // obstacles
-    b.toon('asteroid', asteroidLowGeo(21), { cap: 24, anim: 'popEarly', ink: 0.04, tumble: [0.9, 0.55, OB_Y + 0.43] });
-    b.toon('asteroidB', asteroidLowGeo(37), { cap: 24, anim: 'popEarly', ink: 0.04, tumble: [0.7, 0.8, OB_Y + 0.43] });
+    b.toon('asteroid', asteroidLowGeo(21), { cap: 24, anim: 'popEarly', ink: 0.04, tumble: [0.45, 0.3, LOW_Y] });
+    b.toon('asteroidB', asteroidLowGeo(37), { cap: 24, anim: 'popEarly', ink: 0.04, tumble: [0.35, 0.4, LOW_Y] });
+    b.toon('craterLow', craterLowGeo(5), { cap: 48, anim: 'popEarly', ink: 0.03 });
     // (dark basalt, so it reads at a glance against the red dust)
     b.toon('boulderL', merge([
       ...rockParts({ r: 0.55, lo: C.basalt, hi: C.basaltHi, sy: 0.8, seed: 61 }).map((g) => g.translate(-0.45, 0, 0)),
       ...rockParts({ r: 0.45, lo: C.basalt, hi: C.basaltHi, sy: 0.85, seed: 62 }).map((g) => g.translate(0.45, 0, 0.1)),
       ...rockParts({ r: 0.3, lo: C.basalt, hi: '#9a7a80', sy: 0.9, seed: 63 }).map((g) => g.translate(0.05, 0.3, -0.15)),
     ]).translate(0, 0, -0.5), { cap: 24, anim: 'popEarly', ink: 0.04 });
-    b.toon('asteroidBelt', asteroidBeltGeo(), { cap: 10, anim: 'popEarly', ink: 0.04, wobble: [0, 0.035, 2.2, 0] });
+    b.toon('asteroidBelt', asteroidBeltGeo(), { cap: 10, anim: 'popEarly', ink: 0.04 });
     b.toon('ufo', ufoGeo(), { cap: 24, anim: 'popEarly', ink: 0.035, turn: [0, 0, 0, 1.4], wobble: [0, 0.05, 2.4, 0] });
-    b.toon('mothership', mothershipGeo(), { cap: 10, anim: 'popEarly', ink: 0.04, wobble: [0, 0.04, 1.8, 0] });
+    b.toon('ufoFleet', ufoFleetGeo(), { cap: 10, anim: 'popEarly', ink: 0.035, wobble: [0, 0.04, 1.8, 0] });
     b.toon('asteroidHigh', asteroidHighGeo(44), { cap: 24, anim: 'popEarly', ink: 0.045, tumble: [0.45, 0.3, BIG_Y] });
+    b.toon('holdRing', holdRingGeo(), { cap: 24, anim: 'popEarly', ink: 0.03, wobble: [0, 0.03, 1.6, 0] });
+    // the light each thing hanging overhead throws down on the dust under
+    // it: the open floor you skim through, lit up
+    b.pool('underLight', { cap: 60, anim: 'popEarly', color: '#6ef0ff' });
     b.toon('pillar', pillarGeo(5), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
     b.toon('pillarB', pillarGeo(12), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
     b.toon('spire', spireGeo(7), { cap: 24, anim: 'popEarly', ink: 0.045 });
@@ -631,11 +691,11 @@ export default {
   },
 
   obstacles: {
-    L: [{ name: 'asteroid', len: 0.9 }, { name: 'asteroidB', len: 0.9 }, { name: 'boulderL', len: 1.0 }],
-    H: [{ name: 'ufo', len: 1.6 }, { name: 'ufo', len: 1.6 }, { name: 'asteroidHigh', len: 1.6 }],
+    L: [{ name: 'asteroid', len: 0.9, with: ['craterLow'] }, { name: 'asteroidB', len: 0.9, with: ['craterLow'] }, { name: 'boulderL', len: 1.0 }],
+    H: [{ name: 'ufo', len: 1.6, extras: underLight(1) }, { name: 'ufo', len: 1.6, extras: underLight(1) }, { name: 'asteroidHigh', len: 1.6, with: ['holdRing'], extras: underLight(1) }],
     W: [{ name: 'pillar', len: 1.5 }, { name: 'pillarB', len: 1.5 }, { name: 'spire', len: 1.3 }],
     LW: { name: 'asteroidBelt', len: 1.0 },
-    HW: { name: 'mothership', len: 1.8 },
+    HW: { name: 'ufoFleet', len: 1.8, extras: underLight(3) },
   },
 
   chunk(ctx) {
