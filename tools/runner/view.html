@@ -14,7 +14,7 @@
     <script type="module">
       // A turnaround of a runner like their reference sheet: front, their
       // left side, back, their right side - posed (?pose=idle|run|jump|slide|bind)
-      // at ?t=<seconds> into it. Serve the repository root and open
+      // at ?t=<seconds> into it (and the skater's board tricks: &flat=). Serve the repository root and open
       // tools/runner/view.html?runner=explorer
       import * as THREE from '../../vendor/three/three.module.min.js';
       import { shared } from '../../src/render/shaders.js';
@@ -81,6 +81,13 @@
           if (q.get('carry') && runner.carry) runner.carry.next = 0;
           const n = Math.round(T / dt);
           for (let i = 0; i < n; i++) runner.update(dt, pose === 'run' ? V : 0, () => 0);
+          // (&flat=manual|tictac|shuvit: the skater plays with her board,
+          // &jt= seconds into it)
+          if (q.get('flat') && runner.startFlat) {
+            runner.startFlat(q.get('flat'), q.get('dur') ? Number(q.get('dur')) : undefined);
+            const m = Math.round(Number(q.get('jt') || 0.3) / dt);
+            for (let i = 0; i < m; i++) runner.update(dt, V, () => 0);
+          }
         }
       }
       runner.place(0, 0);

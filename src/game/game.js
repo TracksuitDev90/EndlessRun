@@ -156,6 +156,9 @@ export class Game {
     const r = c.make(WORLD_DEFS[0].env, asset);
     // (a runner whose jump can keep them up longer asks first: see roadClear)
     r.roomAhead = (sec) => this.roadClear(sec);
+    // (and one who plays about while cruising asks whether there's nothing
+    // at all on the road for a while: see roadOpen)
+    r.openRoad = (sec) => this.state === 'running' && this.roadOpen(sec);
     return r;
   }
 
@@ -686,6 +689,18 @@ export class Game {
     const from = this.dist + v * 0.42;
     const to = this.dist + v * (sec + 0.3);
     for (const o of this.obstacles.records) if (o.d > from && o.d < to) return false;
+    return true;
+  }
+
+  // Whether there's nothing on the road at all - in any lane, alongside or
+  // ahead - from just behind the runner to sec seconds ahead: the skater
+  // only plays about on her board (a manual, a shove-it: for show, and none
+  // of it moves her) with open road in front of her.
+  roadOpen(sec) {
+    const v = Math.max(this.speed, CONFIG.speed.start);
+    const from = this.dist - 1;
+    const to = this.dist + v * sec;
+    for (const o of this.obstacles.records) if (o.d + o.len > from && o.d < to) return false;
     return true;
   }
 
