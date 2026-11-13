@@ -409,27 +409,39 @@ over every gap and up every ledge, the arc over the last gap crowned; the
 companions run, fly or waddle along over the tops with you, leaping the
 gaps.
 
-- **The Gallery of Hours** — the walk has fallen away in places into the
-  sand running out beneath it. Up a flight of ivory steps (brass on every
-  nosing) onto a slab of the old floor held up on the works of a clock — its
-  face to you a rack of brass teeth with wheels turning in it, sand pouring
-  down over its lip — and across the gaps, deck to deck, while the sand
-  pours away down into the dark. One gap the first climb of a visit, two
-  the next; two or three a climb the third time through; from the fourth,
-  now and then the far side of a gap a step higher.
-- **The Night Rooftops** — the walkway runs into a jumble of roofs: up an
-  iron stair, jumping up roof to roof (1 m, 1.8 m, 2.6 m) to the top — brick,
-  tar, stone coping, lit windows in their faces — and dropping back down the
-  far side, roof by roof. The second climb of a visit has an alley to leap
-  at the top (its far wall lit by the street far below), every one does
-  the third time through, and from the fourth there are now and then
-  alleys on the way up and down as well.
+- **The Gallery of Hours** — the walk has drifted over and fallen away in
+  places. Up a ramp of sand banked against what's left of the old gallery
+  (smooth down the lanes, heaped and lumpy where it spills out past them)
+  onto a **buried terrace** — a slab of the old floor, sand banked up its
+  sides nearly to the top, a broken balustrade here and heaps of sand there
+  along its edges — and across the gaps onto **stone bridges** broken off
+  over the sand running out below (an arch under each end, balusters along
+  them) and **clock-tower balconies** (a thin slab on slender posts with open
+  air under it, a brass rail down each side, a little clock hung under its
+  bowed lip, and the tower it juts from standing off to the side, its clock
+  turning), while sand pours down over their lips into the dark and rubble
+  lies at the gaps' edges. One gap the first climb of a visit, two the
+  next; two or three a climb the third time through; from the fourth, now
+  and then the far side of a gap a step higher (always onto a balcony).
+- **The Night Rooftops** — the walkway runs into the roofs around it: up a
+  **metal maintenance ramp** (a steel deck ribbed for grip on trestle legs,
+  yellow handrails) onto a **raised section of roof** (brick, tar, stone
+  coping, air conditioners and mushroom vents along its edges), jumping up
+  onto a **fire-escape landing** (an iron grating on posts, railed, a drop
+  ladder hung from its edge) and up again onto the roof above (lit windows
+  in its face), then back down the far side, landing and roof. The second
+  climb of a visit — and every one from the third time through — crosses a
+  **footbridge** strung between two buildings at the top (planks on steel
+  girders, truss panels along its sides), broken off over the alley (its far
+  wall lit by the street far below); from the fourth, now and then an alley
+  on the way up and the way down too.
 
 At most two climbs a visit the first time they come, three after; never
 straight through the doorway in, and never so near the doorway out that it
 wouldn't fit. Lengths are in seconds of running, so the timing holds as the
-pace climbs: a gap is about a quarter of a second of running, well inside a
-jump's 0.64 s.
+pace climbs: every deck is about a second of running — room to land, find
+your feet and line up the next jump — and every gap about a third of a
+second (5.5 m at least), clearly a gap, yet well inside a jump's 0.64 s.
 
 ### Under the sea
 

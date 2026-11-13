@@ -569,33 +569,39 @@ function shedGeo() {
 }
 
 // --- the climbs ------------------------------------------------------------
-// From the second time round, the walkway runs into a jumble of roofs at
-// different heights - a building's added storey, a stair bulkhead, a loft
-// roof - and you go up and over them: up an iron stair onto the first,
-// jumping up roof to roof to the top, (later) leaping the alleys between,
-// and dropping back down the far side. (See def.climb, and
-// ObstacleField.placeClimb.)
+// From the second time round, the walkway runs into the roofs around it and
+// you go up and over: up a metal maintenance ramp onto a raised section of
+// roof, up onto a fire-escape landing, up again onto the next roof, across
+// a footbridge strung between two buildings - broken off over the alley
+// in places - and back down the far side. (See def.climb, and
+// ObstacleField.placeClimb.) Every deck is a body a metre long stretched
+// along the run (sz) and a face at each end; what stands along it - vents,
+// air conditioners, posts, truss panels - is put along it a few metres
+// apart.
 const ROOF_W = 9.0;
 const ROOFS = [1.0, 1.8, 2.6];
-// The iron stair up: open treads on two stringers and a rail each side, a
-// metre long and a metre high (stretched to the ramp: sz, sy).
-function climbStairGeo() {
+// A maintenance ramp: a steel deck ribbed for grip on trestle legs, a
+// handrail each side; a metre long and a metre high (stretched: sz, sy).
+function maintRampGeo() {
   const parts = [];
-  const n = 6;
-  for (let i = 0; i < n; i++) {
-    const y = (i + 1) / n;
-    parts.push(part(P.box(ROOF_W - 0.6, 0.05, 0.8 / n), NY.escape, { y: y - 0.025, z: -(i + 0.55) / n }));
-    parts.push(part(P.box(ROOF_W - 0.6, y, 0.03), NY.iron, { y: y / 2, z: -i / n - 0.02, outline: 0.3 }));
+  const L = Math.SQRT2;
+  parts.push(part(P.box(ROOF_W - 0.6, 0.08, L), '#5e6472', { y: 0.5 - 0.04, z: -0.5, rx: Math.PI / 4 }));
+  for (let i = 0; i < 12; i++) {
+    const t = (i + 0.5) / 12;
+    parts.push(part(P.box(ROOF_W - 0.8, 0.02, 0.012), '#8a92a2', { y: t + 0.006, z: -t, outline: 0 }));
   }
   for (const s of [-1, 1]) {
-    parts.push(part(P.box(0.14, 0.3, Math.SQRT2), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: 0.5, z: -0.5, rx: Math.PI / 4 }));
-    parts.push(part(P.box(0.06, 0.06, Math.SQRT2), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: 1.35, z: -0.5, rx: Math.PI / 4, outline: 0.4 }));
-    for (let k = 0; k <= 3; k++) parts.push(part(P.box(0.05, 0.9, 0.05), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: k / 3 + 0.45, z: -k / 3, outline: 0.3 }));
+    const x = s * (ROOF_W / 2 - 0.4);
+    parts.push(part(P.box(0.08, 0.2, L), '#c8a832', { x, y: 0.5 + 0.06, z: -0.5, rx: Math.PI / 4, outline: 0.4 }));
+    parts.push(part(P.box(0.06, 0.06, L), '#e8c84a', { x, y: 0.5 + 1.0, z: -0.5, rx: Math.PI / 4, outline: 0.4 }));
+    for (let k = 0; k <= 3; k++) parts.push(part(P.box(0.05, 1.0, 0.05), '#c8a832', { x, y: k / 3 + 0.5, z: -k / 3, outline: 0.3 }));
+    // trestle legs under it
+    for (const t of [0.35, 0.7, 0.98]) parts.push(part(P.box(0.1, t, 0.1), NY.iron, { x: s * (ROOF_W / 2 - 0.9), y: t / 2, z: -t, outline: 0.3 }));
   }
   return merge(parts);
 }
-// A roof h up, a metre long (stretched, sz): brick walls, its tar top, stone
-// coping along its sides.
+// A raised section of roof, h up: brick walls, its tar top, stone coping
+// along its sides.
 function climbRoofGeo(h) {
   const parts = [];
   parts.push(part(P.box(ROOF_W - 0.2, h - 0.1, 1), '#ffffff', { y: (h - 0.1) / 2, z: -0.5, tint: 1, mark: 0.55 }));
@@ -603,8 +609,8 @@ function climbRoofGeo(h) {
   for (const s of [-1, 1]) parts.push(part(P.box(0.32, 0.16, 1), NY.stone, { x: s * (ROOF_W / 2 - 0.1), y: h + 0.02, z: -0.5 }));
   return merge(parts);
 }
-// Its front (unstretched; put again at its far end, turned about): a band of
-// coping along the edge, a lit window or two below it, a vent.
+// Its front: a band of coping along the edge, a lit window or two below it
+// (or a vent grille on a low one).
 function climbRoofFaceGeo(h, seed) {
   const rnd = seeded(seed);
   const parts = [];
@@ -624,6 +630,81 @@ function climbRoofFaceGeo(h, seed) {
   }
   return merge(parts);
 }
+// Clutter on a roof's edge: an air conditioner, a mushroom vent.
+function roofACGeo() {
+  return merge([
+    part(P.box(1.1, 0.75, 0.9), NY.ac, { y: 0.4 }),
+    part(P.cyl(0.32, 0.32, 0.05, 14), NY.acDark, { y: 0.8 }),
+    part(P.box(0.06, 0.5, 0.7), NY.acDark, { x: 0.56, y: 0.4, outline: 0.3 }),
+  ]);
+}
+function roofVentGeo() {
+  return merge([
+    part(P.cyl(0.16, 0.16, 0.7, 10), NY.acDark, { y: 0.35 }),
+    part(P.cyl(0.38, 0.2, 0.22, 12), NY.ac, { y: 0.8 }),
+  ]);
+}
+// A fire-escape landing: an iron grating on cross-bearers, rails down its
+// sides (its posts are put along it), open beneath.
+function landingGeo(h) {
+  const parts = [];
+  parts.push(part(P.box(ROOF_W - 0.4, 0.08, 1), NY.escape, { y: h - 0.04, z: -0.5 }));
+  for (let i = 0; i < 9; i++) parts.push(part(P.box(0.03, 0.02, 1), '#4a4e5e', { x: -ROOF_W / 2 + 0.6 + i * ((ROOF_W - 1.2) / 8), y: h + 0.005, z: -0.5, outline: 0 }));
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.14, 0.24, 1), NY.iron, { x: s * (ROOF_W / 2 - 0.25), y: h - 0.16, z: -0.5 }));
+    parts.push(part(P.box(0.06, 0.06, 1), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: h + 1.0, z: -0.5, outline: 0.4 }));
+    parts.push(part(P.box(0.04, 0.04, 1), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: h + 0.5, z: -0.5, outline: 0.3 }));
+  }
+  return merge(parts);
+}
+// Its face: the grating's edge and a drop ladder hung down from it.
+function landingFaceGeo(h) {
+  const parts = [part(P.box(ROOF_W - 0.3, 0.12, 0.08), NY.iron, { y: h - 0.06, z: 0.0 })];
+  for (const s of [-1, 1]) parts.push(part(P.box(0.05, h - 0.35, 0.05), NY.escape, { x: 2.6 + s * 0.24, y: (h - 0.35) / 2 + 0.3, z: 0.08, outline: 0.3 }));
+  for (let y = 0.5; y < h - 0.1; y += 0.3) parts.push(part(P.box(0.48, 0.03, 0.03), NY.escape, { x: 2.6, y, z: 0.08, outline: 0 }));
+  for (const s of [-1, 1]) parts.push(part(P.box(0.06, 1.05, 0.06), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: h + 0.5, z: 0, outline: 0.3 }));
+  return merge(parts);
+}
+// A post holding a landing up, a metre tall (stretched to its height: sy),
+// with a rail post on top of it.
+function landingPostGeo() {
+  return merge([part(P.box(0.1, 1, 0.1), NY.iron, { y: 0.5 })]);
+}
+// A footbridge between two buildings: planks laid along it between two
+// steel girders (truss panels are put along it).
+function footbridgeGeo(h) {
+  const parts = [];
+  for (let i = 0; i < 14; i++) {
+    const x = -ROOF_W / 2 + 0.5 + i * ((ROOF_W - 1) / 13);
+    parts.push(part(P.box((ROOF_W - 1) / 13 - 0.04, 0.08, 1), i % 3 === 0 ? '#6a5a4a' : i % 3 === 1 ? '#7a6652' : '#5e5044', { x, y: h - 0.04, z: -0.5, outline: 0 }));
+  }
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.18, 0.5, 1), '#3a4258', { x: s * (ROOF_W / 2 - 0.2), y: h - 0.2, z: -0.5 }));
+    parts.push(part(P.box(0.08, 0.08, 1), '#4a5470', { x: s * (ROOF_W / 2 - 0.2), y: h + 1.05, z: -0.5, outline: 0.4 }));
+  }
+  return merge(parts);
+}
+// Its end: the girders' end plates, riveted, and the ragged end of the
+// planks where the span broke off.
+function footbridgeFaceGeo(h) {
+  const parts = [];
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.3, 0.6, 0.06), '#4a5470', { x: s * (ROOF_W / 2 - 0.2), y: h - 0.2, z: 0.03, outline: 0.4 }));
+    for (const dy of [-0.35, -0.05]) parts.push(part(P.sphere(0.035, 5, 4), '#8a92a8', { x: s * (ROOF_W / 2 - 0.2), y: h + dy, z: 0.07, outline: 0 }));
+    parts.push(part(P.box(0.08, 1.1, 0.08), '#4a5470', { x: s * (ROOF_W / 2 - 0.2), y: h + 0.55, z: 0, outline: 0.4 }));
+  }
+  const rnd = seeded(Math.round(h * 9));
+  for (let i = 0; i < 13; i++) parts.push(part(P.box(0.6, 0.08, 0.1 + rnd() * 0.35), '#6a5a4a', { x: -ROOF_W / 2 + 0.8 + i * 0.6, y: h - 0.04, z: 0.05 + rnd() * 0.12, ry: (rnd() - 0.5) * 0.2, outline: 0.3 }));
+  return merge(parts);
+}
+// A truss panel of the footbridge's side: a post and a diagonal brace,
+// 2.5 m along the run.
+function trussGeo() {
+  const parts = [part(P.box(0.08, 1.05, 0.08), '#4a5470', { y: 0.52, outline: 0.3 })];
+  const L = Math.hypot(1.0, 2.5);
+  parts.push(part(P.box(0.05, L, 0.05), '#4a5470', { y: 0.5, z: -1.25, rx: -Math.atan2(2.5, 1.0), outline: 0.3 }));
+  return merge(parts);
+}
 // An alley between two roofs, looked down into: the near edge's coping
 // catching the light, black, the far building's wall coming up out of the
 // dark lit by the street far below. A metre long (stretched, sz).
@@ -637,7 +718,7 @@ function climbAlleyGeo() {
     [0.7, 1.0, '#5a3028', '#7a4436'],
   ];
   for (const [a, b, c0, c1] of bands) {
-    const g = new THREE.PlaneGeometry(ROOF_W - 0.2, b - a, 1, 1);
+    const g = new THREE.PlaneGeometry(ROOF_W + 0.4, b - a, 1, 1);
     parts.push(part(g, null, { y: (a + b) / 2, grad: [c0, c1, a, b], outline: 0, emit: a > 0.5 && a < 0.6 ? 0.8 : 0 }));
   }
   return merge(parts.map((g) => g.rotateX(-Math.PI / 2))).translate(0, 0.03, 0);
@@ -704,38 +785,68 @@ export default {
   doorColor: '#3a5cc0',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   // From the second time round: up and over the roofs (see the climbs,
-  // above). Up an iron stair, jumping up roof to roof to the top and
-  // dropping back down the far side; from the third time round with an
-  // alley to leap at the top, and later another on the way up.
+  // above). Up a maintenance ramp onto a raised section of roof, up onto a
+  // fire-escape landing, up onto the roof above, and back down the far
+  // side; the second climb of a visit (and every one, from the third time
+  // through) crosses a footbridge between two buildings at the top, broken
+  // off over the alley; from the fourth, now and then an alley on the way
+  // up and the way down too.
   climb: {
     from: 1,
     every: [2, 4],
     most: (visit) => (visit <= 1 ? 2 : 3),
-    names: ['climbStair', ...ROOFS.map((h, i) => `climbRoof${i}`), ...ROOFS.map((h, i) => `climbRoofFace${i}`), 'climbAlley'],
+    names: [
+      'climbRamp', 'climbAlley', 'climbAC', 'climbVent', 'climbPost', 'climbTruss',
+      ...ROOFS.flatMap((h, i) => [`climbRoof${i}`, `climbRoofFace${i}`, `landing${i}`, `landingFace${i}`, `footbridge${i}`, `footbridgeFace${i}`]),
+    ],
     plan(visit, r, n) {
       const [a, b, c] = ROOFS;
-      const roof = (h, t) => ({ kind: 'deck', h, t, min: 7 });
-      const alley = () => ({ kind: 'gap', t: r.float(0.22, 0.28), min: 4.5 });
-      const P = [{ kind: 'ramp', h: a, t: 0.5, min: 7 }, roof(a, 0.6)];
-      if (visit >= 3 && r.chance(0.5)) P.push(roof(b, 0.6), alley());
-      else P.push(roof(b, 0.6));
-      P.push(roof(c, 0.75));
-      if (visit >= 2 || n > 0) P.push(alley(), roof(c, r.float(0.6, 0.8)));
-      if (visit >= 3 && r.chance(0.5)) P.push(alley(), roof(b, 0.6));
-      else P.push(roof(b, 0.5));
-      P.push(roof(a, 0.5));
+      const t = () => r.float(0.9, 1.05);
+      const deck = (style, h) => ({ kind: 'deck', style, h, t: t(), min: 10 });
+      const alley = () => ({ kind: 'gap', t: r.float(0.3, 0.36), min: 5.5 });
+      const P = [{ kind: 'ramp', h: a, t: 0.55, min: 8 }, deck('roof', a)];
+      if (visit >= 3 && r.chance(0.5)) P.push(alley());
+      P.push(deck('landing', b), deck('roof', c));
+      if (visit >= 2 || n > 0) {
+        P.push(alley(), deck('bridge', c));
+        if (visit >= 2) P.push(alley(), deck('roof', c));
+      }
+      if (visit >= 3 && r.chance(0.5)) P.push(alley());
+      P.push(deck('landing', b), deck('roof', a));
       return P;
     },
-    put(put, P, { d, len, h }) {
-      if (P.kind === 'ramp') return put('climbStair', 0, 0, d, { sz: len, sy: h });
+    put(put, P, { d, len, h, rng }) {
+      if (P.kind === 'ramp') return put('climbRamp', 0, 0, d, { sz: len, sy: h });
       if (P.kind === 'gap') return put('climbAlley', 0, 0, d, { sz: len });
       const i = Math.max(0, ROOFS.indexOf(h));
-      const tint = BRICKS[Math.floor(d * 7.13) % BRICKS.length];
-      put(`climbRoof${i}`, 0, 0, d, { sz: len, c: tint });
-      put(`climbRoofFace${i}`, 0, 0, d, { c: tint });
-      put(`climbRoofFace${i}`, 0, 0, d + len, { ry: Math.PI, c: tint });
+      const st = P.style || 'roof';
+      if (st === 'roof') {
+        const tint = BRICKS[Math.floor(d * 7.13) % BRICKS.length];
+        put(`climbRoof${i}`, 0, 0, d, { sz: len, c: tint });
+        put(`climbRoofFace${i}`, 0, 0, d, { c: tint });
+        put(`climbRoofFace${i}`, 0, 0, d + len, { ry: Math.PI, c: tint });
+        // air conditioners and vents along its edges
+        for (const s of [-1, 1]) {
+          for (let z = d + rng.float(1, 3); z < d + len - 1; z += rng.float(2.5, 5)) {
+            if (rng.chance(0.55)) put(rng.chance(0.5) ? 'climbAC' : 'climbVent', s * rng.float(3.85, 4.15), h, z, { ry: rng.pick([0, Math.PI / 2, Math.PI]) });
+          }
+        }
+        return;
+      }
+      const body = st === 'bridge' ? 'footbridge' : 'landing';
+      put(`${body}${i}`, 0, 0, d, { sz: len });
+      put(`${body}Face${i}`, 0, 0, d);
+      put(`${body}Face${i}`, 0, 0, d + len, { ry: Math.PI });
+      for (const s of [-1, 1]) {
+        if (st === 'landing') {
+          for (let z = d + 1.2; z < d + len - 0.5; z += rng.float(2.4, 3.2)) put('climbPost', s * (ROOF_W / 2 - 0.25), 0, z, { sy: h - 0.2 });
+        } else {
+          for (let z = d + 0.2; z < d + len - 2.4; z += 2.5) put('climbTruss', s * (ROOF_W / 2 - 0.2), h, z);
+        }
+      }
     },
   },
+
   gem: GEM,
   continuation: false, // the facade hides everything behind the door
   env: {
@@ -836,12 +947,20 @@ export default {
     b.toon('waterTank', waterTankGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('shed', shedGeo(), { cap: 24, anim: 'popEarly' });
     // the climbs (from the second time round: see climb, above)
-    b.toon('climbStair', climbStairGeo(), { cap: 8, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbRamp', maintRampGeo(), { cap: 8, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbAlley', climbAlleyGeo(), { cap: 12, anim: 'popEarly', ink: 0 });
+    b.toon('climbAC', roofACGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbVent', roofVentGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbPost', landingPostGeo(), { cap: 80, anim: 'popEarly', ink: 0.025 });
+    b.toon('climbTruss', trussGeo(), { cap: 80, anim: 'popEarly', ink: 0.025 });
     ROOFS.forEach((h, i) => {
       b.toon(`climbRoof${i}`, climbRoofGeo(h), { cap: 12, anim: 'popEarly', ink: 0.035, brick: true });
       b.toon(`climbRoofFace${i}`, climbRoofFaceGeo(h, 5 + i), { cap: 24, anim: 'popEarly', ink: 0.03 });
+      b.toon(`landing${i}`, landingGeo(h), { cap: 10, anim: 'popEarly', ink: 0.03 });
+      b.toon(`landingFace${i}`, landingFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });
+      b.toon(`footbridge${i}`, footbridgeGeo(h), { cap: 10, anim: 'popEarly', ink: 0.03 });
+      b.toon(`footbridgeFace${i}`, footbridgeFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });
     });
-    b.toon('climbAlley', climbAlleyGeo(), { cap: 12, anim: 'popEarly', ink: 0 });
 
   },
 
