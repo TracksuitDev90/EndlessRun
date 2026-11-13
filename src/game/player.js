@@ -973,7 +973,7 @@ export class Player {
       // (where the step took them, before any landing sets them down on top)
       F.fall = this.y;
       // land only when arriving from above; running into a ledge is a hit, not a mantle
-      if (this.y <= ground && this.vy <= 0 && prevY >= ground - CONFIG.player.stepUp) {
+      if (this.y <= ground && this.vy <= 0 && prevY >= ground - (this.onRamp ? 1.2 : CONFIG.player.stepUp)) {
         this.y = ground;
         // (how hard: a plain jump lands at 1, a fast-fall slams in harder;
         // in low gravity they come down softer, a bound softest)
@@ -1001,6 +1001,9 @@ export class Player {
           this.startSlide();
         }
       }
+    } else if (this.onRamp && this.y > ground + 0.02 && this.y - ground < 1.2) {
+      // running down a stair: carried down it, feet on the steps
+      this.y = ground;
     } else if (this.y > ground + 0.02) {
       // walked off the top of something (in low gravity, drifting down)
       this.grounded = false;
@@ -1009,7 +1012,9 @@ export class Player {
       this.vyOff = this.vyPose;
       this.drift = this.lowG;
       this.rethrusts = 0;
-    } else if (ground - this.y < CONFIG.player.stepUp) {
+    } else if (ground - this.y < (this.onRamp ? 1.2 : CONFIG.player.stepUp)) {
+      // (a stair carries them up it however long the step: at 30 fps, or
+      // through a hitch, as at 60)
       this.y = ground;
     }
     if (!this.grounded && this.y < 0) {

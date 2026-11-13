@@ -195,7 +195,7 @@ export class ObstacleField {
     for (const r of this.records) if (!r.group.dead) this.records[w++] = r;
     this.records.length = w;
     w = 0;
-    for (const row of this.rows) if (row.lanes.some((r) => r && !r.group.dead)) this.rows[w++] = row;
+    for (const row of this.rows) if (row.high ? !row.high.a.group.dead : row.lanes.some((r) => r && !r.group.dead)) this.rows[w++] = row;
     this.rows.length = w;
   }
 
@@ -223,7 +223,7 @@ export class ObstacleField {
     for (const row of this.rows) {
       if (row.d < d0 || row.d > d1) continue;
       // (a gust doesn't carry off the road itself)
-      if (row.climb) continue;
+      if (row.climb || row.high) continue;
       if (row.lanes.some((r) => r && !r.group.dead && !r.group.blown)) return row;
     }
     return null;
@@ -311,6 +311,14 @@ export class ObstacleField {
     // (a world with def.climb, from its second time round: now and then a
     // stretch of decks to run up onto and jump between, in place of a
     // pattern - see placeClimb)
+    // (and a world with def.high: now and then a high route, one lane of the
+    // road raised into a walkway over the rest - see placeHigh)
+    if (!tutorial && this.highAt(here, d, v, b)) {
+      const len = this.placeHigh(here.world, d, v, diff);
+      const rest = lerp(o.gapEasy, o.gapHard, diff) * r.float(o.gapJitter[0], o.gapJitter[1]);
+      this.nextD = d + len + Math.max(14, v * Math.max(rest, o.minAfterVertical * 1.4));
+      return;
+    }
     const climb = tutorial ? null : this.climbAt(here, d, v, b);
     if (climb) {
       const len = this.placeClimb(here.world, d, climb, v);
@@ -437,13 +445,165 @@ export class ObstacleField {
     return at - d;
   }
 
+  // --- high routes ------------------------------------------------------------
+  // A world can raise, now and then (def.high), one of the outer lanes into
+  // a walkway over the rest of the road - two routes at once, and you choose:
+  //
+  //   up      a stair in lane P from the road up to the walk (H m up)
+  //   deck A  the walk along lane P, a hurdle or a bar or two along its top
+  //   bridge  a span right across the road at the same height, ground
+  //           runners passing under it (its underside clear of the highest
+  //           jump's head), where the walk crosses over to lane Q
+  //   deck B  the walk along lane Q, perhaps another hurdle or bar
+  //   down    a stair in lane Q back down to the road
+  //
+  // Up top you run on (stay in P across the bridge and you drop off its far
+  // edge back to the road). Below, the structure walls off lane P beside
+  // deck A and lane Q beside deck B, so the low route crosses the other way
+  // under the bridge; and sand pours off the walk through chutes over the
+  // middle lane - a curtain that knocks you stumbling (soft: never a crash)
+  // - with the odd hurdle or bar in the open outer lane between them. Run
+  // into the side of the walk or the front of deck B and you scramble up
+  // onto it, one hit, as on a climb. The walk is lane-wide (its own lane
+  // only), so stepping sideways off it drops you to the road the moment
+  // you're clear of it.
+  //
+  // def.high: { from: the first visit it comes on, every: [min, max]
+  // patterns between two, most(visit), H: the walk's height, put(put,
+  // piece, info): what's drawn for each piece - { kind: 'up' | 'deck' |
+  // 'bridge' | 'down' | 'chute', lane, d, len, h } - and curtain: what a
+  // chute pours (a spec, drawn by put as 'chute') }. Lengths are in seconds
+  // of running, so the timing holds as the pace climbs.
+  highAt(seg, d, v, b) {
+    const C = seg.world.def.high;
+    const visit = seg.visit || 0;
+    if (!C || visit < C.from || seg.world.def.lowGravity) return false;
+    if (d < seg.start + Math.max(CONFIG.doorClearAfter, v * 3)) return false;
+    const r = this.rng;
+    if (seg.highWait === undefined) {
+      seg.highN = 0;
+      seg.highWait = r.int(1, 2);
+    }
+    if (seg.highN >= C.most(visit)) return false;
+    if (seg.highWait-- > 0) return false;
+    const L = this.highLens(v);
+    if (b && d + L.total > b.d - CONFIG.doorClearBefore) return false;
+    seg.highN++;
+    seg.highWait = r.int(C.every[0], C.every[1]);
+    return true;
+  }
+
+  highLens(v) {
+    const L = { up: Math.max(15, v * 1.15), a: Math.max(32, v * 2.7), bridge: Math.max(16, v * 1.15), b: Math.max(22, v * 1.7), down: Math.max(13, v * 0.95) };
+    L.total = L.up + L.a + L.bridge + L.b + L.down;
+    return L;
+  }
+
+  placeHigh(world, d, v, diff) {
+    const def = world.def.high;
+    const defs = world.def.obstacles;
+    const r = this.rng;
+    const H = def.H;
+    const X = CONFIG.laneX;
+    const L = this.highLens(v);
+    const P = r.chance(0.5) ? 0 : 2;
+    const Q = 2 - P;
+    const a0 = d + L.up, b0 = a0 + L.a, c0 = b0 + L.bridge, e0 = c0 + L.b, end = e0 + L.down;
+    const hw = CONFIG.obstacleHalfWidth;
+    const seg = this.game.course.segAt(d);
+    const visit = seg.world === world ? seg.visit || 0 : 0;
+    const group = this.group(world, d, end - d, null, 2);
+    group.climb = true;
+    const laid = { d, end, lanes: [null, null, null], hint: null, high: { P, Q, H, top: [], under: [] } };
+    this.rows.push(laid);
+    const drawn = (P0, o) => def.put((name, px, py, pd, po) => world.put(group, name, px, py, pd, po), P0, { ...o, visit, rng: r, H });
+    const piece = (o) => {
+      const rec = { group, hit: false, wade: false, kind: 'L', high: true, h0: 0, next: 0, ...o };
+      this.records.push(rec);
+      return rec;
+    };
+    const S = laid.high;
+    S.up = piece({ lane: P, x: X[P], hw, d, len: L.up, y0: 0, y1: H, climb: 'ramp', ramp: true });
+    S.a = piece({ lane: P, x: X[P], hw, d: a0, len: L.a, y0: 0, y1: H, climb: 'deck' });
+    // (the bridge: only its slab, so the road under it stays open)
+    S.bridge = piece({ lane: 1, x: 0, hw: CLIMB_HW, d: b0, len: L.bridge, y0: H - 0.42, y1: H, climb: 'deck', over: true });
+    S.b = piece({ lane: Q, x: X[Q], hw, d: c0, len: L.b, y0: 0, y1: H, climb: 'deck' });
+    S.down = piece({ lane: Q, x: X[Q], hw, d: e0, len: L.down, y0: 0, y1: 0, h0: H, climb: 'ramp', ramp: true });
+    drawn({ kind: 'up', lane: P }, { d, len: L.up, h: H });
+    drawn({ kind: 'deck', lane: P }, { d: a0, len: L.a, h: H, joins: 'bridge' });
+    drawn({ kind: 'bridge', lane: 1, from: P, to: Q }, { d: b0, len: L.bridge, h: H });
+    drawn({ kind: 'deck', lane: Q }, { d: c0, len: L.b, h: H, joins: 'down' });
+    drawn({ kind: 'down', lane: Q }, { d: e0, len: L.down, h: H });
+
+    // Up top: a hurdle or a bar along each deck, a second jump apart.
+    const top = (lane, at, kind) => {
+      const spec = r.pick(defs[kind]);
+      const g = this.group(world, at, spec.len, null);
+      const o = { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) };
+      g.spec = spec;
+      g.p0 = o.p0;
+      world.put(g, spec.name, X[lane], H, at, o);
+      if (spec.with) for (const name of spec.with) world.put(g, name, X[lane], H, at, o);
+      const rec = this.record(g, lane, at, spec.len, kind, spec);
+      rec.y0 += H;
+      rec.y1 += H;
+      rec.top = true;
+      S.top.push(rec);
+      return rec;
+    };
+    const pickTop = () => r.weighted([['L', 1.2], ['H', 1]]);
+    const minV = Math.max(10, v * CONFIG.obstacles.minAfterVertical * 1.15);
+    {
+      let at = a0 + Math.max(10, v * 0.75);
+      const n = diff < 0.2 ? 1 : 2;
+      for (let i = 0; i < n && at < b0 - v * 0.55; i++) {
+        const rec = top(P, at, pickTop());
+        at = rec.d + rec.len + minV;
+      }
+      if (diff >= 0.12) top(Q, c0 + Math.max(8, v * 0.6), pickTop());
+    }
+
+    // Below: chutes off the walk pour sand over the middle lane, and between
+    // them the odd hurdle or bar in the open outer lane. (Every moment
+    // leaves a lane you can just run along: the curtains and the outer
+    // lane's obstacles never stand side by side.)
+    const curtain = (from, at) => {
+      const len = def.curtain.len;
+      const g = this.group(world, at, len, null);
+      g.spec = def.curtain;
+      drawn({ kind: 'chute', lane: 1, from }, { d: at, len, h: H, group: g });
+      const rec = this.record(g, 1, at, len, 'W', def.curtain);
+      rec.soft = true;
+      S.under.push(rec);
+      return rec;
+    };
+    const low = (lane, at) => {
+      const kind = r.weighted([['L', 1], ['H', 1]]);
+      const spec = r.pick(defs[kind]);
+      const g = this.group(world, at, spec.len, null);
+      this.putSpec(world, g, spec, X[lane], at, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
+      this.shadow(world, g, X[lane], at, spec.len, 2.4, kind === 'L' ? 0.9 : 2.2);
+      const rec = this.record(g, lane, at, spec.len, kind, spec);
+      S.under.push(rec);
+      return rec;
+    };
+    curtain(P, a0 + v * 0.45);
+    if (diff >= 0.08) low(Q, a0 + v * 1.35);
+    if (diff >= 0.22) curtain(P, a0 + v * 2.15);
+    curtain(Q, c0 + v * 0.5);
+    if (diff >= 0.3) low(P, c0 + v * 1.15);
+    return end - d;
+  }
+
   // The height of the top of the climbs under a companion at (x, d) - a
   // deck's top, a ramp's slope, and across a gap a leap from the one deck
-  // to the next - or 0.
-  surfaceAt(x, d) {
+  // to the next - or 0. (A span overhead - a high route's bridge - only
+  // counts for one already up at its height: y, how high she is now.)
+  surfaceAt(x, d, y = Infinity) {
     let h = 0;
     for (const o of this.records) {
       if (!o.climb || d < o.d || d > o.d + o.len || Math.abs(x - o.x) > o.hw) continue;
+      if (o.over && y < o.y0) continue;
       const t = (d - o.d) / o.len;
       const s = o.pit ? o.h0 + (o.next - o.h0) * t + 0.9 * Math.sin(Math.PI * t) : o.ramp ? o.h0 + (o.y1 - o.h0) * t : o.y1;
       if (s > h) h = s;
@@ -600,18 +760,29 @@ export class ObstacleField {
   // body is over it at all - the same box the hits are tested in, so they can
   // never be standing on it one moment and stumbling into it the next (running
   // off its end, or stepping sideways off it).
-  groundAt(x, dist) {
+  //
+  // (y: how high the runner is now. A span overhead - a high route's bridge
+  // - is only ground for someone up at it, not for someone running under
+  // it. rampUnder: whether the ground found is a stair's slope, which the
+  // runner is carried up and down as they run, rather than stepping off.)
+  groundAt(x, dist, y = Infinity) {
     let h = 0;
+    let ramp = false;
     const pw = CONFIG.player.halfWidth;
     const pd = CONFIG.player.halfDepth;
     for (const o of this.records) {
       if (o.kind !== 'L' || o.hit || o.wade || o.pit) continue;
       if (dist < o.d - pd || dist > o.d + o.len + pd) continue;
       if (Math.abs(x - o.x) >= o.hw + pw) continue;
+      if (o.over && y < o.y0) continue;
       // (a ramp: its slope, under the front of the body)
       const top = o.ramp ? o.h0 + (o.y1 - o.h0) * Math.min(1, Math.max(0, (dist + pd - o.d) / o.len)) : o.y1;
-      if (top > h) h = top;
+      if (top > h || (top === h && o.ramp)) {
+        h = top;
+        ramp = !!o.ramp;
+      }
     }
+    this.rampUnder = ramp;
     return h;
   }
 
