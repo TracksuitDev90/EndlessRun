@@ -2473,6 +2473,72 @@ vec3 groundColor(vec2 p, float dist) {
     vec3 pc = mix(uGroundC * 0.9, mix(uGroundC, uGroundB, 0.6), cap);
     c = mix(c, pc, pebble);
     return mix(c, mix(uGroundA, uGroundC, 0.25), far * 0.45);
+  #elif GROUND == 16
+    // the Hall of Doors: dark old floorboards laid wall to wall along the
+    // run, storybook-whimsical - their seams wandering in long slow waves,
+    // deep dark grooves between them with a worn pale lip beside each, the
+    // grain streaked along every board, board ends staggered, now and then a
+    // knot curled up into a spiral, a crack or two. Kept dark so the books,
+    // chairs and doors stand out against it. (p.y runs on from chunk to
+    // chunk: every period divides the 4096 m it wraps at.)
+    float soften = max(smoothstep(0.25, 0.9, fwidth(p.x) * 9.0), smoothstep(0.2, 0.6, uMotion / 0.42));
+    float fade = (1.0 - far) * (1.0 - soften * 0.6);
+    float n1 = texture2D(uNoise, p * vec2(0.125, 0.0625)).g;
+    float n2 = texture2D(uNoise, p * vec2(0.5, 0.125) + 0.31).g;
+    // the seams wander: a slow wave down the run, bent differently across it
+    float wx = p.x + (n1 - 0.5) * 0.7 + sin(p.y * 0.3926991 + p.x * 0.9) * 0.12;
+    float pw = 0.78;
+    float bi = floor(wx / pw);
+    float fx = fract(wx / pw);
+    // board ends, staggered board to board
+    float bl = 4.0;
+    float by = p.y / bl + hash12(vec2(bi, 5.0));
+    float seg = floor(by);
+    float fy = fract(by);
+    float h = hash12(vec2(bi, seg) + 41.0);
+    float wash = texture2D(uNoise, p * 0.25 + 0.57).g;
+    vec3 c = mix(uGroundA, uGroundB, h * 0.55 + wash * 0.45);
+    // grain: long streaks along the board, lighter and darker
+    float gr = texture2D(uNoise, vec2(wx * 2.0 + h * 7.0, p.y * 0.0625)).g;
+    float streak = smoothstep(0.35, 0.75, gr);
+    c *= mix(1.0, 0.82 + 0.36 * streak, fade);
+    float fine = sin((wx * 26.0 + (gr - 0.5) * 9.0) );
+    c *= 1.0 + fine * 0.035 * fade * (1.0 - smoothstep(0.3, 1.0, fwidth(wx * 26.0)));
+    // the grooves between boards, wider here and narrower there, and a worn
+    // pale lip along each one's lit side
+    float ex = min(fx, 1.0 - fx) * pw;
+    float gw = 0.02 + 0.03 * n2;
+    float aa = fwidth(wx) * 1.2;
+    float groove = 1.0 - smoothstep(gw - aa, gw + aa, ex);
+    float lip = (1.0 - smoothstep(gw, gw + 0.07 + aa, fx * pw)) * step(gw, fx * pw);
+    c = mix(c, c * 1.28 + uGroundA * 0.08, lip * 0.55 * fade);
+    // the board ends: a dark joint across the board
+    float ey = min(fy, 1.0 - fy) * bl;
+    float joint = runLine(ey, 0.014, fwidth(p.y) * 1.2);
+    // a knot curled into a spiral, one board in every few
+    vec2 kc = vec2((bi + 0.3 + 0.4 * hash12(vec2(seg, bi) + 3.0)) * pw, (seg + 0.25 + 0.5 * hash12(vec2(bi, seg) + 9.0) - hash12(vec2(bi, 5.0))) * bl);
+    vec2 kd = vec2(wx, p.y) - kc;
+    kd.y *= 0.8;
+    float kr = length(kd);
+    float hasKnot = step(0.72, hash12(vec2(bi, seg) + 77.0));
+    float kR = 0.13 + 0.07 * hash12(vec2(seg, bi) + 13.0);
+    float ang = atan(kd.y, kd.x) / 6.2831853;
+    float turns = kr / kR * 2.3 - ang;
+    float sp = abs(fract(turns) - 0.5) * 2.0;
+    float coil = (1.0 - smoothstep(0.55, 0.8, sp)) * (1.0 - smoothstep(kR * 0.85, kR, kr)) * smoothstep(0.012, 0.03, kr);
+    coil *= 1.0 - smoothstep(0.3, 1.0, fwidth(turns));
+    // the wood round a knot swells darker, the grain bent round it
+    c = mix(c, uGroundB * 0.85, (1.0 - smoothstep(kR * 0.6, kR * 1.9, kr)) * 0.45 * hasKnot);
+    // cracks: thin and jagged, running a little way along the grain
+    float ck = texture2D(uNoise, vec2(wx * 2.0 + 0.11, p.y * 0.0625)).g;
+    float cw = fwidth(ck);
+    float c0 = 0.2 + 0.6 * hash12(vec2(seg, bi) + 31.0);
+    float crack = (1.0 - smoothstep(cw * 0.5, cw * 1.5, abs(ck - 0.5))) * step(0.8, hash12(vec2(bi, seg) + 23.0)) * smoothstep(0.15, 0.3, fx) * smoothstep(0.15, 0.3, 1.0 - fx) * (1.0 - smoothstep(0.04, 0.16, abs(fy - c0)));
+    float dark = max(max(groove, joint * (1.0 - groove)), max(coil * hasKnot, crack) * fade);
+    c = mix(c, uGroundC, dark * 0.92);
+    // a little warmth and a little cold, painted in patches
+    c *= 0.9 + 0.2 * n1;
+    return mix(c, mix(uGroundA, uGroundB, 0.5) * 0.85, far * 0.6);
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -6762,6 +6828,8 @@ void main() {
     col += base * pow(face, 4.0) * uGemK.w * (1.0 - B.x);
     vec3 shade = mix(mix(uShadowTint, vec3(1.0), 0.45), vec3(1.0), lit);
     col *= mix(shade, vec3(1.0), uGemK.x * (1.0 - B.x * 0.4));
+    // a light of its own from within, in its own colour
+    col += base * 0.16 * (1.0 - B.x * 0.6);
     col = mix(col, lite * 1.15, pow(1.0 - face, 2.2) * 0.55 * (1.0 - B.x * 0.7));
     if (A.z > 0.0) {
       vec3 sq = q * 3.0;
@@ -6882,8 +6950,18 @@ varying vec3 vColor;
 varying float vFade;
 void main() {
   float r = max(1.0 - length(vUv - 0.5) * 2.0, 0.0);
-  float a = pow(r, 2.6) * 0.8 + pow(r, 9.0) * 0.5;
-  gl_FragColor = vec4(vColor * a * vFade * uGemGlow, 1.0);
+  // a hot core, the body of the halo, and a wide faint bloom round it
+  float a = pow(r, 2.6) * 0.8 + pow(r, 9.0) * 0.5 + pow(r, 1.5) * 0.2;
+  // in the stone's own colour, deepened a little so it reads as that colour
+  // and not as white light
+  float peak = max(max(vColor.r, vColor.g), max(vColor.b, 0.05));
+  vec3 c = mix(vColor, vColor * vColor / peak, 0.35);
+  #ifdef POOL
+    float k = 1.2;
+  #else
+    float k = 1.45;
+  #endif
+  gl_FragColor = vec4(c * a * vFade * uGemGlow * k, 1.0);
 }
 `;
 

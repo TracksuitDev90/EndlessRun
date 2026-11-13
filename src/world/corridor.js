@@ -9,7 +9,7 @@ import { groundStrip } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { paintingsGeo, Deck, PAINTING_COUNT } from './hall-art.js';
 
-// V · The Hall of Doors — a mustard-yellow corridor with a checkerboard floor, lined
+// V · The Hall of Doors — a mustard-yellow corridor floored wall to wall in dark old boards, lined
 // with doors of every color, running through the heart of a library that
 // goes on for ever: over its walls a gallery of books rises on either side,
 // railed and lamplit, rolling ladders on its shelves; behind those, rows and
@@ -175,7 +175,6 @@ const LIB = {
   brass: '#d8a24a',
   lamp: '#ffdf9a',
   shade: '#2f6a4a',
-  floor: '#3a2416',
   plaster: '#e6d6b8',
 };
 const TIER_X = 7.0; // the gallery's wall of books, behind each wall of the hall
@@ -682,7 +681,9 @@ export default {
     ink: '#3a1410',
     fog: [46, 200],
     grade: { sat: 1.12, contrast: 1.14, vignette: 0.3, exposure: 1.04, tint: '#6a3a70' },
-    ground: ['#efe7d6', '#2a2530', '#7a2e22'],
+    // dark old floorboards (see GROUND 16): honey-brown, deep brown, the
+    // near-black of the grooves between them
+    ground: ['#6a4228', '#3c2215', '#140805'],
     shadowDecal: [0.5, 0.43, 0.58],
     cast: [-0.62, 0.37],
     glowGain: 0.7,
@@ -700,7 +701,7 @@ export default {
         sky: ['#1e0e18', '#d0886a', '#3a1c24'],
         sun: { dir: [0.45, 0.32, -0.8], glow: '#ffb070' },
         light: { shadow: [0.56, 0.4, 0.62], hi: [1.12, 1.0, 0.9] },
-        ground: ['#f4e6d2', '#1f6f78', '#7a2e22'],
+        ground: ['#7a4232', '#47231e', '#140708'],
         grade: { sat: 1.18, exposure: 1.02, tint: '#5a2a60' },
         glowGain: 1.0,
         trip: [0.12, 0, 0.05],
@@ -714,7 +715,7 @@ export default {
         light: { dir: [-0.5, 0.8, -0.3], shadow: [0.36, 0.34, 0.62], hi: [1.15, 1.15, 1.3] },
         wallShadow: [-WALL_X, WALL_H, 0.5 / 0.8, 1],
         rim: [0.5, 0.55, 1.0, 0.3],
-        ground: ['#d8d0e8', '#2a2040', '#4a2a5a'],
+        ground: ['#4e3e5a', '#2a2036', '#0a0612'],
         shadowDecal: [0.42, 0.38, 0.6],
         cast: [0.62, 0.37],
         grade: { sat: 1.1, contrast: 1.1, exposure: 1.05, tint: '#1a0a40', vignette: 0.45 },
@@ -726,10 +727,11 @@ export default {
   ],
 
   build(b) {
-    b.ground('ground', groundStrip(11.2, 16, '#ffffff', 8), 3);
+    b.ground('ground', groundStrip(11.2, 16, '#ffffff', 8), 16);
     // the library: its floor running out under the stacks, the galleries,
     // the stacks, the roof, lamps, ladders and shafts of sunlight
-    b.toon('libFloor', groundStrip(110, 16, LIB.floor, 8, { y: -0.02 }), { ink: 0, cap: 40 });
+    // (the same boards, a shade darker, on out under the stacks)
+    b.ground('libFloor', groundStrip(110, 16, '#a89488', 8, { y: -0.02 }), 16);
     b.toon('gallery', tiersGeo(), { cap: 40, ink: 0.035, anim: 'rise', shelves: true });
     b.toon('stacksA', stacksGeo(3), { cap: 40, ink: 0.04, anim: 'rise', shelves: true });
     b.toon('stacksB', stacksGeo(11), { cap: 40, ink: 0.04, anim: 'rise', shelves: true });
@@ -798,11 +800,11 @@ export default {
     // things can drift without passing through the shelves)
     const aisle = () => rng.pick([4, 8, 12]) + rng.float(-0.7, 0.7);
     // the library goes on all round, the hall or not
-    ctx.put('libFloor', 0, 0, 0);
+    ctx.put('libFloor', 0, 0, 0, { p0: ctx.d0 % 4096 });
     ctx.put(rng.chance(0.5) ? 'stacksA' : 'stacksB', 0, 0, 0);
     for (const s of [-1, 1]) for (let i = 0; i < 4; i++) ctx.put('glow', s * (STACK_X[0] - 0.6), STACK_LAMP_Y - 0.05, 2 + i * 4, { s: 2.4, c: [1, 0.76, 0.42] });
     if (!ctx.continuation) {
-      ctx.put('ground', 0, 0, 0);
+      ctx.put('ground', 0, 0, 0, { p0: ctx.d0 % 4096 });
       ctx.put('walls', 0, 0, 0);
       ctx.put('gallery', 0, 0, 0, { p0: ctx.d0 % 4096 });
       const nearGate = ctx.toEnd <= 16;
@@ -888,7 +890,7 @@ export default {
         ctx.put('hardShadow', -side * band / 2, 0.041, 1 - off, { sx: w, sz: 1.25 });
       }
     } else {
-      ctx.put('ground', 0, 0, 0);
+      ctx.put('ground', 0, 0, 0, { p0: ctx.d0 % 4096 });
     }
     // later laps: books take wing, then a tea party, then clocks adrift
     if (ctx.visit >= 1) {
