@@ -19,6 +19,9 @@ import { Splash } from './splash.js';
 import { Warp } from './warp.js';
 import { Sands } from './sands.js';
 import { COMPANIONS, companionById } from './companions.js';
+import { Progress } from './progress.js';
+import { Powers, POWERS } from './powers.js';
+import { PowerFx } from './powerfx.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -124,11 +127,19 @@ export class Game {
     // before a doorway into the sea (see sands.js); one with env.snow: their
     // footprints in the snow, and the powder they kick up
     this.sands = new Sands();
+    // what's kept between runs (the gem bank, each companion's level), the
+    // companions' abilities and what they leave in the world to be seen
+    this.progress = new Progress(COMPANIONS.map((c) => c.id));
+    this.powers = new Powers(this);
+    this.powerFx = new PowerFx(this);
+    this.shieldT = 0; // Pitcher Protection: nothing can hurt the runner while it lasts
+    this.folding = false; // World Fold: the portal's closing over the screen
 
     this.sceneMain = new THREE.Scene();
     this.scenePortal = new THREE.Scene();
     this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
     if (this.companion) this.sceneMain.add(...this.companion.objects);
+    this.sceneMain.add(...this.powerFx.objects);
     this.sceneMain.add(this.doors.root);
     this.scenePortal.add(this.portal.stencilMesh);
 
@@ -247,6 +258,13 @@ export class Game {
 
     this.player.reset();
     this.companion?.reset(title);
+    this.powers.reset();
+    this.powerFx.reset();
+    this.shieldT = 0;
+    this.folding = false;
+    this.ui.fold('off');
+    this.ui.setDouble(false);
+    this.showPowers();
     this.startDrain(this.current, 'settle');
     copyEnvUniforms(this.player.u, this.current.u);
     this.setParticles(this.current.env, this.current.env, 0);
@@ -293,11 +311,14 @@ export class Game {
     this.newRun(true);
   }
 
-  // Leaving the crash card for good: any gems still in hand are exchanged
-  // (nobody loses a haul by not pressing the button), and the score saved.
+  // Leaving a run for good (the crash card, or the pause card's Start over
+  // and Choose runner): any gems still in hand - neither exchanged nor
+  // banked yet - go into the bank (nobody loses a haul by not pressing a
+  // button), and the score's saved.
   finishRun() {
-    if (this.state !== 'crashed') return;
-    if (this.gemCount > 0) this.score += this.exchangeOffer().bonus;
+    if (this.state !== 'crashed' && this.state !== 'paused') return;
+    this.powers.stop(true);
+    if (this.gemCount > 0) this.progress.deposit(this.gemCount);
     this.gemCount = 0;
     this.gemWorth = 0;
     this.saveBest();
@@ -342,6 +363,7 @@ export class Game {
       writeString('er.companion', def.id);
     }
     this.companion.greet();
+    this.showPowers();
     return true;
   }
 
@@ -373,6 +395,8 @@ export class Game {
     this.speedMul = 0.85;
     this.speed = 0;
     this.companion?.revived();
+    // (anything bought on the crash card is there to use)
+    this.showPowers();
   }
 
   action(a) {
@@ -380,7 +404,162 @@ export class Game {
       this.start();
       return;
     }
-    if (this.state === 'running') this.player.action(a);
+    if (this.state === 'running') {
+      if (a.startsWith('power')) this.powers.use(Number(a.slice(5)));
+      else this.player.action(a);
+    }
+  }
+
+  // --- the companions' abilities (powers.js) -------------------------------------
+  // The ability buttons for whoever runs with you, as far as they've been
+  // brought on.
+  showPowers() {
+    const def = this.companion ? companionById(this.companionId) : null;
+    this.ui.setPowers(def ? this.powers.list() : [], def);
+  }
+
+  // Freshen Up: the stumble washed away - its window closed (a hit now is a
+  // stumble, not a crash), the runner back on their feet and up to pace.
+  freshen() {
+    this.stumbleWindow = 0;
+    this.speedMul = 1;
+    this.player.stumbleT = 0;
+    this.speed = Math.max(this.speed, this.speedAt(this.runTime) * 0.88);
+  }
+
+  // How long until the runner's body is clear of an obstacle, running on.
+  passTime(o) {
+    return Math.max(0, o.d + o.len + CONFIG.player.halfDepth - this.dist) / Math.max(this.speed, 4);
+  }
+
+  // Pitcher Protection's over: anything the runner is in the middle of
+  // running through - or will be in the next moment, too late to do
+  // anything about it - lets them through, as it did while the water held.
+  endShield() {
+    this.shieldT = 0;
+    const p = this.player;
+    const pw = CONFIG.player.halfWidth + 0.15;
+    const pd = CONFIG.player.halfDepth;
+    const soon = this.dist + pd + Math.max(this.speed, 4) * 0.22;
+    for (const o of this.obstacles.records) {
+      if (o.d > soon || o.d + o.len < this.dist - pd) continue;
+      if (Math.abs(p.x - o.x) >= o.hw + pw) continue;
+      o.grace = Math.max(o.grace || 0, this.time + this.passTime(o) + 0.12);
+      o.group.hit = true;
+    }
+  }
+
+  // Bank the gems in hand (the crash card): into the bank for good, out of
+  // hand - so they can't be exchanged as well, or banked again.
+  bankGems() {
+    if (this.state !== 'crashed' || this.gemCount === 0) return;
+    const n = this.gemCount;
+    this.progress.deposit(n);
+    this.gemCount = 0;
+    this.gemWorth = 0;
+    this.ui.setGems(0);
+    this.ui.banked(n, this.progress.bank);
+    this.audio.exchange(n);
+  }
+
+  // Everything the UI shows of the companions' progress: the bank, and for
+  // each companion their level, what the next costs and every ability.
+  progressView() {
+    return {
+      bank: this.progress.bank,
+      current: this.companion ? this.companionId : null,
+      pals: COMPANIONS.map((c) => ({
+        id: c.id,
+        name: c.name,
+        title: c.title,
+        face: c.face,
+        tint: c.tint,
+        level: this.progress.level(c.id),
+        price: this.progress.price(c.id),
+        prices: CONFIG.powers.costs,
+        powers: POWERS[c.id] || [],
+      })),
+    };
+  }
+
+  // A companion's next level, bought with banked gems (the crash card or the
+  // companion menu).
+  buyLevel(id) {
+    if (!this.progress.buy(id)) return false;
+    this.audio.fanfare();
+    if (id === this.companionId) this.showPowers();
+    return true;
+  }
+
+  // World Fold: through Iris's portal to just inside the next world (b: the
+  // doorway into it), leaving the rest of this one unrun. Everything the
+  // doorway would have done is done - the world behind let go, the new one's
+  // light, motes, colour, dream and its own way in (the splash, the jump to
+  // light speed) - and the runner arrives just as they were, same lane, same
+  // stride, mid-jump if they were. The distance skipped scores nothing (the
+  // score counts metres as they're run), and its obstacles and gems are gone
+  // unrun; the run's clock, which the speed and the difficulty go by, never
+  // jumps, and the worlds' depth and laps count on exactly as through a
+  // doorway (it's the very next world, its own lap and dream). And for the
+  // first few seconds there, the road is clear - nothing laid, nor reaching
+  // into it.
+  foldTo(b) {
+    const seg = b.to;
+    const C = CONFIG.powers.dragon.fold;
+    const d = b.d + seg.world.def.gate.depth + 9;
+    for (const w of this.worlds) {
+      w.clearAll();
+      w.setStencil(false);
+      w.root.removeFromParent();
+      w.flush(0);
+    }
+    this.doors.clearAll();
+    this.doors.flush(0);
+    this.portal.active = false;
+    this.next = null;
+    this.door = null;
+    this.drainWorld = null;
+    this.dist = d;
+    this.prevDist = d;
+    this.origin = Math.floor(d / CONFIG.rebaseStep) * CONFIG.rebaseStep;
+    for (const w of this.worlds) w.markAllDirty();
+    this.course.ensure(d, Math.max(this.speed, CONFIG.speed.start));
+    this.current = seg.world;
+    this.current.applyVisit(seg.visit);
+    this.sceneMain.add(this.current.root);
+    this.depth = seg.ordinal;
+    const v = Math.max(this.speed, CONFIG.speed.start);
+    this.chunks.reset(this.seed, d);
+    this.obstacles.reset(this.rng, d, false);
+    this.obstacles.nextD = d + v * C.clear + 6;
+    this.gems.reset(new RNG(this.seed ^ 0x2c1b3c6d ^ Math.floor(d)), d);
+    this.chunks.update(d);
+    this.obstacles.update(d, this.runTime);
+    // (and checked: nothing at all on the first stretch - a swinging wall's
+    // reach, say)
+    this.obstacles.removeWhere((g) => g.d < d + v * C.clear);
+    this.gems.update(d, this.runTime);
+    this.ui.setGemColor(this.current.def.gem?.color, this.current.def.gem?.icon);
+    this.startDrain(this.current, 'in');
+    copyEnvUniforms(this.player.u, this.current.u);
+    this.setParticles(this.current.env, this.current.env, 0);
+    this.water.reset();
+    this.sands.reset(this.seed ^ Math.floor(d));
+    this.powerFx.reset();
+    this.dream.set(seg.dream, seg.dream, 0);
+    this.dream.doorway(this.current.def, this.current.env, false);
+    this.announceWorld(seg);
+    this.audio.door();
+    this.splash.stop();
+    this.warp.stop();
+    if (this.current.def.env.splash) {
+      this.splash.start();
+      this.audio.splash();
+    }
+    if (this.current.def.env.warp) this.startWarp();
+    this.companion?.folded?.();
+    for (const w of this.worlds) w.flush(this.origin);
+    this.doors.flush(this.origin);
   }
 
   announceWorld(seg) {
@@ -402,24 +581,37 @@ export class Game {
   // A gem is yours: taken by you, or caught by your companion (tossed: she
   // throws it back to you, its motes bursting as it arrives - see
   // companion.js).
-  creditGem(g, tossed = false) {
+  // how: false the runner ran through it; true a companion caught it and
+  // tossed it back; 'carried' Sorrel brought it back in her haul (already
+  // taken: see GemField.stash); 'pulled' Iris's wind drew it in (Dragon's
+  // Gift). Only the gems the runner takes themselves count double under
+  // Lucky Find (and never more than double). quiet: no ting of its own (a
+  // haul's handed over all at once). Returns the points it paid.
+  creditGem(g, how = false, quiet = false) {
     const p = this.player;
     const S = CONFIG.gems.score;
-    if (tossed) this.gems.take(g, this.time, this.dist, true);
-    this.score += (g.crown ? S.crown : S.gem) * this.depth;
-    this.gemCount++;
-    this.gemWorth += this.gemWorthAt(g.d, g.crown);
-    if (!tossed) this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, g.crown ? 1.25 : 1);
+    if (how === true) this.gems.take(g, this.time, this.dist, true);
+    else if (how === 'pulled') this.gems.take(g, this.time, this.dist);
+    const mine = how === false;
+    const mul = mine ? this.powers.gemMul : 1;
+    let pts = (g.crown ? S.crown : S.gem) * this.depth * mul;
+    this.score += pts;
+    this.gemCount += mul;
+    this.gemWorth += this.gemWorthAt(g.d, g.crown) * mul;
+    if (mine || how === 'pulled') this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, (g.crown ? 1.25 : 1) * (mul > 1 || g.lucky ? 1.4 : 1));
     p.onGem?.(g);
-    this.audio.gem(g.index, g.crown);
+    if (!quiet) this.audio.gem(g.index, g.crown);
     if (g.whole) {
       const bonus = S.perfect * g.run.size * this.depth;
       this.score += bonus;
+      pts += bonus;
       this.ui.scorePop(bonus);
       this.audio.gemRun();
       this.companion?.wholeRun();
     }
     this.ui.gem(this.gemCount);
+    if (g.lucky && mine) this.powers.luckyTaken(g);
+    return pts;
   }
 
   // What a gem found at d is worth at the exchange (see CONFIG.gems.exchange).
@@ -508,6 +700,9 @@ export class Game {
   collide() {
     const p = this.player;
     if (p.invulnT > 0 || p.crashed || this.god) return;
+    // (Pitcher Protection, or Iris's portal closing over you: nothing hurts -
+    // whatever they run through lets them by, and pays no clear bonus)
+    const shielded = this.shieldT > 0 || this.folding;
     const pw = CONFIG.player.halfWidth;
     const pd = CONFIG.player.halfDepth;
     const a = this.prevDist;
@@ -546,6 +741,11 @@ export class Game {
         break;
       }
       if (!touched) continue;
+      if (shielded) {
+        o.group.hit = true;
+        o.grace = this.time + this.passTime(o) + 0.12;
+        continue;
+      }
 
       // head-on: the body ran into its front this step (rather than coming
       // at it from the side, or from above or below)
@@ -591,6 +791,9 @@ export class Game {
   }
 
   crash() {
+    // (whatever a companion was up to ends - and anything owed, Sorrel's
+    // haul, is handed over before the card comes up)
+    this.powers.crashed();
     this.state = 'crashed';
     this.saveBest();
     this.player.crash();
@@ -895,6 +1098,7 @@ export class Game {
       this.crashTimer -= dt;
       if (this.crashTimer <= 0 && !this.crashShown) {
         this.crashShown = true;
+        this.ui.setProgress(this.progressView());
         this.ui.showCrash(this.continuesLeft, this.score, this.best, this.score > this.bestBefore && this.score > 0, this.exchangeOffer());
       }
     } else if (st === 'reviving') {
@@ -941,6 +1145,9 @@ export class Game {
       this.cam.boost(this.player.thrust);
       this.audio.thrust(this.player.thrust);
     }
+    // (the companions' abilities: before the hits, so protection that runs
+    // out this frame has let go of whatever it was letting through)
+    this.powers.update(dt);
     if (this.state === 'running') this.collide();
     if (this.state === 'running') this.collectGems();
     if (this.state === 'running') this.updateScore(dt);
@@ -948,6 +1155,7 @@ export class Game {
     const pz = -(this.dist - this.origin);
     this.player.place(pz, this.dist);
     this.companion?.update(dt);
+    this.powerFx.update(dt);
     this.sands.update(dt, this);
     this.updateWater(dt);
     this.callAhead();
@@ -1003,6 +1211,8 @@ export class Game {
       }
     }
     this.ui.setInk(this.stumbleWindow / CONFIG.stumbleWindow);
+    if (st !== 'title') this.ui.updatePowers(this.powers, this);
+    this.ui.setDouble(this.powers.doubleT > 0, this.powers.doubleT);
     const sp = (this.speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start);
     this.audio.setIntensity(this.state === 'running' ? 0.3 + 0.7 * Math.max(0, sp) : 0.15);
   }
@@ -1066,6 +1276,8 @@ export class Game {
       c.forCompile(true);
     }
     this.water.forCompile(true);
+    scene.add(...this.powerFx.objects);
+    this.powerFx.forCompile(true);
     scene.add(this.splash.mesh);
     try {
       const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
@@ -1091,6 +1303,7 @@ export class Game {
     } finally {
       for (const w of [...this.worlds, this.doors]) w.setAllVisibleForCompile(false);
       this.water.forCompile(false);
+      this.powerFx.forCompile(false);
       this.splash.scene.add(this.splash.mesh);
       for (const [root, parent] of roots) {
         root.removeFromParent();
@@ -1100,7 +1313,7 @@ export class Game {
         r.forCompile?.(false);
         for (const o of r.objects) o.removeFromParent();
       }
-      this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects);
+      this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects, ...this.powerFx.objects);
       for (const c of Object.values(this.companions)) {
         c.forCompile(false);
         for (const o of c.objects) o.removeFromParent();

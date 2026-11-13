@@ -7832,6 +7832,113 @@ export function makeDustMaterial(env) {
   });
 }
 
+// --- the companions' abilities (game/powerfx.js) ------------------------------
+// Pitcher Protection: the water Nep drenches the runner in, a clear coat
+// wrapped round them - all but invisible face-on, a teal sheen toward its
+// edges where you look through more of it, streams of water running down it
+// and a glint up top. uAlpha fades it (it thins out before the protection
+// does); uFlow how hard it runs.
+const VS_SHEEN = COMMON + /* glsl */ `
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec3 vLocal;
+void main() {
+  vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+  vLocal = position;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_SHEEN = FS_HEAD + /* glsl */ `
+uniform float uAlpha;
+uniform float uFlow;
+varying vec3 vLocal;
+void main() {
+  vec3 N = normalize(vNormal);
+  vec3 V = normalize(uCamPos - vWorld);
+  float f = 1.0 - abs(dot(N, V));
+  float fres = f * f;
+  // streams running down it, each wavering, each at its own pace
+  float lane = vLocal.x * 7.0 + sin(vLocal.z * 6.0 + vLocal.y * 3.0) * 1.2;
+  float run = sin(lane) * 0.5 + 0.5;
+  float flow = sin(vLocal.y * 9.0 + uTime * 6.0 * uFlow + floor(lane) * 1.7);
+  float stream = smoothstep(0.82, 1.0, run) * smoothstep(0.1, 0.9, flow);
+  float glint = smoothstep(0.86, 0.97, dot(N, normalize(vec3(-0.35, 0.82, 0.45))));
+  float ripple = 0.5 + 0.5 * sin(vLocal.y * 22.0 - uTime * 4.0 + vLocal.x * 5.0);
+  vec3 col = mix(vec3(0.3, 0.66, 0.78), vec3(0.82, 0.97, 1.0), clamp(fres * 0.8 + stream * 0.6, 0.0, 1.0));
+  col += glint * 0.55;
+  float a = uAlpha * (0.06 + 0.5 * fres + 0.32 * stream + 0.4 * glint + 0.05 * ripple * fres);
+  vec3 v = vWorld - uCamPos;
+  col = atmos(col, v, length(v), 0.4);
+  gl_FragColor = vec4(grade(col, uTrip), clamp(a, 0.0, 0.8));
+}
+`;
+export function makeSheenMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, { uAlpha: { value: 0 }, uFlow: { value: 1 } }),
+    vertexShader: VS_SHEEN,
+    fragmentShader: FS_SHEEN,
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
+// Root Reach: one of Nep's roots, a tapering cylinder 0..1 along y (scaled
+// to its length), wriggling as it goes - more at the tip, and less once
+// it's grabbed (uRoot.y: 0 reaching, 1 holding) - bark-brown, its tip a
+// paler new growth, lit from above.
+const VS_ROOT = COMMON + /* glsl */ `
+uniform vec4 uRoot; // x seed, y hold, z length (m)
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec3 vLocal;
+void main() {
+  vec3 p = position;
+  float k = p.y;
+  float wig = sin(k * 7.0 + uTime * 9.0 + uRoot.x * 6.3) * (1.0 - 0.6 * uRoot.y);
+  float wig2 = cos(k * 5.0 - uTime * 7.0 + uRoot.x * 3.1) * (1.0 - 0.6 * uRoot.y);
+  float amp = sin(k * 3.14159) * min(0.22, 0.05 * uRoot.z);
+  // (the wriggle in metres, whatever the length it's scaled to)
+  vec3 wp = (modelMatrix * vec4(p, 1.0)).xyz;
+  vec3 side = normalize(mat3(modelMatrix) * vec3(1.0, 0.0, 0.0));
+  vec3 side2 = normalize(mat3(modelMatrix) * vec3(0.0, 0.0, 1.0));
+  wp += side * wig * amp + side2 * wig2 * amp * 0.7;
+  vLocal = p;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_ROOT = FS_HEAD + /* glsl */ `
+uniform vec3 uLightDir;
+varying vec3 vLocal;
+void main() {
+  vec3 N = normalize(vNormal);
+  float lit = clamp(dot(N, normalize(uLightDir)) * 0.5 + 0.55, 0.25, 1.0);
+  float bark = 0.5 + 0.5 * sin(vLocal.y * 40.0 + atan(vLocal.x, vLocal.z) * 2.0);
+  vec3 col = mix(vec3(0.31, 0.19, 0.11), vec3(0.54, 0.35, 0.2), bark * 0.6);
+  col = mix(col, vec3(0.78, 0.66, 0.42), smoothstep(0.82, 1.0, vLocal.y));
+  col *= lit;
+  vec3 v = vWorld - uCamPos;
+  col = atmos(col, v, length(v), 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), 1.0);
+}
+`;
+export function makeRootMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, { uRoot: { value: new THREE.Vector4() } }),
+    vertexShader: VS_ROOT,
+    fragmentShader: FS_ROOT,
+  });
+}
+
 // The samurai's ribbons of water (game/ribbon.js), lit by env.
 export function makeRibbonMaterial(env) {
   return new THREE.ShaderMaterial({

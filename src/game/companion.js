@@ -114,6 +114,7 @@ export class Companion {
     this.fetching = null;
     if (this.ride && this.game.player) this.game.player.rider = 0;
     this.ride = null;
+    this.power = null;
     this.mood = { happy: 0, wag: 0, earsBack: 0, look: 0 };
     this.happyT = 0;
     this.lookT = 0;
@@ -174,6 +175,16 @@ export class Companion {
 
   cheer(t) {
     this.happyT = Math.max(this.happyT, t);
+  }
+
+  // One of her abilities is starting (powers.js): whatever she was up to,
+  // she drops it.
+  powerBegin() {
+    if (this.ride) this.dismount();
+    this.stopWhirl();
+    if (this.beat) this.endBeat();
+    this.fetching = null;
+    this.body.jawOpen = 0;
   }
 
   lookFor(t, at) {
@@ -362,6 +373,8 @@ export class Companion {
       this.sitting = false;
     }
     this.fetchT -= dt;
+    // (one of her abilities has her: see powers.js)
+    if (this.power?.drive?.(this, dt)) return;
     if (this.fetching) this.fetchStep(dt);
     else if (this.beat) this.beatStep(dt);
     else {
@@ -628,7 +641,8 @@ export class Companion {
     const mischief = Math.random() < C.mischief;
     let best = null;
     for (const gem of g.gems.gems) {
-      if (gem.taken) continue;
+      // (the gems an ability laid are left for you)
+      if (gem.taken || gem.bonus) continue;
       const ahead = gem.d - g.dist;
       if (ahead < C.reach[0] || ahead > C.reach[1] || gem.d - df < 2) continue;
       if (gem.y > 1.9) continue;

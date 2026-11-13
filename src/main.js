@@ -188,6 +188,7 @@ async function boot() {
     if (game.selectCompanion(id)) {
       wantedPal = null;
       ui.showCompanion(game.companionId);
+      ui.setProgress(game.progressView());
       remember();
     } else if (game.state === 'title' && late.has(id) && !game.companions[id]) {
       wantedPal = id;
@@ -199,16 +200,22 @@ async function boot() {
   ui.on('pal', pickPal);
   new Input(canvas, {
     onAction: (a) => {
+      // (the companion menu's open: Escape closes it, nothing else gets past)
+      if (ui.menuOpen) {
+        if (a === 'pause') closeMenu();
+        return;
+      }
       if (a === 'pause') {
         togglePause();
         return;
       }
+      if (a.startsWith('power') && game.state !== 'running') return;
       if (game.state === 'title' && (a === 'left' || a === 'right')) pick(ui.runnerBeside(a === 'left' ? -1 : 1));
       else if (game.state === 'title') begin();
       else game.action(a);
     },
     onTap: () => {
-      if (game.state === 'title') begin();
+      if (game.state === 'title' && !ui.menuOpen) begin();
     },
   });
   // Browsers only allow audio to start inside a tap/click/keypress.
@@ -227,6 +234,7 @@ async function boot() {
     ui.showPause(false);
     audio.resume();
     game.restart();
+    progress();
   });
   ui.on('sound', () => {
     audio.start();
@@ -234,15 +242,40 @@ async function boot() {
     ui.setSound(audio.muted);
   });
   ui.on('continue', () => game.continueRun());
-  ui.on('exchange', () => game.exchangeGems());
+  ui.on('exchange', () => {
+    game.exchangeGems();
+    ui.setProgress(game.progressView());
+  });
+  // the companions' progress: banking the gems in hand, levels bought with
+  // them (the crash card, the companion menu), and their abilities in a run
+  const progress = () => ui.setProgress(game.progressView());
+  ui.on('bank', () => {
+    game.bankGems();
+    progress();
+  });
+  ui.on('buy', (id) => {
+    if (game.buyLevel(id)) progress();
+  });
+  const closeMenu = () => ui.showMenu(false);
+  ui.on('palmenu', () => {
+    progress();
+    ui.showMenu(true);
+  });
+  ui.on('palmenuClose', closeMenu);
+  ui.on('power', (i) => game.action(`power${i}`));
+  progress();
   ui.on('title', () => {
     audio.resume();
     game.toTitle();
+    progress();
     ui.showRunner(game.runnerId, false);
     ui.showCompanion(game.companionId, false);
     ui.showTitle(true);
   });
-  ui.on('again', () => game.restart());
+  ui.on('again', () => {
+    game.restart();
+    progress();
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
