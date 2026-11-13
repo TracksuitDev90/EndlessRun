@@ -136,7 +136,12 @@ const PUSH_YAW = -0.42;
 // knee sinking deep under her as it goes, the board and all of her surging
 // ahead with it (surge, m), and a high kick of the heel as the leg swings
 // through for the next.
-const PUSH = { entry: 0.2, each: 0.6, drive: 0.29, G0: [0.2, -0.13], G1: [0.16, 0.47], n: [2, 3], gap: [2.6, 3.4], sink: 0.15, surge: 0.07 };
+// (Low and long, like a street skater's push: the front knee folds right
+// down, the body pitches forward till it's nearly level, the head stays up
+// looking down the road, and the back leg drives out straight behind, the
+// shoe kicking up off the road at the end of it before the knee swings
+// through high for the next.)
+const PUSH = { entry: 0.2, each: 0.62, drive: 0.31, G0: [0.2, -0.12], G1: [0.17, 0.57], n: [2, 3], gap: [2.6, 3.4], sink: 0.23, surge: 0.08 };
 
 // Her jumps, dealt from a shuffled deck so the same one never comes twice
 // running.
@@ -182,7 +187,7 @@ const FLAT = {
 const DUCK = { hipY: 0.63, hipX: -0.14, hipPitch: 0.46, hipYaw: -1.32, spLean: 0.92, chLean: 0.3, spTwist: 0.18, chTwist: 0.1, hdPitch: -0.6, hdYaw: 0.72, shLx: 1.35, shLz: 0.22, shLy: 0.1, elL: 0.35, wrL: 0.45, shRx: -0.4, shRz: 1.05, shRy: -0.2, elR: 0.45, wrR: 0.2 };
 // How far her foot can bend up toward her shin (rad: her ankle, in a stiff
 // skate shoe); crouched deeper than that, the heel lifts off the deck.
-const ANKLE_MAX = 0.68;
+const ANKLE_MAX = 0.74;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -277,7 +282,7 @@ export class Skater extends Player {
     // the flatground trick going on (FLAT), and this frame's of it (fx:
     // weighted already; all nothing when there isn't one)
     this.flat = { on: false, kind: 'manual', last: null, t: 0, dur: 1, w: 0, next: 0, n: 3, amp: 1, seed: 0, spin: 0, spinTo: 0, deckYaw: 0 };
-    this.fx = { shift: 0, yaw: 0, pitch: 0, pop: 0, lift: 0, off: 0, offF: 0, scoop: 0, hipY: 0, lean: 0, open: 0, arms: 0, wob: 0, look: 0, twist: 0, loose: 0 };
+    this.fx = { shift: 0, yaw: 0, pitch: 0, pop: 0, lift: 0, off: 0, offF: 0, scoop: 0, hipY: 0, lean: 0, open: 0, arms: 0, hang: 0, fling: 0, wob: 0, look: 0, twist: 0, loose: 0 };
     this.buildBraids();
   }
 
@@ -491,10 +496,14 @@ export class Skater extends Player {
       X.lift = 0.1 * hop;
       X.off = 0.09 * off;
       X.offF = 0.03 * off;
-      X.hipY = -0.065 * crouch + 0.09 * A * hop - 0.07 * land;
-      X.lean = 0.12 * crouch + 0.14 * land - 0.04 * hop;
-      X.arms = 0.38 * hop + 0.14 * land + 0.1 * crouch;
-      X.look = 0.18 * crouch + 0.3 * off + 0.1 * land;
+      // (the wind-up deep, arms hanging down between her knees; flung up and
+      // out as she pops, one higher than the other)
+      X.hipY = -0.11 * crouch + 0.09 * A * hop - 0.08 * land;
+      X.lean = 0.24 * crouch + 0.16 * land - 0.05 * hop;
+      X.arms = 0.55 * hop + 0.14 * land - 0.1 * crouch;
+      X.hang = crouch;
+      X.fling = hop;
+      X.look = 0.22 * crouch + 0.3 * off + 0.1 * land;
       X.loose = off;
       if (F.on) F.spin = ease(smooth(0.24, 0.66, u));
     }
@@ -512,12 +521,20 @@ export class Skater extends Player {
     r[C.hipPitch] += -X.open + 0.5 * X.lean;
     r[C.spLean] += X.lean - X.open;
     r[C.chLean] += 0.3 * X.open;
-    r[C.hdPitch] += X.look;
+    r[C.hdPitch] -= X.look;
     r[C.shLz] += X.arms + X.wob;
     r[C.shRz] += 0.9 * X.arms - 0.8 * X.wob;
     r[C.shLx] += 0.25 * X.arms;
     r[C.elL] -= 0.12 * X.arms;
     r[C.elR] -= 0.12 * X.arms;
+    // (a shove-it's wind-up: arms hanging forward between her knees; its
+    // pop: the front arm flung up high, the back one out)
+    r[C.shLx] += 0.55 * X.hang + 0.5 * X.fling;
+    r[C.shRx] += 0.5 * X.hang - 0.2 * X.fling;
+    r[C.shLz] -= 0.25 * X.hang - 0.45 * X.fling;
+    r[C.shRz] -= 0.2 * X.hang;
+    r[C.elL] += 0.25 * X.hang;
+    r[C.elR] += 0.25 * X.hang;
     if (X.twist) {
       r[C.hipYaw] += 0.45 * X.twist;
       r[C.spTwist] -= 0.15 * X.twist;
@@ -618,7 +635,9 @@ export class Skater extends Player {
         const k = ease(e);
         x = mix(g1[0], to[0], k);
         z = mix(g1[1], to[1], k) + 0.1 * Math.sin(Math.PI * e) * (1 - e);
-        y = mix(ANKLE_H + 0.03, to[2], k) + (last ? 0.2 : 0.18) * Math.sin(Math.PI * Math.pow(e, 0.7));
+        // (the shoe kicks up behind as the toe leaves the road, then the
+        // knee swings through high under her)
+        y = mix(ANKLE_H + 0.03, to[2], k) + (last ? 0.22 : 0.22) * Math.sin(Math.PI * Math.pow(e, 0.7)) + 0.1 * bump(0, 0.12, 0.25, 0.5, e);
         pitch = -0.75 * (1 - smooth(0, 0.45, e)) + 0.12 * Math.sin(Math.PI * e);
         if (last) yaw = mix(-0.18, tail.yaw, smooth(0.4, 0.9, e));
         ground = last ? 0 : smooth(0.88, 1, e);
@@ -857,17 +876,18 @@ export class Skater extends Player {
     k('bodyRoll', 0);
     k('bodyZ', -PUSH.surge * drive);
     k('hipYaw', PUSH_YAW + 0.05 * swing);
-    k('hipPitch', 0.14 + 0.08 * drive);
+    k('hipPitch', 0.18 + 0.2 * drive);
     k('hipX', 0.05);
     k('hipRoll', -0.05 - 0.05 * drive);
-    k('spLean', 0.3 + 0.16 * drive - 0.06 * rise + 0.04 * sp);
-    k('chLean', 0.06 + 0.04 * drive);
+    k('spLean', 0.34 + 0.34 * drive - 0.1 * rise + 0.04 * sp);
+    k('chLean', 0.08 + 0.1 * drive);
     k('spTwist', 0.12 + 0.05 * swing);
     k('chTwist', 0.04 + 0.13 * swing);
     k('spSide', 0.04 + 0.04 * drive);
     k('chSide', 0);
     k('hipY', 0.93 - PUSH.sink * drive + 0.025 * rise);
-    k('hdPitch', -0.04 - 0.24 * drive);
+    // (eyes up, down the road, however far forward she's pitched)
+    k('hdPitch', 0.05 + 0.6 * drive - 0.05 * rise);
     k('hdYaw', -0.9 * (PUSH_YAW + 0.16) - 0.08 * swing);
     k('hdRoll', 0.04);
     k('shLx', 0.25 - 0.8 * swing);

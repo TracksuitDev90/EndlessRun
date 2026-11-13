@@ -2148,7 +2148,7 @@ down the outside of each leg and round its hem; white crew socks to
 mid-calf, ribbed, a little blue-and-red square badge on the outside; chunky
 white-and-grey skate shoes, her size (~26.5 cm, the heel just behind the
 ankle, the toe well out in front) — a cupsole grooved all round with some
-height to it (3 cm, not a platform), narrower at the heel than across the
+height to it (2.6 cm and flat, not a platform), narrower at the heel than across the
 ball, an upper close round her foot, low over the toes and rising up the
 instep under a grey suede toe cap and heel counter, laces criss-crossing up
 the front, a padded collar round the ankle. Her card is cut
@@ -2191,7 +2191,8 @@ drifts into another mood (`MOODS`): carving wide and slow, knees soft, arms
 out like wings; chilling, tall and loose, arms down, nodding along to
 something; or crouched down low and fast, the front arm reaching down the
 board. At the start of a run she kicks off — and again every few seconds as
-she rides — two or three pushes (`PUSH`), each a hard one: her hips and
+she rides — two or three pushes (`PUSH`), each a hard one, low and long like a street
+skater's (her body pitched forward till it's nearly level, her head up): her hips and
 shoulders turn square to the road as she swings her front foot round to point
 down the board, her back foot steps off the tail and plants on the road beside
 her front foot, and drives right back along it — quickest in the middle of the

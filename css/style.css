@@ -2437,7 +2437,7 @@ body.touch .pw-key {
   }
   .pick {
     --gap: 10px;
-    --w: clamp(62px, min(10.5vw, 19 * var(--vh)), 96px);
+    --w: clamp(66px, min(10.5vw, 19 * var(--vh)), 96px);
     margin: 0;
     padding-top: calc(var(--w) * 0.42);
     flex: none;
@@ -2450,6 +2450,18 @@ body.touch .pw-key {
     min-height: 1.25em;
     margin-bottom: 6px;
     font-size: 13px;
+  }
+  /* (cards this small keep the name whole and let the line under the grid
+     say what they are) */
+  .pick-title {
+    display: none;
+  }
+  .pick-name {
+    font-size: clamp(11px, calc(var(--w) * 0.155), 15px);
+    letter-spacing: -0.01em;
+  }
+  .pick-plate {
+    padding: 3px 1px 4px;
   }
   .pals {
     display: grid;

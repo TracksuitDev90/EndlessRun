@@ -834,10 +834,10 @@ def g_shorts():
 
 SOCK_TOP = 0.285
 SHOE_X = 0.084
-SOLE_H = 0.032
+SOLE_H = 0.026
 SHOE_COLLAR = 0.146
-# the shoe's heel and toe along it (z, from the ankle): a skate shoe her size
-# (~26.5 cm) - a cupsole with some height to it, not a platform; the heel just
+# the shoe's heel and toe along it (z, from the ankle): a slim skate shoe her
+# size (~26.5 cm) - a flat vulcanised-looking sole, not a platform; the heel just
 # behind the ankle, the toe well out in front
 SHOE_HEEL = 0.064
 SHOE_TOE = -0.2
@@ -904,10 +904,10 @@ def g_shoes():
         sole = Prim(sole_fn, (bx - 0.055, -0.01, SHOE_TOE - 0.01), (bx + 0.055, 0.05, SHOE_HEEL + 0.01))
         # the upper: low over the toes, rising up the instep to a padded
         # collar round the ankle - close round her foot, not a boot
-        foot = round_cone((bx, 0.07, 0.012), (bx, 0.06, -0.11), 0.038, 0.035)
-        toebox = ellipsoid((bx, 0.054, -0.15), (0.04, 0.025, 0.044))
-        instep = round_cone((bx, 0.074, -0.095), (bx, 0.118, -0.03), 0.032, 0.031)
-        heel = ellipsoid((bx, 0.082, 0.026), (0.036, 0.046, 0.028))
+        foot = round_cone((bx, 0.066, 0.012), (bx, 0.054, -0.11), 0.037, 0.032)
+        toebox = ellipsoid((bx, 0.047, -0.15), (0.039, 0.022, 0.044))
+        instep = round_cone((bx, 0.068, -0.095), (bx, 0.114, -0.03), 0.03, 0.03)
+        heel = ellipsoid((bx, 0.078, 0.026), (0.035, 0.045, 0.028))
         ankle = round_cone((bx, 0.075, 0.008), (bx, 0.118, 0.01), 0.039, 0.035)
         collar = torus_y((bx, SHOE_COLLAR - 0.006, 0.01), 0.034, 0.0095, 1.12)
         tongue = round_box((bx, 0.138, -0.034), (0.019, 0.024, 0.007), 0.007, rot_x(-0.35))
@@ -940,7 +940,7 @@ def g_arms():
     for s, L in SIDES:
         S, E, W, dn, out = arm_frame(s)
         R = np.stack([out, dn, fw], 1)
-        upper = round_cone(S + 0.09 * dn, E, 0.038, 0.031)
+        upper = round_cone(S + 0.11 * dn, E, 0.036, 0.031)
         fore = round_cone(E, W, 0.031, 0.022)
         palm = round_box(W + 0.045 * dn, (0.015, 0.041, 0.035), 0.013, R)
         c = W + 0.094 * dn - 0.006 * out
