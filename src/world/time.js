@@ -6,10 +6,11 @@ import { CONFIG } from '../config.js';
 // VIII · The Gallery of Hours — a gallery of clocks open to the sky: a walk
 // of ivory stone inlaid with brass ticks between colonnades of ivory columns
 // and arches, aged brass everywhere, oversized clock faces up on the arches
-// with their hands turning, great gears half sunk behind the balustrades,
-// pendulums swinging slowly in the bays, grandfather clocks standing between
-// the columns — and beyond it all a pale, heavenly sky of cloud with more
-// dials and gears adrift in it.
+// with their hands turning, pendulums swinging slowly in the bays,
+// grandfather clocks standing between the columns; out past the colonnade,
+// the works of one enormous clock, a train of great wheels running the
+// length of the gallery (see WORKS) — and beyond it all a pale, heavenly sky
+// of cloud with more dials adrift high in it.
 //
 // And time has come unstuck here. Every clock hand — on the great clocks up
 // on the arches, the dials adrift in the sky, the grandfather clocks, the
@@ -20,13 +21,13 @@ import { CONFIG } from '../config.js';
 // hourglasses work: their sand runs from the top bulb into the bottom one,
 // and when it has run through, the whole glass turns over on its waist and
 // starts again. Pocket watches dangle out of the sky, hourglasses drift and
-// turn over among the clouds, armillary spheres turn on pedestals in the
-// bays, and little cogs drift by high over the walk.
+// turn over among the clouds, and armillary spheres turn on pedestals in the
+// bays.
 //
 // And the sands of time are running out over it all: the walk is sand. It
 // drifts in off both sides, banked high against the balustrades and
-// spilling in across the walk in tongues — far in here, hardly at all
-// there — and every few arches a thread of sand falls from the cornice and
+// spilling in toward the walk in tongues (never into the lanes) — and
+// every few arches a thread of sand falls from the cornice and
 // heaps up a pile against the balustrade, until it runs out and the pile
 // slumps out across the floor (the drifts and piles are shaped in the vertex
 // shader, see sandHeight; the sand itself is ground pattern 10). Wind ripples
@@ -62,6 +63,10 @@ const C = {
   sand: '#d49a48',
   sandHi: '#e6b664',
   sandFall: '#ecc888',
+  // sand lying where it has drifted (heaps, banks, ramps, dunes): the walk's
+  // own pale sand, so none of it stands out from the floor as something else
+  drift: '#dfc38f',
+  driftHi: '#f5e7c8',
   sky: '#dfe9f6',
 };
 
@@ -507,7 +512,7 @@ function sandfallGeo() {
   return merge(parts);
 }
 function sandHeapGeo() {
-  const parts = [part(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), null, { sy: 0.32, grad: [C.sand, C.sandHi, 0, 0.32] })];
+  const parts = [part(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), null, { sy: 0.32, grad: [C.drift, C.driftHi, 0, 0.32] })];
   const rnd = seeded(9);
   for (let i = 0; i < 6; i++) {
     const a = rnd() * 6.28;
@@ -536,7 +541,7 @@ function duneGeo(seed) {
     pos.setY(i, y - 0.02);
   }
   g.computeVertexNormals();
-  return merge([part(g, null, { grad: [C.sand, '#f2d39a', 0.0, 0.9], outline: 0.3 })]);
+  return merge([part(g, null, { grad: ['#d9b97e', '#f4e2bc', 0.0, 0.9], outline: 0.3 })]);
 }
 
 // A wheel and the pinion it drives (radii at the teeth's tips, teeth: the
@@ -590,6 +595,133 @@ function scapeGeo(r = 0.7, n = 15) {
   return merge(parts);
 }
 
+// --- the works ----------------------------------------------------------------------------
+// The gallery stands inside the works of one enormous clock, and the sands
+// of time have been filling it up. Down each side, out past the colonnade,
+// runs a single train of great wheels, one behind every arch: a wheel low
+// in the sand under each seam arch and a pinion high under the next,
+// zig-zagging tooth in tooth the whole length of the gallery (the same
+// every chunk, so it reads as one machine, not a scatter of gears). Each
+// pinion's arbor runs back over the sand to a greater wheel behind it,
+// turning with it; every arbor rides on a brass pillar. And the sand is
+// banked up through all of it, burying the wheels' feet: every wheel that
+// stands in it scoops it up and pours it off its rim as it turns.
+//
+// The train: wheel and pinion the same tooth pitch, their centres 8 m apart
+// along the run and DY apart in height, so that the angle between a
+// gear's two neighbours is a whole number of half teeth (3/8 of a turn:
+// 21 half teeth of the wheel's, 12 of the pinion's) and every wheel can
+// mesh with both of its pinions at once.
+const WORKS = {
+  x: 10.5, // the train's plane, out from the middle of the walk
+  wheel: { r: 5.93, t: 28, y: 4.5 },
+  pinion: { r: 3.39, t: 16 },
+  dy: 8 / Math.tan((3 * Math.PI) / 8),
+  w: 0.08, // the wheels' pace (rad/s); the pinions turn faster, the other way
+  great: { r: 7.2, t: 44, x: 17 }, // the wheel on each pinion's arbor
+  back: 1.6, // how far behind its gear an arbor's pillar stands
+  bankX: 6.9, // where the sand bank starts, just behind the balustrade
+};
+WORKS.pinion.y = WORKS.wheel.y + WORKS.dy;
+WORKS.wp = (-WORKS.w * WORKS.wheel.t) / WORKS.pinion.t;
+
+// The phases (0..1 of a turn) of the wheel and pinion in chunk k of the train
+// on side s, worked along the chain so every pair is tooth in gap: a
+// gearParts tooth is centred 0.375 of a pitch round from its x axis, a gap
+// 0.875; where two gears touch, how far the one is through its pitch and
+// how far the other is add up to half a pitch. (In the gear's own frame:
+// across the run is its x, and along the run it runs the way sin(ry) says.)
+function worksPhases(k, s) {
+  const { wheel: W, pinion: Pn, dy } = WORKS;
+  const sg = s < 0 ? 1 : -1;
+  const TAU = Math.PI * 2;
+  const fr = (v) => v - Math.floor(v);
+  const through = (a, ph, t) => fr((a / TAU - ph) * t - 0.375);
+  const set = (a, g, t) => fr(a / TAU - (0.5 - g + 0.375) / t);
+  const up = Math.atan2(dy, sg * 8);
+  const down = Math.atan2(-dy, sg * 8);
+  const pinionOf = (pw) => set(up + Math.PI, through(up, pw, W.t), Pn.t);
+  // how far each wheel's phase moves on from the one before it
+  const pp0 = pinionOf(0);
+  const step = set(down + Math.PI, through(down, pp0, Pn.t), W.t);
+  const pw = fr(step * (((k % 4096) + 4096) % 4096));
+  return [pw, pinionOf(pw)];
+}
+
+// A pillar carrying an arbor: a brass column a metre tall (stretched to the
+// arbor's height, sy), its foot in the sand.
+function worksPostGeo() {
+  return merge([part(P.cyl(0.24, 0.32, 1, 10), null, { y: 0.5, grad: [C.brassLo, C.brass, 0, 1] })]);
+}
+// The bearing at the top of a pillar: a block and a collar round the arbor.
+function worksBearingGeo() {
+  return merge([
+    part(P.box(0.8, 0.5, 0.7), C.brass, { y: -0.2 }),
+    part(P.cyl(0.36, 0.36, 0.5, 12), C.brassHi, { rz: Math.PI / 2, outline: 0.5 }),
+  ]);
+}
+// An arbor: a brass shaft along x, a metre long (stretched, sx), collared.
+function worksArborGeo() {
+  return merge([
+    part(P.cyl(0.18, 0.18, 1, 10), C.brassHi, { rz: Math.PI / 2, outline: 0.4 }),
+    part(P.cyl(0.28, 0.28, 0.04, 12), C.brass, { x: -0.42, rz: Math.PI / 2, outline: 0.4 }),
+    part(P.cyl(0.28, 0.28, 0.04, 12), C.brass, { x: 0.42, rz: Math.PI / 2, outline: 0.4 }),
+  ]);
+}
+// A gear of the works, with the stub of its arbor running back into its
+// pillar's bearing.
+function worksGearGeo(o) {
+  return merge([
+    ...gearParts(o),
+    part(P.cyl(0.2, 0.2, WORKS.back, 10), C.brassHi, { z: -WORKS.back / 2, rx: Math.PI / 2, outline: 0.4 }),
+  ]);
+}
+
+// The sand banked up through the works on one side: from just behind the
+// balustrade up over the wheels' feet to a crest under the great wheels,
+// then away down to the sea of dunes. Its own x runs out from the walk (0
+// at bankX), its z along the run (a chunk long, centred), and it's the same
+// at both ends, so chunk after chunk it runs on unbroken. It heaps up round
+// the wheels where they stand in it.
+function sandBankGeo() {
+  const L = CONFIG.chunkLength;
+  const xs = [];
+  for (let x = 0; x < 14; x += 0.5) xs.push(x);
+  for (let x = 14; x <= 30; x += 1.5) xs.push(x);
+  const nz = 32;
+  const ss = (a, b, v) => {
+    const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  const wx = WORKS.x - WORKS.bankX;
+  const gx = WORKS.great.x - WORKS.bankX;
+  const pos = [];
+  for (let j = 0; j <= nz; j++) {
+    const v = j / nz; // 0..1 along the chunk (0 and 1 under the wheels)
+    for (const x of xs) {
+      const c = 0.5 + 0.5 * Math.cos(v * Math.PI * 2);
+      let h = 0.75 + 2.85 * ss(0, 9.5, x) - 3.9 * ss(10, 24, x);
+      h += 1.0 * Math.exp(-(((x - wx) / 2.4) ** 2)) * c * c;
+      h += 0.8 * Math.exp(-(((x - gx) / 3) ** 2)) * (1 - c) * (1 - c);
+      h += 0.14 * Math.sin(x * 0.9 + v * Math.PI * 4) * ss(0.5, 3, x);
+      pos.push(x, h, (0.5 - v) * (L + 0.04));
+    }
+  }
+  const idx = [];
+  const W = xs.length;
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < W - 1; i++) {
+      const a = j * W + i;
+      idx.push(a, a + 1, a + W, a + 1, a + W + 1, a + W);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return merge([part(g, null, { grad: [C.drift, C.driftHi, 0.5, 4.2], outline: 0.25 })]);
+}
+
 // --- the climbs ---------------------------------------------------------------------------
 // From its second time round, the walk has drifted over and fallen away in
 // places, and you go over the top of it: up a ramp of sand banked against
@@ -627,7 +759,7 @@ function sandRampGeo() {
     pos.setY(i, Math.max(0, t * (0.35 + 0.65 * k) * (ax < 4.3 ? 1 : 1) + lump * t) + (ax < 4.3 ? 0 : -0.01));
   }
   g.computeVertexNormals();
-  return merge([part(g, null, { grad: [C.sand, C.sandHi, 0, 1], outline: 0.2 })]);
+  return merge([part(g, null, { grad: [C.drift, C.driftHi, 0, 1], outline: 0.2 })]);
 }
 
 // Buried terrace: a slab of the old floor and the wall under it, the sand
@@ -645,7 +777,7 @@ function terraceBodyGeo(h) {
     bank.rotateX(Math.PI / 2);
     bank.scale(1.5, h * 0.95, 1);
     bank.translate(s * (DECK_W / 2 + 0.2), 0, -0.5);
-    parts.push(part(bank, null, { grad: [C.sand, C.sandHi, 0, h], outline: 0.3 }));
+    parts.push(part(bank, null, { grad: [C.drift, C.driftHi, 0, h], outline: 0.3 }));
   }
   return merge(parts);
 }
@@ -661,7 +793,7 @@ function terraceFaceGeo(h) {
     parts.push(part(P.box(0.4 + rnd() * 0.6, 0.18, 0.26), C.stone, { x, y: h - 0.07 - rnd() * 0.05, z: 0.08, ry: (rnd() - 0.5) * 0.4, rz: (rnd() - 0.5) * 0.25 }));
   }
   for (const s of [-1, 1]) {
-    parts.push(part(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), null, { x: s * (DECK_W / 2 - 0.1), y: 0, z: 0.1, sx: 1.3, sy: h * 0.9, sz: 1.1, grad: [C.sand, C.sandHi, 0, h] }));
+    parts.push(part(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), null, { x: s * (DECK_W / 2 - 0.1), y: 0, z: 0.1, sx: 1.3, sy: h * 0.9, sz: 1.1, grad: [C.drift, C.driftHi, 0, h] }));
   }
   return merge(parts);
 }
@@ -1002,8 +1134,6 @@ export default {
     b.toon('bracket', merge([part(P.box(0.9, 0.9, 1.6), C.ivoryLo, { y: 0.45 }), part(P.cyl(0.6, 0.7, 0.3, 12), C.brass, { y: 1.0 })]), { cap: 24, anim: 'pop', ink: 0.04 });
     b.toon('wallClock', merge(dialParts({ r: 2.6, depth: 0.4 })), { cap: 24, anim: 'pop', ink: 0.05 });
     hands('hands', [2.1, 0.14, 0.32], [1.4, 0.19, 0.4], { cap: 24, anim: 'pop' });
-    b.toon('gear', merge(gearParts({ r: 3.2, teeth: 22, t: 0.4 })), { cap: 24, anim: 'lift', ink: 0.05, turn: [0.12, 0, 0, 0] });
-    b.toon('gearB', merge(gearParts({ r: 2.0, teeth: 14, t: 0.36, color: C.brassLo, hi: C.brass })), { cap: 24, anim: 'lift', ink: 0.05, turn: [-0.2, 0, 0, 0] });
     b.toon('grandfather', merge(grandfatherParts(true)), { cap: 40, anim: 'pop', ink: 0.045 });
     hands('gfHands', [0.3, 0.03, 0.03], [0.2, 0.04, 0.05], { cap: 64, anim: 'pop', ink: 0.015 });
     b.toon('pendulum', merge(bigPendulumParts(6.2)), { cap: 20, anim: 'pop', ink: 0.04, turn: [0, 0.28, 1.4, 0] });
@@ -1015,13 +1145,10 @@ export default {
     b.toon('cloud', merge(cloudParts({ r: 3, lo: '#e2e8f4', hi: '#ffffff' })), { cap: 140, anim: 'lift', wobble: [0, 0.5, 0.3, 0], ink: 0.04 });
     b.toon('skyDial', merge(dialParts({ r: 3.2, depth: 0.4 })), { cap: 40, ink: 0.05, ...SKY });
     hands('skyHands', [2.3, 0.16, 0.3], [1.6, 0.2, 0.36], { cap: 40, ...SKY });
-    b.toon('skyGear', merge(gearParts({ r: 5, teeth: 28, t: 0.5 })), { cap: 32, anim: 'liftFar', ink: 0.05, turn: [0.06, 0, 0, 0] });
     b.toon('skyHourglass', merge(hourglassParts()), { cap: 16, ink: 0.04, sand: HG(0, 9), ...SKY });
     b.glass('skyHourglassGlass', merge(hourglassGlassParts()), { cap: 16, sand: HG(0, 9), ...SKY });
     b.toon('watch', merge(watchParts()), { cap: 24, ink: 0.04, ...WATCH });
     hands('watchHands', [0.8, 0.07, 0.27], [0.55, 0.09, 0.31], { cap: 24, ...WATCH });
-    // little cogs drifting high over the walk
-    b.toon('cog', merge(gearParts({ r: 0.7, teeth: 10, t: 0.18, spokes: 4 })), { cap: 40, anim: 'liftFar', ink: 0.03, turn: [0.5, 0.3, 0.4, 0.15], fly: [0, 0, 0.9, 0.22] });
     b.glow('glow', { cap: 40, anim: 'pop' });
     b.shadow('shadow', { cap: 120, anim: 'pop' });
 
@@ -1039,7 +1166,7 @@ export default {
 
     // the sand pouring in off the architecture, and the dunes it has
     // drifted into out past the colonnade
-    b.toon('sandfall', sandfallGeo(), { cap: 140, anim: 'pop', ink: 0, sandfall: true });
+    b.toon('sandfall', sandfallGeo(), { cap: 220, anim: 'pop', ink: 0, sandfall: true });
     b.toon('sandHeap', sandHeapGeo(), { cap: 90, anim: 'pop', ink: 0.02 });
     b.toon('dune', duneGeo(3), { cap: 60, anim: 'liftFar', ink: 0.02 });
     b.toon('duneB', duneGeo(11), { cap: 60, anim: 'liftFar', ink: 0.02 });
@@ -1052,7 +1179,17 @@ export default {
     b.toon('trainPinion', merge(gearParts({ r: MESH.r[1], teeth: MESH.t[1], t: 0.26, spokes: 3, color: C.brassLo, hi: C.brass })), { cap: 16, anim: 'pop', ink: 0.035, turn: [(-MESH.w * MESH.t[0]) / MESH.t[1], 0, 0, 0] });
     b.toon('scape', scapeGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0.5, 0, 0, 0] });
     b.toon('anchor', anchorGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.22, 2.6, 0] });
-    b.toon('gearGiant', merge(gearParts({ r: 6, teeth: 36, t: 0.7, spokes: 6 })), { cap: 16, anim: 'lift', ink: 0.05, turn: [0.05, 0, 0, 0] });
+    // the works out past the colonnade (see WORKS): the train of wheels and
+    // pinions, the great wheels on the pinions' arbors, their pillars, and
+    // the sand banked up through it all
+    const { wheel: WH, pinion: PN, great: GR } = WORKS;
+    b.toon('worksWheel', worksGearGeo({ r: WH.r, teeth: WH.t, t: 0.6, spokes: 6, hole: 0.12 }), { cap: 40, anim: 'lift', ink: 0.05, turn: [WORKS.w, 0, 0, 0] });
+    b.toon('worksPinion', worksGearGeo({ r: PN.r, teeth: PN.t, t: 0.7, spokes: 4, color: C.brassLo, hi: C.brass }), { cap: 40, anim: 'lift', ink: 0.05, turn: [WORKS.wp, 0, 0, 0] });
+    b.toon('worksGreat', merge(gearParts({ r: GR.r, teeth: GR.t, t: 0.8, spokes: 8, hole: 0.1 })), { cap: 40, anim: 'lift', ink: 0.05, turn: [WORKS.wp, 0, 0, 0] });
+    b.toon('worksArbor', worksArborGeo(), { cap: 40, anim: 'lift', ink: 0.04 });
+    b.toon('worksPost', worksPostGeo(), { cap: 120, anim: 'lift', ink: 0.04 });
+    b.toon('worksBearing', worksBearingGeo(), { cap: 120, anim: 'lift', ink: 0.04 });
+    b.toon('sandBank', sandBankGeo(), { cap: 40, anim: 'lift', ink: 0.02 });
 
     // the climbs (from the second time round: see climb, above)
     b.toon('climbRamp', sandRampGeo(), { cap: 8, anim: 'popEarly', ink: 0.02 });
@@ -1099,28 +1236,34 @@ export default {
     const { rng } = ctx;
     ctx.put('ground', 0, 0, 0, { p0: ctx.d0 % 4096 });
     const put = (name, x, y, z, o) => ctx.put(name, x, y, z, o);
+    // (which chunk of the run this is, counted from the very start, so the
+    // works and every rhythm down the gallery run on unbroken)
+    const k = Math.round(ctx.d0 / CONFIG.chunkLength);
     for (const s of [-1, 1]) {
       const ry = s < 0 ? 0 : Math.PI;
+      const face = s < 0 ? Math.PI / 2 : -Math.PI / 2;
+      // which way along the run a gear's own x points (see worksPhases)
+      const sg = Math.sin(face);
       // under the arch at the chunk's seam, perhaps a thread of sand falling
       // onto a pile (the shaders decide which, and when: see pileCycle)
       ctx.put('sandThread', s * 5.85, 0, 0, { p0: ctx.d0 % 4096, p1: s });
       // the colonnade: a bay every 8 m (each arch reaching back to the next column)
       for (const z of [4, 12]) ctx.put('bay', s * WALL_X, 0, z, { ry });
-      // in the bays: a grandfather clock, a great pendulum swinging along the
-      // run, or a pedestal with an hourglass or an armillary sphere on it
+      // in the bays, in turn: a grandfather clock, a great pendulum swinging
+      // along the run, or a pedestal with an hourglass or an armillary sphere
+      // on it, or an open movement
       const bay = (ctx.index * 2 + (s > 0 ? 1 : 0)) % 5;
-      const face = s < 0 ? Math.PI / 2 : -Math.PI / 2;
       if (bay === 1 || bay === 3) {
         const gx = s * (WALL_X - 1.1);
-        const gz = 8 + rng.float(-1.5, 1.5);
+        const gz = 8;
         ctx.put('grandfather', gx, 0, gz, { ry: face });
         gfHands(face, 0)(put, rng, { x: gx, d: gz });
-      } else if (bay === 0) ctx.put('pendulum', s * (WALL_X + 0.2), 11.2, 8, { ry: 0, p0: rng.float(0, 1) });
-      else if (bay === 4 && rng.chance(0.6)) {
+      } else if (bay === 0) ctx.put('pendulum', s * (WALL_X + 0.2), 11.2, 8, { ry: 0, p0: (k * 0.37) % 1 });
+      else if (bay === 4) {
         // an open movement: its wheel driving a pinion, the scape wheel and
         // its anchor rocking over it, all turning in the bay
         const mx = s * (WALL_X - 1.0);
-        const mz = 8 + rng.float(-0.6, 0.6);
+        const mz = 8;
         const at = (lx) => [mx + lx * Math.cos(face), mz + lx * Math.sin(face)];
         ctx.put('movement', mx, 0, mz, { ry: face });
         const [pw, pp] = meshPhases(MESH.at);
@@ -1135,9 +1278,10 @@ export default {
         ctx.put('anchor', cx, 5.45, cz, { ry: face, p0: rng.float(0, 1) });
       } else {
         const px = s * (WALL_X - 1.0);
-        const pz = 8 + rng.float(-1, 1);
-        if (rng.chance(0.5)) {
-          const o = { ry: rng.float(0, 6.28), p0: rng.float(0, 1) };
+        const pz = 8;
+        // (the armillary sphere and the hourglass take turns)
+        if (k % 2 === 0) {
+          const o = { ry: face, p0: rng.float(0, 1) };
           ctx.put('armillary', px, 0, pz, o);
           ctx.put('armillaryRings', px, 2.3, pz, o);
         } else {
@@ -1156,62 +1300,84 @@ export default {
         ctx.put('bracket', s * WALL_X, 12.3, 8, {});
         ctx.put('hands', s * WALL_X, y, 8, { ...o, p0: rng.float(0, 1) });
       }
-      // sand pouring in off the cornice through an arch, heaping up on the
-      // drift where it lands
-      if (rng.chance(0.45)) {
-        const z = 8 + rng.float(-1.6, 1.6);
-        ctx.put('sandfall', s * (WALL_X - 0.15), 0.9, z, { sx: rng.float(0.8, 2.0), sy: 10.5, p0: rng.float(0, 6.28) });
-        ctx.put('sandHeap', s * (WALL_X - 0.6), 0.55, z, { s: rng.float(0.9, 1.5), ry: rng.float(0, 6.28) });
+      // sand pouring in off the cornice through the arch behind every
+      // pedestal and movement, heaping up on the drift where it lands
+      if (bay === 2 || bay === 4) {
+        ctx.put('sandfall', s * (WALL_X - 0.15), 0.9, 8, { sx: rng.float(1.1, 1.7), sy: 10.5, p0: rng.float(0, 6.28) });
+        ctx.put('sandHeap', s * (WALL_X - 0.3), 0.55, 8, { s: rng.float(0.9, 1.2), ry: rng.float(0, 6.28) });
       }
-      // the dunes the gallery stands in, rolling away to the horizon
+
+      // The works (see WORKS): a wheel behind the seam arch, a pinion behind
+      // the next, tooth in tooth with the wheels either side of it; the
+      // pinion's arbor running back to a great wheel; and the sand banked
+      // up through it all.
+      {
+        const { wheel: WH, pinion: PN, great: GR, back } = WORKS;
+        const [pw, pp] = worksPhases(k, s);
+        const wx = s * WORKS.x;
+        const post = s * (WORKS.x + back);
+        ctx.put('worksWheel', wx, WH.y, 0, { ry: face, p0: pw });
+        ctx.put('worksPost', post, 0, 0, { sy: WH.y - 0.25 });
+        ctx.put('worksBearing', post, WH.y, 0, {});
+        ctx.put('worksPinion', wx, PN.y, 8, { ry: face, p0: pp });
+        ctx.put('worksGreat', s * GR.x, PN.y, 8, { ry: face, p0: pp });
+        const a0 = WORKS.x, a1 = GR.x + back;
+        ctx.put('worksArbor', (s * (a0 + a1)) / 2, PN.y, 8, { sx: a1 - a0 });
+        for (const ax of [WORKS.x + back, a1]) {
+          ctx.put('worksPost', s * ax, 0, 8, { sy: PN.y - 0.25 });
+          ctx.put('worksBearing', s * ax, PN.y, 8, {});
+        }
+        ctx.put('sandBank', s * WORKS.bankX, 0, 8, { ry: s < 0 ? Math.PI : 0 });
+        // Every wheel standing in the sand scoops it up as it turns and
+        // pours it off its rim on the way down (a wheel turning forward
+        // in its own frame brings its rim down on its far side, -x).
+        const pour = (cx, cy, cz, r, rate, base) => {
+          const u = (rate > 0 ? -1 : 1) * 0.72 * r;
+          const top = cy + Math.sqrt(r * r - u * u);
+          ctx.put('sandfall', s * (cx - 0.6), base, cz + sg * u, { sx: rng.float(1.0, 1.6), sy: top - base, p0: rng.float(0, 6.28) });
+        };
+        pour(WORKS.x, WH.y, 0, WH.r, WORKS.w, 2.2);
+        pour(GR.x, PN.y, 8, GR.r, WORKS.wp, 3.4);
+      }
+
+      // the dunes the gallery stands in, rolling away to the horizon (kept
+      // out past the works: however long and however turned, none reaches
+      // in toward the walk)
       if (rng.chance(0.6)) {
-        ctx.put(rng.chance(0.5) ? 'dune' : 'duneB', s * rng.float(15, 75), -0.4, rng.float(0, 16), { sx: rng.float(18, 42), sz: rng.float(16, 34), sy: rng.float(2.5, 8), ry: rng.float(-0.5, 0.5) + (rng.chance(0.5) ? Math.PI : 0) });
+        const sx = rng.float(18, 42);
+        const sz = rng.float(16, 34);
+        const tw = rng.float(-0.5, 0.5);
+        const reach = 0.5 * (sx * Math.abs(Math.cos(tw)) + sz * Math.abs(Math.sin(tw)));
+        ctx.put(rng.chance(0.5) ? 'dune' : 'duneB', s * (27 + reach + rng.float(0, 30)), -0.4, rng.float(0, 16), { sx, sz, sy: rng.float(2.5, 8), ry: tw + (rng.chance(0.5) ? Math.PI : 0) });
       }
-      // now and then a great wheel standing in them, turning slowly, the sand
-      // it has carried up pouring off its rim
-      if (rng.chance(0.14)) {
-        const gx = s * rng.float(13, 17);
-        const gy = rng.float(0.5, 2.2);
-        const gz = rng.float(2, 14);
-        ctx.put('gearGiant', gx, gy, gz, { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1) });
-        ctx.put('sandfall', gx - s * 0.6, 0, gz - 1.6, { sx: rng.float(1.2, 2.2), sy: gy + 5.4, p0: rng.float(0, 6.28) });
-        ctx.put('sandHeap', gx - s * 0.6, 0, gz - 1.6, { s: rng.float(1.6, 2.4) });
-      }
-      // great gears half sunk behind the balustrade
-      if (rng.chance(0.45)) ctx.put(rng.chance(0.5) ? 'gear' : 'gearB', s * rng.float(9, 12), rng.float(0.5, 2.5), rng.float(0, 16), { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1), s: rng.float(0.8, 1.3) });
-      // the heavenly sky beyond: clouds, and dials, gears and hourglasses adrift
+      // the heavenly sky beyond: clouds, and, high over the works, a dial
+      // adrift every third chunk and now and then an hourglass, on
+      // alternating sides
       if (rng.chance(0.75)) {
-        ctx.put('cloud', s * rng.float(16, 70), rng.float(-6, 10), rng.float(0, 16), { s: rng.float(0.8, 2.2), ry: rng.float(0, 6.28) });
+        ctx.put('cloud', s * rng.float(28, 80), rng.float(-6, 10), rng.float(0, 16), { s: rng.float(0.8, 2.2), ry: rng.float(0, 6.28) });
       }
-      if (rng.chance(0.28)) {
-        const o = { s: rng.float(0.9, 2), ry: s * rng.float(-1.2, -0.4), p0: rng.float(0, 1) };
-        const x = s * rng.float(16, 55);
-        const y = rng.float(7, 24);
-        const z = rng.float(0, 16);
-        ctx.put('skyDial', x, y, z, o);
-        ctx.put('skyHands', x, y, z, o);
+      const turnOf = (n) => (Math.floor(k / n) % 2 === 0 ? -1 : 1);
+      if (k % 3 === 0 && s === turnOf(3)) {
+        const o = { s: 1.6, ry: s * -0.8, p0: rng.float(0, 1) };
+        const x = s * 38;
+        const y = 25;
+        ctx.put('skyDial', x, y, 8, o);
+        ctx.put('skyHands', x, y, 8, o);
       }
-      if (rng.chance(0.2)) ctx.put('skyGear', s * rng.float(20, 70), rng.float(6, 30), rng.float(0, 16), { s: rng.float(0.8, 2), ry: s * rng.float(-1.3, -0.3), p0: rng.float(0, 1) });
-      if (rng.chance(0.1)) {
-        const o = { s: rng.float(1.4, 2.6), ry: rng.float(0, 6.28), p0: rng.float(0, 6.28) };
-        const x = s * rng.float(15, 45);
-        const y = rng.float(5, 18);
-        const z = rng.float(0, 16);
-        ctx.put('skyHourglass', x, y, z, o);
-        ctx.put('skyHourglassGlass', x, y, z, o);
+      if (k % 7 === 3 && s === turnOf(7)) {
+        const o = { s: 2.0, ry: rng.float(0, 6.28), p0: rng.float(0, 6.28) };
+        ctx.put('skyHourglass', s * 30, 20, 4, o);
+        ctx.put('skyHourglassGlass', s * 30, 20, 4, o);
       }
-      // a pocket watch dangling out of the sky on its chain
-      if (rng.chance(0.16)) {
-        const o = { s: rng.float(0.9, 1.5), ry: s < 0 ? rng.float(0.3, 1.1) : -rng.float(0.3, 1.1), p0: rng.float(0, 1) };
-        const x = s * rng.float(9, 22);
-        const y = rng.float(9, 15);
-        const z = rng.float(0, 16);
-        ctx.put('watch', x, y, z, o);
-        ctx.put('watchHands', x, y, z, o);
+      // a pocket watch dangling out of the sky on its chain, every fourth
+      // chunk on alternating sides, over the wheel between the great wheels
+      if (k % 4 === 2 && s === turnOf(4)) {
+        const o = { s: 1.2, ry: s < 0 ? 0.7 : -0.7, p0: rng.float(0, 1) };
+        ctx.put('watch', s * 13.8, 15.2, 0, o);
+        ctx.put('watchHands', s * 13.8, 15.2, 0, o);
       }
       // later laps: the midnight dials glow
       if (ctx.visit >= 2 && (ctx.index + (s > 0 ? 1 : 0)) % 2 === 0) ctx.put('glow', s * (WALL_X - 0.5), 15.6, 8, { s: 7, c: [0.6, 0.7, 1] });
     }
-    if (rng.chance(0.3)) ctx.put('cog', rng.float(-4, 4), rng.float(9.5, 13), rng.float(0, 16), { s: rng.float(0.7, 1.4), p0: rng.float(0, 6.28) });
   },
 };
