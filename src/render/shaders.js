@@ -1444,12 +1444,13 @@ vec3 sandGround(vec2 p, float dist, float far) {
   float lee = smoothstep(0.78, 0.93, rf) * (1.0 - smoothstep(0.95, 1.0, rf));
   c *= 1.0 + (0.035 * rf - 0.08 * lee) * rk;
   // loose sand spilled in off the drift on each side: tongues of it reaching
-  // into the walk, far in here, hardly at all there, paler than the packed
-  // sand, with a soft lip facing the walk, lit or shaded as it faces the
-  // light
+  // in toward the walk, further here, hardly at all there, paler than the
+  // packed sand, with a soft lip facing the walk, lit or shaded as it faces
+  // the light - but never into the lanes, where it could pass for something
+  // in the way
   float t1 = sandN(vec2(p.y * 0.125 + side * 0.37, 0.77 + side * 0.11));
   float t2 = sandN(vec2(p.y * 0.375 + side * 0.19, 0.29));
-  float reach = max(0.6, driftFoot(p.y, side) - 0.3 - smoothstep(0.35, 0.75, t1) * 2.3 - (t2 - 0.5) * 0.9);
+  float reach = max(3.5, driftFoot(p.y, side) - 0.3 - smoothstep(0.35, 0.75, t1) * 2.3 - (t2 - 0.5) * 0.9);
   float lt = clamp((ax - reach) / 0.35, 0.0, 1.0);
   float loose = lt * lt * (3.0 - 2.0 * lt);
   float lip = 4.0 * lt * (1.0 - lt) * (1.0 - far);
