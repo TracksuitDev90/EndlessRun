@@ -55,7 +55,7 @@ const D = CONFIG.duckLine;
 
 const C = {
   snow: '#f7faff',
-  snowLo: '#c6c9f0',
+  snowLo: '#a3b8ea',
   snowBlue: '#dfe8fb',
   ice: '#6fd6e6',
   iceHi: '#c9f4f6',
@@ -76,9 +76,9 @@ const C = {
   woodLo: '#48301f',
   sawn: '#dcbd8e',
   shingle: '#4a4152',
-  fir: '#2f6660',
-  firLo: '#1c403f',
-  firHi: '#4f8c7c',
+  fir: '#24525a',
+  firLo: '#122c36',
+  firHi: '#3f7a80',
   amber: '#ffc56b',
   crate: '#9a7448',
   canvas: '#b28c50',
@@ -220,9 +220,65 @@ function lump({ r = 1, sx = 1, sy = 1, sz = 1, seed = 1, detail = 0, jitter = 0.
 function boulder({ r = 1, sx = 1, sy = 0.85, sz = 1, seed = 1, x = 0, y = 0, z = 0, ry = 0, detail = 0, lo = C.rockLo, hi = C.rockHi } = {}) {
   return part(lump({ r, sx, sy, sz, seed, detail }), null, { x, y: y + r * sy * 0.62, z, ry, grad: [lo, hi, y - r * sy * 0.2, y + r * sy * 1.5], mark: 0.35 });
 }
-// Snow lying on top of something: a low dome, white, lavender round its foot.
+// Snow lying on top of something, as snow really lies: not a dome but a
+// pillow - full in the shoulders and soft and flat on top, heaped fuller one
+// way than another, its outline scalloped, a lump or two in it, and its edge
+// rolled over in a lip that hangs down past whatever it's lying on. White,
+// lavender round its foot. (Every cap different: its lumps are seeded by
+// where it lies and how big it is.)
 function snowCap({ r = 1, h = 0.3, x = 0, y = 0, z = 0, sx = 1, sz = 1, seg = 10 } = {}) {
-  return part(new THREE.SphereGeometry(1, seg, 4, 0, TAU, 0, Math.PI / 2), null, { x, y, z, sx: r * sx, sy: h, sz: r * sz, grad: [C.snowLo, C.snow, y - h * 0.2, y + h * 0.7] });
+  const g = new THREE.SphereGeometry(1, Math.max(12, Math.round(seg * 1.6)), 7, 0, TAU, 0, Math.PI / 2);
+  pillow(g, x * 3.17 + z * 7.31 + y * 1.93 + r * 5.1 + h * 2.3);
+  return part(g, null, { x, y, z, sx: r * sx, sy: h, sz: r * sz, grad: [C.snowLo, C.snow, y - h * 0.2, y + h * 0.7] });
+}
+// Reshape a unit half-sphere (pole up) into a pillow of snow (see snowCap).
+// Everything is a smooth function of the angle round it, so the sphere's seam
+// stays closed, and nothing moves at its pole but up and down.
+function pillow(g, seed) {
+  const pos = g.attributes.position;
+  const ph = [seed, seed * 1.7 + 1.1, seed * 2.3 + 2.6, seed * 0.6 + 4.2];
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i);
+    const py = Math.max(0, pos.getY(i));
+    const pz = pos.getZ(i);
+    const rr = Math.hypot(px, pz);
+    const a = Math.atan2(pz, px);
+    // the outline: heaped fuller one way, scalloped
+    const lob = 1 + 0.1 * Math.sin(a * 2 + ph[0]) + 0.07 * Math.sin(a * 3 + ph[1]) + 0.04 * Math.sin(a * 5 + ph[2]);
+    // full in the shoulders, soft and flat on top
+    let r2 = Math.pow(rr, 0.62);
+    let y2 = Math.pow(py, 0.8);
+    // a lump or two in it (none at the pole, none at the rim)
+    y2 *= 1 + rr * py * (0.22 * Math.sin(a * 2 + ph[3]) + 0.12 * Math.sin(a * 3 + ph[0] * 1.3));
+    // the lip: rolled out over the edge and hanging down past it
+    const rim = Math.pow(1 - py, 5);
+    r2 *= 1 + 0.07 * rim;
+    y2 -= (0.2 + 0.1 * Math.sin(a * 4 + ph[1])) * rim;
+    const k = rr > 1e-5 ? (r2 * lob) / rr : 0;
+    pos.setXYZ(i, px * k, y2, pz * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+// Lumpen a squashed sphere of snow lying along a log, a bough or a ledge
+// (x its long axis): its back heaped and dipped along its length, sagging a
+// little at the ends. (Before it's scaled: a unit sphere.)
+function lumpen(g, seed) {
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i);
+    const py = pos.getY(i);
+    const pz = pos.getZ(i);
+    if (py > 0) {
+      const k = 1 + 0.32 * Math.sin(px * 4.1 + seed) + 0.16 * Math.sin(px * 9.3 + seed * 2.1) + 0.1 * Math.sin(pz * 5 + px * 3 + seed);
+      pos.setY(i, py * Math.max(0.55, k) - 0.18 * px * px * py);
+    } else {
+      // the underside rolled out a touch over the sides, a lip
+      pos.setXYZ(i, px, py, pz * (1 + 0.08 * Math.min(1, -py * 3)));
+    }
+  }
+  g.computeVertexNormals();
+  return g;
 }
 // An icicle hanging from (x, y, z).
 function icicle(parts, x, y, z, len, r = 0.09) {
@@ -580,7 +636,9 @@ function driftGeo({ rx = 2.4, h = 0.5, rz = 1.7, seed = 1, up = 2.0, out = 0.5 }
     const z = pos.getZ(i);
     const a = Math.atan2(z, x);
     const k = 1 + 0.12 * Math.sin(a * 3 + seed) + 0.07 * Math.sin(a * 5 + seed * 2.3);
-    pos.setXYZ(i, (x * k + y * 0.45) * rx, y * h, z * k * rz);
+    // (soft and flat across its back, lumped here and there)
+    const lumps = 1 + Math.hypot(x, z) * y * (0.25 * Math.sin(a * 2 + seed * 1.7) + 0.12 * Math.sin(a * 4 + seed));
+    pos.setXYZ(i, (x * k + y * 0.45) * rx, Math.pow(Math.max(0, y), 0.8) * lumps * h, z * k * rz);
   }
   g.computeVertexNormals();
   return settle(part(g, null, { grad: [C.snowLo, C.snow, -h * 0.1, h * 0.7] }), swell(0, 0, up, out));
@@ -755,7 +813,7 @@ function trunkGeo() {
   const half = 1.02;
   const parts = [
     asBark(part(P.cyl(r, r * 1.08, half * 2, 12), null, { y: r, rz: Math.PI / 2, grad: [C.barkLo, C.barkHi, -0.1, r * 2] }), (x) => x, 0.45),
-    part(P.sphere(1, 12, 6), null, { y: r * 1.74, sx: half * 0.94, sy: 0.19, sz: r * 0.92, grad: [C.snowLo, C.snow, r * 1.55, r * 1.95] }),
+    part(lumpen(P.sphere(1, 20, 8), 1.3), null, { y: r * 1.74, sx: half * 0.94, sy: 0.19, sz: r * 0.92, grad: [C.snowLo, C.snow, r * 1.55, r * 1.95] }),
     asBark(part(P.cyl(0.07, 0.1, 0.5, 6), C.bark, { x: 0.35, y: r * 1.5, z: 0.22, rx: 0.9 })),
   ];
   for (const s of [-1, 1]) {
@@ -847,7 +905,7 @@ function boughGeo() {
     parts.push(part(P.sphere(1, 7, 4), null, { x, y: y + 0.2, z: i % 2 ? 0.16 : -0.14, sx: 0.34, sy: 0.14, sz: 0.5, ry: (i % 2 ? 0.5 : -0.5), grad: [C.firLo, C.firHi, y, y + 0.4], mark: 0.6 }));
   }
   // and the snow on top of it all
-  parts.push(part(P.sphere(1, 12, 5), null, { y: y + 0.42, sx: 1.02, sy: 0.2, sz: 0.5, grad: [C.snowLo, C.snow, y + 0.26, y + 0.6] }));
+  parts.push(part(lumpen(P.sphere(1, 20, 8), 4.1), null, { y: y + 0.42, sx: 1.02, sy: 0.2, sz: 0.5, grad: [C.snowLo, C.snow, y + 0.26, y + 0.6] }));
   return merge(parts).translate(0, 0, -0.3);
 }
 
@@ -870,7 +928,7 @@ function ledgeGeo(half, piers) {
   parts.push(part(flat(g), null, { y: u + 0.275, grad: [C.iceDeep, C.ice, u, u + 0.8], mark: 0.2 }));
   // (a dark line along its underside, so the gap beneath it reads)
   parts.push(part(P.box(half * 2 + 0.72, 0.06, 0.97), C.iceDark, { y: u + 0.03, outline: 0 }));
-  parts.push(part(P.sphere(1, 12, 5), null, { y: u + 0.72, sx: half + 0.3, sy: 0.17, sz: 0.5, grad: [C.snowLo, C.snow, u + 0.6, u + 0.9] }));
+  parts.push(part(lumpen(P.sphere(1, Math.max(20, Math.round(half * 8)), 8), half * 2.7), null, { y: u + 0.72, sx: half + 0.3, sy: 0.17, sz: 0.5, grad: [C.snowLo, C.snow, u + 0.6, u + 0.9] }));
   return merge(parts).translate(0, 0, -0.45);
 }
 
@@ -1160,32 +1218,38 @@ export default {
     // the dream lifts far drifts apart
     // (a share of the usual count of motes: snowing harder than anything
     // floats in any other world)
-    snow: { fall: [1.7, 3.0], lift: 0 },
-    sky: ['#55b4de', '#ffe6d4', '#c2dcf0'],
-    bloom: ['#7fe3f2', '#ffffff', '#ffd9c2'],
-    // a low sun ahead and a little to the right, pale peach
-    sun: { dir: [0.3, 0.2, -1], glow: '#ffdcc4', disc: '#fff7ee', size: 0.034 },
+    snow: { fall: [2.6, 4.5], lift: 0 },
+    // a hard, cold dusk that never ends: deep navy overhead, an icy glow
+    // low along the horizon, nothing warm anywhere in it
+    sky: ['#0b1a3e', '#5f9fd6', '#1c3a72'],
+    bloom: ['#5fdcff', '#eaf8ff', '#8fc4ff'],
+    // a low sun ahead and a little to the right, white and cold, no heat in it
+    sun: { dir: [0.3, 0.2, -1], glow: '#9fd2ff', disc: '#f0faff', size: 0.03 },
     stars: 0,
     // (range: jagged mountains along the horizon, far beyond everything)
-    skyFx: { rays: 0.22, clouds: 0.45, range: 0.07 },
-    // cold clear light from ahead and above: lavender shade, the faintest
-    // peach on what faces the sun
-    light: { dir: [0.42, 0.62, -0.5], shadow: [0.69, 0.72, 0.96], hi: [1.06, 1.01, 0.96], soft: 0.09, wrap: 0.2, hiAmt: 0.5, lift: 1 },
-    rim: [0.72, 0.92, 1.0, 0.3],
+    skyFx: { rays: 0.14, clouds: 0.5, range: 0.07 },
+    // cold hard light from ahead and above: deep blue shade, the lit side
+    // a stark icy white
+    light: { dir: [0.42, 0.62, -0.5], shadow: [0.46, 0.56, 0.9], hi: [0.98, 1.04, 1.14], soft: 0.08, wrap: 0.16, hiAmt: 0.55, lift: 1 },
+    rim: [0.55, 0.88, 1.0, 0.42],
     // spindrift blowing low over the snow
-    mist: { color: '#edf4ff', amount: 0.36, top: 1.4, fade: 3.5, near: 30, far: 130 },
-    grade: { sat: 1.07, contrast: 1.03, vignette: 0.24, exposure: 0.99, tint: '#27377a' },
-    ink: '#21407c',
-    fog: [75, 250],
-    ground: [C.snow, '#a8e3ee', '#2d83cc'],
-    shadowDecal: [0.68, 0.72, 0.95],
+    mist: { color: '#b4d4f4', amount: 0.42, top: 1.6, fade: 3.5, near: 26, far: 120 },
+    grade: { sat: 1.14, contrast: 1.14, vignette: 0.46, exposure: 0.82, tint: '#0c2a6e' },
+    ink: '#0e2456',
+    fog: [60, 220],
+    // (the route: wind-packed snow, and between the patches bare ice of a
+    // stark bright blue)
+    ground: ['#dde9fb', '#6fdcf6', '#1a6cd0'],
+    shadowDecal: [0.5, 0.6, 0.92],
     cast: [-0.28, 0.42],
-    glowGain: 0.75,
-    pool: '#ffbe76',
+    glowGain: 0.6,
+    pool: '#9fd6ff',
     // (what's kicked up off this ground is powder)
     dustPale: 0.92,
     // flurries, falling aslant: flakes laid over the picture, not light
     particles: { color: '#ffffff', size: 4.4, drift: [0.45, -1.15, 0.15], opacity: 0.95, flake: 1 },
+    // and behind them, finer flakes further off, falling all the while
+    particles2: { color: '#dceeff', size: 2.6, drift: [0.35, -0.95, 0.12], opacity: 0.75, flake: 1 },
   },
 
   visits: [
@@ -1194,10 +1258,10 @@ export default {
     {
       env: {
         snow: { lift: 0.07 },
-        sky: ['#84b6d8', '#f8e2d8', '#c8d8ea'],
-        sun: { glow: '#ffd6c0' },
+        sky: ['#0e1e44', '#7aa8d4', '#24407a'],
+        sun: { glow: '#b4dcff' },
         skyFx: { rays: 0.1, clouds: 0.75 },
-        light: { shadow: [0.71, 0.73, 0.95], soft: 0.13, hiAmt: 0.4 },
+        light: { shadow: [0.5, 0.58, 0.9], soft: 0.12, hiAmt: 0.45 },
         mist: { amount: 0.44 },
         particles: { size: 4.7, drift: [0.5, -1.25, 0.15] },
         particles2: { color: '#f4f8ff', size: 3.0, drift: [0, 0, 0], opacity: 0.4, still: 1, flake: 1 },
@@ -1208,15 +1272,15 @@ export default {
     {
       env: {
         snow: { lift: 0.5 },
-        sky: ['#3d62aa', '#f2c6b8', '#93a8d2'],
-        sun: { dir: [0.34, 0.11, -1], glow: '#ffc4a4', disc: '#ffeede' },
+        sky: ['#060f2c', '#3f78c0', '#13285a'],
+        sun: { dir: [0.34, 0.11, -1], glow: '#7fc0ff', disc: '#e6f6ff' },
         skyFx: { rays: 0.16, clouds: 0.6 },
-        light: { shadow: [0.58, 0.63, 0.93], hi: [1.05, 0.98, 0.94], soft: 0.1, hiAmt: 0.45 },
-        rim: [0.7, 0.86, 1.0, 0.34],
-        mist: { color: '#dfe6fb', amount: 0.48 },
-        grade: { exposure: 0.95, vignette: 0.32, tint: '#1a2462' },
-        ground: ['#eef3ff', '#9ad6e8', '#2a76c4'],
-        glowGain: 1.15,
+        light: { shadow: [0.4, 0.5, 0.88], hi: [0.95, 1.02, 1.15], soft: 0.1, hiAmt: 0.5 },
+        rim: [0.5, 0.84, 1.0, 0.45],
+        mist: { color: '#9cc0ec', amount: 0.48 },
+        grade: { exposure: 0.82, vignette: 0.48, tint: '#081c5a' },
+        ground: ['#e2eeff', '#5fd2f4', '#155fc4'],
+        glowGain: 0.9,
         particles: { size: 5.0, drift: [0.55, -1.3, 0.15] },
         particles2: { color: '#ffffff', size: 4.2, drift: [0, 0, 0], opacity: 0.8, still: 1, flake: 1 },
       },
@@ -1226,9 +1290,9 @@ export default {
     {
       env: {
         snow: { lift: 0.85 },
-        sky: ['#2c4a96', '#e8b4b6', '#8496cc'],
-        skyFx: { clouds: 0.5, aurora: 0.12 },
-        glowGain: 1.3,
+        sky: ['#050c26', '#3468b4', '#102452'],
+        skyFx: { clouds: 0.5, aurora: 0.16 },
+        glowGain: 1.0,
         particles2: { color: '#ffffff', size: 3.6, drift: [-0.2, 0.95, 0.1], opacity: 0.85, still: 0 },
       },
     },

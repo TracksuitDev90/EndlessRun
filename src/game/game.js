@@ -109,10 +109,10 @@ export class Game {
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     // (room for more: the Frostbound Pass's snowfall, see updateSnow)
-    this.particles = new Particles(240, 99, 720);
+    this.particles = new Particles(240, 99, 1080);
     // a second layer some worlds use (env.particles2): Hell's falling ash
     // under its rising embers; invisible elsewhere
-    this.particles2 = new Particles(320, 7);
+    this.particles2 = new Particles(320, 7, 640);
     this.sparkles = new Sparkles();
     this.dream = new Dream();
     // under the sea: the bubbles, swirl and sand round the runner, lit as
@@ -969,6 +969,8 @@ export class Game {
     // (blended on the run up to a doorway, as the motes themselves are)
     const t = this.portal.active && this.door ? smooth01(55, 0, this.door.quadD - this.dist) : 0;
     this.particles.density = this.particles2.density = fa + (fb - fa) * t;
+    // (the second layer, the Pass's finer, further flakes, thickens too,
+    // but only to twice its usual: see particles2's room)
   }
 
   // --- doorways ---------------------------------------------------------------
