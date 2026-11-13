@@ -146,6 +146,52 @@ function grassParts({ n = 14, h = [0.9, 1.6], spread = 0.4, w = 0.05, seed = 1, 
   return parts;
 }
 
+// A cushion of moss: soft lumps grown into one another, deep green in the
+// hollows and lit lime on top, a sprinkling of spore stalks standing up out
+// of it, each with its little rust-red capsule nodding at the tip.
+function mossParts({ n = 7, spread = 0.7, seed = 1, h = 0.32, stalks = 10 } = {}) {
+  const rnd = seeded(seed);
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * 6.283;
+    const rr = Math.sqrt(rnd()) * spread;
+    const r = 0.22 + rnd() * 0.24;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+    parts.push(part(P.ico(r, 1), null, { x, y: 0, z, sy: (h / r) * (0.6 + rnd() * 0.5), grad: [C.moss, rnd() < 0.3 ? '#b2d94a' : C.mossHi, -0.05, h], outline: 0.4 }));
+  }
+  for (let i = 0; i < stalks; i++) {
+    const a = rnd() * 6.283;
+    const rr = Math.sqrt(rnd()) * spread * 0.9;
+    const sh = 0.12 + rnd() * 0.16;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+    const lean = (rnd() - 0.5) * 0.5;
+    parts.push(part(P.cyl(0.006, 0.01, sh, 3), '#9a5a2a', { x, y: h * 0.7 + sh / 2, z, rz: lean, outline: 0 }));
+    parts.push(part(P.sphere(0.018, 5, 3), '#c2542a', { x: x - Math.sin(lean) * sh, y: h * 0.7 + sh, z, sy: 1.6, rz: lean + 0.6, outline: 0 }));
+  }
+  return parts;
+}
+
+// Moss hanging from a bough in beards: strands of pale sage, long and short,
+// built hanging down from its top (y 0), each a little wavy.
+function mossHangParts({ n = 9, len = [1.2, 3.2], spread = 0.5, seed = 2 } = {}) {
+  const rnd = seeded(seed);
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const L = len[0] + rnd() * (len[1] - len[0]);
+    const x0 = (rnd() - 0.5) * spread * 2, z0 = (rnd() - 0.5) * spread;
+    const segs = 4;
+    for (let k = 0; k < segs; k++) {
+      const y = -(L * (k + 0.5)) / segs;
+      const w = 0.07 * (1 - k / segs) + 0.02;
+      parts.push(part(P.box(w, L / segs + 0.04, w * 0.5), null, {
+        x: x0 + Math.sin(k * 1.7 + i) * 0.06, y, z: z0, rz: Math.sin(k * 2.3 + i) * 0.12,
+        grad: ['#7c9a5a', '#c4d49a', -L, 0], outline: 0,
+      }));
+    }
+  }
+  return parts;
+}
+
 // A fern: long fronds arching out of a crown, each a stalk (the rachis) with
 // leaflets (pinnae) set alternately along it, longest a third of the way out
 // and tapering to the tip, swept forward, dark at the stalk and catching the
@@ -1007,9 +1053,19 @@ export default {
   build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 6);
     b.toon('floor', groundStrip(420, 16, C.floor, 8, { y: -0.03, mark: 0.45 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
-    b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 520, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
-    b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a', seeds: true })), { cap: 260, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
-    b.toon('grassTuft', merge(grassParts({ n: 8, h: [0.2, 0.42], spread: 0.22, w: 0.035, seed: 8 })), { cap: 260, ink: 0, anim: 'popLate', wobble: [0.12, 0, 1.9, 0] });
+    b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 760, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
+    b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a', seeds: true })), { cap: 400, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
+    b.toon('grassTuft', merge(grassParts({ n: 8, h: [0.2, 0.42], spread: 0.22, w: 0.035, seed: 8 })), { cap: 420, ink: 0, anim: 'popLate', wobble: [0.12, 0, 1.9, 0] });
+    // a short, thick clump right along the path's edge, softening it
+    b.toon('grassClump', merge(grassParts({ n: 26, h: [0.35, 0.9], spread: 0.55, w: 0.045, seed: 27 })), { cap: 640, ink: 0, anim: 'popLate', wobble: [0.09, 0, 1.7, 0] });
+    // moss: cushions of it on the forest floor and over the roots, beards
+    // of it hanging from the boughs
+    b.toon('moss', merge(mossParts({ seed: 4 })), { cap: 420, anim: 'pop', ink: 0.02, marks: [2, 2] });
+    b.toon('mossBig', merge(mossParts({ n: 12, spread: 1.4, h: 0.45, stalks: 18, seed: 11 })), { cap: 220, anim: 'pop', ink: 0.02, marks: [2, 2] });
+    b.toon('mossHang', merge(mossHangParts({ seed: 6 })), { cap: 200, anim: 'pop', ink: 0, wobble: [0.012, 0, 0.9, 0] });
+    // fireflies: each a bright core and a soft halo, wandering and
+    // flashing as one (see FIREFLY)
+    b.glow('firefly', { cap: 520, anim: 'pop', firefly: [0.7, 0.35, 0.32, 0.06] });
     b.toon('fern', merge(fernParts({ n: 9, len: 1.1, seed: 5 })), { cap: 160, anim: 'pop', wobble: [0.04, 0, 1.3, 0], ink: 0 });
     b.toon('flowers', merge(flowerPatchParts({ seed: 6 })), { cap: 120, anim: 'pop', marks: [2, 2], wobble: [0.08, 0, 1.6, 0], ink: 0 });
     b.toon('trunk', merge(trunkParts({ r: 1, h: 32, seed: 2 })), { cap: 170, anim: 'pop', marks: [1, 1], ink: 0.06, bark: true });
@@ -1123,18 +1179,38 @@ export default {
       const gz = dz + (SHAFT[2] / n) * k;
       if (gz > -2 && gz < 18) ctx.put('sunspot', gx, 0.05, gz, { sx: 3.6 * sc, sz: 4.4 * sc, c: [rng.float(0.7, 1), 1, 1] });
     }
+    // fireflies drifting over the path and in among the trunks - a few by
+    // day, the wood full of them by night (see FIREFLY)
+    {
+      const n = v === 1 ? 26 : v >= 2 ? 18 : 10;
+      for (let i = 0; i < n; i++) {
+        const x = rng.float(-13, 13);
+        const y = rng.float(0.4, Math.abs(x) < 4 ? 3.2 : 5.5);
+        const z = rng.float(0, 16);
+        const p0 = rng.float(0, 6.28);
+        const warm = rng.chance(0.3);
+        ctx.put('firefly', x, y, z, { s: 0.32, c: warm ? [1.6, 1.4, 0.7] : [1.3, 1.6, 0.8], p0 });
+        ctx.put('firefly', x, y, z, { s: 1.5, c: warm ? [0.7, 0.55, 0.15] : [0.45, 0.75, 0.2], p0 });
+      }
+    }
+    // moss creeping in over the edges of the path
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 4; i++) ctx.put('moss', s * rng.float(3.9, 5.2), 0, rng.float(0, 16), { s: rng.float(0.7, 1.3), ry: rng.float(0, 6.28) });
+      // and long grass right along it
+      for (let i = 0; i < 7; i++) ctx.put('grassClump', s * rng.float(3.95, 5.0), 0, rng.float(0, 16), { s: rng.float(0.8, 1.25), ry: rng.float(0, 6.28) });
+    }
     // grass growing up through the path
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 14; i++) {
       ctx.put('grassTuft', rng.float(-4.2, 4.2), 0, rng.float(0, 16), { s: rng.float(0.8, 1.3), ry: rng.float(-0.5, 0.5), c: [1, 1, 1] });
     }
 
     for (const s of [-1, 1]) {
       // long grass and ferns crowding the verge, taller still in among the
       // trunks behind
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 22; i++) {
         ctx.put('grassTall', s * rng.float(4.45, 9.5), 0, rng.float(0, 16), { s: rng.float(0.8, 1.35), ry: rng.float(-0.6, 0.6), c: [1, 1, 1] });
       }
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 10; i++) {
         ctx.put('grassTaller', s * rng.float(5.2, 12), 0, rng.float(0, 16), { s: rng.float(0.85, 1.3), ry: rng.float(-0.6, 0.6), c: [1, 1, 1] });
       }
       for (let i = 0; i < 3; i++) {
@@ -1160,6 +1236,14 @@ export default {
           const x = s * rng.float(6.4, 9.5) + s * (sc - 1) * 1.6;
           ctx.put(rng.chance(0.5) ? 'trunk' : 'trunkB', x, 0, dz, { s: sc, sy: 1, ry: rng.float(0, 6.28), c: barkTint() });
           ctx.put('shadow', x, 0.03, dz, { sx: 5.5 * sc, sz: 5.5 * sc });
+          // moss grown thick over its roots, and hanging in beards from it
+          for (let k = 0; k < 3; k++) {
+            const a = rng.float(0, 6.28);
+            ctx.put(k === 0 ? 'mossBig' : 'moss', x + Math.cos(a) * sc * 1.7, 0, dz + Math.sin(a) * sc * 1.7, { s: rng.float(0.9, 1.4) * sc, ry: rng.float(0, 6.28) });
+          }
+          if (rng.chance(0.6)) {
+            for (let k = 0; k < 2; k++) ctx.put('mossHang', x - s * sc * rng.float(0.9, 1.6), rng.float(7, 12), dz + rng.float(-1.5, 1.5), { s: rng.float(0.9, 1.5), ry: rng.float(0, 6.28) });
+          }
           if (rng.chance(v >= 1 ? 0.8 : 0.5)) {
             const mx = x - s * (sc * 1.4 + 0.2);
             const mz = dz + rng.float(-1, 1);
@@ -1179,6 +1263,8 @@ export default {
         const sc = rng.float(1.1, 1.8);
         ctx.put(rng.chance(0.5) ? 'trunk' : 'trunkB', s * rng.float(12.5, 22), 0, rng.float(0, 16), { s: sc, sy: 1, ry: rng.float(0, 6.28), c: barkTint() });
       }
+      // moss carpeting the floor between the trunks
+      for (let i = 0; i < 4; i++) ctx.put(rng.chance(0.4) ? 'mossBig' : 'moss', s * rng.float(5.2, 14), 0, rng.float(0, 16), { s: rng.float(0.9, 1.8), ry: rng.float(0, 6.28) });
       // rocks, stumps and fallen logs on the forest floor
       if (rng.chance(0.35)) ctx.put('rock', s * rng.float(5.4, 11), 0, rng.float(0, 16), { s: rng.float(0.6, 1.3), ry: rng.float(0, 6.28) });
       if (rng.chance(0.18)) ctx.put('stump', s * rng.float(5.6, 10), 0, rng.float(0, 16), { s: rng.float(0.8, 1.2), ry: rng.float(0, 6.28) });

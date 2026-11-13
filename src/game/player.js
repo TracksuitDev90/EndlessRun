@@ -846,6 +846,21 @@ export class Player {
     this.stumbleT = 0.6;
   }
 
+  // Scrambling up onto a deck whose top is at `top` (see Game.scramble):
+  // flung up to a little over it, to come down on it.
+  scramble(top) {
+    const rise = Math.max(0.6, top + 0.55 - this.y);
+    this.vy = Math.sqrt(2 * this.G * rise);
+    this.vyPose = this.vy;
+    this.vyOff = 0;
+    this.grounded = false;
+    this.drift = false;
+    this.bounding = false;
+    this.slideT = 0;
+    this.slideQueued = false;
+    this.ledgeT = 0;
+  }
+
   crash() {
     this.crashed = true;
     this.crashT = 0;

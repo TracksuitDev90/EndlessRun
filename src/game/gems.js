@@ -127,6 +127,7 @@ export class GemField {
 
   // --- the route ------------------------------------------------------------
   pass(row, dist, runTime) {
+    if (row.climb) return this.climb(row, dist, runTime);
     row.gemmed = true;
     const C = CONFIG.gems;
     const r = this.rng;
@@ -169,6 +170,52 @@ export class GemField {
   // The lane the route takes past a row: never a wall; at first the nearest
   // free lane, later more willing to cross the road and drawn to the hurdles
   // and bars it used to steer round.
+  // A climb (see ObstacleField.placeClimb): steer to the middle of the road
+  // before it and lay a run up the ramp, along the top of every deck, and
+  // in an arc over every gap and up every ledge - the arc over the last gap
+  // crowned.
+  climb(row, dist, runTime) {
+    row.gemmed = true;
+    const C = CONFIG.gems;
+    const [v, diff] = this.at(row.d, dist, runTime);
+    const sp = this.spacing(v);
+    this.restT = lerp(C.rest[0], C.rest[1], diff);
+    this.route(this.lane, 1, row.d - v * 0.4, v, diff);
+    this.cruise(this.cursor, row.d - v * 0.6, v, diff, sp, true);
+    const A = this.arcAt(row.d);
+    const x = X[1];
+    const parts = row.climb;
+    let lastGap = -1;
+    parts.forEach((o, i) => o.pit && (lastGap = i));
+    let d = row.d + sp * 0.5;
+    for (let i = 0; i < parts.length; i++) {
+      const o = parts[i];
+      const end = o.d + o.len;
+      const nx = parts[i + 1];
+      // up onto a higher deck, or over a gap: the arc a jump takes from just
+      // before the edge (and the deck's run stops short of it)
+      const leap = nx && (nx.pit || (!nx.ramp && nx.y1 > o.y1 + 0.2)) && !o.pit;
+      const stop = leap ? end - v * 0.18 - sp * 0.4 : end;
+      if (!o.pit) {
+        for (; d < stop; d += sp) {
+          const s = o.ramp ? o.h0 + (o.y1 - o.h0) * Math.min(1, (d - o.d) / o.len) : o.y1;
+          this.gem(d, x, s + C.ground, v, diff, false, true);
+        }
+      }
+      if (leap) {
+        const takeoff = end - v * 0.14;
+        const n = 5;
+        for (let k = 0; k < n; k++) {
+          const t = (A.T * (k + 0.5)) / n;
+          this.gem(takeoff + v * t, x, o.y1 + A.feet(t) + C.ground, v, diff, nx.pit && i + 1 === lastGap && k === (n - 1) >> 1, true);
+        }
+        d = Math.max(stop, takeoff + v * A.T + sp * 0.3);
+      } else if (o.pit) d = Math.max(d, end + sp * 0.3);
+    }
+    this.lane = 1;
+    this.cursor = row.end + v * 0.12;
+  }
+
   chooseLane(row, from, diff) {
     const r = this.rng;
     let best = from;
@@ -338,6 +385,14 @@ export class GemField {
     const react = v * lerp(C.react[0], C.react[1], diff);
     for (const o of this.game.obstacles.records) {
       const dx = Math.abs(x - o.x);
+      // (a climb spans the road: a gem is clear of it if it's over its top)
+      if (o.climb) {
+        if (o.pit || d < o.d - 0.7 || d > o.d + o.len + 0.7) continue;
+        const k = Math.min(1, Math.max(0, (d - o.d) / o.len));
+        const top = o.ramp ? o.h0 + (o.y1 - o.h0) * k : o.y1;
+        if (y - R < top - 0.05) return false;
+        continue;
+      }
       if (dx > 2.2) continue;
       if (dx < o.hw + R && d > o.d - 0.7 && d < o.d + o.len + 0.7 && y + R > o.y0 && y - R < o.y1) return false;
       if (o.kind === 'W') {
