@@ -727,7 +727,7 @@ export class Game {
     const prevFront = a + pd;
     const at = _at;
     for (const o of this.obstacles.records) {
-      if (o.hit || (o.grace && o.grace > this.time)) continue;
+      if (o.hit || o.ramp || (o.grace && o.grace > this.time)) continue;
       if (z1 < o.d || z0 > o.d + o.len) continue;
       // the stretch of the step the body overlaps it along the road, looked at
       // every 5 cm or so of it
@@ -756,6 +756,11 @@ export class Game {
         break;
       }
       if (!touched) continue;
+      // a deck's face, or the drop between two (see placeClimb)
+      if (o.climb) {
+        this.scramble(o, shielded);
+        return;
+      }
       if (shielded) {
         o.group.hit = true;
         o.grace = this.time + this.passTime(o) + 0.12;
@@ -791,6 +796,21 @@ export class Game {
       }
       return;
     }
+  }
+
+  // Run into the face of a deck, or come down into a gap: a stumble (unless
+  // something's keeping you from harm), and you scramble up onto the deck -
+  // the one in front of you, or the one across the gap - passing through
+  // nothing of the climb while you do (so it's only ever the one hit).
+  scramble(o, free) {
+    o.group.hit = true;
+    if (!free) {
+      this.stumble();
+      if (this.state !== 'running') return;
+    }
+    const until = this.time + 0.6;
+    for (const r of this.obstacles.records) if (r.group === o.group && r.d > o.d - 0.01 && r.d < o.d + o.len + 14) r.grace = until;
+    this.player.scramble(o.pit ? o.next : o.y1);
   }
 
   stumble() {

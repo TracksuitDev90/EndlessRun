@@ -2854,6 +2854,19 @@ void main() {
     col = mix(col, hl, rip * 0.5 + glint * 0.5);
   #endif
 
+  #ifdef SANDFALL
+    // a curtain of sand pouring down (the Gallery of Hours' cornices, gears
+    // and ledges): streaks of paler and darker grain sliding down it, a
+    // glitter caught in them, and a little light of its own so it reads
+    // against the shade
+    vec2 sq = vec2((vPos.x + vPos.z) * 0.55, vPos.y * 0.07 + uTime * 0.55);
+    float sf1 = texture2D(uNoise, sq).g;
+    float sf2 = texture2D(uNoise, sq * vec2(2.4, 1.6) + vec2(0.37, uTime * 0.31)).g;
+    float streak = smoothstep(0.3, 0.78, sf1 * 0.62 + sf2 * 0.48);
+    col *= 0.8 + 0.42 * streak;
+    col += vec3(1.0, 0.92, 0.7) * smoothstep(0.8, 0.87, sf2) * 0.3;
+  #endif
+
   #ifndef GROUND
     // back light: silhouettes catch the light when it's behind them
     float fres = 1.0 - abs(dot(n, V));
@@ -5505,6 +5518,13 @@ void main() { gl_FragColor = vec4(0.0); }
 const VS_GLOW = COMMON + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uFog;
+#ifdef FIREFLY
+// A firefly (glow option firefly): x how far it wanders round its spot (m),
+// y how fast, z flashes a second (about), w how much it glows between them.
+// Each its own path and its own beat (its phase); a core and its halo put
+// with the same phase wander and flash as one.
+uniform vec4 uFirefly;
+#endif
 attribute vec4 aInst;
 varying vec2 vUv;
 varying vec3 vColor;
@@ -5512,6 +5532,15 @@ varying float vFade;
 void main() {
   mat4 M = modelMatrix * instanceMatrix;
   vec3 pivot = M[3].xyz;
+  #ifdef FIREFLY
+    float fh = fract(aInst.x * 0.1591549);
+    float ft = uTime * uFirefly.y * (0.7 + 0.6 * fract(fh * 7.31));
+    pivot += vec3(
+      sin(ft * 1.3 + fh * 31.0) + 0.5 * sin(ft * 2.9 + fh * 17.0),
+      0.55 * sin(ft * 1.7 + fh * 13.0) + 0.25 * sin(ft * 4.1 + fh * 5.0),
+      cos(ft * 1.1 + fh * 23.0) + 0.4 * sin(ft * 2.3 + fh * 11.0)
+    ) * uFirefly.x;
+  #endif
   float sc = length(M[0].xyz);
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
@@ -5521,6 +5550,11 @@ void main() {
   vec3 wp = bp + (right * position.x + up * position.y) * sc;
   float dist = length(bp - uCamPos);
   float flick = 0.88 + 0.12 * sin(uTime * 6.0 + aInst.x * 13.0) * sin(uTime * 2.3 + aInst.x);
+  #ifdef FIREFLY
+    // a slow swell into a flash and a quick fade, then dark a while
+    float bt = fract(uTime * uFirefly.z * (0.6 + 0.8 * fract(fh * 3.7)) + fh * 9.0);
+    flick = uFirefly.w + (1.0 - uFirefly.w) * smoothstep(0.0, 0.1, bt) * (1.0 - smoothstep(0.14, 0.42, bt));
+  #endif
   vFade = pop * flick * (1.0 - 0.75 * smoothstep(uFog.x, uFog.y, dist));
   vUv = uv;
   vColor = instanceColor;
@@ -7493,6 +7527,7 @@ export function makeToonMaterial(env, o = {}) {
   if (o.kinds) defines.KINDS = '';
   if (o.splash) defines.SPLASH = '';
   if (o.wonky) defines.WONKY = '';
+  if (o.sandfall) defines.SANDFALL = '';
   if (o.flame) defines.FLAME = '';
   if (o.bark) defines.BARK = '';
   // shelves of books on parts marked 0.7 (along the run) or 0.75 (across it)
@@ -7681,8 +7716,14 @@ export function makeGlassMaterial(env, o = {}) {
 
 export function makeGlowMaterial(env, o = {}) {
   const uniforms = withShared(env, { uAnim: { value: animVector(o.anim) } });
+  const defines = {};
+  if (o.firefly) {
+    defines.FIREFLY = '';
+    uniforms.uFirefly = { value: new THREE.Vector4(...o.firefly) };
+  }
   return new THREE.ShaderMaterial({
     uniforms,
+    defines,
     vertexShader: VS_GLOW,
     fragmentShader: FS_GLOW,
     transparent: true,

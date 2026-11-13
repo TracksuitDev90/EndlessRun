@@ -482,6 +482,204 @@ function threadGeo() {
   return merge(parts);
 }
 
+// --- the sands pouring in ----------------------------------------------------------------
+// A curtain of sand pouring down (SANDFALL in the shaders streaks it): a
+// thin ribbon 1 m tall from its lip (y 1) to where it lands (y 0), a little
+// bowed out as it falls, frayed at its edges, and the heap it splashes up at
+// its foot. Stretched to the height it falls (sy) and the width (sx).
+function sandfallGeo() {
+  const parts = [];
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const y0 = i / n, y1 = (i + 1) / n;
+    const bow = (y) => 0.1 * Math.sin(y * Math.PI) + 0.06 * (1 - y);
+    const w = (y) => 1 - 0.18 * (1 - y);
+    const g = new THREE.BufferGeometry();
+    const za = bow(y0), zb = bow(y1);
+    const pos = [
+      -w(y0) / 2, y0, za, w(y0) / 2, y0, za, w(y1) / 2, y1, zb,
+      -w(y0) / 2, y0, za, w(y1) / 2, y1, zb, -w(y1) / 2, y1, zb,
+    ];
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(6).fill([0, 0, 1]).flat(), 3));
+    parts.push(part(g, null, { grad: [C.sand, C.sandFall, 0, 1], emit: 0.18, outline: 0 }));
+  }
+  return merge(parts);
+}
+function sandHeapGeo() {
+  const parts = [part(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), null, { sy: 0.32, grad: [C.sand, C.sandHi, 0, 0.32] })];
+  const rnd = seeded(9);
+  for (let i = 0; i < 6; i++) {
+    const a = rnd() * 6.28;
+    parts.push(part(P.ico(0.06 + rnd() * 0.05), C.sandFall, { x: Math.cos(a) * 0.5, y: 0.3 + rnd() * 0.3, z: Math.sin(a) * 0.5, emit: 0.2, outline: 0 }));
+  }
+  return merge(parts);
+}
+
+// A dune out past the colonnade: a long whaleback of sand, its windward
+// side a gentle swell and its lee a steeper face falling off a crisp crest,
+// ripples combed across it by the wind.
+function duneGeo(seed) {
+  const rnd = seeded(seed);
+  const g = new THREE.PlaneGeometry(1, 1, 24, 14);
+  g.rotateX(-Math.PI / 2);
+  const pos = g.attributes.position;
+  const ph = rnd() * 6.28;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    // across: a skewed hump (crest off-centre toward +x, the lee)
+    const u = x + 0.5;
+    const cx = 0.62 + 0.08 * Math.sin(z * 5 + ph);
+    const k = u < cx ? Math.pow(u / cx, 1.6) : Math.pow(Math.max(0, (1 - u) / (1 - cx)), 0.7);
+    const along = Math.pow(Math.max(0, 1 - Math.pow(Math.abs(z) * 2, 2.2)), 0.6);
+    const y = Math.max(0, k * along) * (0.85 + 0.15 * Math.sin(z * 9 + ph)) + 0.012 * Math.sin(u * 60 + z * 8) * along;
+    pos.setY(i, y - 0.02);
+  }
+  g.computeVertexNormals();
+  return merge([part(g, null, { grad: [C.sand, '#f2d39a', 0.0, 0.9], outline: 0.3 })]);
+}
+
+// A wheel and the pinion it drives (radii at the teeth's tips, teeth: the
+// same pitch, so they mesh), how fast the wheel turns (rad/s), and where the
+// pinion sits off the wheel (the angle of the line between their centres).
+const MESH = { r: [1.5, 0.6875], t: [24, 11], w: 0.32, at: -0.55 };
+// The phases (0..1 of a turn, at time 0) that set a tooth of the wheel
+// into a gap of the pinion along the line between them (a tooth of a
+// gearParts wheel is centred 0.375 of a pitch round from its x axis).
+function meshPhases(at) {
+  const wheel = at / (Math.PI * 2) - 0.375 / MESH.t[0];
+  const pinion = (at + Math.PI) / (Math.PI * 2) - 0.875 / MESH.t[1];
+  return [wheel, pinion];
+}
+
+// --- clockwork laid bare -----------------------------------------------------------------
+// A movement standing open in a bay, as if the wall had fallen away from the
+// works of a great clock: two brass plates on pillars, and between them the
+// train (its wheels are their own turning batches, meshed: see the chunk).
+function movementFrameGeo() {
+  const parts = [];
+  const W = 4.2, H = 5.6;
+  for (const z of [-0.45, 0.45]) {
+    for (const x of [-W / 2, W / 2]) parts.push(part(P.box(0.16, H, 0.12), C.brassLo, { x, y: H / 2, z }));
+    parts.push(part(P.box(W + 0.16, 0.16, 0.12), C.brass, { y: H, z }));
+    parts.push(part(P.box(W + 0.16, 0.16, 0.12), C.brass, { y: 0.4, z }));
+    parts.push(part(P.box(W, 0.1, 0.1), C.brassLo, { y: H * 0.55, z, rz: 0.5, outline: 0.4 }));
+  }
+  for (const x of [-W / 2, W / 2]) for (const y of [0.4, H]) parts.push(part(P.cyl(0.07, 0.07, 1.0, 8), C.brassHi, { x, y, rx: Math.PI / 2, outline: 0.4 }));
+  parts.push(part(P.box(W + 0.6, 0.4, 1.4), C.ivoryLo, { y: 0.2 }));
+  return merge(parts);
+}
+// The escapement: an anchor rocking over its scape wheel (TURN swing).
+function anchorGeo() {
+  const parts = [part(P.box(0.08, 1.3, 0.06), C.brassLo, { y: -0.65, outline: 0.4 })];
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.9, 0.09, 0.07), C.brass, { x: s * 0.42, y: -1.3, rz: s * 0.35, outline: 0.4 }));
+    parts.push(part(P.cone(0.07, 0.24, 4), C.brassHi, { x: s * 0.82, y: -1.52, rz: Math.PI, outline: 0.4 }));
+  }
+  parts.push(part(P.sphere(0.1, 8, 6), C.brassHi, {}));
+  return merge(parts);
+}
+// A scape wheel: slanted, hooked teeth.
+function scapeGeo(r = 0.7, n = 15) {
+  const parts = [part(P.torus(r * 0.86, 0.05, 5, 30), C.brassHi, {}), part(P.cyl(0.09, 0.09, 0.14, 10), C.brass, { rx: Math.PI / 2 })];
+  for (let i = 0; i < 4; i++) parts.push(part(P.box(r * 1.7, 0.05, 0.04), C.brass, { rz: (i / 4) * Math.PI, outline: 0.4 }));
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    parts.push(part(P.cone(0.07, 0.24, 3), C.brassHi, { x: Math.cos(a) * r * 0.98, y: Math.sin(a) * r * 0.98, rz: a - 0.5, sz: 0.4, outline: 0.3 }));
+  }
+  return merge(parts);
+}
+
+// --- the climbs ---------------------------------------------------------------------------
+// From its second time round, the walk has fallen away in places into the
+// sand running out beneath it, and you go over the top: up a flight of
+// ivory steps onto a deck - a slab of the old gallery floor held up on the
+// works of a clock, its face to you all teeth and turning wheels - and
+// across the gaps between, deck to deck, while the sand pours away down
+// into them. (See def.climb, and ObstacleField.placeClimb.)
+const DECK_W = 9.0;
+const DECK_LO = 1.1;
+const DECK_HI = 1.9;
+// The steps up: a flight of them a metre long and a metre high, stretched
+// to the ramp's length and height (sz, sy), brass on every nosing, a
+// sloping stringer each side. (The road itself is a smooth slope: the
+// steps are only how it looks.)
+function stepsGeo() {
+  const parts = [];
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const y1 = (i + 1) / n;
+    parts.push(part(P.box(DECK_W - 0.4, y1, 1 / n), null, { y: y1 / 2, z: -(i + 0.5) / n, grad: [C.ivoryLo, C.ivoryHi, 0, 1] }));
+    parts.push(part(P.box(DECK_W - 0.36, 0.035, 0.02), C.brass, { y: y1 - 0.02, z: -i / n + 0.004, outline: 0 }));
+  }
+  // a sloping stringer each side, its top just over the nosings
+  for (const s of [-1, 1]) parts.push(part(P.box(0.32, 0.22, Math.SQRT2), C.ivory, { x: s * (DECK_W / 2 - 0.05), y: 0.56, z: -0.5, rx: Math.PI / 4 }));
+  return merge(parts);
+}
+// A deck's body, a metre long (stretched along the run, sz) and h high: the
+// slab of floor on top, a brass band under its lip, ivory walls down to the
+// sand, a rack of brass teeth along each side as if the whole deck were a
+// part of the works.
+function deckGeo(h) {
+  const parts = [];
+  const body = h - 0.24;
+  parts.push(part(P.box(DECK_W - 0.3, body, 1), null, { y: body / 2, z: -0.5, grad: [C.ivoryLo, C.ivory, 0, body] }));
+  parts.push(part(P.box(DECK_W, 0.24, 1), C.ivory, { y: h - 0.12, z: -0.5 }));
+  // brass inlaid along it, between the lanes and round its edge, like the
+  // ticks round a dial
+  for (const x of [-1.2, 1.2, -(DECK_W / 2 - 0.35), DECK_W / 2 - 0.35]) parts.push(part(P.box(0.08, 0.02, 1), C.brass, { x, y: h + 0.005, z: -0.5, outline: 0 }));
+  parts.push(part(P.box(DECK_W - 1.6, 0.02, 1), C.ivoryHi, { y: h + 0.002, z: -0.5, outline: 0 }));
+  parts.push(part(P.box(DECK_W + 0.06, 0.07, 1), C.brass, { y: h - 0.27, z: -0.5, outline: 0.5 }));
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.12, 0.3, 1), C.brassLo, { x: s * (DECK_W / 2 - 0.1), y: body * 0.45, z: -0.5, outline: 0.4 }));
+  }
+  return merge(parts);
+}
+// Its face, toward you (unstretched; put again at its far end turned about):
+// the rim of a clock dial set into the wall, a toothed rack under the lip
+// and the ivory's broken edge where the floor fell away.
+function deckFaceGeo(h) {
+  const parts = [];
+  const top = h - 0.27;
+  for (let i = 0; i < 26; i++) {
+    const x = -DECK_W / 2 + 0.25 + (i * (DECK_W - 0.5)) / 25;
+    parts.push(part(P.box(0.14, 0.16, 0.12), C.brassHi, { x, y: top - 0.12, z: 0.06, outline: 0.3 }));
+  }
+  parts.push(part(P.box(DECK_W - 0.2, 0.06, 0.1), C.brass, { y: top - 0.2, z: 0.04, outline: 0.4 }));
+  // the broken edge: chunks of slab hanging on at the lip
+  const rnd = seeded(Math.round(h * 10));
+  for (let i = 0; i < 7; i++) {
+    const x = -DECK_W / 2 + 0.6 + rnd() * (DECK_W - 1.2);
+    parts.push(part(P.box(0.3 + rnd() * 0.5, 0.16, 0.22), C.ivoryHi, { x, y: h - 0.08 - rnd() * 0.04, z: 0.06, ry: (rnd() - 0.5) * 0.3, rz: (rnd() - 0.5) * 0.2 }));
+  }
+  // pilasters with brass capitals at the corners
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.5, top, 0.3), C.ivory, { x: s * (DECK_W / 2 - 0.25), y: top / 2, z: 0.05 }));
+    parts.push(part(P.box(0.6, 0.12, 0.38), C.brass, { x: s * (DECK_W / 2 - 0.25), y: top - 0.04, z: 0.05, outline: 0.4 }));
+  }
+  return merge(parts);
+}
+// The gap: the slot the floor fell into, looked down into from behind - its
+// near lip a bright edge of sand, then shadow, then its far wall coming up
+// out of the dark into the light (the deck beyond's face carries on above
+// it). A metre long, stretched to the gap (sz).
+function gapGeo() {
+  const parts = [];
+  const bands = [
+    [0, 0.06, '#f2d6a0', '#e0b46c'],
+    [0.06, 0.16, '#b07a3a', '#3a2412'],
+    [0.16, 0.55, '#2a170a', '#1a0e06'],
+    [0.55, 0.8, '#1a0e06', '#5a3c22'],
+    [0.8, 1.0, '#6a4a2c', '#b89a6c'],
+  ];
+  for (const [a, b, c0, c1] of bands) {
+    const g = new THREE.PlaneGeometry(DECK_W - 0.2, b - a, 1, 1);
+    // (laid flat: its far edge, b, is y = 1 before it's turned down)
+    parts.push(part(g, null, { y: (a + b) / 2, grad: [c0, c1, a, b], outline: 0 }));
+  }
+  return merge(parts.map((g) => g.rotateX(-Math.PI / 2))).translate(0, 0.03, 0);
+}
+
 function gateGeo(opening, depth) {
   const parts = [...gateFrameParts(opening, { thick: 1.4, depth, color: C.ivory })];
   const top = gateTop(opening);
@@ -541,6 +739,48 @@ export default {
   doorColor: '#e8c674',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
+  // From the second time round: decks over the sand running out beneath
+  // the walk, up a flight of steps and across the gaps, deck to deck (see
+  // ObstacleField.placeClimb). One gap the first of them, two after; from the
+  // fourth time round now and then the far side a step higher.
+  climb: {
+    from: 1,
+    every: [2, 4],
+    most: (visit) => (visit <= 1 ? 2 : 3),
+    names: ['climbSteps', 'climbDeck', 'climbDeckHi', 'climbFace', 'climbFaceHi', 'climbGap', 'climbGear', 'climbGearB'],
+    plan(visit, r, n) {
+      const gaps = visit <= 1 ? (n === 0 ? 1 : 2) : visit === 2 ? r.int(2, 3) : 3;
+      const P = [{ kind: 'ramp', h: DECK_LO, t: 0.55, min: 8 }];
+      let h = DECK_LO;
+      for (let i = 0; i < gaps; i++) {
+        P.push({ kind: 'deck', h, t: r.float(0.62, 0.78), min: 8 });
+        P.push({ kind: 'gap', t: r.float(0.24, 0.3), min: 4.5 });
+        if (visit >= 3 && h === DECK_LO && i < gaps - 1 && r.chance(0.4)) h = DECK_HI;
+      }
+      P.push({ kind: 'deck', h, t: 0.72, min: 8 });
+      return P;
+    },
+    put(put, P, { d, len, h, rng }) {
+      if (P.kind === 'ramp') {
+        put('climbSteps', 0, 0, d, { sz: len, sy: h });
+        return;
+      }
+      if (P.kind === 'gap') {
+        put('climbGap', 0, 0, d, { sz: len });
+        return;
+      }
+      const hi = h > DECK_LO + 0.1;
+      put(hi ? 'climbDeckHi' : 'climbDeck', 0, 0, d, { sz: len });
+      put(hi ? 'climbFaceHi' : 'climbFace', 0, 0, d);
+      put(hi ? 'climbFaceHi' : 'climbFace', 0, 0, d + len, { ry: Math.PI });
+      // the works turning in its face, and sand pouring down over its lip
+      // into the gap before it
+      const gy = (h - 0.27) * 0.5;
+      put('climbGear', -2.2, gy, d - 0.06, { p0: rng.float(0, 1), s: h / DECK_LO });
+      put('climbGearB', 2.2, gy, d - 0.06, { p0: rng.float(0, 1), s: h / DECK_LO });
+      for (const x of [rng.float(-3.6, -0.6), rng.float(0.6, 3.6)]) put('sandfall', x, 0, d - 0.12, { sx: rng.float(0.7, 1.5), sy: h - 0.05, sz: 0.5 });
+    },
+  },
   env: {
     // how unstuck time is as you come in, and by the doorway out (see game.js)
     wonk: [0.15, 1.6],
@@ -565,7 +805,7 @@ export default {
     // in and draw back (s), and how far from the doorway the runner is as it
     // starts to pour in and when it's in full (m)
     sands: {
-      dunes: [0.75, 1.25, 9, 0.65],
+      dunes: [1.0, 1.55, 9, 0.85],
       sea: ['#8fdcd6', '#45b2c4', '#fbfdfa'],
       surf: { reach: 26, period: [2.6, 3.6], from: 80, to: 46 },
     },
@@ -661,6 +901,33 @@ export default {
     b.glass('hourglassGlass', hourglassGlassGeo(), { cap: 24, anim: 'popEarly', sand: HG(-0.8, 6) });
     b.toon('weight', weightGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
 
+    // the sand pouring in off the architecture, and the dunes it has
+    // drifted into out past the colonnade
+    b.toon('sandfall', sandfallGeo(), { cap: 140, anim: 'pop', ink: 0, sandfall: true });
+    b.toon('sandHeap', sandHeapGeo(), { cap: 90, anim: 'pop', ink: 0.02 });
+    b.toon('dune', duneGeo(3), { cap: 60, anim: 'liftFar', ink: 0.02 });
+    b.toon('duneB', duneGeo(11), { cap: 60, anim: 'liftFar', ink: 0.02 });
+    // clockwork laid bare: an open movement in the bays, its train of
+    // wheels meshing (each wheel its own batch, turning at the ratio of its
+    // teeth: see MESH), its anchor rocking over the scape wheel; and the
+    // great wheels standing in the dunes
+    b.toon('movement', movementFrameGeo(), { cap: 16, anim: 'pop', ink: 0.04 });
+    b.toon('trainWheel', merge(gearParts({ r: MESH.r[0], teeth: MESH.t[0], t: 0.22 })), { cap: 16, anim: 'pop', ink: 0.035, turn: [MESH.w, 0, 0, 0] });
+    b.toon('trainPinion', merge(gearParts({ r: MESH.r[1], teeth: MESH.t[1], t: 0.26, spokes: 3, color: C.brassLo, hi: C.brass })), { cap: 16, anim: 'pop', ink: 0.035, turn: [(-MESH.w * MESH.t[0]) / MESH.t[1], 0, 0, 0] });
+    b.toon('scape', scapeGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0.5, 0, 0, 0] });
+    b.toon('anchor', anchorGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.22, 2.6, 0] });
+    b.toon('gearGiant', merge(gearParts({ r: 6, teeth: 36, t: 0.7, spokes: 6 })), { cap: 16, anim: 'lift', ink: 0.05, turn: [0.05, 0, 0, 0] });
+
+    // the climbs (from the second time round: see climb, above)
+    b.toon('climbSteps', stepsGeo(), { cap: 8, anim: 'popEarly', ink: 0.035 });
+    b.toon('climbDeck', deckGeo(DECK_LO), { cap: 16, anim: 'popEarly', ink: 0.04 });
+    b.toon('climbDeckHi', deckGeo(DECK_HI), { cap: 8, anim: 'popEarly', ink: 0.04 });
+    b.toon('climbFace', deckFaceGeo(DECK_LO), { cap: 32, anim: 'popEarly', ink: 0.035 });
+    b.toon('climbFaceHi', deckFaceGeo(DECK_HI), { cap: 16, anim: 'popEarly', ink: 0.035 });
+    b.toon('climbGap', gapGeo(), { cap: 16, anim: 'popEarly', ink: 0 });
+    b.toon('climbGear', merge(gearParts({ r: 0.62, teeth: 12, t: 0.16, spokes: 4 })), { cap: 24, anim: 'popEarly', ink: 0.03, turn: [0.8, 0, 0, 0] });
+    b.toon('climbGearB', merge(gearParts({ r: 0.62, teeth: 12, t: 0.16, spokes: 4, color: C.brassLo, hi: C.brass })), { cap: 24, anim: 'popEarly', ink: 0.03, turn: [-0.8, 0, 0, 0] });
+
   },
 
   // (the hands of the clock over the doorway out, at its centre)
@@ -708,7 +975,24 @@ export default {
         ctx.put('grandfather', gx, 0, gz, { ry: face });
         gfHands(face, 0)(put, rng, { x: gx, d: gz });
       } else if (bay === 0) ctx.put('pendulum', s * (WALL_X + 0.2), 11.2, 8, { ry: 0, p0: rng.float(0, 1) });
-      else {
+      else if (bay === 4 && rng.chance(0.6)) {
+        // an open movement: its wheel driving a pinion, the scape wheel and
+        // its anchor rocking over it, all turning in the bay
+        const mx = s * (WALL_X - 1.0);
+        const mz = 8 + rng.float(-0.6, 0.6);
+        const at = (lx) => [mx + lx * Math.cos(face), mz + lx * Math.sin(face)];
+        ctx.put('movement', mx, 0, mz, { ry: face });
+        const [pw, pp] = meshPhases(MESH.at);
+        const wx = -0.7, wy = 2.4;
+        const reach = 0.93 * (MESH.r[0] + MESH.r[1]);
+        const [ax, az] = at(wx);
+        ctx.put('trainWheel', ax, wy, az, { ry: face, p0: pw });
+        const [bx, bz] = at(wx + Math.cos(MESH.at) * reach);
+        ctx.put('trainPinion', bx, wy + Math.sin(MESH.at) * reach, bz, { ry: face, p0: pp });
+        const [cx, cz] = at(1.05);
+        ctx.put('scape', cx, 4.1, cz, { ry: face, p0: rng.float(0, 1) });
+        ctx.put('anchor', cx, 5.45, cz, { ry: face, p0: rng.float(0, 1) });
+      } else {
         const px = s * (WALL_X - 1.0);
         const pz = 8 + rng.float(-1, 1);
         if (rng.chance(0.5)) {
@@ -730,6 +1014,27 @@ export default {
         ctx.put('wallClock', s * WALL_X, y, 8, o);
         ctx.put('bracket', s * WALL_X, 12.3, 8, {});
         ctx.put('hands', s * WALL_X, y, 8, { ...o, p0: rng.float(0, 1) });
+      }
+      // sand pouring in off the cornice through an arch, heaping up on the
+      // drift where it lands
+      if (rng.chance(0.45)) {
+        const z = 8 + rng.float(-1.6, 1.6);
+        ctx.put('sandfall', s * (WALL_X - 0.15), 0.9, z, { sx: rng.float(0.8, 2.0), sy: 10.5, p0: rng.float(0, 6.28) });
+        ctx.put('sandHeap', s * (WALL_X - 0.6), 0.55, z, { s: rng.float(0.9, 1.5), ry: rng.float(0, 6.28) });
+      }
+      // the dunes the gallery stands in, rolling away to the horizon
+      if (rng.chance(0.6)) {
+        ctx.put(rng.chance(0.5) ? 'dune' : 'duneB', s * rng.float(15, 75), -0.4, rng.float(0, 16), { sx: rng.float(18, 42), sz: rng.float(16, 34), sy: rng.float(2.5, 8), ry: rng.float(-0.5, 0.5) + (rng.chance(0.5) ? Math.PI : 0) });
+      }
+      // now and then a great wheel standing in them, turning slowly, the sand
+      // it has carried up pouring off its rim
+      if (rng.chance(0.14)) {
+        const gx = s * rng.float(13, 17);
+        const gy = rng.float(0.5, 2.2);
+        const gz = rng.float(2, 14);
+        ctx.put('gearGiant', gx, gy, gz, { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1) });
+        ctx.put('sandfall', gx - s * 0.6, 0, gz - 1.6, { sx: rng.float(1.2, 2.2), sy: gy + 5.4, p0: rng.float(0, 6.28) });
+        ctx.put('sandHeap', gx - s * 0.6, 0, gz - 1.6, { s: rng.float(1.6, 2.4) });
       }
       // great gears half sunk behind the balustrade
       if (rng.chance(0.45)) ctx.put(rng.chance(0.5) ? 'gear' : 'gearB', s * rng.float(9, 12), rng.float(0.5, 2.5), rng.float(0, 16), { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1), s: rng.float(0.8, 1.3) });

@@ -483,6 +483,214 @@ function spireGeo(seed) {
 }
 
 // --- the gate -----------------------------------------------------------------------
+// --- alien life -------------------------------------------------------------
+// Things grow in the red dust after all, and glow: lit from within, in
+// teal, magenta, gold and orange against the rust (the instance's colour,
+// on the parts marked tint, is the glow; see the chunk).
+const GLOWS = { teal: '#4af0d8', cyan: '#58e8ff', magenta: '#ff4ac0', violet: '#a07aff', gold: '#ffd04a', orange: '#ff8a3a' };
+// A bend of stalk from a to b, bowed out by `bow` across its middle.
+function stalk(parts, a, b, r0, r1, color, bow = [0, 0, 0], n = 4) {
+  let prev = a;
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const k = Math.sin(Math.PI * t);
+    const p = [a[0] + (b[0] - a[0]) * t + bow[0] * k, a[1] + (b[1] - a[1]) * t + bow[1] * k, a[2] + (b[2] - a[2]) * t + bow[2] * k];
+    const d = new THREE.Vector3(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]);
+    const len = d.length();
+    const r = r0 + (r1 - r0) * t;
+    const g = P.cyl(r, r + (r0 - r1) / n, len, 5);
+    g.translate(0, len / 2, 0);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+    g.translate(prev[0], prev[1], prev[2]);
+    parts.push(part(g, color, { outline: 0.4 }));
+    prev = p;
+  }
+  return prev;
+}
+// Orb stalks: thin dark stems forking out of a knot, every one ending in a
+// bead of light, like a model of a molecule grown out of the ground.
+function orbStalkGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [part(P.sphere(0.22, 8, 6), C.basalt, { y: 0.1, sy: 0.6 })];
+  const n = 4 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.28 + rnd() * 0.6;
+    const h = 1.2 + rnd() * 2.2;
+    const out = 0.3 + rnd() * 0.9;
+    const tip = stalk(parts, [0, 0.1, 0], [Math.cos(a) * out, h, Math.sin(a) * out], 0.05, 0.025, '#2a1a34', [Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2]);
+    const r = 0.16 + rnd() * 0.2;
+    parts.push(part(P.sphere(r, 12, 9), '#ffffff', { x: tip[0], y: tip[1] + r * 0.7, z: tip[2], emit: 0.85, tint: 1 }));
+    // a twig off the side with a smaller bead
+    if (rnd() < 0.7) {
+      const b = [tip[0] * 0.6, tip[1] * 0.62, tip[2] * 0.6];
+      const e = stalk(parts, b, [b[0] + Math.cos(a + 1.4) * 0.5, b[1] + 0.35, b[2] + Math.sin(a + 1.4) * 0.5], 0.022, 0.015, '#2a1a34', [0, 0.1, 0], 2);
+      parts.push(part(P.sphere(r * 0.55, 10, 7), '#ffffff', { x: e[0], y: e[1] + r * 0.35, z: e[2], emit: 0.85, tint: 1 }));
+    }
+  }
+  return merge(parts);
+}
+// Puffballs: round pods bristling with spines, piled in a heap, glowing
+// warm through their skins.
+function puffGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const n = 3 + Math.floor(rnd() * 4);
+  for (let i = 0; i < n; i++) {
+    const r = i === 0 ? 0.6 : 0.2 + rnd() * 0.35;
+    const a = rnd() * 6.28;
+    const rr = i === 0 ? 0 : 0.5 + rnd() * 0.5;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr, y = r * 0.85;
+    parts.push(part(P.sphere(r, 14, 10), null, { x, y, z, grad: ['#c8501a', '#ffffff', y - r, y + r], emit: 0.4, tint: 1 }));
+    const spines = Math.round(10 + r * 30);
+    for (let k = 0; k < spines; k++) {
+      const u = rnd() * 2 - 1, t = rnd() * 6.28;
+      const s2 = Math.sqrt(1 - u * u);
+      const d = new THREE.Vector3(s2 * Math.cos(t), u, s2 * Math.sin(t));
+      if (d.y < -0.4) continue;
+      const g = P.cone(0.025, r * 0.45, 3);
+      g.translate(0, r + r * 0.2, 0);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d));
+      g.translate(x, y, z);
+      parts.push(part(g, '#ffe0a0', { emit: 0.5, outline: 0 }));
+    }
+  }
+  return merge(parts);
+}
+// A parasol tree: a tall, thin, bending stem under a broad flat cap like a
+// lily pad, its underside veined and lit, its rim curling a little.
+function parasolGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const h = 5 + rnd() * 4;
+  const lean = [(rnd() - 0.5) * 1.6, 0, (rnd() - 0.5) * 1.2];
+  const top = stalk(parts, [0, 0, 0], [lean[0], h, lean[2]], 0.16, 0.08, '#3a2050', [lean[0] * 0.4 + 0.4, 0, 0], 6);
+  const R = 2.2 + rnd() * 1.4;
+  const cap = new THREE.CylinderGeometry(R, R * 0.92, 0.22, 20, 1);
+  const pos = cap.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const r = Math.hypot(x, z) / R;
+    pos.setY(i, pos.getY(i) - 0.35 * r * r + 0.08 * Math.sin(Math.atan2(z, x) * 5 + seed));
+  }
+  cap.computeVertexNormals();
+  parts.push(part(cap, null, { x: top[0], y: top[1] + 0.05, z: top[2], grad: ['#ffffff', '#ffd8f4', top[1] - 0.4, top[1] + 0.2], emit: 0.35, tint: 1 }));
+  // the veins under it, glowing
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * 6.28;
+    parts.push(part(P.box(R * 0.9, 0.04, 0.05), '#ffffff', { x: top[0] + Math.cos(a) * R * 0.45, y: top[1] - 0.12, z: top[2] + Math.sin(a) * R * 0.45, ry: -a, emit: 1, tint: 1, outline: 0 }));
+  }
+  // a second, smaller pad lower down now and then
+  if (rnd() < 0.6) {
+    const hy = h * 0.55;
+    const r2 = R * 0.45;
+    parts.push(part(P.cyl(r2, r2 * 0.9, 0.14, 14), null, { x: lean[0] * 0.55 + 0.35, y: hy, z: lean[2] * 0.55, grad: ['#ffffff', '#ffd8f4', hy - 0.2, hy + 0.1], emit: 0.35, tint: 1 }));
+  }
+  return merge(parts);
+}
+// Antler fronds: gold stalks branching and branching again, curling at
+// the tips, lit like filaments.
+function frondGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const grow = (a, dir, len, r, depth) => {
+    const b = [a[0] + dir[0] * len, a[1] + dir[1] * len, a[2] + dir[2] * len];
+    const e = stalk(parts, a, b, r, r * 0.7, '#ffffff', [dir[2] * 0.15, 0, -dir[0] * 0.15], 3);
+    if (depth <= 0) {
+      parts.push(part(P.sphere(r * 1.6, 6, 4), '#ffffff', { x: e[0], y: e[1], z: e[2], emit: 1, tint: 1, outline: 0 }));
+      return;
+    }
+    for (const s of [-1, 1]) {
+      const t = 0.45 + rnd() * 0.25;
+      const nd = new THREE.Vector3(dir[0] + s * 0.55 * (rnd() + 0.4), dir[1] * 0.9 + 0.2, dir[2] + s * 0.3 * (rnd() - 0.5)).normalize();
+      grow(e, [nd.x, nd.y, nd.z], len * t * 1.4, r * 0.7, depth - 1);
+    }
+  };
+  const n = 2 + Math.floor(rnd() * 2);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.28 + rnd();
+    const d = new THREE.Vector3(Math.cos(a) * 0.25, 1, Math.sin(a) * 0.25).normalize();
+    grow([Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2], [d.x, d.y, d.z], 1.0 + rnd() * 0.7, 0.07, 2);
+  }
+  // (the stalks themselves glow too, softly)
+  for (const g of parts) {
+    const fx = g.attributes.fx.array;
+    for (let k = 0; k < fx.length; k += 3) {
+      fx[k + 1] = Math.max(fx[k + 1], 0.6);
+      fx[k + 2] = 1;
+    }
+  }
+  return merge(parts);
+}
+// Lantern pods: teardrop bulbs on drooping stems, a cluster of them,
+// glowing like paper lanterns.
+function podGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [part(P.sphere(0.3, 8, 6), '#2a1a34', { y: 0.05, sy: 0.5 })];
+  const n = 5 + Math.floor(rnd() * 4);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * 6.28;
+    const h = 0.6 + rnd() * 1.4;
+    const out = 0.25 + rnd() * 0.5;
+    const tip = stalk(parts, [0, 0.05, 0], [Math.cos(a) * out, h, Math.sin(a) * out], 0.035, 0.02, '#4a2a5a', [Math.cos(a) * 0.3, 0.15, Math.sin(a) * 0.3], 3);
+    const L = 0.28 + rnd() * 0.2;
+    parts.push(part(P.lathe([[0, 0], [L * 0.4, L * 0.25], [L * 0.45, L * 0.6], [L * 0.2, L * 1.0], [0, L * 1.1]], 10), '#ffffff', { x: tip[0], y: tip[1] - L * 1.05, z: tip[2], emit: 0.8, tint: 1 }));
+  }
+  return merge(parts);
+}
+
+// --- alien rock ---------------------------------------------------------------
+// A spire twisted as it rose, its strata wound round it like a screw, a
+// seam of something glowing in its grooves.
+function twistSpireGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  const n = 9;
+  const h = 5 + rnd() * 4;
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    const r = 1.1 * (1 - t * 0.8);
+    const y = (h * (i + 0.5)) / n;
+    parts.push(part(P.cyl(r * 0.9, r, h / n + 0.02, 5), C.strata[(i + seed) % C.strata.length], { x: Math.sin(t * 3) * 0.4, y, ry: t * 2.6, outline: 0.5 }));
+    parts.push(part(P.torus(r * 0.93, 0.05, 3, 5), '#ffffff', { x: Math.sin(t * 3) * 0.4, y: y + h / n / 2, rx: Math.PI / 2, rz: t * 2.6, emit: 1, tint: 1, outline: 0 }));
+  }
+  parts.push(part(P.cone(0.3, 0.9, 5), C.basalt, { x: Math.sin(3) * 0.4, y: h + 0.4 }));
+  return merge(parts);
+}
+// Stones stacked by no one: rounded, balanced each on the one below,
+// wider at the top than they should be.
+function cairnGeo(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  let y = 0;
+  let x = 0;
+  const n = 3 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const r = 0.45 + rnd() * 0.5 + i * 0.12;
+    const sy = 0.45 + rnd() * 0.25;
+    x += (rnd() - 0.5) * 0.3;
+    parts.push(part(P.sphere(r, 12, 8), null, { x, y: y + r * sy, sy, grad: [C.basalt, C.basaltHi, y, y + r * sy * 2], ry: rnd() * 6 }));
+    y += r * sy * 1.85;
+  }
+  return merge(parts);
+}
+// A ring of rock standing on its edge, the dust blown clean through it.
+function ringRockGeo(seed) {
+  const rnd = seeded(seed);
+  const g = new THREE.TorusGeometry(2.2, 0.75, 7, 16);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const k = 1 + 0.15 * Math.sin(x * 3 + seed) * Math.sin(y * 2.4) + 0.1 * Math.sin(z * 5);
+    pos.setXYZ(i, x * k, y * k, z * k * 0.8);
+  }
+  g.computeVertexNormals();
+  return merge([
+    part(g, null, { y: 2.4, grad: [C.rustLo, C.rustHi, 0, 5], mark: 0.6 }),
+    ...rockParts({ r: 0.9, lo: C.rockDark, hi: C.rockHi, seed: seed + 3 }).map((q) => q.translate(0.3, 0, 0)),
+    part(P.torus(1.5, 0.05, 3, 20), '#ffffff', { y: 2.4, emit: 1, tint: 1, outline: 0 }),
+  ]);
+}
+
 const OPENING = { halfW: 4.6, rectH: 7.2, arch: true };
 const GATE_DEPTH = 1.8;
 function gateGeo() {
@@ -679,6 +887,18 @@ export default {
     b.toon('pillar', pillarGeo(5), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
     b.toon('pillarB', pillarGeo(12), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
     b.toon('spire', spireGeo(7), { cap: 24, anim: 'popEarly', ink: 0.045 });
+    // alien life, glowing (each a colour of its own: see GLOWS), and rock
+    // grown into shapes no rock should take
+    b.toon('orbStalk', orbStalkGeo(3), { cap: 70, anim: 'pop', ink: 0.025, wobble: [0.012, 0, 1.1, 0] });
+    b.toon('orbStalkB', orbStalkGeo(14), { cap: 70, anim: 'pop', ink: 0.025, wobble: [0.012, 0, 0.9, 0] });
+    b.toon('puff', puffGeo(5), { cap: 60, anim: 'pop', ink: 0.025 });
+    b.toon('parasol', parasolGeo(2), { cap: 40, anim: 'lift', ink: 0.035, wobble: [0.0025, 0.03, 0.5, 0] });
+    b.toon('parasolB', parasolGeo(9), { cap: 40, anim: 'lift', ink: 0.035, wobble: [0.0025, 0.03, 0.6, 0] });
+    b.toon('frond', frondGeo(4), { cap: 60, anim: 'pop', ink: 0.02, wobble: [0.03, 0, 1.4, 0] });
+    b.toon('pods', podGeo(8), { cap: 60, anim: 'pop', ink: 0.02, wobble: [0.02, 0, 1.2, 0] });
+    b.toon('twistSpire', twistSpireGeo(4), { cap: 24, anim: 'lift', ink: 0.045 });
+    b.toon('cairn', cairnGeo(6), { cap: 30, anim: 'pop', ink: 0.04 });
+    b.toon('ringRock', ringRockGeo(3), { cap: 12, anim: 'lift', ink: 0.05, marks: [2, 2] });
 
   },
 
@@ -716,6 +936,41 @@ export default {
         ctx.put('glow', x, big ? 1.6 : 0.9, z, { s: big ? 5 : 3.2, c: [0.55, 0.38, 1.0] });
         ctx.put('pool', x, 0.04, z, { s: big ? 6 : 4, c: [0.5, 0.5, 0.5] });
       }
+      // alien life by the road, glowing: orb stalks, puffballs, lantern pods
+      // and gold fronds in a thicket near the edge, parasol trees standing
+      // over them further out
+      {
+        const n = rng.int(2, 4);
+        for (let i = 0; i < n; i++) {
+          const x = s * rng.float(5.4, 13);
+          const z = rng.float(0, 16);
+          const k = rng.weighted([['orb', 3], ['puff', 2], ['pods', 2], ['frond', 2]]);
+          const col = k === 'puff' ? rng.pick([GLOWS.orange, GLOWS.gold]) : k === 'frond' ? rng.pick([GLOWS.gold, GLOWS.orange, GLOWS.cyan]) : rng.pick([GLOWS.teal, GLOWS.cyan, GLOWS.magenta, GLOWS.violet]);
+          const name = k === 'orb' ? (rng.chance(0.5) ? 'orbStalk' : 'orbStalkB') : k;
+          const sc = rng.float(0.8, 1.4);
+          ctx.put(name, x, 0, z, { s: sc, ry: rng.float(0, 6.28), c: col });
+          const c = rgb(col);
+          ctx.put('glow', x, 1.1 * sc, z, { s: 3.6 * sc, c: [c[0] * 0.55, c[1] * 0.55, c[2] * 0.55] });
+          if (rng.chance(0.5)) ctx.put('pool', x, 0.04, z, { s: 4.5 * sc, c: [c[0] * 0.4, c[1] * 0.4, c[2] * 0.4] });
+        }
+      }
+      if (rng.chance(0.45)) {
+        const x = s * rng.float(8, 22);
+        const z = rng.float(0, 16);
+        const col = rng.pick([GLOWS.magenta, GLOWS.violet, GLOWS.teal]);
+        const sc = rng.float(0.8, 1.3);
+        ctx.put(rng.chance(0.5) ? 'parasol' : 'parasolB', x, 0, z, { s: sc, ry: rng.float(0, 6.28), c: col });
+        const c = rgb(col);
+        ctx.put('glow', x, 6.5 * sc, z, { s: 7 * sc, c: [c[0] * 0.4, c[1] * 0.4, c[2] * 0.4] });
+      }
+      // rock gone strange: a spire wound like a screw, stones balanced on
+      // stones, a ring of rock on its edge
+      if (rng.chance(0.18)) {
+        const col = rng.pick([GLOWS.cyan, GLOWS.magenta, GLOWS.gold]);
+        ctx.put('twistSpire', s * rng.float(9, 26), 0, rng.float(0, 16), { s: rng.float(0.8, 1.5), ry: rng.float(0, 6.28), c: col });
+      }
+      if (rng.chance(0.22)) ctx.put('cairn', s * rng.float(6, 16), 0, rng.float(0, 16), { s: rng.float(0.7, 1.3), ry: rng.float(0, 6.28) });
+      if (rng.chance(0.07)) ctx.put('ringRock', s * rng.float(11, 24), 0, rng.float(0, 16), { s: rng.float(0.9, 1.5), ry: rng.float(-0.6, 0.6) + Math.PI / 2, c: rng.pick([GLOWS.cyan, GLOWS.magenta]) });
       if (rng.chance(0.2)) ctx.put(rng.chance(0.5) ? 'butte' : 'butteB', s * rng.float(60, 150), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.7, 1.4) });
       // little asteroids tumbling overhead
       if (rng.chance(0.35)) ctx.put('floatRock', s * rng.float(6, 30), rng.float(5, 18), rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.5, 1.3) });

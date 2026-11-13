@@ -568,6 +568,81 @@ function shedGeo() {
   return merge(parts).translate(0, 0, -1.3);
 }
 
+// --- the climbs ------------------------------------------------------------
+// From the second time round, the walkway runs into a jumble of roofs at
+// different heights - a building's added storey, a stair bulkhead, a loft
+// roof - and you go up and over them: up an iron stair onto the first,
+// jumping up roof to roof to the top, (later) leaping the alleys between,
+// and dropping back down the far side. (See def.climb, and
+// ObstacleField.placeClimb.)
+const ROOF_W = 9.0;
+const ROOFS = [1.0, 1.8, 2.6];
+// The iron stair up: open treads on two stringers and a rail each side, a
+// metre long and a metre high (stretched to the ramp: sz, sy).
+function climbStairGeo() {
+  const parts = [];
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const y = (i + 1) / n;
+    parts.push(part(P.box(ROOF_W - 0.6, 0.05, 0.8 / n), NY.escape, { y: y - 0.025, z: -(i + 0.55) / n }));
+    parts.push(part(P.box(ROOF_W - 0.6, y, 0.03), NY.iron, { y: y / 2, z: -i / n - 0.02, outline: 0.3 }));
+  }
+  for (const s of [-1, 1]) {
+    parts.push(part(P.box(0.14, 0.3, Math.SQRT2), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: 0.5, z: -0.5, rx: Math.PI / 4 }));
+    parts.push(part(P.box(0.06, 0.06, Math.SQRT2), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: 1.35, z: -0.5, rx: Math.PI / 4, outline: 0.4 }));
+    for (let k = 0; k <= 3; k++) parts.push(part(P.box(0.05, 0.9, 0.05), NY.escape, { x: s * (ROOF_W / 2 - 0.25), y: k / 3 + 0.45, z: -k / 3, outline: 0.3 }));
+  }
+  return merge(parts);
+}
+// A roof h up, a metre long (stretched, sz): brick walls, its tar top, stone
+// coping along its sides.
+function climbRoofGeo(h) {
+  const parts = [];
+  parts.push(part(P.box(ROOF_W - 0.2, h - 0.1, 1), '#ffffff', { y: (h - 0.1) / 2, z: -0.5, tint: 1, mark: 0.55 }));
+  parts.push(part(P.box(ROOF_W - 0.3, 0.1, 1), NY.tar, { y: h - 0.05, z: -0.5 }));
+  for (const s of [-1, 1]) parts.push(part(P.box(0.32, 0.16, 1), NY.stone, { x: s * (ROOF_W / 2 - 0.1), y: h + 0.02, z: -0.5 }));
+  return merge(parts);
+}
+// Its front (unstretched; put again at its far end, turned about): a band of
+// coping along the edge, a lit window or two below it, a vent.
+function climbRoofFaceGeo(h, seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  parts.push(part(P.box(ROOF_W, 0.16, 0.36), NY.stone, { y: h + 0.02, z: -0.1 }));
+  parts.push(part(P.box(ROOF_W - 0.2, 0.08, 0.06), NY.cornice, { y: h - 0.16, z: 0.03, outline: 0.4 }));
+  if (h > 1.5) {
+    const n = h > 2.2 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const x = -ROOF_W / 2 + (ROOF_W * (i + 0.5)) / n + (rnd() - 0.5) * 0.6;
+      const lit = rnd() < 0.7;
+      parts.push(part(P.box(0.9, 0.9, 0.06), NY.frame, { x, y: h - 0.85, z: 0.03, outline: 0.4 }));
+      parts.push(part(P.box(0.74, 0.74, 0.04), lit ? C.lit[i % 4] : C.unlit, { x, y: h - 0.85, z: 0.05, emit: lit ? 1 : 0, outline: 0 }));
+      parts.push(part(P.box(1.02, 0.1, 0.12), NY.stone, { x, y: h - 0.34, z: 0.06 }));
+    }
+  } else {
+    for (const x of [-2.6, 2.4]) parts.push(part(P.box(0.7, 0.36, 0.05), NY.iron, { x, y: h * 0.5, z: 0.03, outline: 0.4 }));
+  }
+  return merge(parts);
+}
+// An alley between two roofs, looked down into: the near edge's coping
+// catching the light, black, the far building's wall coming up out of the
+// dark lit by the street far below. A metre long (stretched, sz).
+function climbAlleyGeo() {
+  const parts = [];
+  const bands = [
+    [0, 0.05, '#8a8aa8', '#5a5a78'],
+    [0.05, 0.3, '#0a0c1a', '#05060e'],
+    [0.3, 0.55, '#05060e', '#3a2420'],
+    [0.55, 0.7, '#ffb85a', '#6a3428'],
+    [0.7, 1.0, '#5a3028', '#7a4436'],
+  ];
+  for (const [a, b, c0, c1] of bands) {
+    const g = new THREE.PlaneGeometry(ROOF_W - 0.2, b - a, 1, 1);
+    parts.push(part(g, null, { y: (a + b) / 2, grad: [c0, c1, a, b], outline: 0, emit: a > 0.5 && a < 0.6 ? 0.8 : 0 }));
+  }
+  return merge(parts.map((g) => g.rotateX(-Math.PI / 2))).translate(0, 0.03, 0);
+}
+
 function gateGeo() {
   const rnd = seeded(77);
   const parts = [...gateFrameParts(OPENING, { thick: 1.1, depth: GATE_DEPTH, color: C.cream })];
@@ -628,6 +703,39 @@ export default {
   name: 'The Night Rooftops',
   doorColor: '#3a5cc0',
   gate: { opening: OPENING, depth: GATE_DEPTH },
+  // From the second time round: up and over the roofs (see the climbs,
+  // above). Up an iron stair, jumping up roof to roof to the top and
+  // dropping back down the far side; from the third time round with an
+  // alley to leap at the top, and later another on the way up.
+  climb: {
+    from: 1,
+    every: [2, 4],
+    most: (visit) => (visit <= 1 ? 2 : 3),
+    names: ['climbStair', ...ROOFS.map((h, i) => `climbRoof${i}`), ...ROOFS.map((h, i) => `climbRoofFace${i}`), 'climbAlley'],
+    plan(visit, r, n) {
+      const [a, b, c] = ROOFS;
+      const roof = (h, t) => ({ kind: 'deck', h, t, min: 7 });
+      const alley = () => ({ kind: 'gap', t: r.float(0.22, 0.28), min: 4.5 });
+      const P = [{ kind: 'ramp', h: a, t: 0.5, min: 7 }, roof(a, 0.6)];
+      if (visit >= 3 && r.chance(0.5)) P.push(roof(b, 0.6), alley());
+      else P.push(roof(b, 0.6));
+      P.push(roof(c, 0.75));
+      if (visit >= 2 || n > 0) P.push(alley(), roof(c, r.float(0.6, 0.8)));
+      if (visit >= 3 && r.chance(0.5)) P.push(alley(), roof(b, 0.6));
+      else P.push(roof(b, 0.5));
+      P.push(roof(a, 0.5));
+      return P;
+    },
+    put(put, P, { d, len, h }) {
+      if (P.kind === 'ramp') return put('climbStair', 0, 0, d, { sz: len, sy: h });
+      if (P.kind === 'gap') return put('climbAlley', 0, 0, d, { sz: len });
+      const i = Math.max(0, ROOFS.indexOf(h));
+      const tint = BRICKS[Math.floor(d * 7.13) % BRICKS.length];
+      put(`climbRoof${i}`, 0, 0, d, { sz: len, c: tint });
+      put(`climbRoofFace${i}`, 0, 0, d, { c: tint });
+      put(`climbRoofFace${i}`, 0, 0, d + len, { ry: Math.PI, c: tint });
+    },
+  },
   gem: GEM,
   continuation: false, // the facade hides everything behind the door
   env: {
@@ -727,6 +835,13 @@ export default {
     b.toon('chimneyStack', chimneyStackGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('waterTank', waterTankGeo(), { cap: 24, anim: 'popEarly' });
     b.toon('shed', shedGeo(), { cap: 24, anim: 'popEarly' });
+    // the climbs (from the second time round: see climb, above)
+    b.toon('climbStair', climbStairGeo(), { cap: 8, anim: 'popEarly', ink: 0.03 });
+    ROOFS.forEach((h, i) => {
+      b.toon(`climbRoof${i}`, climbRoofGeo(h), { cap: 12, anim: 'popEarly', ink: 0.035, brick: true });
+      b.toon(`climbRoofFace${i}`, climbRoofFaceGeo(h, 5 + i), { cap: 24, anim: 'popEarly', ink: 0.03 });
+    });
+    b.toon('climbAlley', climbAlleyGeo(), { cap: 12, anim: 'popEarly', ink: 0 });
 
   },
 

@@ -108,6 +108,9 @@ const TUTORIAL = [
   { lanes: [null, 'W', null], hint: 'side' },
 ];
 
+// (a climb's pieces span the whole road: every lane, and between them)
+const CLIMB_HW = 3.7;
+
 const needsVertical = (row) => !!row.wide || row.lanes.some((k) => k === 'L' || k === 'H');
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -219,6 +222,8 @@ export class ObstacleField {
   rowBetween(d0, d1) {
     for (const row of this.rows) {
       if (row.d < d0 || row.d > d1) continue;
+      // (a gust doesn't carry off the road itself)
+      if (row.climb) continue;
       if (row.lanes.some((r) => r && !r.group.dead && !r.group.blown)) return row;
     }
     return null;
@@ -303,6 +308,16 @@ export class ObstacleField {
     const calm = this.calmAt(d);
     const diff = this.difficultyFor(d, eta);
     const tutorial = this.tutorial.length > 0;
+    // (a world with def.climb, from its second time round: now and then a
+    // stretch of decks to run up onto and jump between, in place of a
+    // pattern - see placeClimb)
+    const climb = tutorial ? null : this.climbAt(here, d, v, b);
+    if (climb) {
+      const len = this.placeClimb(here.world, d, climb, v);
+      const rest = lerp(o.gapEasy, o.gapHard, diff) * r.float(o.gapJitter[0], o.gapJitter[1]);
+      this.nextD = d + len + Math.max(14, v * Math.max(rest, o.minAfterVertical * 1.4));
+      return;
+    }
     const rows = tutorial ? [this.tutorial.shift()] : this.pick(diff, calm);
     // (low gravity: a jump hangs longer, so the rows come further apart,
     // and never as close after one you jump or duck - see CONFIG.drift.pace)
@@ -335,6 +350,105 @@ export class ObstacleField {
     }
     if (last) gap = Math.max(gap, needsVertical(last) ? o.minAfterVertical * airMul : o.minAfterLane);
     this.nextD = d + Math.max(12, v * gap);
+  }
+
+  // --- climbs -------------------------------------------------------------------
+  // A world can lay, now and then from its second time round (def.climb), a
+  // stretch of road you get up off: a ramp (steps, a stair) running up onto
+  // a deck, decks you jump up onto or across gaps between, and off the end
+  // of the last one back down onto the road. Each piece is the whole width
+  // of the road. def.climb: { from: the first visit (0 the first time
+  // through) it comes on, every: [min, max] patterns between two, most(visit):
+  // how many a visit, plan(visit, rng, n): the pieces of the n-th - each {
+  // kind: 'ramp' | 'deck' | 'gap', h: the height it ends at (m), t: how long
+  // it is in seconds of running, min: in metres at least } - and put(put,
+  // piece, info): what's drawn for one, info { d, len, h, h0 (the height
+  // before it), next (a gap's far deck), visit, rng, i, n } }.
+  //
+  // Running up a ramp is just running. A deck's front is a ledge: jump up
+  // onto it (or come down on it); run into its face and you stumble and
+  // scramble up onto it. A gap is a drop: come down into it and you stumble,
+  // and scramble up onto the deck beyond (see Game.scramble) - one hit,
+  // never two at once, and never left running through the inside of a deck.
+  climbAt(seg, d, v, b) {
+    const C = seg.world.def.climb;
+    const visit = seg.visit || 0;
+    if (!C || visit < C.from || seg.world.def.lowGravity) return null;
+    // (not straight through the doorway in, and never into the doorway out)
+    if (d < seg.start + Math.max(CONFIG.doorClearAfter, v * 3)) return null;
+    const r = this.rng;
+    if (seg.climbWait === undefined) {
+      seg.climbN = 0;
+      seg.climbWait = r.int(0, 1);
+    }
+    if (seg.climbN >= C.most(visit)) return null;
+    if (seg.climbWait-- > 0) return null;
+    const pieces = C.plan(visit, r, seg.climbN);
+    let total = 0;
+    for (const P of pieces) total += this.climbLen(P, v);
+    if (b && d + total > b.d - CONFIG.doorClearBefore) return null;
+    seg.climbN++;
+    seg.climbWait = r.int(C.every[0], C.every[1]);
+    return pieces;
+  }
+
+  climbLen(P, v) {
+    return Math.max(P.min ?? 3, v * P.t);
+  }
+
+  placeClimb(world, d, pieces, v) {
+    const def = world.def.climb;
+    const seg = this.game.course.segAt(d);
+    const visit = seg.world === world ? seg.visit || 0 : 0;
+    const group = this.group(world, d, 0, null, pieces.filter((P) => P.kind !== 'ramp').length);
+    group.climb = true;
+    const laid = { d, end: d, lanes: [null, null, null], hint: null, climb: [] };
+    this.rows.push(laid);
+    let h = 0;
+    let at = d;
+    for (let i = 0; i < pieces.length; i++) {
+      const P = pieces[i];
+      const len = this.climbLen(P, v);
+      let next = 0;
+      for (let k = i + 1; k < pieces.length; k++) {
+        if (pieces[k].kind !== 'gap') {
+          next = pieces[k].h;
+          break;
+        }
+      }
+      const gap = P.kind === 'gap';
+      const top = gap ? h : P.h;
+      const rec = {
+        group, lane: 1, x: 0, hw: CLIMB_HW, d: at, len,
+        // (a gap: a drop you're in once you're down near the road in it)
+        y0: gap ? -1 : 0, y1: gap ? 0.3 : top,
+        kind: 'L', wade: false, hit: false,
+        climb: P.kind, h0: h, next, pit: gap, ramp: P.kind === 'ramp',
+      };
+      this.records.push(rec);
+      laid.climb.push(rec);
+      if (!laid.lanes[1] && !gap) laid.lanes[0] = laid.lanes[1] = laid.lanes[2] = rec;
+      def.put((name, px, py, pd, po) => world.put(group, name, px, py, pd, po), P, { d: at, len, h: top, h0: h, next, visit, rng: this.rng, i, n: pieces.length });
+      if (!gap) h = P.h;
+      at += len;
+    }
+    group.len = at - d;
+    laid.end = at;
+    return at - d;
+  }
+
+  // The height of the top of the climbs under a companion at (x, d) - a
+  // deck's top, a ramp's slope, and across a gap a leap from the one deck
+  // to the next - or 0.
+  surfaceAt(x, d) {
+    let h = 0;
+    for (const o of this.records) {
+      if (!o.climb || d < o.d || d > o.d + o.len || Math.abs(x - o.x) > o.hw) continue;
+      const t = (d - o.d) / o.len;
+      const s = o.pit ? o.h0 + (o.next - o.h0) * t + 0.9 * Math.sin(Math.PI * t) : o.ramp ? o.h0 + (o.y1 - o.h0) * t : o.y1;
+      if (s > h) h = s;
+    }
+    return h;
   }
 
   // calm (a breather world): only the gentler patterns, however far the run
@@ -491,10 +605,12 @@ export class ObstacleField {
     const pw = CONFIG.player.halfWidth;
     const pd = CONFIG.player.halfDepth;
     for (const o of this.records) {
-      if (o.kind !== 'L' || o.hit || o.wade) continue;
+      if (o.kind !== 'L' || o.hit || o.wade || o.pit) continue;
       if (dist < o.d - pd || dist > o.d + o.len + pd) continue;
       if (Math.abs(x - o.x) >= o.hw + pw) continue;
-      if (o.y1 > h) h = o.y1;
+      // (a ramp: its slope, under the front of the body)
+      const top = o.ramp ? o.h0 + (o.y1 - o.h0) * Math.min(1, Math.max(0, (dist + pd - o.d) / o.len)) : o.y1;
+      if (top > h) h = top;
     }
     return h;
   }

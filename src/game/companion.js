@@ -269,7 +269,11 @@ export class Companion {
       return;
     }
     const vf = g.speed + this.vdz;
-    _p.set(this.x, this.y, this.pz - this.dz);
+    // (up a climb's ramp and along its decks, leaping its gaps: see
+    // ObstacleField.surfaceAt)
+    const sf = Number.isFinite(g.dist) ? g.obstacles.surfaceAt(this.x, g.dist + this.dz) : 0;
+    this.lift = (this.lift || 0) + (sf - (this.lift || 0)) * (sf > (this.lift || 0) ? 1 - Math.exp(-dt * 16) : 1 - Math.exp(-dt * 7));
+    _p.set(this.x, this.y + this.lift, this.pz - this.dz);
     // facing where she's going, banked into turns
     _e.set(0, this.yaw + this.spin, 0, 'YXZ');
     _q.setFromEuler(_e);
@@ -725,7 +729,7 @@ export class Companion {
   threat(x, d0, d1, kinds = 'LWH') {
     let best = null;
     for (const o of this.game.obstacles.records) {
-      if (o.d + o.len < d0 || o.d > d1 || kinds.indexOf(o.kind) < 0) continue;
+      if (o.climb || o.d + o.len < d0 || o.d > d1 || kinds.indexOf(o.kind) < 0) continue;
       if (Math.abs(x - o.x) > o.hw + this.hw) continue;
       if (!best || o.d < best.d) best = o;
     }

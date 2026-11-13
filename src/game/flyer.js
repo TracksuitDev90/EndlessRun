@@ -251,7 +251,11 @@ export class Flyer {
     c.yaw = this.yaw;
     if (this.mode === 'fly') {
       this.headTrack(_p);
-      c.head.set(_p.x, _p.y, pz - _p.z);
+      // (over a climb she keeps her height above its decks, not the road:
+      // see ObstacleField.surfaceAt)
+      const sf = Number.isFinite(g.dist) && g.obstacles ? g.obstacles.surfaceAt(_p.x, g.dist + _p.z) : 0;
+      this.lift = (this.lift || 0) + (sf - (this.lift || 0)) * (1 - Math.exp(-(dt || 0) * 5));
+      c.head.set(_p.x, _p.y + this.lift, pz - _p.z);
     } else {
       b.standHead(this.spot, this.yaw, this.mode, c.head);
       // (her anchor kept on her head, to take off from)
@@ -865,7 +869,7 @@ export class Flyer {
   // The obstacles in lane l (by x) over track distances d0..d1.
   each(x, d0, d1, fn) {
     for (const o of this.game.obstacles.records) {
-      if (o.d + o.len < d0 || o.d > d1) continue;
+      if (o.climb || o.d + o.len < d0 || o.d > d1) continue;
       if (Math.abs(x - o.x) > o.hw + HW) continue;
       fn(o);
     }
