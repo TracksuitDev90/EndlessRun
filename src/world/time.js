@@ -66,6 +66,8 @@ const C = {
   // sand lying where it has drifted (heaps, banks, ramps, dunes): the walk's
   // own pale sand, so none of it stands out from the floor as something else
   drift: '#dfc38f',
+  // the high walk's paving: worn, warm stone, sand ground into it
+  pave: '#dcc69c',
   driftHi: '#f5e7c8',
   sky: '#dfe9f6',
 };
@@ -918,6 +920,139 @@ function gapGeo() {
   return merge(parts.map((g) => g.rotateX(-Math.PI / 2))).translate(0, 0.03, 0);
 }
 
+// --- the high walk --------------------------------------------------------------------------
+// One of the outer lanes raised into a walk over the rest of the gallery
+// (see def.high, and ObstacleField.placeHigh): a stone stair up, a walk on
+// a wall of blind arches, a bridge right across the road to the other side
+// - the road running on under its arch - the far walk, and a stair back
+// down. Sand pours off the walk through brass chutes over the middle lane.
+// The pieces are a metre long, stretched along the run (sz); the stair and
+// the walk come in two hands (their parapet on the outer side, s: -1 the
+// left lane, +1 the right), the stair down being the stair up turned round.
+const HIGH_H = 3.6;
+const HIGH_W = 2.3; // the walk's width (a lane)
+const HIGH_UNDER = HIGH_H - 0.42; // the bridge's underside over the lanes
+
+function highStairGeo(s) {
+  const parts = [];
+  const n = 14;
+  for (let i = 0; i < n; i++) {
+    const y = (HIGH_H * (i + 1)) / n;
+    const z = -(i + 0.5) / n;
+    parts.push(part(P.box(HIGH_W, y, 1 / n), null, { y: y / 2, z, grad: [C.ivoryLo, C.ivory, 0, HIGH_H] }));
+    parts.push(part(P.box(HIGH_W - 0.1, 0.03, 1 / n), C.pave, { y: y + 0.005, z, outline: 0 }));
+    parts.push(part(P.box(HIGH_W + 0.04, 0.05, 0.4 / n), C.ivoryHi, { y: y + 0.025, z: -(i + 0.2) / n, outline: 0 }));
+    // the parapet, stepped in blocks up the outer side; a lip on the inner
+    parts.push(part(P.box(0.34, y + 0.55, 1 / n), C.ivory, { x: s * (HIGH_W / 2 + 0.12), y: (y + 0.55) / 2, z }));
+    parts.push(part(P.box(0.4, 0.1, 1 / n), C.ivoryHi, { x: s * (HIGH_W / 2 + 0.12), y: y + 0.6, z, outline: 0.4 }));
+    parts.push(part(P.box(0.14, 0.12, 1 / n), C.ivoryHi, { x: -s * (HIGH_W / 2 + 0.03), y: y - 0.04, z, outline: 0.3 }));
+  }
+  return merge(parts);
+}
+// The walk: a wall of ivory up to a slab paved on top, a kerb on the outer
+// side (its balustrade is put along it) and a cornice along the inner edge.
+function highDeckGeo(s) {
+  const body = HIGH_H - 0.3;
+  return merge([
+    part(P.box(HIGH_W, body, 1), null, { y: body / 2, z: -0.5, grad: [C.ivoryLo, C.ivory, 0, body] }),
+    part(P.box(HIGH_W + 0.3, 0.3, 1), C.stone, { y: HIGH_H - 0.15, z: -0.5 }),
+    part(P.box(HIGH_W - 0.3, 0.02, 1), C.pave, { y: HIGH_H + 0.005, z: -0.5, outline: 0 }),
+    part(P.box(0.06, 0.02, 1), C.brass, { x: -0.55, y: HIGH_H + 0.012, z: -0.5, outline: 0 }),
+    part(P.box(0.06, 0.02, 1), C.brass, { x: 0.55, y: HIGH_H + 0.012, z: -0.5, outline: 0 }),
+    part(P.box(0.26, 0.18, 1), C.ivoryHi, { x: -s * (HIGH_W / 2 + 0.1), y: HIGH_H - 0.36, z: -0.5, outline: 0.4 }),
+    part(P.box(0.32, 0.22, 1), C.ivoryLo, { x: s * (HIGH_W / 2), y: HIGH_H + 0.11, z: -0.5 }),
+  ]);
+}
+// A bay of the walk's wall, 4 m along the run, on the side facing the
+// middle of the road: a pilaster and a blind arch.
+function highBayGeo(s) {
+  const sh = new THREE.Shape();
+  const w = 1.3, h1 = HIGH_H - 0.5 - w - 0.15;
+  sh.moveTo(-w, 0);
+  sh.lineTo(-w, h1);
+  for (let i = 0; i <= 14; i++) {
+    const a = Math.PI - (i / 14) * Math.PI;
+    sh.lineTo(Math.cos(a) * w, h1 + Math.sin(a) * w);
+  }
+  sh.lineTo(w, 0);
+  sh.lineTo(-w, 0);
+  const recess = P.extrude(sh, 0.04, 2);
+  const x = -s * (HIGH_W / 2 + 0.01);
+  return merge([
+    part(recess, '#c9b28a', { x, y: 0.15, z: -2, ry: Math.PI / 2, outline: 0.5 }),
+    part(P.box(0.14, HIGH_H - 0.5, 0.42), C.ivoryHi, { x: -s * (HIGH_W / 2 + 0.05), y: (HIGH_H - 0.5) / 2, z: 0 }),
+    part(P.box(0.2, 0.2, 0.55), C.brass, { x: -s * (HIGH_W / 2 + 0.07), y: HIGH_H - 0.62, z: 0, outline: 0.4 }),
+  ]);
+}
+// A stretch of balustrade, 2 m along the run, standing on a walk's outer
+// kerb or along the bridge's sides.
+function highRailGeo() {
+  const parts = [part(P.box(0.26, 0.1, 2.0), C.ivoryHi, { y: 0.8, z: -1 }), part(P.box(0.34, 0.9, 0.34), C.ivory, { y: 0.45, z: 0 })];
+  for (let i = 0; i < 4; i++) parts.push(part(P.lathe([[0, 0], [0.09, 0], [0.12, 0.2], [0.05, 0.42], [0.09, 0.74], [0, 0.74]], 6), C.ivory, { z: -0.45 - i * 0.4 }));
+  return merge(parts);
+}
+// The bridge across the road: a span from pier to pier outside the lanes,
+// its soffit flat over them (clear of the highest jump) and curving down
+// into the piers, paved on top. Shaped across the road, a metre along it.
+function highBridgeGeo() {
+  const W = 5.6, pier = 4.4, flat = 3.0, spring = 1.6;
+  const sh = new THREE.Shape();
+  sh.moveTo(-W, 0);
+  sh.lineTo(-W, HIGH_H);
+  sh.lineTo(W, HIGH_H);
+  sh.lineTo(W, 0);
+  sh.lineTo(pier, 0);
+  sh.lineTo(pier, spring);
+  const n = 10;
+  for (let i = 1; i <= n; i++) {
+    const a = (i / n) * (Math.PI / 2);
+    sh.lineTo(flat + (pier - flat) * Math.cos(a), spring + (HIGH_UNDER - spring) * Math.sin(a));
+  }
+  for (let i = 0; i <= n; i++) {
+    const a = Math.PI / 2 + (i / n) * (Math.PI / 2);
+    sh.lineTo(-flat + (pier - flat) * Math.cos(a), spring + (HIGH_UNDER - spring) * Math.sin(a));
+  }
+  sh.lineTo(-pier, 0);
+  sh.lineTo(-W, 0);
+  const span = P.extrude(sh, 1, 3);
+  span.translate(0, 0, -0.5);
+  return merge([
+    part(span, null, { grad: [C.ivoryLo, C.ivory, 0, HIGH_H] }),
+    part(P.box(2 * W - 0.8, 0.02, 1), C.pave, { y: HIGH_H + 0.005, z: -0.5, outline: 0 }),
+    ...CONFIG.laneX.map((x) => part(P.box(0.06, 0.02, 1), C.brass, { x: x + 1.2, y: HIGH_H + 0.012, z: -0.5, outline: 0 })),
+    part(P.box(0.06, 0.02, 1), C.brass, { x: CONFIG.laneX[0] - 1.2, y: HIGH_H + 0.012, z: -0.5, outline: 0 }),
+    part(P.box(2 * flat, 0.02, 1), C.stone, { y: HIGH_UNDER - 0.005, z: -0.5, outline: 0 }),
+  ]);
+}
+// Its face, front and back: a cornice, a brass keystone over the road, and
+// a clock on each pier.
+function highBridgeFaceGeo() {
+  const parts = [
+    part(P.box(11.4, 0.16, 0.2), C.ivoryHi, { y: HIGH_H - 0.08, z: 0.06, outline: 0.4 }),
+    part(P.box(6.2, 0.07, 0.12), C.brass, { y: HIGH_UNDER + 0.05, z: 0.04, outline: 0.4 }),
+    part(P.box(0.5, 0.42, 0.2), C.brass, { y: HIGH_UNDER + 0.2, z: 0.08, outline: 0.5 }),
+  ];
+  for (const x of [-5.0, 5.0]) parts.push(...dialParts({ r: 0.48, depth: 0.1, seg: 18 }).map((g) => g.translate(x, 2.1, 0.08)));
+  return merge(parts);
+}
+// A brass chute jutting from the walk's inner edge out over the middle lane
+// (its bottom rusted through), sand pouring off its whole length: s, the
+// walk's side (-1 the left lane, +1 the right).
+function highChuteGeo(s) {
+  const x0 = s * (-CONFIG.laneX[0] - HIGH_W / 2 + 0.1), x1 = -s * 1.15;
+  const L = Math.abs(x1 - x0), cx = (x0 + x1) / 2;
+  const y = HIGH_H - 0.42;
+  const tilt = 0.06 * s;
+  const parts = [
+    part(P.box(L, 0.07, 1.4), C.brassLo, { x: cx, y, z: -0.8, rz: tilt }),
+    part(P.box(L, 0.32, 0.07), C.brass, { x: cx, y: y + 0.14, z: -0.1, rz: tilt, outline: 0.5 }),
+    part(P.box(L, 0.32, 0.07), C.brass, { x: cx, y: y + 0.14, z: -1.5, rz: tilt, outline: 0.5 }),
+    part(P.box(0.07, 0.34, 1.47), C.brassHi, { x: x1, y: y + 0.08, z: -0.8, outline: 0.5 }),
+  ];
+  for (const z of [-0.2, -1.4]) parts.push(part(P.box(1.6, 0.08, 0.08), C.brassLo, { x: x0 - s * 0.6, y: y - 0.55, z, rz: -0.75 * s, outline: 0.4 }));
+  return merge(parts);
+}
+
 function gateGeo(opening, depth) {
   const parts = [...gateFrameParts(opening, { thick: 1.4, depth, color: C.ivory })];
   const top = gateTop(opening);
@@ -1046,6 +1181,78 @@ export default {
         const o = { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1) };
         put('wallClock', x - s * 1.62, 12.2, z, { ...o, s: 0.55 });
         put('hands', x - s * 1.62, 12.2, z, { ...o, s: 0.55 });
+      }
+    },
+  },
+  // The high walk (see above, and ObstacleField.placeHigh): from the first
+  // time through, now and then one of the outer lanes rises into a walk
+  // over the gallery - up a stair, along the walk, across a bridge over
+  // the road to the other side and down again - while the road runs on
+  // beneath it, sand pouring off the walk through chutes over the middle
+  // lane. Once a visit the first time, twice after.
+  high: {
+    from: 0,
+    every: [2, 4],
+    most: (visit) => (visit === 0 ? 1 : 2),
+    H: HIGH_H,
+    curtain: { name: 'chuteFall', len: 1.6 },
+    // (what it's built of, kept true to shape like any obstacle: see
+    // World.markObstacles)
+    names: ['highStairL', 'highStairR', 'highDeckL', 'highDeckR', 'highBayL', 'highBayR', 'highChuteL', 'highChuteR', 'chuteFall', 'highRail', 'highBridge', 'highBridgeFace'],
+    put(put, P, { d, len, rng }) {
+      const X = CONFIG.laneX;
+      const H = HIGH_H;
+      const hand = (s) => (s < 0 ? 'L' : 'R');
+      if (P.kind === 'up') {
+        const s = Math.sign(X[P.lane]);
+        put(`highStair${hand(s)}`, X[P.lane], 0, d, { sz: len });
+        return;
+      }
+      if (P.kind === 'down') {
+        // (the stair up turned round: its parapet on the other hand)
+        const s = Math.sign(X[P.lane]);
+        put(`highStair${hand(-s)}`, X[P.lane], 0, d + len, { sz: len, ry: Math.PI });
+        return;
+      }
+      if (P.kind === 'deck') {
+        const s = Math.sign(X[P.lane]);
+        const x = X[P.lane];
+        put(`highDeck${hand(s)}`, x, 0, d, { sz: len });
+        for (let z = d; z < d + len - 1.5; z += 4) put(`highBay${hand(s)}`, x, 0, z, {});
+        for (let z = d + 0.6; z < d + len - 1.8; z += 2.2) put('highRail', x + s * (HIGH_W / 2), H + 0.22, z, {});
+        // sand heaped against its outer foot, trickling off its outer edge
+        for (let z = d + rng.float(2, 5); z < d + len - 2; z += rng.float(5, 9)) {
+          put('sandHeap', x + s * (HIGH_W / 2 + 0.6), 0, z, { s: rng.float(0.8, 1.2), ry: rng.float(0, 6.28) });
+          if (rng.chance(0.5)) put('sandfall', x + s * (HIGH_W / 2 + 0.3), 0, z, { sx: rng.float(0.4, 0.8), sy: H + 0.1, p0: rng.float(0, 6.28) });
+        }
+        return;
+      }
+      if (P.kind === 'bridge') {
+        put('highBridge', 0, 0, d, { sz: len });
+        put('highBridgeFace', 0, 0, d, {});
+        put('highBridgeFace', 0, 0, d + len, { ry: Math.PI });
+        for (const s of [-1, 1]) {
+          for (let z = d + 0.6; z < d + len - 1.8; z += 2.2) put('highRail', s * 5.25, H, z, {});
+          put('sandHeap', s * 5.0, 0, d + len * 0.3, { s: 1.3, ry: rng.float(0, 6.28) });
+        }
+        // a clock tower standing over it on the side it crosses to
+        const s = Math.sign(X[P.to]);
+        const tx = s * (DECK_W / 2 + 2.4);
+        const tz = d + len * 0.5;
+        put('climbTower', tx, 0, tz, {});
+        const o = { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1) };
+        put('wallClock', tx - s * 1.62, 12.2, tz, { ...o, s: 0.55 });
+        put('hands', tx - s * 1.62, 12.2, tz, { ...o, s: 0.55 });
+        return;
+      }
+      if (P.kind === 'chute') {
+        // a chute off the walk in lane `from`, sand pouring off it across
+        // the middle lane: the curtain the road runs through
+        const s = Math.sign(X[P.from]);
+        put(`highChute${hand(s)}`, 0, 0, d, {});
+        const x0 = s * 1.3, x1 = -s * 1.1;
+        for (const z of [d + 0.25, d + 0.8, d + 1.35]) put('chuteFall', (x0 + x1) / 2, 0, z, { sx: Math.abs(x1 - x0), sy: H - 0.5, p0: rng.float(0, 6.28) });
+        put('sandHeap', (x0 + x1) / 2, 0, d + 0.8, { s: 1.0, ry: rng.float(0, 6.28) });
       }
     },
   },
@@ -1198,6 +1405,17 @@ export default {
     b.toon('climbRail', terraceRailGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
     b.toon('climbPost', balconyPostGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
     b.toon('climbTower', clockTowerGeo(), { cap: 8, anim: 'popEarly', ink: 0.05 });
+    // the high walk (see high, above)
+    for (const [k, s] of [['L', -1], ['R', 1]]) {
+      b.toon(`highStair${k}`, highStairGeo(s), { cap: 6, anim: 'popEarly', ink: 0.035 });
+      b.toon(`highDeck${k}`, highDeckGeo(s), { cap: 6, anim: 'popEarly', ink: 0.035 });
+      b.toon(`highBay${k}`, highBayGeo(s), { cap: 40, anim: 'popEarly', ink: 0.03 });
+      b.toon(`highChute${k}`, highChuteGeo(s), { cap: 10, anim: 'popEarly', ink: 0.035 });
+    }
+    b.toon('chuteFall', sandfallGeo(), { cap: 30, anim: 'popEarly', ink: 0, sandfall: true });
+    b.toon('highRail', highRailGeo(), { cap: 90, anim: 'popEarly', ink: 0.03 });
+    b.toon('highBridge', highBridgeGeo(), { cap: 4, anim: 'popEarly', ink: 0.04 });
+    b.toon('highBridgeFace', highBridgeFaceGeo(), { cap: 8, anim: 'popEarly', ink: 0.035 });
     DECKS.forEach((h, i) => {
       b.toon(`terrace${i}`, terraceBodyGeo(h), { cap: 10, anim: 'popEarly', ink: 0.035 });
       b.toon(`terraceFace${i}`, terraceFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });

@@ -729,6 +729,9 @@ export class Game {
     for (const o of this.obstacles.records) {
       if (o.hit || o.ramp || (o.grace && o.grace > this.time)) continue;
       if (z1 < o.d || z0 > o.d + o.len) continue;
+      // (a span overhead - a high route's bridge - is never a hit from
+      // below: the road under it is open, even to the highest jump)
+      if (o.over && p.y < o.y0) continue;
       // the stretch of the step the body overlaps it along the road, looked at
       // every 5 cm or so of it
       let sa = 1, sb = 1;
@@ -774,8 +777,15 @@ export class Game {
       o.group.hit = true;
       // dropping into water from a mistimed jump trips you just like running in
       if ((frontal || o.wade) && !glancing) {
-        if (o.kind === 'W') {
+        if (o.kind === 'W' && !o.soft) {
           this.crash();
+          return;
+        }
+        if (o.soft) {
+          // (a curtain of sand pouring down: it knocks you stumbling
+          // through it, never down)
+          o.hit = true;
+          this.stumble();
           return;
         }
         o.hit = true;
@@ -1177,7 +1187,12 @@ export class Game {
     // until they're through the one out (see Player)
     this.player.lowG = st !== 'title' && !!this.course.segAt(this.dist).world.def.lowGravity;
     const boosts = this.player.boosted;
-    this.player.update(dt, this.speed, (x) => this.obstacles.groundAt(x, this.dist));
+    this.player.update(dt, this.speed, (x) => {
+      const h = this.obstacles.groundAt(x, this.dist, this.player.y);
+      // (on a stair, carried up and down it rather than stepping off it)
+      this.player.onRamp = this.obstacles.rampUnder;
+      return h;
+    });
     if (this.player.boosted !== boosts) {
       this.cam.boost(this.player.thrust);
       this.audio.thrust(this.player.thrust);

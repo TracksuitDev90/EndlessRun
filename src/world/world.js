@@ -130,6 +130,7 @@ export class World {
     }
     // (and what a climb is built of: see ObstacleField.placeClimb)
     for (const name of this.def.climb?.names || []) names.add(name);
+    for (const name of this.def.high?.names || []) names.add(name);
     for (const name of names) {
       if (!this.batches.has(name)) continue;
       for (const m of this.batches.get(name).materials) {

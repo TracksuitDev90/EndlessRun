@@ -271,7 +271,7 @@ export class Companion {
     const vf = g.speed + this.vdz;
     // (up a climb's ramp and along its decks, leaping its gaps: see
     // ObstacleField.surfaceAt)
-    const sf = Number.isFinite(g.dist) ? g.obstacles.surfaceAt(this.x, g.dist + this.dz) : 0;
+    const sf = Number.isFinite(g.dist) ? g.obstacles.surfaceAt(this.x, g.dist + this.dz, (this.lift || 0) + 0.6) : 0;
     this.lift = (this.lift || 0) + (sf - (this.lift || 0)) * (sf > (this.lift || 0) ? 1 - Math.exp(-dt * 16) : 1 - Math.exp(-dt * 7));
     _p.set(this.x, this.y + this.lift, this.pz - this.dz);
     // facing where she's going, banked into turns

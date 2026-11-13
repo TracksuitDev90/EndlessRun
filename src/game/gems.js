@@ -128,6 +128,7 @@ export class GemField {
   // --- the route ------------------------------------------------------------
   pass(row, dist, runTime) {
     if (row.climb) return this.climb(row, dist, runTime);
+    if (row.high) return this.high(row, dist, runTime);
     row.gemmed = true;
     const C = CONFIG.gems;
     const r = this.rng;
@@ -213,6 +214,68 @@ export class GemField {
       } else if (o.pit) d = Math.max(d, end + sp * 0.3);
     }
     this.lane = 1;
+    this.cursor = row.end + v * 0.12;
+  }
+
+  // A high route (see ObstacleField.placeHigh): the gems are the reason to go
+  // up. Steer into its lane before the stair and lay a run up it, along the
+  // walk - in an arc over every hurdle up there and low under every bar -
+  // across the bridge to the other side (the one in the middle of the
+  // crossing crowned), along the far walk and down its stair.
+  high(row, dist, runTime) {
+    row.gemmed = true;
+    const C = CONFIG.gems;
+    const [v, diff] = this.at(row.d, dist, runTime);
+    const sp = this.spacing(v);
+    this.restT = lerp(C.rest[0], C.rest[1], diff);
+    const S = row.high;
+    this.route(this.lane, S.P, row.d - v * 0.45, v, diff);
+    this.cruise(this.cursor, row.d - v * 0.6, v, diff, sp, true);
+    const A = this.arcAt(row.d);
+    const H = S.H;
+    const c0 = S.bridge.d + v * 0.2;
+    const c1 = S.bridge.d + S.bridge.len - v * 0.25;
+    const xAt = (d) => (d < c0 ? X[S.P] : d > c1 ? X[S.Q] : lerp(X[S.P], X[S.Q], ease((d - c0) / (c1 - c0))));
+    const yAt = (d) => {
+      if (d < S.a.d) return H * Math.min(1, Math.max(0, (d - S.up.d) / S.up.len));
+      if (d > S.down.d) return H * (1 - Math.min(1, Math.max(0, (d - S.down.d) / S.down.len)));
+      return H;
+    };
+    const mid = (c0 + c1) / 2;
+    let crowned = false;
+    const line = (from, to) => {
+      let d = from;
+      for (; d < to; d += sp) {
+        const crown = !crowned && d >= mid - sp / 2;
+        if (crown) crowned = true;
+        this.gem(d, xAt(d), yAt(d) + C.ground, v, diff, crown, true);
+      }
+      return d;
+    };
+    let d = row.d + sp * 0.5;
+    for (const o of S.top) {
+      if (o.kind === 'L') {
+        const takeoff = o.d + o.len / 2 - v * A.mid;
+        line(d, takeoff - sp * 0.4);
+        const n = 5;
+        for (let k = 0; k < n; k++) {
+          const t = (A.T * (k + 0.5)) / n;
+          this.gem(takeoff + v * t, X[o.lane], H + A.feet(t) + C.ground, v, diff, false, true);
+        }
+        d = takeoff + v * A.T + sp * 0.3;
+      } else {
+        const u0 = o.d - v * 0.2;
+        const u1 = o.d + o.len + v * 0.2;
+        line(d, u0 - sp * 0.5);
+        const n = Math.max(3, Math.round((u1 - u0) / sp) + 1);
+        for (let k = 0; k < n; k++) this.gem(lerp(u0, u1, k / (n - 1)), X[o.lane], H + C.low, v, diff, false, true);
+        d = u1 + sp * 0.6;
+      }
+    }
+    line(d, row.end - sp * 0.3);
+    // (the route crossed over on the bridge: later runs carry on from there)
+    this.moves.push({ d: c0, from: S.P, to: S.Q, len: c1 - c0 });
+    this.lane = S.Q;
     this.cursor = row.end + v * 0.12;
   }
 
@@ -385,6 +448,9 @@ export class GemField {
     const react = v * lerp(C.react[0], C.react[1], diff);
     for (const o of this.game.obstacles.records) {
       const dx = Math.abs(x - o.x);
+      // (a high route's walk is one lane wide, and the road under its bridge
+      // is open: clear of them, a gem is clear)
+      if (o.high && (dx >= o.hw + R || (o.over && y + R < o.y0))) continue;
       // (a climb spans the road: a gem is clear of it if it's over its top)
       if (o.climb) {
         if (o.pit || d < o.d - 0.7 || d > o.d + o.len + 0.7) continue;
@@ -537,6 +603,8 @@ export class GemField {
     const v = Math.max(game.speed, CONFIG.speed.start);
     const door = game.course.boundaryAfter(game.dist);
     if (door) to = Math.min(to, door.d - 3);
+    // (a trail stops short of a high route: it's a route of its own)
+    for (const r of game.obstacles.rows) if (r.high && r.end > from && r.d < to) to = Math.min(to, r.d - v * 0.5);
     if (to - from < v) return [];
     const rows = game.obstacles.rows.filter((r) => r.d > from && r.end < to && r.lanes.some(Boolean));
     // the lane past each row: never a wall; reachable from the last in the
