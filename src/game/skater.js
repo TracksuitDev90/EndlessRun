@@ -33,6 +33,10 @@ import { Dust } from './dust.js';
 //     over her heels (and a heel comes up off the deck before an ankle would
 //     bend further than it can: heelLift);
 //   - every lane change is a carve, the board leaning hard into it;
+//   - now and then, cruising with open road ahead, she plays with her board
+//     (FLAT: a manual, a few tic-tacs, a pop shove-it) - for show only: none
+//     of it moves her, slows her or changes what can hit her, and anything
+//     asked of her takes over at once;
 //   - her braids are simulated one by one (twelve in the ponytail, four
 //     framing her face - each a chain of bones swung by a little rope of
 //     particles), her tee's hem flaps on springs and ripples in the wind (the
@@ -132,7 +136,12 @@ const PUSH_YAW = -0.42;
 // knee sinking deep under her as it goes, the board and all of her surging
 // ahead with it (surge, m), and a high kick of the heel as the leg swings
 // through for the next.
-const PUSH = { entry: 0.2, each: 0.6, drive: 0.29, G0: [0.2, -0.13], G1: [0.16, 0.47], n: [2, 3], gap: [2.6, 3.4], sink: 0.15, surge: 0.07 };
+// (Low and long, like a street skater's push: the front knee folds right
+// down, the body pitches forward till it's nearly level, the head stays up
+// looking down the road, and the back leg drives out straight behind, the
+// shoe kicking up off the road at the end of it before the knee swings
+// through high for the next.)
+const PUSH = { entry: 0.2, each: 0.62, drive: 0.31, G0: [0.2, -0.12], G1: [0.17, 0.57], n: [2, 3], gap: [2.6, 3.4], sink: 0.23, surge: 0.08 };
 
 // Her jumps, dealt from a shuffled deck so the same one never comes twice
 // running.
@@ -142,6 +151,34 @@ const TRICKS = ['ollie', 'kickflip', 'heelflip', 'ollie', 'kickflip', 'heelflip'
 const TUCK = 0.33;
 const FLIP_LIFT = 0.25;
 
+// Flatground tricks: every so often, riding along with nothing on the road
+// for a while ahead, she plays with her board - one of
+//   - a manual: her weight back over the tail, the nose up off the road on
+//     the back wheels, balancing there a second or so (knees soft, arms out,
+//     nudging it up and down), then setting it back down;
+//   - tic-tacs: up on the back wheels, the board swung from side to side
+//     under her - her hips going with it, her shoulders winding against it
+//     to swing it - a weight-shift and a knee-bend on each;
+//   - a pop shove-it: a crouch, the tail scooped, and the board spins half a
+//     turn under her feet as she hops up off it, a hand's breadth; she
+//     catches it and rides away on it (it stays turned round: the board's
+//     ends are the same).
+// For show only - none moves where the game has her, how fast she goes, how
+// high she is or what can hit her - and only on her wheels, with nothing
+// else going on; a jump, a duck or a lane change takes over at once, the
+// trick let go in a tenth of a second or so (out, 1/s; a shove-it's spin
+// finishes itself). Each a little different every time (how long, how many,
+// how hard), never the same one twice running, and several seconds of plain
+// riding between them (gap: s).
+const FLAT = {
+  kinds: ['manual', 'tictac', 'shuvit'],
+  dur: { manual: [1.05, 0.65], tictac: [1.2, 0.3], shuvit: [0.64, 0.08] },
+  gap: [6, 7],
+  first: [4.5, 4],
+  clear: 1.2,
+  out: 20,
+};
+
 // The crouch under a bar (by how far through the slide she is): a skater's
 // crouch - her seat sat back over her heels (not dropped straight down onto
 // them: no ankle bends that far), folded forward over her knees, her front
@@ -150,7 +187,7 @@ const FLIP_LIFT = 0.25;
 const DUCK = { hipY: 0.63, hipX: -0.14, hipPitch: 0.46, hipYaw: -1.32, spLean: 0.92, chLean: 0.3, spTwist: 0.18, chTwist: 0.1, hdPitch: -0.6, hdYaw: 0.72, shLx: 1.35, shLz: 0.22, shLy: 0.1, elL: 0.35, wrL: 0.45, shRx: -0.4, shRz: 1.05, shRy: -0.2, elR: 0.45, wrR: 0.2 };
 // How far her foot can bend up toward her shin (rad: her ankle, in a stiff
 // skate shoe); crouched deeper than that, the heel lifts off the deck.
-const ANKLE_MAX = 0.68;
+const ANKLE_MAX = 0.74;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -188,8 +225,8 @@ export class Skater extends Player {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
     // (the fox can ride on her shoulder, but there's a board between her feet)
     this.onBoard = true;
-    // (her braids stream out a long way behind her; the board goes up with her)
-    this.castR = 1.15;
+    // (her braids stream out behind her; the board goes up with her)
+    this.castR = 1.0;
     this.castTop = 2.1;
   }
 
@@ -242,6 +279,10 @@ export class Skater extends Player {
     this.swayS = new Spring();
     this.swayX = 0;
     this.hemS = { F: new Spring(), B: new Spring(), L: new Spring(), R: new Spring() };
+    // the flatground trick going on (FLAT), and this frame's of it (fx:
+    // weighted already; all nothing when there isn't one)
+    this.flat = { on: false, kind: 'manual', last: null, t: 0, dur: 1, w: 0, next: 0, n: 3, amp: 1, seed: 0, spin: 0, spinTo: 0, deckYaw: 0 };
+    this.fx = { shift: 0, yaw: 0, pitch: 0, pop: 0, lift: 0, off: 0, offF: 0, scoop: 0, hipY: 0, lean: 0, open: 0, arms: 0, hang: 0, fling: 0, wob: 0, look: 0, twist: 0, loose: 0 };
     this.buildBraids();
   }
 
@@ -255,6 +296,14 @@ export class Skater extends Player {
     this.moodNext = MOOD_HOLD[0] + MOOD_HOLD[1] * Math.random();
     for (const k of MOOD_NAMES) this.moodK[k] = k === this.mood ? 1 : 0;
     this.push = { on: false, t: 0, n: 0, w: 0, foot: 0, next: 0.25, wantFirst: true, planted: -1 };
+    const F = this.flat;
+    F.on = false;
+    F.w = 0;
+    F.spin = 0;
+    F.deckYaw = 0;
+    F.last = null;
+    F.next = FLAT.first[0] + FLAT.first[1] * Math.random();
+    for (const k in this.fx) this.fx[k] = 0;
     this.carvePh = Math.random() * TAU;
     if (this.swayS) this.swayS.reset();
     this.pushPlant = false;
@@ -281,6 +330,7 @@ export class Skater extends Player {
     const sp = clamp((speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start), 0, 1);
     this.carvePh += dt * (CARVE.rate[0] + CARVE.rate[1] * sp) * (rate / (tot || 1)) * (1 + 0.22 * Math.sin(this.time * 0.29 + 1.1));
     this.moodStep(dt);
+    this.flatStep(dt, speed);
     this.pushStep(dt, speed);
     this.greetT += dt;
     this.dodgeT += dt;
@@ -320,18 +370,195 @@ export class Skater extends Player {
     for (const k of MOOD_NAMES) this.moodK[k] = k === name ? 1 : 0;
   }
 
+  // The flatground tricks (FLAT): when the next is due, and she's riding
+  // along on her wheels with nothing else going on and open road ahead, one
+  // starts (never the one before); then this frame's of it, into fx.
+  flatStep(dt, speed) {
+    const F = this.flat;
+    const riding = this.mode === 'run' && !this.crashed && this.grounded && !this.bounding && !this.sliding && !this.lowG && !(this.stumbleT > 0);
+    if (F.on) {
+      F.t += dt;
+      if (!riding) this.flatCut();
+      else if (F.t >= F.dur) {
+        F.on = false;
+        if (F.kind === 'shuvit') this.flatSpun();
+        F.next = FLAT.gap[0] + FLAT.gap[1] * Math.random();
+        this.push.next = Math.max(this.push.next, 0.8 + 0.8 * Math.random());
+      }
+    } else if (this.mode === 'run' && !this.crashed) {
+      F.next -= dt;
+      if (F.next <= 0) {
+        const calm = riding && speed > 6 && !this.push.on && this.push.w < 0.02 && this.w.run > 0.97 && this.dodgeT > 0.8 && this.landT > 1 && Math.abs(this.laneC || 0) < 0.06 && !(this.flyW > 0.01);
+        let kind = null;
+        if (calm) {
+          const pick = FLAT.kinds.filter((k) => k !== F.last);
+          kind = pick[Math.floor(Math.random() * pick.length)];
+        }
+        const dur = kind && FLAT.dur[kind][0] + FLAT.dur[kind][1] * Math.random();
+        if (kind && this.openRoad?.(dur + FLAT.clear)) this.startFlat(kind, dur);
+        // (not now: look again in a moment)
+        else F.next = 0.3 + 0.4 * Math.random();
+      }
+    }
+    // let go of quickly when it's cut short; a shove-it's spin finishes
+    // itself (or, barely begun, turns back)
+    F.w = F.on ? 1 : damp(F.w, 0, FLAT.out, dt);
+    if (!F.on && F.spin > 0) {
+      F.spin = F.spinTo ? Math.min(1, F.spin + dt * 7) : Math.max(0, F.spin - dt * 7);
+      if (F.spin >= 1) this.flatSpun();
+    }
+    this.flatPose();
+  }
+
+  // Start a flatground trick (kind; dur: s, or one of its own). (The viewer
+  // calls this too: &flat=.)
+  startFlat(kind, dur) {
+    const F = this.flat;
+    F.on = true;
+    F.kind = kind;
+    F.last = kind;
+    F.t = 0;
+    F.dur = dur ?? FLAT.dur[kind][0] + FLAT.dur[kind][1] * Math.random();
+    F.n = 3 + (Math.random() < 0.4 ? 1 : 0);
+    F.amp = 0.85 + 0.3 * Math.random();
+    F.seed = Math.random() * 10;
+    F.spin = 0;
+  }
+
+  // Cut short (a jump, a duck, a lane change, a stumble...): let go now.
+  flatCut() {
+    const F = this.flat;
+    if (!F.on) return;
+    F.on = false;
+    F.spinTo = F.spin > 0.3 ? 1 : 0;
+    F.next = Math.max(F.next, FLAT.gap[0] * 0.6 + FLAT.gap[1] * 0.5 * Math.random());
+  }
+
+  // A shove-it's half turn done: the board stays turned round.
+  flatSpun() {
+    const F = this.flat;
+    F.deckYaw = wrapAngle(F.deckYaw + Math.PI);
+    F.spin = 0;
+  }
+
+  // This frame's of the trick (fx), by how far through it she is - the
+  // board's moves (a slide along under her: shift; swung on its back
+  // wheels: yaw; tipped up onto them: pitch; popped off its tail: pop;
+  // lifted: lift), her feet's (off it, up: off, the front a little more:
+  // offF; the back one onto the tail: scoop) and her body's - all weighted
+  // by how much of the trick there is.
+  flatPose() {
+    const F = this.flat;
+    const X = this.fx;
+    for (const k in X) X[k] = 0;
+    const w = F.w;
+    if (w < 0.001) return;
+    const u = clamp(F.t / F.dur, 0, 1);
+    const t = F.t;
+    const A = F.amp;
+    if (F.kind === 'manual') {
+      // up onto the back wheels, balanced there - nudged up and down - and
+      // set back down, the knees taking it
+      const e = smooth(0, 0.18, u) * (1 - smooth(0.8, 0.97, u));
+      const wob = 0.6 * Math.sin(t * 6.3 + F.seed * 5) + 0.4 * Math.sin(t * 10.1 + F.seed * 3);
+      const tap = bump(0.86, 0.91, 0.93, 1, u);
+      X.pitch = (0.15 * A + 0.035 * wob) * e;
+      X.shift = -0.075 * e;
+      X.hipY = -0.035 * e - 0.025 * tap;
+      X.open = 0.1 * e;
+      X.arms = 0.5 * e;
+      X.wob = 0.16 * wob * e;
+      X.look = 0.16 * e;
+      X.lean = 0.1 * tap;
+    } else if (F.kind === 'tictac') {
+      // swung from side to side on the back wheels, the nose up as it
+      // swings; a dip of the knees as it turns each way
+      const e = smooth(0, 0.1, u) * (1 - smooth(0.86, 1, u));
+      const sw = Math.sin(Math.PI * F.n * smooth(0.02, 0.96, u));
+      X.yaw = 0.4 * A * sw * e;
+      X.pitch = (0.06 + 0.045 * Math.abs(sw)) * e;
+      X.shift = -0.02 * e;
+      X.hipY = -0.015 * e - 0.03 * sw * sw * e;
+      X.twist = X.yaw;
+      X.arms = 0.32 * e;
+      X.look = 0.12 * e;
+      X.lean = 0.05 * sw * sw * e;
+    } else {
+      // the pop shove-it: crouch, scoop the tail, hop up a little off it as
+      // it spins under her, catch it, ride it away
+      const crouch = bump(0, 0.16, 0.2, 0.3, u);
+      const pop = bump(0.17, 0.22, 0.25, 0.36, u);
+      const hop = bump(0.22, 0.4, 0.5, 0.72, u);
+      const off = bump(0.21, 0.3, 0.62, 0.72, u);
+      const land = bump(0.68, 0.78, 0.82, 1, u);
+      X.scoop = bump(0.06, 0.16, 0.26, 0.38, u);
+      X.pop = 0.2 * pop;
+      X.lift = 0.1 * hop;
+      X.off = 0.09 * off;
+      X.offF = 0.03 * off;
+      // (the wind-up deep, arms hanging down between her knees; flung up and
+      // out as she pops, one higher than the other)
+      X.hipY = -0.11 * crouch + 0.09 * A * hop - 0.08 * land;
+      X.lean = 0.24 * crouch + 0.16 * land - 0.05 * hop;
+      X.arms = 0.55 * hop + 0.14 * land - 0.1 * crouch;
+      X.hang = crouch;
+      X.fling = hop;
+      X.look = 0.22 * crouch + 0.3 * off + 0.1 * land;
+      X.loose = off;
+      if (F.on) F.spin = ease(smooth(0.24, 0.66, u));
+    }
+    for (const k in X) X[k] *= w;
+  }
+
+  // The trick on her body (fx): sat back or crouched or up off the board,
+  // arms out to balance, eyes on the board; for the tic-tacs, her hips go
+  // with the board and her shoulders wind against it to swing it (her head
+  // keeps looking down the road).
+  poseFlat(r) {
+    const X = this.fx;
+    if (this.flat.w < 0.001) return;
+    r[C.hipY] += X.hipY;
+    r[C.hipPitch] += -X.open + 0.5 * X.lean;
+    r[C.spLean] += X.lean - X.open;
+    r[C.chLean] += 0.3 * X.open;
+    r[C.hdPitch] -= X.look;
+    r[C.shLz] += X.arms + X.wob;
+    r[C.shRz] += 0.9 * X.arms - 0.8 * X.wob;
+    r[C.shLx] += 0.25 * X.arms;
+    r[C.elL] -= 0.12 * X.arms;
+    r[C.elR] -= 0.12 * X.arms;
+    // (a shove-it's wind-up: arms hanging forward between her knees; its
+    // pop: the front arm flung up high, the back one out)
+    r[C.shLx] += 0.55 * X.hang + 0.5 * X.fling;
+    r[C.shRx] += 0.5 * X.hang - 0.2 * X.fling;
+    r[C.shLz] -= 0.25 * X.hang - 0.45 * X.fling;
+    r[C.shRz] -= 0.2 * X.hang;
+    r[C.elL] += 0.25 * X.hang;
+    r[C.elR] += 0.25 * X.hang;
+    if (X.twist) {
+      r[C.hipYaw] += 0.45 * X.twist;
+      r[C.spTwist] -= 0.15 * X.twist;
+      r[C.chTwist] -= 0.55 * X.twist;
+      r[C.hdYaw] += 0.22 * X.twist;
+      r[C.shLx] -= 0.7 * X.twist;
+      r[C.shRx] += 0.7 * X.twist;
+    }
+  }
+
   // Two or three pushes off the road at the start of a run, and again every
   // few seconds - only with her wheels on the road and nothing else going on
   // (anything that needs her back foot on the board puts it back at once).
   pushStep(dt, speed) {
     const P = this.push;
-    const free = this.mode === 'run' && !this.crashed && this.grounded && !this.sliding && speed > 2 && this.w.jump < 0.3 && this.w.slide < 0.2;
+    const free = this.mode === 'run' && !this.crashed && this.grounded && !this.sliding && speed > 2 && this.w.jump < 0.3 && this.w.slide < 0.2 && !this.flat.on && this.flat.w < 0.05;
     if (P.on) {
       P.t += dt;
       const end = PUSH.entry + P.n * PUSH.each;
       if (!free || P.t >= end) {
         P.on = false;
         P.next = PUSH.gap[0] + PUSH.gap[1] * Math.random();
+        // (a breath of plain riding before any trick)
+        this.flat.next = Math.max(this.flat.next, 1.2 + Math.random());
       } else {
         // a foot planted: a scuff of dust, a print in the sand
         const i = Math.floor((P.t - PUSH.entry) / PUSH.each);
@@ -408,7 +635,9 @@ export class Skater extends Player {
         const k = ease(e);
         x = mix(g1[0], to[0], k);
         z = mix(g1[1], to[1], k) + 0.1 * Math.sin(Math.PI * e) * (1 - e);
-        y = mix(ANKLE_H + 0.03, to[2], k) + (last ? 0.2 : 0.18) * Math.sin(Math.PI * Math.pow(e, 0.7));
+        // (the shoe kicks up behind as the toe leaves the road, then the
+        // knee swings through high under her)
+        y = mix(ANKLE_H + 0.03, to[2], k) + (last ? 0.22 : 0.22) * Math.sin(Math.PI * Math.pow(e, 0.7)) + 0.1 * bump(0, 0.12, 0.25, 0.5, e);
         pitch = -0.75 * (1 - smooth(0, 0.45, e)) + 0.12 * Math.sin(Math.PI * e);
         if (last) yaw = mix(-0.18, tail.yaw, smooth(0.4, 0.9, e));
         ground = last ? 0 : smooth(0.88, 1, e);
@@ -456,6 +685,7 @@ export class Skater extends Player {
     }
     super.jump();
     this.push.on = false;
+    this.flatCut();
     // (a flip still turning finishes quickly)
     this.flip.value = wrapAngle(this.flip.value);
     this.flip.from = this.flip.to = this.flip.value;
@@ -473,15 +703,18 @@ export class Skater extends Player {
     this.dodgeT = 0;
     this.dodgeDir = dir;
     this.push.on = false;
+    this.flatCut();
   }
 
   startSlide() {
     super.startSlide();
     this.push.on = false;
+    this.flatCut();
   }
 
   crash() {
     super.crash();
+    this.flatCut();
     // the board shoots off on its own, tumbling down the road
     const F = this.free;
     F.on = true;
@@ -537,12 +770,13 @@ export class Skater extends Player {
     // the carve: + out over her toes, - back on her heels; the hips lead it,
     // the chest, the head and the arms follow, each a beat behind
     const ph = this.carvePh;
-    const A = carve;
+    // (playing with the board, she stops carving to)
+    const A = carve * (1 - 0.75 * this.flat.w);
     const L = Math.sin(ph);
     const Lh = Math.sin(ph + 0.25);
     const Lc = Math.sin(ph - 0.45);
     const Ld = Math.sin(ph - 0.9);
-    this.carveAmt = carve;
+    this.carveAmt = A;
     // the whole of her, from the wheels (toward her toes is -roll)
     r[C.bodyRoll] = -CARVE.lean * A * L;
     r[C.hipX] = 0.045 * A * Lh;
@@ -609,6 +843,7 @@ export class Skater extends Player {
     r[C.hdYaw] = -0.94 * (STANCE_YAW + r[C.spTwist] + r[C.chTwist]) + 0.08 * Math.sin(t * 0.43) - 0.12 * A * Lc;
     r[C.hdRoll] = 0.06 + 0.04 * Math.sin(t * 0.31) + 0.05 * A * Ld + 0.02 * n3;
     this.posePush(r, sp);
+    this.poseFlat(r);
     // (with the fox riding on her shoulder, the arm under her stays down)
     if (this.rider) {
       const left = this.rider < 0;
@@ -641,17 +876,18 @@ export class Skater extends Player {
     k('bodyRoll', 0);
     k('bodyZ', -PUSH.surge * drive);
     k('hipYaw', PUSH_YAW + 0.05 * swing);
-    k('hipPitch', 0.14 + 0.08 * drive);
+    k('hipPitch', 0.18 + 0.2 * drive);
     k('hipX', 0.05);
     k('hipRoll', -0.05 - 0.05 * drive);
-    k('spLean', 0.3 + 0.16 * drive - 0.06 * rise + 0.04 * sp);
-    k('chLean', 0.06 + 0.04 * drive);
+    k('spLean', 0.34 + 0.34 * drive - 0.1 * rise + 0.04 * sp);
+    k('chLean', 0.08 + 0.1 * drive);
     k('spTwist', 0.12 + 0.05 * swing);
     k('chTwist', 0.04 + 0.13 * swing);
     k('spSide', 0.04 + 0.04 * drive);
     k('chSide', 0);
     k('hipY', 0.93 - PUSH.sink * drive + 0.025 * rise);
-    k('hdPitch', -0.04 - 0.24 * drive);
+    // (eyes up, down the road, however far forward she's pitched)
+    k('hdPitch', 0.05 + 0.6 * drive - 0.05 * rise);
     k('hdYaw', -0.9 * (PUSH_YAW + 0.16) - 0.08 * swing);
     k('hdRoll', 0.04);
     k('shLx', 0.25 - 0.8 * swing);
@@ -890,6 +1126,17 @@ export class Skater extends Player {
     q.multiply(_q.setFromAxisAngle(AY, yaw + IDLE_BOARD * wi));
     q.multiply(_q.setFromAxisAngle(AZ, roll + wob));
     const P = this.bPos.set(0, BOARD_Y + lift + hop, 0);
+    // a flatground trick (fx): slid along under her, swung about its back
+    // truck, tipped up onto its back wheels, popped off its tail, lifted
+    const X = this.fx;
+    if (this.flat.w > 0.001) {
+      const R = this.rig.board;
+      if (X.shift) P.add(_v.set(0, 0, X.shift).applyQuaternion(q));
+      if (X.yaw) this.turnBoard(AY, X.yaw, 0, R.truckZ);
+      if (X.pitch) this.turnBoard(AX, X.pitch, -BOARD_Y, R.truckZ);
+      if (X.pop) this.turnBoard(AX, X.pop, -BOARD_Y, 0.36);
+      if (X.lift) P.y += X.lift;
+    }
     // (the pop turns it nose up about its tail on the road)
     if (pop > 0) {
       const pv = _v.set(0, -BOARD_Y, 0.36);
@@ -904,7 +1151,7 @@ export class Skater extends Player {
     const popK = wj * bump(0, 0.04, 0.35, 0.6, u);
     const slideUp = wj * bump(0.04, 0.2, 0.3, 0.55, u);
     const zF = mix(SPOT.front, -0.3, slideUp) + (SPOT.slide - SPOT.front) * 0.3 * ws;
-    const zB = mix(SPOT.back, SPOT.tail, popK);
+    const zB = mix(mix(SPOT.back, SPOT.tail, popK), SPOT.tail, X.scoop);
     const aF = mix(ANGLE.front, ANGLE.push, this.push.w);
     const fronts = [this.footOnBoard(this.feet[0], zF, aF), this.footOnBoard(this.feet[1], zB, ANGLE.back)];
     // off the board while it flips: the front foot flicked out (off the heel
@@ -912,6 +1159,16 @@ export class Skater extends Player {
     // lifted up over it; caught, and ridden down
     const off = flipping ? wj * bump(0.1, 0.2, 0.58, 0.7, u) : 0;
     const off2 = wi * g.off;
+    // (a shove-it: both feet up off it while it spins, the front a little
+    // higher)
+    if (X.off > 0) {
+      for (let i = 0; i < 2; i++) {
+        const Ft = this.feet[i];
+        Ft.at.y += X.off + (i === 0 ? X.offF : 0);
+        Ft.pitch += (i === 0 ? -0.15 : -0.08) * X.loose;
+        Ft.flat *= 1 - X.loose;
+      }
+    }
     if (off > 0 || off2 > 0) {
       const side = trick === 'heelflip' ? 1 : -1;
       for (let i = 0; i < 2; i++) {
@@ -946,15 +1203,18 @@ export class Skater extends Player {
     // (the feet placed, the board's own turns go on: the flip about its long
     // axis, through its middle; the shove-it about the upright)
     if (flip !== 0) this.turnBoard(AZ, flip, -0.04);
-    if (spin !== 0) this.turnBoard(AY, spin, 0);
+    // (and the shove-it's half turn - and every one before it: the board
+    // rides on turned round)
+    const turn = spin + this.flat.deckYaw + Math.PI * this.flat.spin;
+    if (turn !== 0) this.turnBoard(AY, turn, 0);
     this.boardFlip = flip;
   }
 
   // Turn the board about one of its own axes through a point h up from the
-  // middle of its deck's top.
-  turnBoard(axis, angle, h) {
+  // middle of its deck's top (and z along it).
+  turnBoard(axis, angle, h, z = 0) {
     const q = this.bQ;
-    const pv = _v.set(0, h, 0);
+    const pv = _v.set(0, h, z);
     _q2.setFromAxisAngle(axis, angle);
     this.bPos.add(_v2.copy(pv).applyQuaternion(q)).sub(_v3.copy(pv).applyQuaternion(_q3.copy(q).multiply(_q2)));
     q.multiply(_q2);
@@ -1313,7 +1573,10 @@ export class Skater extends Player {
       const tail = d.group === 'tail';
       // how hard each joint is held to where it sits on her head: the
       // ponytail's arc out of the cuff, the face-framing ones at their roots
-      const hold = tail ? [1, 0.5, 0.22, 0.07, 0.02] : [1, 0.25, 0.06];
+      // (only the first of the arc firmly: held all the way round it, the
+      // arc turns forward with her head when she ducks and the wind folds
+      // the rest of the braid back over it into a loop)
+      const hold = tail ? [1, 0.5, 0.14, 0.03] : [1, 0.28, 0.06];
       // each braid its own: how much the wind takes it, how heavy it hangs,
       // how quickly and how hard it flutters, how stiff it is (hashed off its
       // seed, so none moves quite like its neighbour)
@@ -1332,11 +1595,15 @@ export class Skater extends Player {
         tgt: Array.from({ length: n }, () => new THREE.Vector3()),
         tgt0: Array.from({ length: n }, () => new THREE.Vector3()),
         hold: Array.from({ length: n }, (_, k) => hold[k] ?? 0),
-        drag: (tail ? 0.64 : 0.56) * (0.7 + 0.6 * h(1)),
-        heavy: 0.88 + 0.24 * h(2),
+        drag: (tail ? 0.6 : 0.5) * (0.75 + 0.5 * h(1)),
+        heavy: 0.92 + 0.2 * h(2),
         freq: 0.75 + 0.55 * h(3),
-        flut: 0.7 + 0.7 * h(4),
-        stiff: 0.88 + 0.06 * h(5),
+        flut: 0.6 + 0.5 * h(4),
+        // (a braid is a stiffish cord: it bends in long curves, it doesn't
+        // kink or fold back on itself - but its arc out of the cuff is
+        // sculpted tighter than that, so the arc keeps its own shape)
+        stiff: 0.95 + 0.03 * h(5),
+        stiffFrom: tail ? 3 : 1,
         seed: d.seed,
       };
     });
@@ -1429,16 +1696,18 @@ export class Skater extends Player {
           // own time and to its own degree
           // (long waves down it - a joint and its neighbours pushed much the
           // same way - so it ripples rather than kinks)
-          const fk = Math.pow(k / n, 1.1) * airS * 0.3 * B.flut;
+          const fk = Math.pow(k / n, 1.1) * airS * 0.17 * B.flut;
           const n1 = Math.sin(tb * 7.1 - k * 0.5 + B.seed * 23) + 0.35 * Math.sin(tb * 11.7 - k * 0.75 + B.seed * 9);
           const n2 = Math.sin(tb * 6.3 - k * 0.55 + B.seed * 31) + 0.3 * Math.sin(tb * 10.3 - k * 0.8 + B.seed * 5);
           const n3 = Math.sin(tb * 4.9 - k * 0.4 + B.seed * 13);
           const ax = gx + kd * (airX - vx) + fk * n1;
           const ay = gy + kd * (airY - vy) + fk * n2 * 0.7;
           const az = gz + kd * (airZ - vz) + fk * n3 * 0.35;
-          const nx = p.x + (p.x - q.x) * scale * 0.988 + ax * h * h;
-          const ny = p.y + (p.y - q.y) * scale * 0.988 + ay * h * h;
-          const nz = p.z + (p.z - q.z) * scale * 0.988 + az * h * h;
+          // (a touch of damping on top of the air's: they settle rather than
+          // whip on after every jolt)
+          const nx = p.x + (p.x - q.x) * scale * 0.982 + ax * h * h;
+          const ny = p.y + (p.y - q.y) * scale * 0.982 + ay * h * h;
+          const nz = p.z + (p.z - q.z) * scale * 0.982 + az * h * h;
           q.copy(p);
           p.set(nx, ny, nz);
         }
@@ -1466,10 +1735,11 @@ export class Skater extends Player {
               c.addScaledVector(_v, -0.5 * e);
             }
           }
-          // a little stiffness against folding back on itself
+          // stiffness against kinking or folding back on itself (past the
+          // ponytail's arc: that keeps the shape it's held in)
           for (let k = 0; k < B.n - 2; k++) {
             const a = B.p[k], c = B.p[k + 2];
-            const want = B.stiff * (B.len[k] + B.len[k + 1]);
+            const want = (k >= B.stiffFrom ? B.stiff : 0.86) * (B.len[k] + B.len[k + 1]);
             _v.subVectors(c, a);
             const L = _v.length() || 1e-6;
             if (L < want) {

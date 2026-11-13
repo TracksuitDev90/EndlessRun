@@ -127,6 +127,7 @@ export class UI {
       ['btn-palmenu', 'palmenu'],
       ['btn-palmenu-2', 'palmenu'],
       ['btn-palmenu-close', 'palmenuClose'],
+      ['btn-begin', 'begin'],
     ]) {
       const el = $(id);
       if (!el) continue;
@@ -148,10 +149,17 @@ export class UI {
       const b = e.target.closest('[data-buy]');
       if (b && !b.disabled) this.handlers.buy?.(b.dataset.buy);
     });
-    $('palmenu').addEventListener('pointerdown', (e) => e.stopPropagation());
+    // (only a tap on the menu's own backdrop closes it - not a scroll of its
+    // list that happens to end out there)
+    let downOnBackdrop = false;
+    $('palmenu').addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      downOnBackdrop = e.target === $('palmenu');
+    });
     $('palmenu').addEventListener('click', (e) => {
       e.stopPropagation();
-      if (e.target === $('palmenu')) this.handlers.palmenuClose?.();
+      if (e.target === $('palmenu') && downOnBackdrop) this.handlers.palmenuClose?.();
+      downOnBackdrop = false;
     });
     this.powerEls = [];
     this.powerSt = {};
@@ -318,6 +326,7 @@ export class UI {
 
   loaded() {
     $('loading').classList.remove('show');
+    this.layers();
   }
 
   error(msg) {
@@ -330,6 +339,24 @@ export class UI {
     $('hud').classList.toggle('show', !on);
     $('scorebox').classList.toggle('show', !on);
     $('powers').classList.toggle('show', !on);
+    this.layers();
+  }
+
+  // What's on top, and everything under it put out of reach. A screen is
+  // stacked by the order it comes in the page (each is a stacking context of
+  // its own: nothing in one - a picked card standing up, a tilted ribbon -
+  // can rise through another, see .screen in style.css); here the open
+  // modal, if any, is the only thing that can be touched, tabbed to or read
+  // out - the companion menu over the crash or pause card over the run or
+  // the title - and a screen on its way out (fading) is out of reach at
+  // once, so a second tap on a card as the run starts does nothing.
+  layers() {
+    const top = ['palmenu', 'crash', 'pause'].map($).find((m) => m.classList.contains('show')) || null;
+    for (const el of $('ui').children) {
+      if (el.id === 'stats') continue;
+      const gone = el.classList.contains('screen') && !el.classList.contains('show');
+      el.inert = el === top ? false : gone || top !== null;
+    }
   }
 
   // Called every frame; only touches the DOM when a shown digit changes.
@@ -440,6 +467,7 @@ export class UI {
       $('pause-worth').textContent = offer.gems > 0 ? ` (worth +${fmt.format(offer.bonus)})` : '';
     }
     $('pause').classList.toggle('show', on);
+    this.layers();
   }
 
   showCrash(continuesLeft, score, best, isNewBest, offer = { gems: 0, bonus: 0, haul: 1 }) {
@@ -469,6 +497,8 @@ export class UI {
     $('bank-after').textContent = fmt.format(this.bank + offer.gems);
     ex.classList.remove('banked');
     $('crash').classList.add('show');
+    $('crash').querySelector('.card').scrollTop = 0;
+    this.layers();
   }
 
   // The gems banked from the crash card: the gem count drains away into the
@@ -516,6 +546,7 @@ export class UI {
   hideCrash() {
     cancelAnimationFrame(this.exchangeAnim);
     $('crash').classList.remove('show');
+    this.layers();
   }
 
   // --- the companions' abilities (game/powers.js) ----------------------------------
@@ -674,10 +705,21 @@ export class UI {
     if (this.menuOpen) this.renderMenu();
   }
 
+  // The companion menu, over whatever it was opened from (the title screen,
+  // or the crash card), which waits under it out of reach; closing it hands
+  // that back as it was, the focus where it was.
   showMenu(on) {
+    if (on === this.menuOpen) return;
     this.menuOpen = on;
-    if (on) this.renderMenu();
+    if (on) {
+      this.menuFrom = document.activeElement;
+      this.renderMenu();
+      $('palmenu-scroll').scrollTop = 0;
+    }
     $('palmenu').classList.toggle('show', on);
+    this.layers();
+    if (on) $('btn-palmenu-close').focus({ preventScroll: true });
+    else if (this.menuFrom && this.menuFrom.isConnected && !this.menuFrom.closest('[inert]')) this.menuFrom.focus({ preventScroll: true });
   }
 
   renderMenu() {

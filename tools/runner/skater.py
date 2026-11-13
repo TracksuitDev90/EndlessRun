@@ -8,11 +8,12 @@ by the game's character shader) to her reference sheet
 (tools/characters/skater-sheet.jpg): a young Black woman, slim and athletic,
 about seven heads tall, warm deep-brown skin, an oval face with a defined
 jaw, full lips, a small nose and big almond-shaped dark eyes under thick
-brows; long box braids gathered into a high ponytail that falls past her
-waist, a few left down either side to frame her face; small gold hoops and a
-few thin bracelets; an oversized neon-lime tee; baggy black skate shorts
-piped in white; white crew socks; chunky white-and-grey skate shoes on thick
-platform soles - and her skateboard.
+brows; box braids gathered into a high ponytail that falls to her shoulder
+blades (shorter than her sheet's, which fall past her waist: that much hair
+swung wider than she is in motion), a few left down either side to frame her
+face; small gold hoops and a few thin bracelets; an oversized neon-lime tee;
+baggy black skate shorts piped in white; white crew socks; white-and-grey
+skate shoes on cupsoles - and her skateboard.
 
 Two things here aren't sculpted as fields:
 
@@ -149,18 +150,20 @@ def catmull(pts, step):
 
 
 # The ponytail: twelve braids out of the cuff on her crown, arcing up and back
-# over it and falling down her back to below her seat - a loose round bundle
-# of them, not a flat fan (a fan of cords reads as one sheet): their slot is
-# where each lies across the bundle (across, how far off her back) and a seed.
+# over it and falling to her shoulder blades - a loose round bundle of them,
+# not a flat fan (a fan of cords reads as one sheet): their slot is where each
+# lies across the bundle (across, how far off her back) and a seed. (They
+# used to fall to below her seat: in motion that much hair swung wider than
+# she is and took the eye off her riding.)
 # The face-framing braids: two either side from the temples, down past her
-# cheek and jaw and over the front of her shoulder onto her chest.
+# cheek and jaw to just over the front of her shoulder.
 TAIL_SEEDS = [0.11, 0.73, 0.38, 0.91, 0.27, 0.62, 0.05, 0.84, 0.47, 0.19, 0.66, 0.98]
 TAIL_SLOTS = [
     (0.05 * math.cos(2 * math.pi * (k + 0.5) / 12) * (0.85 + 0.3 * sd), 0.024 + 0.021 * math.sin(2 * math.pi * (k + 0.5) / 12) * (0.85 + 0.3 * sd), sd)
     for k, sd in enumerate(TAIL_SEEDS)
 ]
-TAIL_JOINTS = [0.0, 0.045, 0.1, 0.18, 0.3, 0.44, 0.6, 0.76, 0.92, 1.07]
-FRONT_JOINTS = [0.0, 0.07, 0.15, 0.24, 0.34, 0.45]
+TAIL_JOINTS = [0.0, 0.045, 0.1, 0.18, 0.27, 0.37, 0.47]
+FRONT_JOINTS = [0.0, 0.07, 0.15, 0.23]
 BRAID_R = 0.0066
 
 
@@ -173,17 +176,16 @@ def tail_path(k):
     up = np.cross(TIE_DIR, side)
     p0 = TIE + 0.012 * (math.cos(a) * side + math.sin(a) * up)
     fan = lambda f: V(xo * f, 0, 0)
-    L = 1.0 + 0.08 * (seed - 0.5)
+    # (the tips a little uneven, round her shoulder blades)
+    tip = 1.19 - 0.06 * (seed - 0.5)
     pts = [
         p0,
         TIE + TIE_DIR * 0.045 + fan(0.25) + 0.01 * up * math.sin(a),
         TIE + V(0, 0.036, 0.095) + fan(0.45),
         TIE + V(0, -0.012, 0.142) + fan(0.65) + V(0, 0, zo * 0.5),
         V(0, 1.52, 0.176 + zo) + fan(0.85),
-        V(0, 1.33, 0.175 + zo) + fan(1.0),
-        V(0, 1.12, 0.17 + zo) + fan(1.05),
-        V(0, 0.9, 0.172 + zo) + fan(1.06),
-        V(0, 1.68 - L - 0.08, 0.18 + zo) + fan(1.08),
+        V(0, 1.36, 0.178 + zo) + fan(0.98),
+        V(0, tip, 0.176 + zo) + fan(1.03),
     ]
     return pts, seed
 
@@ -191,10 +193,10 @@ def tail_path(k):
 def front_path(s, k):
     """The rest centreline of face-framing braid k on side s."""
     if k == 0:
-        pts = [(0.071, 1.556, -0.044), (0.083, 1.49, -0.052), (0.089, 1.415, -0.05), (0.094, 1.335, -0.072), (0.102, 1.255, -0.104), (0.104, 1.14, -0.124), (0.104, 1.06, -0.13)]
+        pts = [(0.071, 1.556, -0.044), (0.083, 1.49, -0.052), (0.089, 1.415, -0.05), (0.095, 1.34, -0.07), (0.103, 1.272, -0.096)]
         seed = 0.31 if s < 0 else 0.57
     else:
-        pts = [(0.078, 1.54, -0.022), (0.091, 1.47, -0.028), (0.099, 1.395, -0.03), (0.112, 1.31, -0.05), (0.128, 1.235, -0.083), (0.132, 1.13, -0.106), (0.133, 1.03, -0.113)]
+        pts = [(0.078, 1.54, -0.022), (0.091, 1.47, -0.028), (0.099, 1.395, -0.03), (0.113, 1.315, -0.05), (0.127, 1.25, -0.078)]
         seed = 0.82 if s < 0 else 0.14
     return [V(s * x, y, z) for x, y, z in pts], seed
 
@@ -670,15 +672,19 @@ def g_gold():
 # the tee
 # --------------------------------------------------------------------------------
 
+# (Oversized and relaxed, but cloth: it hangs from her shoulders close over
+# her chest and back and falls fairly straight to the hem, rather than
+# rounding out all over like a shell; the sleeves are wide but sit near the
+# arm, the shoulder seam just off the shoulder.)
 TEE = dict(
-    chest=((0, 1.16, 0.012), (0.142, 0.13, 0.094)),
-    yoke=((0, 1.252, 0.01), (0.15, 0.056, 0.08)),
-    belly=((0, 0.965, 0.014), (0.146, 0.165, 0.1)),
+    chest=((0, 1.162, 0.012), (0.131, 0.128, 0.085)),
+    yoke=((0, 1.254, 0.01), (0.143, 0.05, 0.072)),
+    belly=((0, 0.95, 0.014), (0.138, 0.19, 0.09)),
     # (a little over her hips, as her sheet has it: oversized, not a dress)
     hem=0.77,
-    drop=0.035,  # the shoulder seams drop this far down the arm
-    sleeve=(0.07, 0.064),  # the sleeve's radius at the shoulder, at its end
-    end=0.225,  # how far down the arm the sleeve reaches (just over the elbow)
+    drop=0.028,  # the shoulder seams drop this far down the arm
+    sleeve=(0.06, 0.052),  # the sleeve's radius at the shoulder, at its end
+    end=0.205,  # how far down the arm the sleeve reaches (just over the elbow)
 )
 
 
@@ -689,7 +695,9 @@ def tee_prims():
     belly = ellipsoid(*T['belly'])
     sleeves = []
     for S, E, W, d, out in [arm_frame(s) for s, _ in SIDES]:
-        a = S + T['drop'] * d - 0.03 * out + V(0, -0.012, 0)
+        # (centred on the arm, a little in toward her and down: the arm keeps
+        # some slack all round inside it as it swings and lifts)
+        a = S + T['drop'] * d - 0.012 * out + V(0, -0.008, 0)
         b = S + T['end'] * d + 0.008 * out
         sleeves.append(dict(S=S, d=d, out=out, tube=round_cone(a, b, T['sleeve'][0], T['sleeve'][1]),
                             # the opening at its end, so it reads as a sleeve round the arm
@@ -719,18 +727,22 @@ def g_tee():
     def field(p):
         y = p[:, 1]
         t = body(p)
-        # loose cotton: soft vertical folds hanging from the chest, a few
-        # wrinkles where it gathers over the hips
+        # loose cotton: soft vertical folds hanging from the chest (wider
+        # apart and deeper toward the hem, where it hangs free), a fold
+        # dragging down from each armpit, a few wrinkles where it gathers
+        # over the hips
         az = np.arctan2(p[:, 0], -p[:, 2])
-        t = t + 0.0042 * np.sin(az * 9 + 0.6 * np.sin(y * 13)) * smooth(1.08, 0.84, y)
-        t = t + 0.0022 * np.sin(y * 70 + az * 3) * smooth(0.9, 0.75, y) * smooth(0.06, 0.14, np.abs(p[:, 0]))
+        t = t + 0.0048 * np.sin(az * 7 + 0.7 * np.sin(y * 11)) * smooth(1.1, 0.82, y)
+        pit = np.exp(-(((np.abs(p[:, 0]) - 0.11) / 0.022) ** 2)) * smooth(1.2, 1.1, y) * smooth(0.86, 1.0, y)
+        t = t - 0.004 * pit
+        t = t + 0.002 * np.sin(y * 70 + az * 3) * smooth(0.9, 0.75, y) * smooth(0.06, 0.14, np.abs(p[:, 0]))
         t = smax(t, tee_hem(p) - y, 0.016)
         t = smin(t, collar(p), 0.012)
         t = smax(t, -neckhole(p), 0.008)
         for sl in sleeves:
             s = sl['tube'](p)
             u = (p - sl['S']) @ sl['d']
-            s = s + 0.0035 * np.sin(u * 55 + p[:, 2] * 40) * smooth(0.08, 0.18, u)
+            s = s + 0.0028 * np.sin(u * 55 + p[:, 2] * 40) * smooth(0.06, 0.16, u)
             s = smax(s, -sl['hole'](p), 0.006)
             t = smin(t, s, 0.055)
         return t
@@ -822,13 +834,13 @@ def g_shorts():
 
 SOCK_TOP = 0.285
 SHOE_X = 0.084
-SOLE_H = 0.045
-SHOE_COLLAR = 0.158
-# the shoe's heel and toe along it (z, from the ankle): chunky on its
-# platform, but a shoe her size - the heel just behind the ankle, the toe
-# well out in front
-SHOE_HEEL = 0.068
-SHOE_TOE = -0.205
+SOLE_H = 0.026
+SHOE_COLLAR = 0.146
+# the shoe's heel and toe along it (z, from the ankle): a slim skate shoe her
+# size (~26.5 cm) - a flat vulcanised-looking sole, not a platform; the heel just
+# behind the ankle, the toe well out in front
+SHOE_HEEL = 0.064
+SHOE_TOE = -0.2
 
 
 def g_legs():
@@ -876,27 +888,30 @@ def g_shoes():
 
         def sole_fn(p, bx=bx):
             x, y, z = p[:, 0] - bx, p[:, 1], p[:, 2]
-            r1, r2 = 0.045, 0.049
+            # (narrower at the heel than across the ball of the foot)
+            r1, r2 = 0.037, 0.045
             h = (SHOE_HEEL - r1) - (SHOE_TOE + r2)
             px, py = np.abs(x), (SHOE_HEEL - r1) - z
             b = (r1 - r2) / h
             a = math.sqrt(1 - b * b)
             k = -b * px + a * py
             d2 = np.where(k < 0, np.sqrt(px ** 2 + py ** 2) - r1, np.where(k > a * h, np.sqrt(px ** 2 + (py - h) ** 2) - r2, a * px + b * py - r1))
-            yy = y - 0.02 * smooth(-0.1, -0.2, z) ** 2
-            r = 0.012
+            yy = y - 0.016 * smooth(-0.11, -0.2, z) ** 2
+            r = 0.009
             wx, wy = d2 + r, np.abs(yy - SOLE_H / 2) - SOLE_H / 2 + r
             return np.sqrt(np.maximum(wx, 0) ** 2 + np.maximum(wy, 0) ** 2) + np.minimum(np.maximum(wx, wy), 0) - r
 
-        sole = Prim(sole_fn, (bx - 0.06, -0.01, SHOE_TOE - 0.01), (bx + 0.06, 0.065, SHOE_HEEL + 0.01))
-        foot = round_cone((bx, 0.086, 0.014), (bx, 0.078, -0.11), 0.045, 0.043)
-        toebox = ellipsoid((bx, 0.074, -0.148), (0.045, 0.032, 0.048))
-        instep = round_cone((bx, 0.09, -0.09), (bx, 0.13, -0.028), 0.039, 0.037)
-        heel = ellipsoid((bx, 0.094, 0.03), (0.043, 0.052, 0.03))
-        ankle = round_cone((bx, 0.085, 0.01), (bx, 0.142, 0.01), 0.045, 0.042)
-        collar = torus_y((bx, SHOE_COLLAR - 0.006, 0.012), 0.037, 0.012, 1.12)
-        tongue = round_box((bx, 0.15, -0.034), (0.021, 0.026, 0.008), 0.008, rot_x(-0.35))
-        hole = round_cone((bx, 0.115, 0.008), (bx, 0.26, 0.008), 0.03, 0.03)
+        sole = Prim(sole_fn, (bx - 0.055, -0.01, SHOE_TOE - 0.01), (bx + 0.055, 0.05, SHOE_HEEL + 0.01))
+        # the upper: low over the toes, rising up the instep to a padded
+        # collar round the ankle - close round her foot, not a boot
+        foot = round_cone((bx, 0.066, 0.012), (bx, 0.054, -0.11), 0.037, 0.032)
+        toebox = ellipsoid((bx, 0.047, -0.15), (0.039, 0.022, 0.044))
+        instep = round_cone((bx, 0.068, -0.095), (bx, 0.114, -0.03), 0.03, 0.03)
+        heel = ellipsoid((bx, 0.078, 0.026), (0.035, 0.045, 0.028))
+        ankle = round_cone((bx, 0.075, 0.008), (bx, 0.118, 0.01), 0.039, 0.035)
+        collar = torus_y((bx, SHOE_COLLAR - 0.006, 0.01), 0.034, 0.0095, 1.12)
+        tongue = round_box((bx, 0.138, -0.034), (0.019, 0.024, 0.007), 0.007, rot_x(-0.35))
+        hole = round_cone((bx, 0.106, 0.008), (bx, 0.26, 0.008), 0.028, 0.028)
         parts.append((sole, foot, toebox, instep, heel, ankle, collar, tongue, hole))
         low = along(lambda p: p[:, 2], [(-0.12, 'toe' + L), (-0.075, 'foot' + L)])
         owners += [(sole, low), (foot, low), (toebox, low), (instep, low), (heel, rigid('foot' + L)), (ankle, rigid('foot' + L)), (collar, rigid('foot' + L)), (tongue, rigid('foot' + L))]
@@ -904,18 +919,18 @@ def g_shoes():
     def field(p):
         out = np.full(len(p), 1.0)
         for sole, foot, toebox, instep, heel, ankle, collar, tongue, hole in parts:
-            d = smin(sole(p), foot(p), 0.018)
-            d = smin(d, toebox(p), 0.024)
-            d = smin(d, instep(p), 0.032)
-            d = smin(d, heel(p), 0.024)
-            d = smin(d, ankle(p), 0.032)
-            d = smin(d, collar(p), 0.012)
+            d = smin(sole(p), foot(p), 0.014)
+            d = smin(d, toebox(p), 0.02)
+            d = smin(d, instep(p), 0.026)
+            d = smin(d, heel(p), 0.02)
+            d = smin(d, ankle(p), 0.026)
+            d = smin(d, collar(p), 0.01)
             d = smin(d, tongue(p), 0.01)
             d = smax(d, -hole(p), 0.006)
             out = np.minimum(out, d)
         return out
 
-    return Garment('shoes', MAT['shoe'], 0.0028, (-0.16, -0.012, -0.225), (0.16, 0.2, 0.1), field, owners, 3300, tau=0.012)
+    return Garment('shoes', MAT['shoe'], 0.0025, (-0.15, -0.012, -0.22), (0.15, 0.19, 0.095), field, owners, 3300, tau=0.01)
 
 
 def g_arms():
@@ -925,7 +940,7 @@ def g_arms():
     for s, L in SIDES:
         S, E, W, dn, out = arm_frame(s)
         R = np.stack([out, dn, fw], 1)
-        upper = round_cone(S + 0.09 * dn, E, 0.038, 0.031)
+        upper = round_cone(S + 0.11 * dn, E, 0.036, 0.031)
         fore = round_cone(E, W, 0.031, 0.022)
         palm = round_box(W + 0.045 * dn, (0.015, 0.041, 0.035), 0.013, R)
         c = W + 0.094 * dn - 0.006 * out

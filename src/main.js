@@ -262,6 +262,10 @@ async function boot() {
     ui.showMenu(true);
   });
   ui.on('palmenuClose', closeMenu);
+  // (the title screen's start button; a tap on the road starts it too)
+  ui.on('begin', () => {
+    if (!ui.menuOpen) begin();
+  });
   ui.on('power', (i) => game.action(`power${i}`));
   progress();
   ui.on('title', () => {

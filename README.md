@@ -1005,9 +1005,33 @@ can fire a second time while it hangs, and down in the air drives you down
 (see [Low gravity](#low-gravity-the-red-drift)).
 
 On the title screen, tap a runner's card to pick them (← → / A D, or a
-sideways swipe, steps between them); tap anywhere else, swipe up or press
-Space / Enter to begin. **Choose runner** on the pause and crash cards goes
-back there.
+sideways swipe, steps between them); tap **Tap to begin** (or anywhere on the
+road), swipe up or press Space / Enter to begin. **Choose runner** on the
+pause and crash cards goes back there.
+
+**The screens on a phone.** The title screen is laid out to the height the
+browser really leaves (`dvh`, so Safari's toolbars sliding in and out never
+push anything off it) and inside the safe areas: held upright, a compact
+wordmark at the top, the runner standing on the road under it, then the
+cards (three across, sized to fit), a line about whoever's picked, the
+companions as three equal badges that always fit the width (narrower than
+they can show a name beside the portrait, the portrait stands over the
+name), the companion menu, one line of swipes (a keyboard gets its keys
+drawn instead) and a big start button in reach of a thumb. On its side,
+the wordmark and the start go down the left and the cards and companions
+down the right, that column scrolling on its own if a very short screen
+needs it to. Each screen is a stacking context of its own, stacked in page
+order (nothing standing up in one - a picked card, the tagline's ribbon -
+can rise through another), and while a modal is open (pause, crash, the
+companion menu) everything under it is `inert`: nothing there can be
+tapped, scrolled, tabbed to or read out, so a tap or a scroll in the menu
+never picks a runner or starts a run, and closing it hands back the screen
+under it as it was. A card taller than the screen scrolls inside itself:
+the companion menu keeps its title, bank and close button pinned while its
+list scrolls; the crash card, on a short wide screen, puts the tally on
+the left and the buttons on the right. In a run, the ability buttons sit
+in a row in the bottom corner (in a column up the right-hand edge, over the
+roadside, with the phone on its side).
 
 **Hits:** clipping something from the side, or tripping over a low obstacle /
 bumping a high one, makes you *stumble* (ink creeps in from the screen edges
@@ -1391,7 +1415,7 @@ are, their card and how to make them live in `characters.js`).
 
 | | Rowan, the wayfarer | Wren, the explorer | Alder, the elder | Bramble, the tumbler | Hazel, the skater | Birch, the samurai |
 |---|---|---|---|---|---|---|
-| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick | a short, bipedal brown rabbit, a faded cream muzzle, cheeks and chin, buck teeth, big round dark glasses; big ears pink inside, one upright and one bent over, through a yellow bucket hat; a cream short-sleeved shirt, brown suspenders on brass clips, billowy rust trousers gathered at the ankles; big bare rabbit feet, a fluffy tail; an olive satchel slung across him | an oversized neon-lime tee, baggy black skate shorts piped in white, white crew socks with a little badge, chunky white-and-grey skate shoes on platform soles; long box braids up in a high ponytail through a gold cuff, a few left down to frame her face; small gold hoops, thin bracelets; her board — a purple deck, lime chevrons underneath | a near-black training kimono crossed left over right in a deep V, wide sleeves to past the elbow; a reddish-brown obi knotted at the front, its two long ends hanging; loose charcoal hakama, pleated, gathered round his lower shins; his forearms bound in reddish-brown wraps; barefoot on big clawed paws; ivory fur, charcoal stripes, golden eyes under a scowling brow, a cheetah's dark tear lines, a dusty-rose nose, long pale whiskers, round ears; a long thick striped tail; a katana in a black lacquered scabbard through the obi at his left hip |
+| Look | puffer, cargo shorts, hiking boots, an orange hooded cape | oversized rose sweater, charcoal shorts, chunky trainers, long vermilion hair, a backpack, her sketchbook | a flowing teal robe open over a sea-green under-robe, its hood down, wide bell sleeves, a brown sash under his pot belly; large orange spectacles, a long hooked nose, big ears, wispy white hair; brown leggings and old cuffed boots; a long twisted walking stick | a short, bipedal brown rabbit, a faded cream muzzle, cheeks and chin, buck teeth, big round dark glasses; big ears pink inside, one upright and one bent over, through a yellow bucket hat; a cream short-sleeved shirt, brown suspenders on brass clips, billowy rust trousers gathered at the ankles; big bare rabbit feet, a fluffy tail; an olive satchel slung across him | an oversized neon-lime tee, baggy black skate shorts piped in white, white crew socks with a little badge, white-and-grey skate shoes on cupsoles; box braids up in a high ponytail through a gold cuff, falling to her shoulder blades, a few left down to frame her face; small gold hoops, thin bracelets; her board — a purple deck, lime chevrons underneath | a near-black training kimono crossed left over right in a deep V, wide sleeves to past the elbow; a reddish-brown obi knotted at the front, its two long ends hanging; loose charcoal hakama, pleated, gathered round his lower shins; his forearms bound in reddish-brown wraps; barefoot on big clawed paws; ivory fur, charcoal stripes, golden eyes under a scowling brow, a cheetah's dark tear lines, a dusty-rose nose, long pale whiskers, round ears; a long thick striped tail; a katana in a black lacquered scabbard through the obi at his left hip |
 | Build | a tall bruiser, ~1.73 m to the top of his hair: long legs, a long torso, his head small for his frame | slight, about five heads tall, ~1.64 m to the top of her bun | the tallest: ~2.0 m and eight heads tall stood up straight — which he never is: bent at the waist, he still tops 1.8 m; rail thin but for his pot belly | the smallest by far: ~1.1 m to the crown of his hat (~1.35 m to the tip of his upright ear), about five heads tall, compact and a little rounded, short legs on big feet | slim and athletic, about six and a half heads tall, ~1.66 m to the crown (her ponytail rises over it), a round young face, stood a board's height (~10 cm) up off the road | the tallest who stands up straight: ~1.9 m to his crown, his round ears nearer 2 m; about seven and a half heads tall, broad through the shoulders, heavy in the forearm and the calf, long in the leg |
 | Simulated | the cape (19×19 cloth), a puff of dust off every push-off | her long hair (15×12 cloth), the bun, fringe and side locks on springs, the backpack bouncing, things spilling out of it, dust off her slides | his long, full beard (11×16 cloth), the skirt of his robe (19×11) and of the under-robe under it (15×10); the bell sleeves, his wisps and brows on springs; his stick planted in the road, his arm solved to reach it; dust off its tip, and now and then a poof of sparks off its knob in the colours of his gems | no sheets: his ears on springs (laid back by the headwind, the bent one flopping at its fold, twitching), his hat's brim, his tail wagging in quick flicks, his satchel bouncing on his hip and its flap lifting; whiskers; what he floats on (an umbrella, a balloon, a dandelion), dandelion seeds and dust | no sheets: her braids one by one (twelve in the ponytail, four framing her face — each a chain of bones swung by a little rope of particles, each with its own weight, drag, stiffness and flutter, so they part and swing on their own); her tee's hem on four springs, rippling in the wind; her hoops; the board, a body of its own under her feet; dust off her pushes and landings | no sheets: his tail and the obi's two hanging ends on ropes of particles (the tail held in a hunting cat's curve, firm at its root and loose at its tip), his ears on springs and twitching; the sword on a bone of its own, in its scabbard, his hand or anywhere between; ribbons of water off his hands and his blade (`ribbon.js`); dust off his sprint, landings and dashes |
 | Lanes | spring 32/s, a steady lean | spring 40/s — snappier — a side-skip with a hop, arms out, a deeper lean | spring 34/s: he plants his stick on the far side and shoves himself off it, a hop, his free hand flung out | spring 38/s: a quick sideways hop, knees tucked, arms out | spring 30/s: a carve, the board leaning hard into it — out over her toes turning right, back on her heels turning left | spring 46/s, the quickest of all: a flash step — a low, wide lunge across, the leg behind stretched long, the leading arm sweeping through in a whip of water (drawn: a cut) |
@@ -2105,22 +2129,29 @@ an arch two-thirds of the way out and falling to a fine tail; rosy-brown
 lips. Her box braids are drawn up from the hairline
 all round into a high ponytail on her crown — the cap of them is sculpted,
 each braid raised over her scalp and plaited (the shader), the parts between
-them showing — through a gold cuff, and twelve long braids spring up out of
-it in a loose round bundle, arc back over her head and fall down her back to
-below her seat; four more are left down, two either side, framing her face
-from the temples, past her cheeks and over the front of her shoulders onto
-her chest. Small gold hoops hang from her lobes; a few thin gold bracelets
+them showing — through a gold cuff, and twelve braids spring up out of it in a
+loose round bundle, arc back over her head and fall to her shoulder blades
+(they used to reach below her seat: in motion that much hair swung wider
+than she is and took the eye off her riding); four more are left down, two
+either side, framing her face from the temples, past her cheeks to just
+over the front of her shoulders. Small gold hoops hang from her lobes; a few thin gold bracelets
 are loose round her wrists. Her oversized neon-lime tee hangs loose from
 dropped shoulders to just over her hips (as her sheet has it: oversized, not
-a dress), its wide sleeves to the elbow, soft folds hanging from the chest, a
-ribbed crew collar sitting round the base of her neck, stitched hems. Baggy
+a dress) — cloth hanging off her, close over her chest and back and falling
+fairly straight to the hem rather than rounding out like a shell — its wide
+sleeves to the elbow, sitting near the arm with some slack all round, soft
+folds hanging from the chest (wider and deeper toward the hem), a fold
+dragging down from each armpit, a ribbed crew collar sitting round the base
+of her neck, stitched hems. Baggy
 black skate shorts to just over the knee, wide in the leg, piped in white
 down the outside of each leg and round its hem; white crew socks to
 mid-calf, ribbed, a little blue-and-red square badge on the outside; chunky
-white-and-grey skate shoes, her size (~27 cm, the heel just behind the ankle,
-the toe well out in front) — a platform cupsole grooved all round, a rounded
-toe box under a grey suede toe cap and heel counter, laces criss-crossing up
-the front, a padded collar. Her card is cut
+white-and-grey skate shoes, her size (~26.5 cm, the heel just behind the
+ankle, the toe well out in front) — a cupsole grooved all round with some
+height to it (2.6 cm and flat, not a platform), narrower at the heel than across the
+ball, an upper close round her foot, low over the toes and rising up the
+instep under a grey suede toe cap and heel counter, laces criss-crossing up
+the front, a padded collar round the ankle. Her card is cut
 from the sheet's front view (a brand mark on the shorts painted out first:
 her sculpt has none). Through Hell's drain her tee keeps its colour (and her
 board's graphic).
@@ -2160,7 +2191,8 @@ drifts into another mood (`MOODS`): carving wide and slow, knees soft, arms
 out like wings; chilling, tall and loose, arms down, nodding along to
 something; or crouched down low and fast, the front arm reaching down the
 board. At the start of a run she kicks off — and again every few seconds as
-she rides — two or three pushes (`PUSH`), each a hard one: her hips and
+she rides — two or three pushes (`PUSH`), each a hard one, low and long like a street
+skater's (her body pitched forward till it's nearly level, her head up): her hips and
 shoulders turn square to the road as she swings her front foot round to point
 down the board, her back foot steps off the tail and plants on the road beside
 her front foot, and drives right back along it — quickest in the middle of the
@@ -2213,14 +2245,18 @@ her board together).
 
 **Her braids are simulated one by one** (`braidStep`). Each is its own tube,
 meshed directly round its centreline (not a field: box braids are cords, not a
-sheet) and skinned along its own chain of bones — ten down each of the
-ponytail's, six down each face-framer's. In the game each chain is a rope of
+sheet) and skinned along its own chain of bones — seven down each of the
+ponytail's, four down each face-framer's. In the game each chain is a rope of
 particles, one at every joint and its tip, rooted where it grows on her head
 and swung by gravity, her own accelerations and the headwind (each braid
 catching it a little differently, fluttering toward its tip), kept off her
 head, neck, shoulders, arms, back, seat and legs by their own volumes and off
-the road; the ponytail's first few joints are held in their arc up out of the
-cuff. Each braid is its own: how much the wind takes it, how heavy it hangs,
+the road; the ponytail's first joints are held in their arc up out of the cuff
+(only the first firmly: held all the way round it, the arc would turn
+forward with her head as she ducks and the wind fold the braid back over it
+into a loop). Past the arc, each is a stiffish cord — it bends in long
+curves, never kinks or folds back on itself — damped a little on top of the
+air, so it settles after a jolt rather than whipping on. Each braid is its own: how much the wind takes it, how heavy it hangs,
 how quickly and how hard it flutters (in long waves running down it, so it
 ripples rather than kinks) and how stiff it is are all hashed off its seed,
 so no braid moves quite like its neighbour. The ponytail's braids are drawn
@@ -2243,8 +2279,39 @@ she goes (`uFlutter`). Her hoops swing on the shared hair springs. On the
 Gallery's sand her wheels roll two thin tracks behind her, and where she
 plants her foot to push, a print. The fox rides on her shoulder but doesn't
 shoot through her legs (`onBoard`: there's a board between them). Her mesh is
-about 40k triangles, a quarter of them the braids; her simulation costs about
-what the elder's does per frame.
+about 35k triangles, a seventh of them the braids; her simulation costs a
+little less than the elder's per frame.
+
+**She plays with her board.** Every so often (six to thirteen seconds of
+plain riding apart), cruising on her wheels with nothing else going on and
+nothing at all on the road — in any lane — for her trick and a second after
+it (`Game.roadOpen`), she does one of three things (`FLAT`), never the same
+one twice running, each a little different every time (how long, how many,
+how far):
+
+- **a manual** — her weight back over the tail (the board slides forward
+  under her), the nose tipped up off the road on the back wheels, balancing
+  there a second or so with her knees soft and her arms out, nudging it up
+  and down, then setting it back down, her knees taking it;
+- **tic-tacs** — up on the back wheels, the board swung three or four times
+  from side to side about its back truck, her hips going with it and her
+  shoulders winding against it to swing it, a dip of the knees each way, her
+  head still looking down the road;
+- **a pop shove-it** — a crouch, the back foot scooping the tail, and the
+  board spins half a turn under her as she hops a hand's breadth up off it,
+  both feet lifted clear of it; she catches it, sinks into her knees and
+  rides away on it (turned round: its ends are the same).
+
+They're for show only: the board's and her body's moves are all in the
+figure — where the game has her, her speed, her height, her hitbox, the
+score are never touched — and they only start with her wheels on the road,
+no push, jump, duck, lane change, landing or stumble going on. Anything
+asked of her takes over the same frame: the jump, duck or lane change goes
+exactly as it would have, and the trick is let go of in a tenth of a second
+or so (a shove-it's spin carries on round to finish, or, barely begun,
+turns back). Pushes wait for a trick to finish, and a trick for a push.
+(`tools/runner/view.html?runner=skater&pose=run&t=3.4&flat=manual&jt=0.6`
+poses one.)
 
 ### The samurai
 

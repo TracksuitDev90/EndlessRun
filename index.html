@@ -185,12 +185,15 @@
           <button id="btn-palmenu" class="pill palmenu-btn" type="button" hidden><span class="bank-gem"><svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg></span><b id="title-bank">0</b><span class="palmenu-label">Companions</span></button>
         </div>
         <div class="title-bottom">
-          <div class="howto">
+          <!-- the controls: on a keyboard, drawn as keys; on a touch screen,
+               one line of swipes -->
+          <div class="howto mouse-only">
             <div class="howto-item"><span class="key"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span><span>jump</span></div>
             <div class="howto-item"><span class="key down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span><span>slide</span></div>
             <div class="howto-item"><span class="key-pair"><span class="key left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span><span class="key right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.2L12 4.6l6.5 6.6" /></svg></span></span><span>dodge</span></div>
           </div>
-          <div class="begin"><span class="touch-only">tap to begin</span><span class="mouse-only">click or press space to begin</span></div>
+          <p class="swipes touch-only"><span class="swipes-label">swipe</span> <span class="sw"><b aria-hidden="true">↑</b> jump</span> <span class="sw"><b aria-hidden="true">↓</b> slide</span> <span class="sw"><b aria-hidden="true">← →</b> dodge</span></p>
+          <button id="btn-begin" class="begin" type="button"><span class="touch-only">Tap to begin</span><span class="mouse-only">Begin <small>or press space</small></span></button>
         </div>
         <button id="btn-sound-2" class="round sound-toggle title-sound" aria-label="Mute sound" aria-pressed="false"><svg class="ic-speaker" viewBox="0 0 24 24" aria-hidden="true"><path class="spk-body" d="M3.5 9h3.8L12.5 4.6v14.8L7.3 15H3.5z" /><path class="spk-on" d="M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.8 7.8 0 0 1 0 11" /><path class="spk-off" d="M16 9.3l5 5.4M21 9.3l-5 5.4" /></svg></button>
       </div>
@@ -240,6 +243,10 @@
 
       <div id="crash" class="screen modal">
         <div class="card">
+          <!-- (one column on a phone held upright; on a short, wide screen the
+               tally on the left and what to do next on the right, so every
+               button shows without scrolling) -->
+          <div class="crash-main">
           <h2>Oof.</h2>
           <div id="crash-new" class="ribbon">new best!</div>
           <div class="tally">
@@ -268,20 +275,29 @@
             <button id="btn-buy" class="btn buy" type="button"></button>
           </div>
           <p class="bank-line"><span class="bank-gem"><svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg></span><b id="crash-bank">0</b> banked · <button id="btn-palmenu-2" class="link" type="button">companions</button></p>
+          </div>
+          <div class="crash-actions">
           <p class="sub">Dust off and keep going?</p>
           <button id="btn-continue" class="btn primary">Continue <small id="continue-count">1 left</small></button>
           <button id="btn-again" class="btn">Run again</button>
           <button id="btn-title-2" class="btn quiet">Choose runner</button>
+          </div>
         </div>
       </div>
 
       <div id="palmenu" class="screen modal palmenu" role="dialog" aria-modal="true" aria-labelledby="palmenu-title">
         <div class="card wide">
-          <button id="btn-palmenu-close" class="round palmenu-close" type="button" aria-label="Close">✕</button>
-          <h2 id="palmenu-title">Companions</h2>
-          <p class="sub">Bank gems after a run to bring them on. Every level adds an ability; abilities are free to use, each on its own cooldown.</p>
-          <p class="palmenu-bank"><span class="bank-gem"><svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg></span><b id="menu-bank">0</b> banked</p>
-          <div id="palmenu-list" class="palmenu-list"></div>
+          <!-- (the header stays put, its close button always in reach; the
+               rest scrolls inside the card) -->
+          <header class="palmenu-head">
+            <h2 id="palmenu-title">Companions</h2>
+            <p class="palmenu-bank"><span class="bank-gem"><svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg></span><b id="menu-bank">0</b> banked</p>
+            <button id="btn-palmenu-close" class="round palmenu-close" type="button" aria-label="Close">✕</button>
+          </header>
+          <div id="palmenu-scroll" class="palmenu-scroll">
+            <p class="sub">Bank gems after a run to bring them on. Every level adds an ability; abilities are free to use, each on its own cooldown.</p>
+            <div id="palmenu-list" class="palmenu-list"></div>
+          </div>
         </div>
       </div>
 
