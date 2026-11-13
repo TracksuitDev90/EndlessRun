@@ -591,71 +591,178 @@ function scapeGeo(r = 0.7, n = 15) {
 }
 
 // --- the climbs ---------------------------------------------------------------------------
-// From its second time round, the walk has fallen away in places into the
-// sand running out beneath it, and you go over the top: up a flight of
-// ivory steps onto a deck - a slab of the old gallery floor held up on the
-// works of a clock, its face to you all teeth and turning wheels - and
-// across the gaps between, deck to deck, while the sand pours away down
-// into them. (See def.climb, and ObstacleField.placeClimb.)
+// From its second time round, the walk has drifted over and fallen away in
+// places, and you go over the top of it: up a ramp of sand banked against
+// what's left of the old gallery - a terrace half buried in the drift, a
+// balcony jutting from a clock tower, a stone bridge broken off over the
+// sand running out below - and across the gaps between, while the sand
+// pours away down into them. (See def.climb, and ObstacleField.placeClimb.)
+// Every deck is a body a metre long stretched along the run (sz) and a face
+// at each end (unstretched); what stands along it - balusters, posts, heaps
+// of sand, the tower - is put along it a few metres apart, so no two are
+// alike.
 const DECK_W = 9.0;
 const DECK_LO = 1.1;
 const DECK_HI = 1.9;
-// The steps up: a flight of them a metre long and a metre high, stretched
-// to the ramp's length and height (sz, sy), brass on every nosing, a
-// sloping stringer each side. (The road itself is a smooth slope: the
-// steps are only how it looks.)
-function stepsGeo() {
-  const parts = [];
-  const n = 7;
-  for (let i = 0; i < n; i++) {
-    const y1 = (i + 1) / n;
-    parts.push(part(P.box(DECK_W - 0.4, y1, 1 / n), null, { y: y1 / 2, z: -(i + 0.5) / n, grad: [C.ivoryLo, C.ivoryHi, 0, 1] }));
-    parts.push(part(P.box(DECK_W - 0.36, 0.035, 0.02), C.brass, { y: y1 - 0.02, z: -i / n + 0.004, outline: 0 }));
+const DECKS = [DECK_LO, DECK_HI];
+
+// A ramp of sand drifted up against the first deck: a metre long and a
+// metre high (stretched: sz, sy), the slope smooth down the lanes and
+// heaped and lumpy where it spills out past them, a soft lip at its foot.
+function sandRampGeo() {
+  const nx = 28, nz = 16;
+  const W = 6.2;
+  const g = new THREE.PlaneGeometry(W * 2, 1.03, nx, nz);
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 0, -0.515);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const t = Math.min(1, Math.max(0, -z));
+    const ax = Math.abs(x);
+    // past the lanes it falls away to the floor, in lumps
+    const e = 1 - Math.min(1, Math.max(0, (ax - 4.3) / (W - 4.3)));
+    const k = e * e * (3 - 2 * e);
+    const lump = ax > 4.2 ? 0.12 * Math.sin(z * 19 + x * 3.1) * Math.sin(z * 7 + x) * (1 - k) : 0;
+    pos.setY(i, Math.max(0, t * (0.35 + 0.65 * k) * (ax < 4.3 ? 1 : 1) + lump * t) + (ax < 4.3 ? 0 : -0.01));
   }
-  // a sloping stringer each side, its top just over the nosings
-  for (const s of [-1, 1]) parts.push(part(P.box(0.32, 0.22, Math.SQRT2), C.ivory, { x: s * (DECK_W / 2 - 0.05), y: 0.56, z: -0.5, rx: Math.PI / 4 }));
+  g.computeVertexNormals();
+  return merge([part(g, null, { grad: [C.sand, C.sandHi, 0, 1], outline: 0.2 })]);
+}
+
+// Buried terrace: a slab of the old floor and the wall under it, the sand
+// banked up its sides nearly to the top.
+function terraceBodyGeo(h) {
+  const parts = [];
+  const body = h - 0.26;
+  parts.push(part(P.box(DECK_W - 0.4, body, 1), null, { y: body / 2, z: -0.5, grad: [C.ivoryLo, C.ivory, 0, body] }));
+  parts.push(part(P.box(DECK_W - 0.1, 0.26, 1), C.stone, { y: h - 0.13, z: -0.5 }));
+  parts.push(part(P.box(DECK_W - 2.6, 0.02, 1), C.ivory, { y: h + 0.005, z: -0.5, outline: 0 }));
+  for (const x of [-1.2, 1.2]) parts.push(part(P.box(0.07, 0.02, 1), C.brass, { x, y: h + 0.01, z: -0.5, outline: 0 }));
+  for (const s of [-1, 1]) {
+    // (a long round bank, its lower half under the floor)
+    const bank = P.cyl(1, 1, 1, 16);
+    bank.rotateX(Math.PI / 2);
+    bank.scale(1.5, h * 0.95, 1);
+    bank.translate(s * (DECK_W / 2 + 0.2), 0, -0.5);
+    parts.push(part(bank, null, { grad: [C.sand, C.sandHi, 0, h], outline: 0.3 }));
+  }
   return merge(parts);
 }
-// A deck's body, a metre long (stretched along the run, sz) and h high: the
-// slab of floor on top, a brass band under its lip, ivory walls down to the
-// sand, a rack of brass teeth along each side as if the whole deck were a
-// part of the works.
-function deckGeo(h) {
+// Its face: the slab's broken edge, a run of dentils under it, sand
+// spilling round the corners.
+function terraceFaceGeo(h) {
+  const rnd = seeded(Math.round(h * 13));
   const parts = [];
-  const body = h - 0.24;
-  parts.push(part(P.box(DECK_W - 0.3, body, 1), null, { y: body / 2, z: -0.5, grad: [C.ivoryLo, C.ivory, 0, body] }));
-  parts.push(part(P.box(DECK_W, 0.24, 1), C.ivory, { y: h - 0.12, z: -0.5 }));
-  // brass inlaid along it, between the lanes and round its edge, like the
-  // ticks round a dial
-  for (const x of [-1.2, 1.2, -(DECK_W / 2 - 0.35), DECK_W / 2 - 0.35]) parts.push(part(P.box(0.08, 0.02, 1), C.brass, { x, y: h + 0.005, z: -0.5, outline: 0 }));
-  parts.push(part(P.box(DECK_W - 1.6, 0.02, 1), C.ivoryHi, { y: h + 0.002, z: -0.5, outline: 0 }));
-  parts.push(part(P.box(DECK_W + 0.06, 0.07, 1), C.brass, { y: h - 0.27, z: -0.5, outline: 0.5 }));
+  parts.push(part(P.box(DECK_W - 1.0, 0.1, 0.16), C.ivoryLo, { y: h - 0.32, z: 0.06 }));
+  for (let i = 0; i < 18; i++) parts.push(part(P.box(0.18, 0.14, 0.12), C.ivoryHi, { x: -DECK_W / 2 + 0.9 + (i * (DECK_W - 1.8)) / 17, y: h - 0.44, z: 0.06, outline: 0.3 }));
+  for (let i = 0; i < 6; i++) {
+    const x = -DECK_W / 2 + 1.2 + rnd() * (DECK_W - 2.4);
+    parts.push(part(P.box(0.4 + rnd() * 0.6, 0.18, 0.26), C.stone, { x, y: h - 0.07 - rnd() * 0.05, z: 0.08, ry: (rnd() - 0.5) * 0.4, rz: (rnd() - 0.5) * 0.25 }));
+  }
   for (const s of [-1, 1]) {
-    parts.push(part(P.box(0.12, 0.3, 1), C.brassLo, { x: s * (DECK_W / 2 - 0.1), y: body * 0.45, z: -0.5, outline: 0.4 }));
+    parts.push(part(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), null, { x: s * (DECK_W / 2 - 0.1), y: 0, z: 0.1, sx: 1.3, sy: h * 0.9, sz: 1.1, grad: [C.sand, C.sandHi, 0, h] }));
   }
   return merge(parts);
 }
-// Its face, toward you (unstretched; put again at its far end turned about):
-// the rim of a clock dial set into the wall, a toothed rack under the lip
-// and the ivory's broken edge where the floor fell away.
-function deckFaceGeo(h) {
+// A stretch of the terrace's balustrade, a little broken: rail, balusters,
+// a pier at one end (stands on the deck's edge, along the run).
+function terraceRailGeo() {
+  const parts = [part(P.box(0.5, 1.0, 0.5), C.ivory, { y: 0.5 }), part(P.box(0.6, 0.12, 0.6), C.ivoryHi, { y: 1.06 })];
+  parts.push(part(P.box(0.34, 0.12, 2.0), C.ivoryHi, { y: 0.86, z: -1.2, rx: 0.06 }));
+  for (let i = 0; i < 4; i++) parts.push(part(P.lathe([[0, 0], [0.1, 0], [0.13, 0.22], [0.06, 0.46], [0.1, 0.78], [0, 0.78]], 6), C.ivory, { y: 0, z: -0.55 - i * 0.45 }));
+  return merge(parts);
+}
+
+// A clock-tower balcony: a slab jutting out, thin, with open air under it,
+// a brass rail down each side (its posts are put along it).
+function balconyBodyGeo(h) {
   const parts = [];
-  const top = h - 0.27;
-  for (let i = 0; i < 26; i++) {
-    const x = -DECK_W / 2 + 0.25 + (i * (DECK_W - 0.5)) / 25;
-    parts.push(part(P.box(0.14, 0.16, 0.12), C.brassHi, { x, y: top - 0.12, z: 0.06, outline: 0.3 }));
-  }
-  parts.push(part(P.box(DECK_W - 0.2, 0.06, 0.1), C.brass, { y: top - 0.2, z: 0.04, outline: 0.4 }));
-  // the broken edge: chunks of slab hanging on at the lip
-  const rnd = seeded(Math.round(h * 10));
-  for (let i = 0; i < 7; i++) {
-    const x = -DECK_W / 2 + 0.6 + rnd() * (DECK_W - 1.2);
-    parts.push(part(P.box(0.3 + rnd() * 0.5, 0.16, 0.22), C.ivoryHi, { x, y: h - 0.08 - rnd() * 0.04, z: 0.06, ry: (rnd() - 0.5) * 0.3, rz: (rnd() - 0.5) * 0.2 }));
-  }
-  // pilasters with brass capitals at the corners
+  parts.push(part(P.box(DECK_W - 0.2, 0.34, 1), C.ivoryHi, { y: h - 0.17, z: -0.5 }));
+  parts.push(part(P.box(DECK_W - 0.6, 0.16, 1), C.ivoryLo, { y: h - 0.42, z: -0.5 }));
+  parts.push(part(P.box(DECK_W, 0.07, 1), C.brass, { y: h - 0.33, z: -0.5, outline: 0.5 }));
   for (const s of [-1, 1]) {
-    parts.push(part(P.box(0.5, top, 0.3), C.ivory, { x: s * (DECK_W / 2 - 0.25), y: top / 2, z: 0.05 }));
-    parts.push(part(P.box(0.6, 0.12, 0.38), C.brass, { x: s * (DECK_W / 2 - 0.25), y: top - 0.04, z: 0.05, outline: 0.4 }));
+    parts.push(part(P.box(0.09, 0.09, 1), C.brassHi, { x: s * (DECK_W / 2 - 0.2), y: h + 0.95, z: -0.5, outline: 0.5 }));
+    parts.push(part(P.box(0.05, 0.05, 1), C.brass, { x: s * (DECK_W / 2 - 0.2), y: h + 0.45, z: -0.5, outline: 0.4 }));
+  }
+  return merge(parts);
+}
+// Its face: a bowed lip with dentils, and a little clock hung under it.
+function balconyFaceGeo(h) {
+  const parts = [];
+  parts.push(part(P.cyl(DECK_W / 2, DECK_W / 2, 0.36, 24, 1, false, -Math.PI / 2, Math.PI), C.ivoryHi, { y: h - 0.18, sz: 0.14 }));
+  parts.push(part(P.torus(DECK_W / 2, 0.05, 4, 24, Math.PI), C.brass, { y: h - 0.36, rx: Math.PI / 2, sy: 0.14, outline: 0.4 }));
+  parts.push(...dialParts({ r: 0.5, depth: 0.1, seg: 18 }).map((g) => g.translate(0, h - 0.95, 0.12)));
+  parts.push(part(P.box(0.08, 0.4, 0.06), C.brass, { y: h - 0.55, z: 0.08, outline: 0.4 }));
+  for (const s of [-1, 1]) parts.push(part(P.cyl(0.08, 0.08, 1.0, 8), C.brassHi, { x: s * (DECK_W / 2 - 0.2), y: h + 0.5, z: 0.0 }));
+  return merge(parts);
+}
+// A slender post holding the balcony up (stretched to its height, sy), and
+// a baluster of its rail.
+function balconyPostGeo() {
+  return merge([
+    part(P.cyl(0.14, 0.18, 1, 8), null, { y: 0.5, grad: [C.ivoryLo, C.ivory, 0, 1] }),
+    part(P.box(0.4, 0.06, 0.4), C.brass, { y: 0.97, outline: 0.4 }),
+  ]);
+}
+// A clock tower standing off to the side of the walk, the balcony jutting
+// from it: a tall shaft of ivory, brass bands, an arched window, a dome.
+function clockTowerGeo() {
+  const parts = [];
+  const H = 15;
+  parts.push(part(P.box(3.2, H, 3.2), null, { y: H / 2, grad: [C.ivoryLo, C.ivoryHi, 0, H] }));
+  for (const y of [4, 9.6, H - 0.2]) parts.push(part(P.box(3.5, 0.3, 3.5), C.brass, { y, outline: 0.5 }));
+  parts.push(part(P.box(3.6, 0.5, 3.6), C.ivory, { y: H + 0.25 }));
+  parts.push(part(P.sphere(1.6, 16, 10), C.brass, { y: H + 0.5, sy: 0.9 }));
+  parts.push(part(P.cone(0.3, 1.6, 8), C.brassHi, { y: H + 2.6 }));
+  for (const s of [-1, 1]) parts.push(part(P.box(0.08, 2.2, 0.9), C.ink, { x: s * 1.62, y: 6.6, outline: 0 }));
+  return merge(parts);
+}
+
+// A stone bridge: its deck and a parapet down each side, open beneath.
+function bridgeBodyGeo(h) {
+  const parts = [];
+  parts.push(part(P.box(DECK_W - 0.2, 0.5, 1), C.ivory, { y: h - 0.25, z: -0.5 }));
+  parts.push(part(P.box(DECK_W - 1.2, 0.02, 1), C.stone, { y: h + 0.005, z: -0.5, outline: 0 }));
+  // (a kerb each side; its balustrade is put along it)
+  for (const s of [-1, 1]) parts.push(part(P.box(0.5, 0.18, 1), C.ivoryLo, { x: s * (DECK_W / 2 - 0.25), y: h + 0.09, z: -0.5 }));
+  return merge(parts);
+}
+// Its face: an arch, keystoned in brass, its stones broken off ragged at
+// the top where the span fell.
+function bridgeFaceGeo(h) {
+  const rnd = seeded(Math.round(h * 7) + 2);
+  const parts = [];
+  const s = new THREE.Shape();
+  const W = DECK_W / 2;
+  s.moveTo(-W, 0);
+  s.lineTo(-W, h);
+  s.lineTo(W, h);
+  s.lineTo(W, 0);
+  s.lineTo(W - 0.7, 0);
+  // the arch's soffit: a flattened half-ellipse up to just under the deck
+  const rise = Math.max(0.3, h - 0.55);
+  for (let i = 0; i <= 16; i++) {
+    const a = (i / 16) * Math.PI;
+    s.lineTo(Math.cos(a) * (W - 0.7), Math.sin(a) * rise);
+  }
+  s.lineTo(-W, 0);
+  parts.push(part(P.extrude(s, 0.6, 2), null, { z: -0.3, grad: [C.ivoryLo, C.ivory, 0, h] }));
+  parts.push(part(P.box(0.5, 0.5, 0.66), C.brass, { y: h - 0.3, z: -0.3, outline: 0.5 }));
+  for (let i = 0; i < 9; i++) {
+    const x = -W + 0.4 + rnd() * (2 * W - 0.8);
+    parts.push(part(P.box(0.3 + rnd() * 0.4, 0.14, 0.3), C.stone, { x, y: h + 0.02, z: 0.05, rz: (rnd() - 0.5) * 0.4, ry: rnd() }));
+  }
+  return merge(parts);
+}
+
+// Rubble at the lip of a gap: chunks of the floor that fell, half sunk.
+function rubbleGeo() {
+  const rnd = seeded(17);
+  const parts = [];
+  for (let i = 0; i < 6; i++) {
+    const s = 0.2 + rnd() * 0.35;
+    parts.push(part(P.box(s * 1.6, s, s * 1.2), rnd() < 0.5 ? C.ivory : C.stone, { x: (rnd() - 0.5) * 2.2, y: s * 0.3, z: (rnd() - 0.5) * 0.8, rx: rnd(), ry: rnd() * 3, rz: rnd() }));
   }
   return merge(parts);
 }
@@ -666,15 +773,14 @@ function deckFaceGeo(h) {
 function gapGeo() {
   const parts = [];
   const bands = [
-    [0, 0.06, '#f2d6a0', '#e0b46c'],
-    [0.06, 0.16, '#b07a3a', '#3a2412'],
-    [0.16, 0.55, '#2a170a', '#1a0e06'],
-    [0.55, 0.8, '#1a0e06', '#5a3c22'],
-    [0.8, 1.0, '#6a4a2c', '#b89a6c'],
+    [0, 0.05, '#f2d6a0', '#e0b46c'],
+    [0.05, 0.14, '#b07a3a', '#3a2412'],
+    [0.14, 0.6, '#2a170a', '#140a04'],
+    [0.6, 0.84, '#140a04', '#5a3c22'],
+    [0.84, 1.0, '#6a4a2c', '#b89a6c'],
   ];
   for (const [a, b, c0, c1] of bands) {
-    const g = new THREE.PlaneGeometry(DECK_W - 0.2, b - a, 1, 1);
-    // (laid flat: its far edge, b, is y = 1 before it's turned down)
+    const g = new THREE.PlaneGeometry(DECK_W + 1.6, b - a, 1, 1);
     parts.push(part(g, null, { y: (a + b) / 2, grad: [c0, c1, a, b], outline: 0 }));
   }
   return merge(parts.map((g) => g.rotateX(-Math.PI / 2))).translate(0, 0.03, 0);
@@ -739,46 +845,76 @@ export default {
   doorColor: '#e8c674',
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
-  // From the second time round: decks over the sand running out beneath
-  // the walk, up a flight of steps and across the gaps, deck to deck (see
-  // ObstacleField.placeClimb). One gap the first of them, two after; from the
-  // fourth time round now and then the far side a step higher.
+  // From the second time round: up a ramp of sand onto what's left of the
+  // gallery - buried terraces, clock-tower balconies, stone bridges broken
+  // off over the sand running out below - and across the gaps between (see
+  // the climbs, above, and ObstacleField.placeClimb). One gap the first
+  // climb of a visit, two after; two or three the third time through; from
+  // the fourth, now and then the far side of a gap a step higher.
   climb: {
     from: 1,
     every: [2, 4],
     most: (visit) => (visit <= 1 ? 2 : 3),
-    names: ['climbSteps', 'climbDeck', 'climbDeckHi', 'climbFace', 'climbFaceHi', 'climbGap', 'climbGear', 'climbGearB'],
+    names: [
+      'climbRamp', 'climbGap', 'climbRubble', 'climbRail', 'climbPost', 'climbTower',
+      ...DECKS.flatMap((h, i) => [`terrace${i}`, `terraceFace${i}`, `balcony${i}`, `balconyFace${i}`, `bridge${i}`, `bridgeFace${i}`]),
+    ],
     plan(visit, r, n) {
       const gaps = visit <= 1 ? (n === 0 ? 1 : 2) : visit === 2 ? r.int(2, 3) : 3;
-      const P = [{ kind: 'ramp', h: DECK_LO, t: 0.55, min: 8 }];
+      const P = [{ kind: 'ramp', h: DECK_LO, t: 0.55, min: 8 }, { kind: 'deck', style: 'terrace', h: DECK_LO, t: r.float(0.9, 1.05), min: 10 }];
       let h = DECK_LO;
       for (let i = 0; i < gaps; i++) {
-        P.push({ kind: 'deck', h, t: r.float(0.62, 0.78), min: 8 });
-        P.push({ kind: 'gap', t: r.float(0.24, 0.3), min: 4.5 });
-        if (visit >= 3 && h === DECK_LO && i < gaps - 1 && r.chance(0.4)) h = DECK_HI;
+        const up = visit >= 3 && h === DECK_LO && r.chance(0.4);
+        if (up) h = DECK_HI;
+        P.push({ kind: 'gap', t: r.float(0.3, 0.36), min: 5.5 });
+        // (a higher deck is a balcony on its tower; otherwise a bridge, or
+        // now and then a balcony or another terrace)
+        const style = up ? 'balcony' : i === gaps - 1 && gaps > 1 ? r.pick(['balcony', 'terrace']) : r.weighted([['bridge', 3], ['balcony', 1.4], ['terrace', 1]]);
+        P.push({ kind: 'deck', style, h, t: r.float(0.9, 1.05), min: 10 });
       }
-      P.push({ kind: 'deck', h, t: 0.72, min: 8 });
       return P;
     },
     put(put, P, { d, len, h, rng }) {
-      if (P.kind === 'ramp') {
-        put('climbSteps', 0, 0, d, { sz: len, sy: h });
-        return;
-      }
+      if (P.kind === 'ramp') return put('climbRamp', 0, 0, d, { sz: len * 1.02, sy: h });
       if (P.kind === 'gap') {
         put('climbGap', 0, 0, d, { sz: len });
+        // the floor's rubble at both its lips
+        for (const [x, z] of [[rng.float(-3.5, -1.5), d + 0.4], [rng.float(1.5, 3.5), d + len - 0.4]]) put('climbRubble', x, 0, z, { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.2) });
         return;
       }
-      const hi = h > DECK_LO + 0.1;
-      put(hi ? 'climbDeckHi' : 'climbDeck', 0, 0, d, { sz: len });
-      put(hi ? 'climbFaceHi' : 'climbFace', 0, 0, d);
-      put(hi ? 'climbFaceHi' : 'climbFace', 0, 0, d + len, { ry: Math.PI });
-      // the works turning in its face, and sand pouring down over its lip
-      // into the gap before it
-      const gy = (h - 0.27) * 0.5;
-      put('climbGear', -2.2, gy, d - 0.06, { p0: rng.float(0, 1), s: h / DECK_LO });
-      put('climbGearB', 2.2, gy, d - 0.06, { p0: rng.float(0, 1), s: h / DECK_LO });
-      for (const x of [rng.float(-3.6, -0.6), rng.float(0.6, 3.6)]) put('sandfall', x, 0, d - 0.12, { sx: rng.float(0.7, 1.5), sy: h - 0.05, sz: 0.5 });
+      const i = DECKS.indexOf(h) < 0 ? 0 : DECKS.indexOf(h);
+      const st = P.style || 'terrace';
+      const face = `${st}Face${i}`;
+      put(`${st}${i}`, 0, 0, d, { sz: len });
+      put(face, 0, 0, d);
+      put(face, 0, 0, d + len, { ry: Math.PI });
+      // sand pouring down over its lip
+      for (const x of [rng.float(-3.6, -0.8), rng.float(0.8, 3.6)]) {
+        if (rng.chance(0.75)) put('sandfall', x, 0, d - (st === 'balcony' ? 0.7 : st === 'bridge' ? 0.05 : 0.12), { sx: rng.float(0.6, 1.3), sy: h - 0.05, sz: 0.5, p0: rng.float(0, 6.28) });
+      }
+      // and along it, a few metres apart, never two the same
+      for (const s of [-1, 1]) {
+        for (let z = d + rng.float(1.2, 2.6); z < d + len - 1; z += rng.float(2.2, 3.6)) {
+          if (st === 'terrace') {
+            if (rng.chance(0.45)) put('climbRail', s * (DECK_W / 2 - 0.35), h, z, { ry: rng.float(-0.06, 0.06) });
+            else if (rng.chance(0.6)) put('sandHeap', s * rng.float(4.1, 4.5), h - 0.05, z, { s: rng.float(0.55, 0.85), ry: rng.float(0, 6.28) });
+          } else if (st === 'bridge') {
+            if (rng.chance(0.85)) put('climbRail', s * (DECK_W / 2 - 0.3), h + 0.1, z, { ry: rng.float(-0.04, 0.04) });
+          } else if (st === 'balcony') {
+            put('climbPost', s * rng.float(3.2, 3.9), 0, z, { sy: h - 0.5 });
+          }
+        }
+      }
+      // a balcony juts from its clock tower, standing off to one side
+      if (st === 'balcony') {
+        const s = rng.sign();
+        const x = s * (DECK_W / 2 + 2.4);
+        const z = d + Math.min(len * 0.5, 5);
+        put('climbTower', x, 0, z, {});
+        const o = { ry: s < 0 ? Math.PI / 2 : -Math.PI / 2, p0: rng.float(0, 1) };
+        put('wallClock', x - s * 1.62, 12.2, z, { ...o, s: 0.55 });
+        put('hands', x - s * 1.62, 12.2, z, { ...o, s: 0.55 });
+      }
     },
   },
   env: {
@@ -919,15 +1055,20 @@ export default {
     b.toon('gearGiant', merge(gearParts({ r: 6, teeth: 36, t: 0.7, spokes: 6 })), { cap: 16, anim: 'lift', ink: 0.05, turn: [0.05, 0, 0, 0] });
 
     // the climbs (from the second time round: see climb, above)
-    b.toon('climbSteps', stepsGeo(), { cap: 8, anim: 'popEarly', ink: 0.035 });
-    b.toon('climbDeck', deckGeo(DECK_LO), { cap: 16, anim: 'popEarly', ink: 0.04 });
-    b.toon('climbDeckHi', deckGeo(DECK_HI), { cap: 8, anim: 'popEarly', ink: 0.04 });
-    b.toon('climbFace', deckFaceGeo(DECK_LO), { cap: 32, anim: 'popEarly', ink: 0.035 });
-    b.toon('climbFaceHi', deckFaceGeo(DECK_HI), { cap: 16, anim: 'popEarly', ink: 0.035 });
+    b.toon('climbRamp', sandRampGeo(), { cap: 8, anim: 'popEarly', ink: 0.02 });
     b.toon('climbGap', gapGeo(), { cap: 16, anim: 'popEarly', ink: 0 });
-    b.toon('climbGear', merge(gearParts({ r: 0.62, teeth: 12, t: 0.16, spokes: 4 })), { cap: 24, anim: 'popEarly', ink: 0.03, turn: [0.8, 0, 0, 0] });
-    b.toon('climbGearB', merge(gearParts({ r: 0.62, teeth: 12, t: 0.16, spokes: 4, color: C.brassLo, hi: C.brass })), { cap: 24, anim: 'popEarly', ink: 0.03, turn: [-0.8, 0, 0, 0] });
-
+    b.toon('climbRubble', rubbleGeo(), { cap: 32, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbRail', terraceRailGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbPost', balconyPostGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    b.toon('climbTower', clockTowerGeo(), { cap: 8, anim: 'popEarly', ink: 0.05 });
+    DECKS.forEach((h, i) => {
+      b.toon(`terrace${i}`, terraceBodyGeo(h), { cap: 10, anim: 'popEarly', ink: 0.035 });
+      b.toon(`terraceFace${i}`, terraceFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });
+      b.toon(`balcony${i}`, balconyBodyGeo(h), { cap: 10, anim: 'popEarly', ink: 0.035 });
+      b.toon(`balconyFace${i}`, balconyFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });
+      b.toon(`bridge${i}`, bridgeBodyGeo(h), { cap: 10, anim: 'popEarly', ink: 0.035 });
+      b.toon(`bridgeFace${i}`, bridgeFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.035 });
+    });
   },
 
   // (the hands of the clock over the doorway out, at its centre)
