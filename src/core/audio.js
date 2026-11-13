@@ -286,6 +286,32 @@ export class Ambient {
     }, 1600);
   }
 
+  // Iris's wind (the companions' abilities): kind 0 her breath drawn in (a
+  // soft rising hush), 1 the gust (a low rush that tears past), 2 her
+  // portal folding the world (a long rising whoosh, a glassy chord over it).
+  gust(kind = 1) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const [f0, f1, vol, dur] = kind === 0 ? [300, 1100, 0.05, 0.55] : kind === 1 ? [1600, 260, 0.2, 0.8] : [200, 2400, 0.12, 0.9];
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise();
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 0.7;
+    band.frequency.setValueAtTime(f0, t);
+    band.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.85);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + (kind === 1 ? 0.03 : dur * 0.6));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(band).connect(g).connect(this.bus);
+    src.start(t, Math.random() * 0.2);
+    src.stop(t + dur + 0.05);
+    if (kind === 2) [74, 81, 86, 93].forEach((m, i) => this.chime(hz(m), t + 0.25 + i * 0.06, 0.04));
+    setTimeout(() => g.disconnect(), (dur + 0.4) * 1000);
+  }
+
   // A thruster's burst (the boost, in low gravity): a short hiss of
   // vapour, brighter for a full burst than a top-up.
   thrust(k = 1) {

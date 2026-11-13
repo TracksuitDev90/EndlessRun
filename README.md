@@ -969,12 +969,17 @@ at the far end of the first world 17, and one at the far end of the ninth 87.
 When you crash, the card offers to **exchange** the gems in hand for that many
 points, plus a haul bonus for a big pile (up to ×1.5 at 400 gems): tap it and
 the gem count drains away as the score counts up, to a tumble of tings. In all
-it comes to about two fifths again on top of what the run scored. Exchange
-and Continue, and you carry on with none in hand (the next crash offers
-whatever you've found since); Continue without exchanging and your haul rides
-on, growing. Whatever's still in hand when you leave the card for good is
-exchanged anyway, so a haul is never lost. (Later on, gems will buy things;
-for now, they're points.) Tunables live in `CONFIG.gems.exchange`.
+it comes to about two fifths again on top of what the run scored. Or **bank** them instead —
+one or the other, never both: banked gems go into a bank kept on the device,
+and buy your companions' levels (see [Companion
+abilities](#companion-abilities)). Exchange or bank and Continue, and you
+carry on with none in hand (the next crash offers whatever you've found
+since); Continue with neither and your haul rides on, growing. Whatever's
+still in hand when you leave the run for good (Run again, Choose runner, or
+Start over from the pause card) is banked, so a haul is never lost — and
+since gems leave your hand the moment they're exchanged or banked, no crash
+card, however many a run has, can count the same gem twice. Tunables live in
+`CONFIG.gems.exchange`.
 
 ![The crash card in the Kelp Deep: 25 pearls offered for +335, then exchanged — the count drained to nothing, the score and best counted up](docs/exchange.jpg)
 
@@ -991,6 +996,7 @@ chimes. The crash card tallies the run against your best. Tunables live in
 | Slide | swipe down (in the air: dive and slide on landing) | ↓ / S / Shift | drag down |
 | Change lane | swipe left / right | ← → / A D | drag left / right |
 | Pause | ⏸ button | Esc / P | ⏸ button |
+| Companion ability | its round button, bottom right | 1 / 2 / 3 | its button |
 
 Swipes fire the moment your finger has travelled far enough — you don't have
 to lift it — which is what makes the controls feel instant. A jump pressed just
@@ -2892,6 +2898,101 @@ and a half minutes of play on each of four seeds
 (`node tools/companion/audit.js "?manual&seed=2&companion=pitcher" 150`) he
 touches nothing.
 
+## Companion abilities
+
+Your companion can be brought on, for keeps, with gems. **Bank** the gems in
+hand on the crash card (or just leave the run: whatever's still in hand is
+banked), then spend them — on the crash card, where the next level of
+whoever ran with you is offered with its price, or in the **Companions** menu
+(the button under the companion badges on the title screen, or the link on
+the crash card), which lists all three, every ability, what each level costs
+and how many gems you still need. Each companion has **three levels**, each
+dearer than the last (120, 360 and 900 gems to start with), and each level
+**unlocks one more ability**, keeping the ones before it. The bank and the
+levels are kept on this device (`localStorage`, `er.progress`).
+
+In a run, the abilities the companion with you has unlocked sit in a row of
+round **buttons in the bottom-right corner** (keys **1**, **2**, **3**). Using
+one costs nothing. Each has its **own cooldown**, counted from when its effect
+ends and only while you're running — a dark dial sweeps back round the button
+with the seconds left on it, and it gives a little bounce when it's ready.
+While its effect runs a ring of the companion's colour drains round it. Only
+**one effect runs at a time**: while one does, the others wash out; so does
+any with nothing to do just now (Freshen Up with no stumble to wash away,
+Windbreak with no row coming, Root Reach with no gems in reach). The bigger
+the ability, the slower it recharges. Everything a companion does besides —
+her ideas, fetching a gem now and then — carries on around them.
+
+**Sorrel, the fox**
+
+1. **Fox's Haul** (7 s, then 22 s to recharge) — she tears off and darts from
+   lane to lane after the gems near you that you aren't about to run through
+   yourself, springing for the high ones, keeps them in her jaws, and then
+   trots back to your side and hands the whole haul over in a burst, very
+   pleased with herself.
+2. **Buried Treasure** (36 s) — she races ahead and digs, soil flying, and a
+   trail of bonus gems comes up along a route through the next few seconds of
+   road that's checked to be runnable: every row is passed in a lane with no
+   wall in it, lane changes only happen in the open road between rows with
+   time to make them, and the hurdles and bars on the way are taken — gems
+   on the arc of the jump, low under the bar — so you have to follow it,
+   jumps, slides and dodges and all. It never runs through a doorway.
+3. **Lucky Find** (55 s) — she digs up a special gem, bigger and brighter, a
+   few seconds up the road in a lane you can be standing in. Take it and
+   for 10 s every gem **you** take counts double (points, gems in hand and
+   their worth); the counter wears a ×2 badge while it lasts. Gems a
+   companion catches don't count double, and it's never more than double.
+
+**Iris, the wind dragon**
+
+1. **Dragon's Gift** (6 s, 22 s) — she flies in close beside you, her mane
+   streaming, and the gems near you — up to 9 m ahead, across all three
+   lanes — are drawn into you one after another, each with a breath of wind
+   behind it, a few wisps of it streaming past.
+2. **Windbreak** (40 s) — she flies out ahead, rears back and draws breath
+   (half a second you can see coming), and a gust clears the next row of
+   obstacles off the road: from that moment it can't be hit, and what you see
+   of it is carried off the side of the road, tumbling. A whale isn't: it
+   just swims aside, level and whole. A row cleared this way pays no clear
+   bonus.
+3. **World Fold** (once a run, continues and all) — her button shows where
+   it goes: the next world's name, in its doorway's colour. She flies ahead,
+   a portal swirling in her colours closes over the screen, and opens on the
+   start of the next world. Everything a doorway would do is done — the old
+   world let go, the new one's light, motes and dream, its splash or jump to
+   light speed — and you arrive as you were: same lane, same stride, mid-jump
+   if you were. The camera keeps its place behind you; the cut happens behind
+   the portal. Nothing skipped earns anything (the score counts metres as
+   they're run; the skipped obstacles and gems are simply gone), the run's
+   clock — which the speed and the difficulty go by — doesn't jump, and the
+   depth and laps count on exactly as through a doorway (it's the very next
+   world, with its own lap and dream). The first ~3 s of the new world are
+   empty road, checked, including anything that would reach into it.
+
+**Nep, the pitcher plant**
+
+1. **Freshen Up** (26 s) — only after a stumble: he shakes himself and
+   splashes it away. The danger of a second hit is gone, the ink clears and
+   you're straight back up to pace. It can't undo a crash.
+2. **Root Reach** (32 s) — he plants his feet (and the road carries him back
+   a little), his roots burrow out and each grabs a gem from the nearest
+   cluster ahead, across the lanes near you, and tosses it to you; then he
+   scrambles back up, soil flying off him.
+3. **Pitcher Protection** (5 s, 70 s) — he drenches you: for 5 s nothing can
+   hurt you, and anything you run through lets you by (no clear bonus for
+   it). A clear coat of water wraps you, streams running down it, drops
+   falling off you and little splashes at your feet; over its last second
+   and more it visibly thins and shimmers out. Anything you're in the middle
+   of running through as it ends — or will be a moment later — still lets
+   you through.
+
+All the durations, cooldowns and prices are starting points for tuning, in
+`CONFIG.powers`. The effects reuse what's already there: the gems'
+pick-up and toss, the sparkles, the runners' dust (one more set of it, for
+soil, water and wind), the obstacles' own instances (moved, not rebuilt),
+the doorway's effects; only the water's sheen and Nep's roots are new, a few
+small meshes drawn only while they're in use.
+
 ## Project layout
 
 ```
@@ -2952,7 +3053,11 @@ src/game/                     game loop, player (the runners' shared core:
                               legs, whiskers and frills; pitcher.js: Nep's
                               body, waddle, wobble, leaf, tendrils, sloshing
                               water and the soil off his roots; sprout.js:
-                              his own mind, on the runner's)
+                              his own mind, on the runner's); progress.js (the
+                              gem bank and the companions' levels), powers.js
+                              (their abilities) and powerfx.js (what the
+                              abilities leave in the world: soil, water,
+                              wind, the water's sheen, Nep's roots)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/elder.py         offline sculpt of the elder -> assets/elder/
@@ -3150,7 +3255,6 @@ light on the road and the motes they leave a colour of their own; and `icon:
 
 ## Not in yet (on purpose)
 
-Keys, power-ups (the companions will fetch those too), the companions' own
-gifts (growing with their loyalty the further you run), more runners, more
+Keys, power-ups (the companions will fetch those too), more runners, more
 companions and most sound effects are left for the next pass; the ambient soundtrack (and the gems' chimes) is generated live
 with Web Audio.

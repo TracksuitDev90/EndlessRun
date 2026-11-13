@@ -1318,6 +1318,672 @@ body:not(.touch) .touch-only {
   opacity: 0.7;
 }
 
+/* --- the companions' abilities (game/powers.js) ----------------------------
+   Round buttons down in the bottom corner, where a thumb rests: one for each
+   ability the companion has unlocked, in their colours. Recharging, a dark
+   dial sweeps back round with the seconds left on it; while its effect runs,
+   a ring of their colour drains round it; ready, it stands up bright (and
+   bounces as it comes ready). Another effect running, or nothing for it to
+   do just now, it's washed out. */
+.powers {
+  position: absolute;
+  right: calc(14px + var(--safe-right));
+  bottom: calc(16px + var(--safe-bottom));
+  display: flex;
+  gap: clamp(8px, 2.4vw, 12px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease;
+}
+.powers.show {
+  opacity: 1;
+  visibility: visible;
+}
+.powers[hidden] {
+  display: none;
+}
+.pw {
+  --s: clamp(52px, 14vw, 60px);
+  position: relative;
+  width: var(--s);
+  height: var(--s);
+  padding: 0;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, var(--paper) 0 30%, var(--c1) 100%);
+  box-shadow: 3px 4px 0 var(--ink);
+  color: var(--ink);
+  touch-action: none;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.25s ease;
+}
+.pw:active {
+  transform: translate(2px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.pw-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.pw svg {
+  width: 58%;
+  height: 58%;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pw svg .f,
+.pm-pw svg .f {
+  fill: var(--ink);
+}
+.pw svg .hi,
+.pm-pw svg .hi {
+  stroke: var(--paper);
+}
+/* recharging: the dial */
+.pw-cd {
+  --cd: 0;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(30, 20, 14, 0.66) calc(var(--cd) * 1turn), transparent 0);
+  pointer-events: none;
+}
+.pw-sec {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  font-weight: 800;
+  font-size: calc(var(--s) * 0.36);
+  font-variant-numeric: tabular-nums lining-nums;
+  text-shadow: 0 2px 0 var(--ink);
+  pointer-events: none;
+}
+/* its effect running: the ring */
+.pw-ring {
+  --on: 0;
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: conic-gradient(var(--c2) calc(var(--on) * 1turn), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent calc(50% - 5px), #000 calc(50% - 4.5px));
+  mask: radial-gradient(circle, transparent calc(50% - 5px), #000 calc(50% - 4.5px));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.pw[data-state='on'] .pw-ring {
+  opacity: 1;
+}
+.pw[data-state='on'] {
+  background: radial-gradient(circle at 38% 32%, var(--white) 0 30%, var(--c1) 100%);
+  box-shadow: 3px 4px 0 var(--ink), 0 0 0 3px var(--paper), 0 0 18px 4px var(--c1);
+}
+.pw[data-state='cool'] .pw-face {
+  opacity: 0.55;
+}
+.pw[data-state='busy'],
+.pw[data-state='idle'],
+.pw[data-state='used'] {
+  filter: saturate(0.25) brightness(0.92);
+}
+.pw[data-state='busy'] .pw-face,
+.pw[data-state='idle'] .pw-face,
+.pw[data-state='used'] .pw-face {
+  opacity: 0.5;
+}
+.pw[data-state='used']::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 50%;
+  border-top: 3px solid var(--ink);
+  transform: rotate(-35deg);
+}
+.pw-key {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  font: 700 11px/1 ui-monospace, Menlo, Consolas, monospace;
+}
+body.touch .pw-key {
+  display: none;
+}
+/* World Fold: where it goes, over the button, in that world's colour */
+.pw[data-id='fold'] {
+  background: radial-gradient(circle at 50% 50%, var(--dest, var(--c1)) 0 26%, var(--c1) 46%, var(--c2) 100%);
+}
+.pw[data-id='fold'] svg {
+  stroke: var(--ink);
+}
+.pw-dest {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: -4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 3px 4px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 11.5px;
+  font-style: italic;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pw-dest i {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+}
+.pw[data-state='used'] .pw-dest {
+  opacity: 0.7;
+}
+.pw.ping,
+.pw.ping-b {
+  animation: pw-ping 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.pw.ping-b {
+  animation-name: pw-ping-b;
+}
+.pw.fire,
+.pw.fire-b {
+  animation: pw-fire 0.35s ease-out;
+}
+.pw.fire-b {
+  animation-name: pw-fire-b;
+}
+@keyframes pw-ping {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.16) rotate(-6deg); }
+  100% { transform: scale(1); }
+}
+@keyframes pw-ping-b {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.16) rotate(-6deg); }
+  100% { transform: scale(1); }
+}
+@keyframes pw-fire {
+  0% { transform: translate(2px, 3px) scale(0.92); }
+  100% { transform: none; }
+}
+@keyframes pw-fire-b {
+  0% { transform: translate(2px, 3px) scale(0.92); }
+  100% { transform: none; }
+}
+/* a word over the buttons: Sorrel's haul, ×2 gems... */
+.power-note {
+  position: absolute;
+  right: calc(14px + var(--safe-right));
+  bottom: calc(96px + var(--safe-bottom));
+  max-width: 70vw;
+  padding: 4px 12px 5px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.power-note[data-kind='lucky'] {
+  background: #ffe066;
+}
+.power-note.show {
+  animation: note 1.9s ease-out both;
+}
+.power-note.show-b {
+  animation: note-b 1.9s ease-out both;
+}
+@keyframes note {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  12% { opacity: 1; transform: translateY(0) scale(1.04); }
+  20% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes note-b {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  12% { opacity: 1; transform: translateY(0) scale(1.04); }
+  20% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+/* Lucky Find: the gems you take count double, on the counter */
+.gem-double {
+  display: none;
+  margin-left: 2px;
+  padding: 0 7px 1px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #ffe066;
+  font-size: 13px;
+  font-weight: 800;
+  font-style: normal;
+  white-space: nowrap;
+}
+.gem-pill.double .gem-double {
+  display: inline-block;
+  animation: breathe 0.9s ease-in-out infinite;
+}
+
+/* World Fold: Iris's portal closes over the screen from the middle, a
+   swirl of her colours round the colour of where it goes - and opens again,
+   swelling away, on the world beyond. */
+.fold {
+  --dest: #8fe3e6;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  visibility: hidden;
+  background:
+    radial-gradient(circle at 50% 46%, var(--dest) 0 9%, color-mix(in srgb, var(--dest) 40%, #8fe3e6) 17%, #8fe3e6 26%, #3b56c4 52%, #121848 92%);
+  clip-path: circle(0% at 50% 46%);
+}
+.fold::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: repeating-conic-gradient(from 0deg at 50% 46%, rgba(255, 255, 255, 0.16) 0 7deg, transparent 7deg 22deg);
+  animation: fold-spin 1.2s linear infinite;
+}
+.fold.in {
+  visibility: visible;
+  animation: fold-in 0.45s cubic-bezier(0.5, 0, 0.75, 0.4) both;
+}
+.fold.out {
+  visibility: visible;
+  clip-path: circle(150% at 50% 46%);
+  animation: fold-out 0.7s ease-out both;
+}
+@keyframes fold-in {
+  0% { clip-path: circle(0% at 50% 46%); }
+  100% { clip-path: circle(150% at 50% 46%); }
+}
+@keyframes fold-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+@keyframes fold-spin {
+  to { transform: rotate(1turn); }
+}
+
+/* --- the bank and the companions' levels --------------------------------- */
+.bank-gem {
+  display: inline-grid;
+  place-items: center;
+}
+.bank-gem .gem-ic {
+  width: 17px;
+  height: 15px;
+}
+.palmenu-btn {
+  margin: clamp(8px, 1.6vh, 14px) auto 0;
+  pointer-events: auto;
+  font-family: var(--serif);
+  font-size: 14px;
+  gap: 6px;
+  padding: 5px 13px 6px 10px;
+}
+.palmenu-btn[hidden] {
+  display: none;
+}
+.palmenu-btn b {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.palmenu-label {
+  font-style: italic;
+  opacity: 0.85;
+}
+.palmenu-label::before {
+  content: '·';
+  margin: 0 6px 0 2px;
+  font-style: normal;
+}
+/* the crash card: exchange or bank, the next level, the bank */
+#crash .card {
+  max-height: calc(100% - 20px - var(--safe-top) - var(--safe-bottom));
+  overflow-y: auto;
+  gap: 10px;
+}
+.exchange .or {
+  align-self: center;
+  margin: -3px 0 -4px;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.6;
+}
+.btn.gem.bank {
+  background: linear-gradient(135deg, var(--paper) 0%, var(--paper) 55%, #d9ccff 100%);
+}
+.bank-ic {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.btn.gem .bank-pts {
+  background: #b9a6ff;
+}
+.exchange.banked #btn-exchange .ex-label,
+.exchange.done:not(.banked) #btn-bank .ex-label {
+  opacity: 0.45;
+}
+.bank-line {
+  margin: -2px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 14px;
+  font-style: italic;
+}
+.bank-line b {
+  font-style: normal;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.upgrade {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 7px 6px 6px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--c1) 55%, var(--paper)), var(--paper) 70%);
+  text-align: left;
+}
+.upgrade[hidden] {
+  display: none;
+}
+.up-face {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 70%, var(--c1), var(--c2) 85%);
+}
+.up-face img {
+  position: absolute;
+  left: -14%;
+  bottom: -10%;
+  width: 128%;
+  height: 128%;
+  object-fit: contain;
+}
+.up-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.up-who {
+  font-weight: 600;
+  font-size: 14px;
+}
+.up-next {
+  font-size: 13px;
+  font-style: italic;
+}
+.up-next b {
+  font-style: normal;
+}
+.btn.buy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 6px 11px 7px 9px;
+  font-size: 15px;
+  border-radius: 11px;
+  background: #ffd25e;
+  box-shadow: 2px 3px 0 var(--ink);
+}
+.btn.buy[hidden] {
+  display: none;
+}
+.btn.buy .gem-ic {
+  width: 17px;
+  height: 15px;
+}
+.btn.buy b {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.btn.buy:disabled {
+  background: var(--paper-2);
+  opacity: 0.7;
+  cursor: default;
+  transform: translate(1px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+/* the companion menu */
+.palmenu .card.wide {
+  position: relative;
+  width: min(440px, calc(100% - 24px));
+  max-height: calc(100% - 24px - var(--safe-top) - var(--safe-bottom));
+  overflow-y: auto;
+  padding: 22px 16px 16px;
+  text-align: left;
+}
+.palmenu h2 {
+  text-align: center;
+}
+.palmenu .sub {
+  text-align: center;
+  font-size: 13.5px;
+  margin: -6px 6px 0;
+}
+.palmenu-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 38px;
+  height: 38px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.palmenu-bank {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  font-size: 16px;
+  font-style: italic;
+}
+.palmenu-bank b {
+  font-style: normal;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.palmenu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pm-pal {
+  border: 2.5px solid var(--ink);
+  border-radius: 16px;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--c1) 38%, var(--paper)), var(--paper) 46%);
+  padding: 8px 10px 6px;
+}
+.pm-pal.current {
+  box-shadow: 3px 4px 0 var(--ink);
+}
+.pm-pal header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.pm-pal .pal-face {
+  width: 38px;
+  height: 38px;
+}
+.pm-who {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.pm-who b {
+  font-weight: 700;
+  font-size: 17px;
+}
+.pm-who i {
+  font-size: 12.5px;
+  opacity: 0.75;
+}
+.pm-pips {
+  display: flex;
+  gap: 4px;
+}
+.pm-pips i {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+}
+.pm-pips i.on {
+  background: var(--c2);
+}
+.pm-powers {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pm-pw {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 2px 5px 0;
+  border-top: 1.5px dashed rgba(42, 29, 20, 0.25);
+}
+.pm-pw .pw-face {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, var(--paper) 0 30%, var(--c1) 100%);
+}
+.pm-pw svg {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pm-pw.locked .pw-face {
+  filter: saturate(0) brightness(1.05);
+  opacity: 0.6;
+}
+.pm-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+.pm-text b {
+  font-size: 15px;
+}
+.pm-text small {
+  font-size: 11.5px;
+  font-style: italic;
+  opacity: 0.65;
+}
+.pm-blurb {
+  display: block;
+  font-size: 12.5px;
+  opacity: 0.85;
+}
+.pm-pw.locked .pm-text {
+  opacity: 0.6;
+}
+.pm-state {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.pm-owned {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--c1);
+  font-weight: 800;
+}
+.pm-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.pm-price .gem-ic {
+  width: 14px;
+  height: 12px;
+}
+.pm-short {
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fold::before,
+  .gem-pill.double .gem-double {
+    animation: none;
+  }
+}
+
 #stats {
   position: absolute;
   left: calc(8px + var(--safe-left));
@@ -1502,4 +2168,16 @@ body:not(.touch) .touch-only {
   .tagline {
     transform: rotate(-2deg);
   }
+}
+
+/* (banked gems are all one gem, whatever world you're in - never a pearl) */
+#ui.pearl .bank-gem .gem-ic,
+#ui.pearl .btn.buy .gem-ic,
+#ui.pearl .pm-price .gem-ic {
+  display: inline;
+}
+.bank-gem .gem-body,
+.btn.buy .gem-body,
+.pm-price .gem-body {
+  fill: #a982ff;
 }

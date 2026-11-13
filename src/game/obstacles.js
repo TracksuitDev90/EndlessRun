@@ -120,6 +120,8 @@ export class ObstacleField {
     // read by the gem director to plan its route through them
     this.rows = [];
     this.nextD = 0;
+    // rows a gust is carrying off the road (Windbreak, see blow)
+    this.blowing = [];
   }
 
   reset(rng, startD, tutorial) {
@@ -157,6 +159,8 @@ export class ObstacleField {
 
   clear() {
     for (const g of this.groups) g.world.removeOwner(g);
+    for (const b of this.blowing) b.g.world.removeOwner(b.g);
+    this.blowing.length = 0;
     this.groups.length = 0;
     this.records.length = 0;
     this.rows.length = 0;
@@ -164,6 +168,11 @@ export class ObstacleField {
 
   dropWorld(world) {
     this.removeWhere((g) => g.world === world);
+    this.blowing = this.blowing.filter((b) => {
+      if (b.g.world !== world) return true;
+      world.removeOwner(b.g);
+      return false;
+    });
   }
 
   clearRange(d0, d1) {
@@ -201,6 +210,71 @@ export class ObstacleField {
       this.removeWhere((g) => g.d + g.len < limit);
     }
     while (this.rows.length && this.rows[0].end < limit) this.rows.shift();
+    if (this.blowing.length) this.blowStep();
+  }
+
+  // --- Windbreak ---------------------------------------------------------------
+  // (powers.js) The first row of obstacles between d0 and d1 that has
+  // anything in it, or null.
+  rowBetween(d0, d1) {
+    for (const row of this.rows) {
+      if (row.d < d0 || row.d > d1) continue;
+      if (row.lanes.some((r) => r && !r.group.dead && !r.group.blown)) return row;
+    }
+    return null;
+  }
+
+  // A gust takes a row off the road. From this moment nothing of it can be
+  // hit, stood on or stepped round (its records are gone), and it earns no
+  // clear bonus; what you see of it is carried off to the side of the road
+  // over `dur` seconds - away from the runner, off the near edge - lifting a
+  // little, and tumbling if it's a thing; anything alive (spec.call: the
+  // whales) just swims aside, unhurried, level and whole. Then it's let go.
+  // side: which way (-1 / +1) a full-width one goes.
+  blow(row, time, side, dur) {
+    const groups = new Set();
+    for (const r of row.lanes) if (r && !r.group.dead && !r.group.blown) groups.add(r.group);
+    if (!groups.size) return 0;
+    for (const g of groups) {
+      g.blown = true;
+      g.scored = true;
+      const items = [];
+      for (const b of g.world.batches.values()) for (const it of b.items) if (it.owner === g) items.push({ it, b, x: it.x, y: it.y, ry: it.ry });
+      const rec = row.lanes.find((r) => r && r.group === g);
+      const wide = row.lanes.every((r) => r && r.group === g);
+      const dir = wide || rec.lane === 1 ? side : rec.lane === 0 ? -1 : 1;
+      const alive = !!g.spec?.call;
+      this.blowing.push({ g, items, t0: time, dur: dur * (alive ? 1.5 : 1), dir, alive, spin: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8) });
+    }
+    let w = 0;
+    for (const r of this.records) if (!r.group.blown) this.records[w++] = r;
+    this.records.length = w;
+    for (let i = 0; i < 3; i++) if (row.lanes[i]?.group.blown) row.lanes[i] = null;
+    this.groups = this.groups.filter((g) => !g.blown);
+    return groups.size;
+  }
+
+  blowStep() {
+    const time = this.game.time;
+    let w = 0;
+    for (const B of this.blowing) {
+      const k = Math.min(1, (time - B.t0) / B.dur);
+      // (the gust shoves hard and lets go; a whale eases away)
+      const e = B.alive ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 2.4);
+      for (const I of B.items) {
+        const it = I.it;
+        if (it.owner !== B.g) continue;
+        it.x = I.x + B.dir * e * (B.alive ? 9 : 10.5);
+        it.y = I.y + (B.alive ? 1.6 * e : 2.2 * Math.sin(Math.min(1, e * 1.25) * Math.PI * 0.85));
+        if (!B.alive) it.ry = I.ry + B.spin * e * 2.4;
+        I.b.dirty = true;
+      }
+      if (k >= 1) {
+        B.g.world.removeOwner(B.g);
+        B.g.dead = true;
+      } else this.blowing[w++] = B;
+    }
+    this.blowing.length = w;
   }
 
   spawnNext(dist, runTime) {

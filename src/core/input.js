@@ -74,6 +74,9 @@ export class Input {
       ArrowRight: 'right', KeyD: 'right',
       ArrowUp: 'up', KeyW: 'up', Space: 'up',
       ArrowDown: 'down', KeyS: 'down', ShiftLeft: 'down', ShiftRight: 'down',
+      // the companion's abilities
+      Digit1: 'power0', Digit2: 'power1', Digit3: 'power2',
+      Numpad1: 'power0', Numpad2: 'power1', Numpad3: 'power2',
     };
     const a = map[e.code];
     if (a) {

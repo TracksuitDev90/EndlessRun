@@ -219,6 +219,47 @@ export const CONFIG = {
     },
   },
 
+  // Companion progression and abilities (see game/progress.js and
+  // game/powers.js). Gems banked after a run buy a companion's levels - the
+  // n-th level costs costs[n - 1], each dearer than the last - and every
+  // level unlocks one more ability, kept with those before it. An ability
+  // costs nothing to use; each has its own cooldown (cd, s of running,
+  // counted from when its effect ends), the bigger ones recharging slower,
+  // and only one companion effect is ever active at a time. These are
+  // starting points for tuning.
+  powers: {
+    costs: [120, 360, 900],
+    fox: {
+      // Fox's Haul: dur s of darting after gems up to reach m ahead
+      haul: { dur: 7, cd: 22, reach: [2, 22] },
+      // Buried Treasure: a bonus trail through the road from ahead[0] to
+      // ahead[1] seconds of running ahead
+      treasure: { cd: 36, ahead: [1.5, 6.5] },
+      // Lucky Find: a special gem `ahead` s up the road; taking it doubles
+      // (mul) the gems you take yourself for dur s
+      lucky: { cd: 55, dur: 10, mul: 2, ahead: 2.6 },
+    },
+    dragon: {
+      // Dragon's Gift: for dur s, gems within reach m ahead and side m
+      // across are drawn into the runner
+      gift: { dur: 6, cd: 22, reach: 9, side: 3.4 },
+      // Windbreak: a windup s wind-up, then one row between range[0] and
+      // range[1] seconds ahead is blown aside (over blow s)
+      windbreak: { cd: 40, windup: 0.55, range: [1.0, 3.4], blow: 0.85 },
+      // World Fold: once a run; the portal closes over the screen in
+      // windup s, and at least clear s of the new world are empty road
+      fold: { windup: 0.45, clear: 3.2, minDoor: 70 },
+    },
+    pitcher: {
+      freshen: { cd: 26 },
+      // Root Reach: one cluster of gems between reach[0] and reach[1] m
+      // ahead, at most `most` of them
+      roots: { cd: 32, reach: [3, 24], most: 10 },
+      // Pitcher Protection: dur s, the coating fading over its last fade s
+      shield: { dur: 5, cd: 70, fade: 1.3 },
+    },
+  },
+
   // Hits
   stumbleWindow: 4.5, // a second hit within this many seconds ends the run
   stumbleSpeedMul: 0.72,

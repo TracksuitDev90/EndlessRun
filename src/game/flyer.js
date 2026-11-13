@@ -91,6 +91,7 @@ export class Flyer {
     this.offV = { x: 0, y: 0, dz: 0 };
     this.prevReady = false;
     this.script = null;
+    this.power = null;
     this.spot = new THREE.Vector3(this.x, 0, 0);
     this.yaw = 0.4;
     this.yawV = 0;
@@ -179,6 +180,15 @@ export class Flyer {
 
   cheer(t) {
     this.happyT = Math.max(this.happyT, t);
+  }
+
+  // One of her abilities is starting (powers.js): she drops whatever she
+  // was up to.
+  powerBegin() {
+    if (this.beat) this.endBeat();
+    this.fetching = null;
+    if (this.script && this.script.kind !== 'twirl') this.endScript();
+    this.body.jawOpen = 0;
   }
 
   lookFor(t, at) {
@@ -465,6 +475,8 @@ export class Flyer {
   think(dt) {
     this.fetchT -= dt;
     this.swim = 1;
+    // (one of her abilities has her: see powers.js)
+    if (this.power?.drive?.(this, dt)) return;
     if (this.fetching) this.fetchStep(dt);
     else if (this.beat) this.beatStep(dt);
     else {
@@ -772,7 +784,8 @@ export class Flyer {
     let best = null;
     const dh = g.dist + this.dz;
     for (const gem of g.gems.gems) {
-      if (gem.taken) continue;
+      // (the gems an ability laid are left for you)
+      if (gem.taken || gem.bonus) continue;
       const ahead = gem.d - g.dist;
       if (ahead < C.reach[0] || ahead > C.reach[1] || gem.d - dh < 3) continue;
       if (gem.y > 2.4 || Math.abs(gem.x - p.x) < 1.4) continue;

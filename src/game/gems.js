@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { rgb } from '../render/geo.js';
 import { boostArc, plainArc } from './drift.js';
+import { RNG } from '../core/rng.js';
 
 // Gem director. Gems are laid in runs along a "ghost" route: the line a good
 // runner would take through the obstacles ahead, planned row by row as the
@@ -47,6 +48,9 @@ export class GemField {
     this.cursor = startD + CONFIG.gems.firstAt; // the route is planned up to here
     this.restUntil = this.cursor; // no new run starts before here
     this.restT = CONFIG.gems.rest[0];
+    // (the companions' gems have dice of their own, so the road's own come
+    // out the same for a seed whatever they do: see bonus)
+    this.bonusRng = new RNG((Math.random() * 1e9) | 0);
   }
 
   clear() {
@@ -396,8 +400,186 @@ export class GemField {
   }
 
   // One of the world's everyday stones, by weight.
-  pickStone(spec) {
-    return this.rng.weighted(spec.stones.map((s, i) => [i, s.weight ?? 1]));
+  pickStone(spec, rng = this.rng) {
+    return rng.weighted(spec.stones.map((s, i) => [i, s.weight ?? 1]));
+  }
+
+  // --- the companions' gems -------------------------------------------------
+  // (see powers.js) Laid with dice of their own, so the road's own gems -
+  // and everything else a seed lays - come out the same with or without.
+  // A gem outside the director's runs: crown, the world's crown stone; big,
+  // drawn bigger (Lucky Find's); run, a run of the companion's own to count
+  // toward (null: a run of one). Never where a gem already is, nor anywhere
+  // safe() wouldn't lay one. Returns it, or null.
+  bonus(d, x, y, { crown = false, big = 1, run = null, rng } = {}) {
+    rng = rng || this.bonusRng;
+    const game = this.game;
+    const v = Math.max(game.speed, CONFIG.speed.start);
+    const diff = game.obstacles.difficultyFor(d, game.runTime);
+    if (!this.safe(d, x, y, v, diff)) return null;
+    for (const g of this.gems) if (!g.taken && Math.abs(g.d - d) < 1.4 && Math.abs(g.x - x) < 0.9 && Math.abs(g.y - y) < 0.7) return null;
+    const world = game.course.segAt(d).world;
+    const spec = world.def.gem;
+    if (!spec) return null;
+    run = run || { size: 0, taken: 0, closed: true, last: d, phase: rng.float(0, 6.28), lead: new Map(), bonus: true };
+    const index = run.size++;
+    run.last = d;
+    if (!run.lead.has(world)) run.lead.set(world, this.pickStone(spec, rng));
+    const kind = crown ? spec.stones.length : run.lead.get(world);
+    const stone = crown ? spec.crown : spec.stones[kind];
+    const tints = stone.rgb || (stone.rgb = stone.tints.map((t) => rgb(t)));
+    const a = rng.pick(tints);
+    const tint = [a[0], a[1], a[2]];
+    const light = spec.light ? (spec.lightRgb || (spec.lightRgb = rgb(spec.light))) : tint;
+    const g = { d, x, y, world, run, index, kind, crown, tint, light, taken: 0, items: null, bonus: true, big };
+    const C = CONFIG.gems;
+    const p0 = run.phase - index * 0.6;
+    const s = C.size * (crown ? 1.3 : 1) * big;
+    const duck = y < C.ground - 0.1 ? 0.85 : 1;
+    g.items = [
+      world.put(g, 'gems', x, y, d, { s: big * duck, c: tint, p0, p1: kind }),
+      world.put(g, 'gemGlow', x, y, d, { s: (spec.halo ?? 1.5) * s * (big > 1 ? 1.35 : 1), c: light, p0 }),
+      world.put(g, 'gemPool', x, 0.04, d, { s: 1.7 * s, c: light, p0 }),
+    ];
+    // (kept in order along the road: the companions look through them so)
+    let i = this.gems.length;
+    while (i > 0 && this.gems[i - 1].d > d) i--;
+    this.gems.splice(i, 0, g);
+    return g;
+  }
+
+  // Bonus gems taken back up unlaid (a trail too short to be worth it).
+  retract(list) {
+    const gone = new Set(list);
+    for (const g of list) this.unput(g);
+    this.gems = this.gems.filter((g) => !gone.has(g));
+  }
+
+  // Sorrel caught it and keeps it (Fox's Haul): it's taken - counting toward
+  // its run, as any gem taken - and gone into her jaws at once, to be handed
+  // over when she brings her haul back.
+  stash(g, time) {
+    g.taken = time;
+    g.tossed = false;
+    this.unput(g);
+    g.items = [];
+    const run = g.run;
+    run.taken++;
+    g.whole = run.taken === run.size && run.size >= 3 && (run.closed || this.cursor - run.last > 8);
+    return g;
+  }
+
+  // Buried Treasure: a trail of bonus gems from `from` to `to` along a route
+  // that can be run - taking every row on the way in a lane with no wall in
+  // it, over the hurdles on the arc of a jump and under the bars low, and
+  // only changing lanes in the open road between rows, with time to - and
+  // never through a doorway. lane: where the runner is now. Returns the gems
+  // laid (none if no route could be found).
+  trail(from, to, lane) {
+    const game = this.game;
+    const C = CONFIG.gems;
+    const rng = this.bonusRng;
+    const v = Math.max(game.speed, CONFIG.speed.start);
+    const door = game.course.boundaryAfter(game.dist);
+    if (door) to = Math.min(to, door.d - 3);
+    if (to - from < v) return [];
+    const rows = game.obstacles.rows.filter((r) => r.d > from && r.end < to && r.lanes.some(Boolean));
+    // the lane past each row: never a wall; reachable from the last in the
+    // road between them; and leaving a way on past the next. Hurdles and
+    // bars are taken gladly - that's the treasure's price.
+    const swerve = v * C.swerve; // m to cross one lane
+    const react = v * 0.4;
+    const pass = (rec) => !rec || (rec.kind !== 'W' && !(rec.kind === 'L' && rec.y1 > 1.2));
+    const can = (row, l) => pass(row.lanes[l]);
+    const plan = [];
+    let cur = lane;
+    let at = from;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const room = row.d - react - at;
+      const reach = (l) => Math.abs(l - cur) * swerve <= room;
+      const next = rows[i + 1];
+      let best = -1, score = -1e9;
+      for (let l = 0; l < 3; l++) {
+        if (!can(row, l) || !reach(l)) continue;
+        // (a way on from here past the next row)
+        if (next) {
+          const room2 = next.d - react - (row.end + v * 0.1);
+          if (![0, 1, 2].some((m) => can(next, m) && Math.abs(m - l) * swerve <= room2)) continue;
+        }
+        const act = row.lanes[l] ? 1.2 : 0;
+        const sc = act - Math.abs(l - cur) * 0.7 + rng.float(0, 0.6);
+        if (sc > score) {
+          score = sc;
+          best = l;
+        }
+      }
+      if (best < 0) {
+        // (a row too close to swerve for, before the trail's begun: it
+        // starts past it instead, in whichever lane leads on best)
+        if (!plan.length && i + 1 < rows.length) {
+          const open = [0, 1, 2].filter((l) => can(row, l));
+          if (open.length) {
+            cur = open.reduce((a, b) => (Math.abs(b - lane) < Math.abs(a - lane) ? b : a));
+            lane = cur;
+            from = at = row.end + v * 0.3;
+            continue;
+          }
+        }
+        to = Math.min(to, row.d - react);
+        break;
+      }
+      plan.push({ row, lane: best, from: cur, at: Math.max(at, row.d - react - Math.abs(best - cur) * swerve) });
+      cur = best;
+      at = row.end + v * 0.12;
+    }
+    // where the route is across the road at d
+    const xAt = (d) => {
+      let x = CONFIG.laneX[lane];
+      for (const p of plan) {
+        if (d < p.at) break;
+        const len = Math.max(1e-3, Math.abs(p.lane - p.from) * swerve);
+        x = lerp(CONFIG.laneX[p.from], CONFIG.laneX[p.lane], ease((d - p.at) / len));
+      }
+      return x;
+    };
+    const run = { size: 0, taken: 0, closed: true, last: from, phase: rng.float(0, 6.28), lead: new Map(), bonus: true };
+    const out = [];
+    const put = (d, x, y, crown = false) => {
+      if (d < from || d > to) return;
+      const g = this.bonus(d, x, y, { crown, run, rng });
+      if (g) out.push(g);
+    };
+    const sp = this.spacing(v);
+    // the open road, one gem every step...
+    const busy = []; // [d0, d1] stretches the rows' own gems take
+    for (const p of plan) {
+      const rec = p.row.lanes[p.lane];
+      if (rec && rec.kind === 'L') {
+        const A = this.arcAt(rec.d);
+        const takeoff = rec.d + rec.len / 2 - v * A.mid;
+        busy.push([takeoff - sp * 0.5, takeoff + v * A.T + sp * 0.5]);
+        const n = 5;
+        for (let k = 0; k < n; k++) {
+          const t = (A.T * (k + 0.5)) / n;
+          put(takeoff + v * t, CONFIG.laneX[p.lane], A.feet(t) + C.ground, k === (n - 1) >> 1);
+        }
+      } else if (rec && rec.kind === 'H') {
+        const d0 = p.row.d - v * 0.2, d1 = p.row.end + v * 0.2;
+        busy.push([d0 - sp * 0.5, d1 + sp * 0.5]);
+        const n = Math.max(3, Math.round((d1 - d0) / sp) + 1);
+        for (let k = 0; k < n; k++) put(lerp(d0, d1, k / (n - 1)), CONFIG.laneX[p.lane], C.low, k === n - 1);
+      } else {
+        busy.push([p.row.d - 0.6, p.row.end + 0.6]);
+      }
+    }
+    for (let d = from; d <= to; d += sp) {
+      if (busy.some(([a, b]) => d > a && d < b)) continue;
+      put(d, xAt(d), C.ground);
+    }
+    out.sort((a, b) => a.d - b.d);
+    run.size = out.length;
+    return out;
   }
 
   // --- pick-up --------------------------------------------------------------
