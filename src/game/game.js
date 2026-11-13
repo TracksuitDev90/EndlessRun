@@ -809,7 +809,7 @@ export class Game {
       if (this.state !== 'running') return;
     }
     const until = this.time + 0.6;
-    for (const r of this.obstacles.records) if (r.group === o.group && r.d > o.d - 0.01 && r.d < o.d + o.len + 14) r.grace = until;
+    for (const r of this.obstacles.records) if (r.group === o.group && r.d + r.len > o.d - 14 && r.d < o.d + o.len + 14) r.grace = until;
     this.player.scramble(o.pit ? o.next : o.y1);
   }
 
