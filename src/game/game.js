@@ -123,10 +123,10 @@ export class Game {
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     // (room for more: the Frostbound Pass's snowfall, see updateSnow)
-    this.particles = new Particles(240, 99, 1080);
+    this.particles = new Particles(240, 99, 1400);
     // a second layer some worlds use (env.particles2): Hell's falling ash
     // under its rising embers; invisible elsewhere
-    this.particles2 = new Particles(320, 7, 640);
+    this.particles2 = new Particles(320, 7, 800);
     this.sparkles = new Sparkles();
     this.dream = new Dream();
     // under the sea: the bubbles, swirl and sand round the runner, lit as
@@ -1200,6 +1200,15 @@ export class Game {
     return world.def.snowAt(seg.visit || 0, t);
   }
 
+  // How heavy its flakes are (def.snowWeight(visit, t)): heavier every lap,
+  // so the more times you've come round, the harder it's coming down. 1
+  // anywhere else.
+  snowWeightOf(world, seg) {
+    if (!seg || !world.def.snowWeight) return 1;
+    const t = Math.min(1, Math.max(0, (this.dist - seg.start) / Math.max(1, seg.end - seg.start)));
+    return world.def.snowWeight(seg.visit || 0, t);
+  }
+
   updateSnow() {
     const seg = this.course.segAt(this.dist);
     // (the runner through a doorway the camera hasn't followed them through
@@ -1216,13 +1225,21 @@ export class Game {
       const f = world.env.snow?.fall;
       return f ? f[0] + (f[1] - f[0]) * lv : 1;
     };
-    const fa = fall(this.current, a);
-    const fb = this.next && this.door ? fall(this.next, b) : fa;
+    const wa = this.snowWeightOf(this.current, here && here.world === this.current ? here : null);
+    const wb = this.next && this.door ? this.snowWeightOf(this.next, this.door.seg) : wa;
+    // (heavier flakes come thicker too)
+    const fa = fall(this.current, a) * (1 + 0.6 * (wa - 1));
+    const fb = (this.next && this.door ? fall(this.next, b) : fall(this.current, a)) * (1 + 0.6 * (wb - 1));
     // (blended on the run up to a doorway, as the motes themselves are)
     const t = this.portal.active && this.door ? smooth01(55, 0, this.door.quadD - this.dist) : 0;
     this.particles.density = this.particles2.density = fa + (fb - fa) * t;
+    const w = wa + (wb - wa) * t;
+    if (w !== this.particles.weight) {
+      this.particles.weigh(w);
+      this.particles2.weigh(w);
+    }
     // (the second layer, the Pass's finer, further flakes, thickens too,
-    // but only to twice its usual: see particles2's room)
+    // but only to two and a half times its usual: see particles2's room)
   }
 
   // --- doorways ---------------------------------------------------------------

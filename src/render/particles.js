@@ -42,6 +42,11 @@ export class Particles {
     this.room = room;
     this.density = 1;
     this.shown = -1;
+    // how heavy they are (1 as the world asks; more: the Frostbound Pass's
+    // flakes, a little bigger and falling a little faster every lap - see
+    // Game.updateSnow): laid over whatever set() last blended
+    this.weight = 1;
+    this.base = { size: 1, drift: new THREE.Vector3() };
   }
 
   // Blend appearance between two worlds' particle settings (every frame
@@ -49,16 +54,27 @@ export class Particles {
   set(a, b, t) {
     const u = this.material.uniforms;
     u.uColor.value.copy(colorOf(a)).lerp(colorOf(b), t);
-    u.uSize.value = a.size + (b.size - a.size) * t;
+    this.base.size = a.size + (b.size - a.size) * t;
     u.uOpacity.value = a.opacity + (b.opacity - a.opacity) * t;
     u.uRing.value = (a.ring || 0) + ((b.ring || 0) - (a.ring || 0)) * t;
     u.uStill.value = (a.still || 0) + ((b.still || 0) - (a.still || 0)) * t;
     u.uFlake.value = (a.flake || 0) + ((b.flake || 0) - (a.flake || 0)) * t;
-    u.uDrift.value.set(
+    this.base.drift.set(
       a.drift[0] + (b.drift[0] - a.drift[0]) * t,
       a.drift[1] + (b.drift[1] - a.drift[1]) * t,
       a.drift[2] + (b.drift[2] - a.drift[2]) * t
     );
+    this.weigh(this.weight);
+  }
+
+  // Heavier (k over 1): bigger, and what's falling falls faster (what's
+  // rising or hanging still is left as it is).
+  weigh(k) {
+    this.weight = k;
+    const u = this.material.uniforms;
+    u.uSize.value = this.base.size * k;
+    const d = this.base.drift;
+    u.uDrift.value.set(d.x, d.y < 0 ? d.y * (1 + 1.2 * (k - 1)) : d.y, d.z);
   }
 
   update(dist) {

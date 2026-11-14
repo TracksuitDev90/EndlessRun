@@ -187,11 +187,11 @@ export class Ambient {
     band.type = 'bandpass';
     band.Q.value = 0.9;
     band.frequency.setValueAtTime(3200, t);
-    band.frequency.exponentialRampToValueAtTime(380, t + 0.7);
+    band.frequency.exponentialRampToValueAtTime(380, t + 0.58);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(0.32, t + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.83);
     src.connect(band).connect(g).connect(this.bus);
     src.start(t);
     src.stop(t + 1.1);
@@ -207,7 +207,7 @@ export class Ambient {
     o.start(t);
     o.stop(t + 0.5);
     for (let i = 0; i < 9; i++) {
-      const bt = t + 0.15 + Math.random() * 0.9;
+      const bt = t + 0.12 + Math.random() * 0.75;
       const f = 280 + Math.random() * 420;
       const b = ctx.createOscillator();
       b.type = 'sine';
@@ -227,8 +227,9 @@ export class Ambient {
     }, 1500);
   }
 
-  // The jump to light speed (into the Red Drift): a rush of noise tearing up
-  // from a rumble to a shriek as the stars stretch, a deep swell under it and
+  // The jump to light speed (into the Red Drift), quick as the picture's:
+  // a rush of noise tearing up from a rumble to a shriek as the world is
+  // pulled into trails, a deep swell under it and
   // a glassy chord gliding up; then, as it drops out, a falling whoom and a
   // soft boom, and a chime as the stars come back.
   warp() {
@@ -241,49 +242,49 @@ export class Ambient {
     band.type = 'bandpass';
     band.Q.value = 1.4;
     band.frequency.setValueAtTime(180, t);
-    band.frequency.exponentialRampToValueAtTime(5600, t + 0.98);
-    band.frequency.exponentialRampToValueAtTime(260, t + 1.18);
+    band.frequency.exponentialRampToValueAtTime(5600, t + 0.529);
+    band.frequency.exponentialRampToValueAtTime(260, t + 0.637);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.26, t + 0.08);
-    g.gain.setValueAtTime(0.26, t + 0.95);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.19);
+    g.gain.exponentialRampToValueAtTime(0.26, t + 0.043);
+    g.gain.setValueAtTime(0.26, t + 0.513);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.643);
     src.connect(band).connect(g).connect(this.bus);
     src.start(t);
-    src.stop(t + 1.2);
+    src.stop(t + 0.648);
     // the swell under it, and the drop out of it
     const o = ctx.createOscillator();
     o.type = 'sine';
     o.frequency.setValueAtTime(48, t);
-    o.frequency.exponentialRampToValueAtTime(110, t + 1.0);
-    o.frequency.exponentialRampToValueAtTime(34, t + 1.3);
+    o.frequency.exponentialRampToValueAtTime(110, t + 0.54);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.702);
     const og = ctx.createGain();
     og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(0.22, t + 0.15);
-    og.gain.setValueAtTime(0.22, t + 1.02);
-    og.gain.exponentialRampToValueAtTime(0.0001, t + 1.45);
+    og.gain.exponentialRampToValueAtTime(0.22, t + 0.081);
+    og.gain.setValueAtTime(0.22, t + 0.551);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.783);
     o.connect(og).connect(this.master);
     o.start(t);
-    o.stop(t + 1.5);
+    o.stop(t + 0.81);
     // a glassy chord gliding up as it takes hold
     [62, 69, 74, 81].forEach((m, i) => {
       const s = ctx.createOscillator();
       s.type = 'triangle';
       s.frequency.setValueAtTime(hz(m - 12), t);
-      s.frequency.exponentialRampToValueAtTime(hz(m), t + 1.0);
+      s.frequency.exponentialRampToValueAtTime(hz(m), t + 0.54);
       const sg = ctx.createGain();
       sg.gain.setValueAtTime(0.0001, t);
-      sg.gain.exponentialRampToValueAtTime(0.025, t + 0.2 + i * 0.04);
-      sg.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+      sg.gain.exponentialRampToValueAtTime(0.025, t + 0.108 + i * 0.04);
+      sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.621);
       s.connect(sg).connect(this.bus);
       s.start(t);
-      s.stop(t + 1.2);
+      s.stop(t + 0.648);
     });
-    [86, 93, 98].forEach((m, i) => this.chime(hz(m), t + 1.15 + i * 0.08, 0.04));
+    [86, 93, 98].forEach((m, i) => this.chime(hz(m), t + 0.621 + i * 0.08, 0.04));
     setTimeout(() => {
       g.disconnect();
       og.disconnect();
-    }, 1600);
+    }, 900);
   }
 
   // Iris's wind (the companions' abilities): kind 0 her breath drawn in (a

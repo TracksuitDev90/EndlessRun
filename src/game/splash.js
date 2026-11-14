@@ -8,14 +8,18 @@ import { shared } from '../render/shaders.js';
 // faster, its front edge a bright wavering meniscus; and behind it, left on
 // the glass, drops big and small hang a moment and then streak away down
 // the screen, stretching as they speed up, each one a little lens with a
-// glint on top and a wet trail beaded with tiny drops behind it. A second
-// and a half in all.
+// glint on top and a wet trail beaded with tiny drops behind it. Just under
+// a second and a half in all: its clock runs at SPLASH_SPEED, so the whole
+// thing - the hit, the slide, the drops - plays out a fifth quicker than the
+// shader's own timeline (SPLASH_TIME) reads.
 //
 // It's drawn over the finished frame: the frame is copied into a texture
 // and one full-screen pass refracts it through the water — only while a
 // splash is running, so it costs nothing the rest of the time.
 
 export const SPLASH_TIME = 1.65;
+// how fast its clock runs: 1.2, a fifth quicker - 1.65 / 1.2, about 1.38 s
+export const SPLASH_SPEED = 1.2;
 
 const VS = /* glsl */ `
 varying vec2 vUv;
@@ -204,7 +208,7 @@ export class Splash {
   }
 
   update(dt) {
-    if (this.active) this.t += dt;
+    if (this.active) this.t += dt * SPLASH_SPEED;
   }
 
   // Draw one, unseen (under the loading screen), so its frame texture is
