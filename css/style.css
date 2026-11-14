@@ -517,6 +517,22 @@ body:not(.touch) .touch-only {
   background: var(--coat);
   transform: scale(1.3);
 }
+/* (a page still running the script from before the pages came in - a
+   browser can hold on to an old copy of one file while fetching a new copy
+   of another - deals its cards straight into the window, no strip of
+   pages: lay them out three by two as that did, rather than in a heap) */
+.pick:not(:has(> .pick-strip)) {
+  display: grid;
+  grid-template-columns: repeat(3, var(--w));
+  justify-content: center;
+  column-gap: var(--gap);
+  row-gap: calc(var(--w) * 0.33);
+  width: auto;
+  margin: 0 0 4px;
+  padding-top: calc(var(--w) * 0.31);
+  overflow: visible;
+  pointer-events: none;
+}
 .pick-dot:focus-visible {
   outline: 2px dashed var(--white);
   outline-offset: -2px;
