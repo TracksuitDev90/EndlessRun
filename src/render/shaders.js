@@ -4938,6 +4938,359 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#elif defined(FISHER)
+// --- the fisherman -----------------------------------------------------------------
+// (palette: see COL in game/fisher.js; r is the rest position - he is
+// sculpted where he stands; see tools/runner/fisher.py. uRig[0]: x, y the
+// middle of his eyes, z how far forward his face is there, w the trousers'
+// hem; uRig[1]: x the bib's top, y its half width, z the boots' x, w how
+// high the boots' soles are; uRig[2]: x the jacket's hem, y the cuffs down
+// the arm, z the tank's glass's half height.)
+#define R_SKIN_DEEP 17
+#define R_SKIN_LIGHT 18
+#define R_BLUSH 19
+#define R_FRECKLE 20
+#define R_DIRT 21
+#define R_EYE 22
+#define R_IRIS 23
+#define R_INK 24
+#define R_MOUTH 25
+#define R_JACKET_DEEP 26
+#define R_TROUSER_DEEP 27
+#define R_CYAN 28
+#define R_BELLY 29
+#define R_GLOW 31
+float rdHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float rdNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(rdHash(i), rdHash(i + vec3(1, 0, 0)), f.x), mix(rdHash(i + vec3(0, 1, 0)), rdHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(rdHash(i + vec3(0, 0, 1)), rdHash(i + vec3(1, 0, 1)), f.x), mix(rdHash(i + vec3(0, 1, 1)), rdHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// A smudge of dirt: a soft, uneven blot round c (radii rr), broken up.
+float rdSmudge(vec3 r, vec3 c, vec3 rr, float seed) {
+  float e = length((r - c) / rr);
+  float n = rdNoise(r * 160.0 + seed) * 0.6 + rdNoise(r * 420.0 + seed * 2.0) * 0.4;
+  return smoothstep(1.0, 0.45, e + 0.45 * (n - 0.5));
+}
+// His skin: fair and warm, a shade deeper in its hollows, a sheen up high.
+vec3 rdSkin(vec3 c, vec3 r, float k) {
+  float n = rdNoise(r * 90.0);
+  c = mix(c, uPal[R_SKIN_DEEP], 0.12 * k * smoothstep(0.45, 0.8, n));
+  return mix(c, uPal[R_SKIN_LIGHT], 0.08 * k * smoothstep(0.5, 0.2, n));
+}
+// His face, drawn on as his sheet draws it: big round brown eyes under soft
+// fair brows, an easy grin, rosy round cheeks, a dusting of freckles over
+// his nose and cheeks - and a smudge of dirt on his left cheek.
+vec3 drawFace(vec3 base, vec3 r, inout float unlit) {
+  float front = smoothstep(-0.06, -0.08, r.z);
+  vec3 c = base;
+  vec2 f = vec2(abs(r.x), r.y);
+  vec3 ink = uPal[R_INK];
+  // (everything on his face is placed from his eyes)
+  float ey = uRig[0].y;
+  // (a shade deeper under the jaw; rosy cheeks; a sheen down his nose)
+  c = mix(c, uPal[R_SKIN_DEEP], 0.3 * smoothstep(ey - 0.069, ey - 0.094, r.y) * smoothstep(-0.02, -0.06, r.z));
+  float blush = 1.0 - smoothstep(0.0, 1.0, length((f - vec2(0.048, ey - 0.037)) / vec2(0.026, 0.017)));
+  c = mix(c, uPal[R_BLUSH], 0.42 * blush * front);
+  float bridge = (1.0 - smoothstep(0.003, 0.007, f.x)) * smoothstep(ey - 0.034, ey - 0.022, r.y) * (1.0 - smoothstep(ey - 0.004, ey + 0.006, r.y));
+  c = mix(c, uPal[R_SKIN_LIGHT], 0.3 * bridge * front);
+  // freckles: little dots over the bridge of his nose and across his cheeks
+  vec2 fq = vec2(r.x, r.y) * 330.0;
+  vec2 fi = floor(fq);
+  float fh = rdHash(vec3(fi, 3.0));
+  vec2 fo = vec2(rdHash(vec3(fi, 7.0)), rdHash(vec3(fi, 11.0))) - 0.5;
+  float fz = 1.0 - smoothstep(0.0, 1.0, length((vec2(f.x * 0.9, r.y) - vec2(0.03, ey - 0.026)) / vec2(0.05, 0.014)));
+  float frk = fill(length(fract(fq) - 0.5 - fo * 0.5) - (0.12 + 0.12 * fh)) * step(0.55, fh) * fz;
+  c = mix(c, uPal[R_FRECKLE], 0.65 * frk * front);
+  // the smudge on his left cheek (and a fainter one on his jaw)
+  float sm = rdSmudge(r, vec3(-0.062, ey - 0.046, -0.07), vec3(0.016, 0.009, 0.03), 3.0) * 0.55 + rdSmudge(r, vec3(-0.052, ey - 0.069, -0.07), vec3(0.008, 0.005, 0.03), 9.0) * 0.35;
+  c = mix(c, uPal[R_DIRT], sm * front);
+  if (front <= 0.0) return c;
+  // the eyes: big and round, a little taller than wide
+  vec2 E = uRig[0].xy;
+  vec2 q = f - E;
+  float er = length(q / vec2(0.0118, 0.0132));
+  float eye = fill((er - 1.0) * 0.012) * front;
+  c = mix(c, uPal[R_EYE], eye);
+  unlit = max(unlit, eye * 0.45);
+  // the iris (warm brown, lighter low down), a dark ring, the pupil, two
+  // catch-lights; looking a touch toward you
+  vec2 ic = q - vec2(-0.0014, -0.0009);
+  float ir = length(ic);
+  float IR = 0.0086;
+  vec3 iris = mix(uPal[R_IRIS] * 1.7 + 0.04, uPal[R_IRIS], smoothstep(-0.006, 0.004, ic.y));
+  iris = mix(iris, uPal[R_IRIS] * 0.4, smoothstep(IR - 0.0018, IR, ir));
+  iris = mix(iris, ink, fill(ir - 0.0037));
+  float inI = fill(max(ir - IR, (er - 1.0) * 0.012)) * front;
+  c = mix(c, iris, inI);
+  float glint = max(fill(length(ic - vec2(0.003, 0.0034)) - 0.0019), 0.8 * fill(length(ic - vec2(-0.0028, -0.0032)) - 0.0008)) * inI;
+  c = mix(c, vec3(1.0), glint);
+  unlit = max(unlit, max(inI * 0.3, glint));
+  // the upper lid's line, bold, over the top of the eye; a fine one below
+  float lid = band(er - 1.0, 0.07 + 0.08 * smoothstep(-0.004, 0.012, q.x)) * step(-0.002, q.y + 0.0045);
+  c = mix(c, ink, lid * front);
+  float lower = band(er - 1.02, 0.045) * step(q.y, -0.006) * 0.5;
+  c = mix(c, mix(ink, uPal[R_SKIN_DEEP], 0.5), lower * front);
+  // brows: soft and fair, a gentle arch, lifted a little (he's pleased)
+  vec2 bq = f - vec2(0.036, uRig[0].y + 0.026);
+  bq.y -= 0.0028 - 7.0 * bq.x * bq.x;
+  float brow = band(bq.y, 0.0021 - 0.0011 * smoothstep(0.0, 0.02, bq.x)) * smoothstep(-0.017, -0.015, bq.x) * (1.0 - smoothstep(0.018, 0.021, bq.x));
+  c = mix(c, mix(uPal[2] * 0.62, ink, 0.25), brow * front);
+  // his nostrils
+  vec2 nq = vec2(f.x - 0.0078, r.y - (uRig[0].y - 0.0355));
+  float nos = fill(length(nq / vec2(0.0034, 0.0019)) - 1.0) * smoothstep(-0.088, -0.095, r.z);
+  c = mix(c, uPal[R_SKIN_DEEP] * 0.55, nos * 0.75);
+  // the grin: a closed, easy smile curving up at its corners, a dimple at
+  // each end, the lower lip a touch rosier under it
+  float mz = smoothstep(-0.07, -0.082, r.z);
+  vec2 mq = vec2(r.x, r.y - uRig[0].w);
+  float curve = 0.0105 - 22.0 * mq.x * mq.x;
+  float smile = band(mq.y + curve, 0.00105 * (1.0 - smoothstep(0.012, 0.019, abs(mq.x)))) * step(abs(mq.x), 0.019);
+  c = mix(c, uPal[R_MOUTH] * 0.8, smile * mz);
+  float lip = (1.0 - smoothstep(0.0, 1.0, length(vec2(mq.x / 0.011, (mq.y + curve + 0.0042) / 0.0028)))) * mz;
+  c = mix(c, uPal[R_BLUSH], 0.35 * lip);
+  float dimple = band(length(vec2(abs(mq.x) - 0.0205, mq.y + 0.0005)) - 0.0026, 0.0005) * step(0.0, mq.y + 0.0005) * mz;
+  c = mix(c, uPal[R_SKIN_DEEP], 0.6 * dimple);
+  unlit = max(unlit, 0.2 * front);
+  return c;
+}
+// Waterproof cloth: smooth, a faint sheen, a little grime gathered low and
+// in the creases.
+vec3 rdCloth(vec3 c, vec3 r, vec3 deep, float k) {
+  float n = rdNoise(r * vec3(28.0, 11.0, 28.0));
+  c = mix(c, deep, 0.2 * smoothstep(0.5, 0.85, n));
+  c = mix(c, c * 1.12 + 0.02, 0.25 * smoothstep(0.45, 0.15, n));
+  float g = rdNoise(r * 70.0 + 4.0) * 0.6 + rdNoise(r * 190.0) * 0.4;
+  return mix(c, mix(c, uPal[R_DIRT], 0.55), k * smoothstep(0.62, 0.8, g));
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) {
+    c = rdSkin(c, r, 0.35);
+    // (the inside of the ear a shade deeper)
+    c = mix(c, uPal[R_SKIN_DEEP], d.x * 0.35);
+    c = drawFace(c, r, unlit);
+  } else if (m == 7) {
+    c = rdSkin(c, r, 1.0);
+    // knuckles, a little grubby
+    float kn = d.x * rdNoise(r * 260.0);
+    c = mix(c, uPal[R_SKIN_DEEP], 0.25 * smoothstep(0.5, 0.8, kn));
+    c = mix(c, uPal[R_DIRT], 0.25 * d.x * smoothstep(0.62, 0.78, rdNoise(r * 120.0 + 2.0)));
+  } else if (m == 2) {
+    // short blonde hair: strands down each lock, darker at the roots
+    float s = rdNoise(vec3(r.x * 300.0, r.y * 60.0, r.z * 300.0));
+    c = mix(c, c * 0.78, 0.4 * smoothstep(0.55, 0.8, s));
+    c = mix(c, uPal[30], 0.3 * smoothstep(0.4, 0.15, s) * d.x);
+    c = mix(c, c * 0.8, 0.35 * (1.0 - d.x) * smoothstep(1.5, 1.42, d.y));
+  } else if (m == 3) {
+    // the teal tee: cotton, its crew collar ribbed
+    float n = rdNoise(r * vec3(40.0, 14.0, 40.0));
+    c = mix(c, c * 0.85, 0.2 * smoothstep(0.5, 0.85, n));
+    c = mix(c, c * 0.82, d.x * (0.6 + 0.4 * lines(atan(r.x, r.z) * 38.0, 0.25)));
+  } else if (m == 4) {
+    // the rain jacket: yellow, its seams stitched; the open fronts' edges
+    // faced (a shade deeper), press studs down them; flap pockets (their
+    // outline below the flap, a stud on each); the cuffs turned back; the
+    // inside of it (d.w < 0) a deeper, duller lining; grimy low down, a
+    // smear or two
+    float lining = step(d.w, -0.5);
+    c = rdCloth(c, r, uPal[R_JACKET_DEEP], 0.35 * smoothstep(0.9, 0.76, r.y) * d.z);
+    float ax = abs(r.x);
+    float body = d.z * (1.0 - lining);
+    // (the front's edge: where it hangs open, half the gap by height)
+    float edgeX = mix(0.084, 0.05, smoothstep(1.2, 1.33, r.y));
+    float facing = (1.0 - smoothstep(0.003, 0.016, ax - edgeX)) * step(r.z, -0.02) * body;
+    c = mix(c, uPal[R_JACKET_DEEP], 0.55 * facing);
+    float stud = 0.0;
+    for (int k = 0; k < 5; k++) {
+      float y = 0.84 + 0.1 * float(k);
+      stud = max(stud, fill(length(vec2(ax - (edgeX + 0.016), r.y - y)) - 0.0042));
+    }
+    c = mix(c, mix(uPal[R_JACKET_DEEP] * 0.75, vec3(0.85, 0.8, 0.7), 0.35), stud * body * step(r.z, -0.02));
+    // seams: down the sides, across the yoke behind, the turned-back cuffs
+    float side = band(abs(atan(r.x, -r.z)) - 1.62, 0.012) * body;
+    float yoke = band(r.y - (1.235 + 0.02 * smoothstep(0.0, 0.1, r.z)), 0.0008) * body * step(0.0, r.z);
+    float cuff = band(d.w - (uRig[2].y - 0.01), 0.0012) * (1.0 - d.z) * (1.0 - lining);
+    float hem = band(r.y - (uRig[2].x + 0.028), 0.0007) * body * step(0.4, fract(atan(r.x, r.z) * 60.0));
+    c = mix(c, uPal[R_JACKET_DEEP], max(max(side, yoke), max(cuff, hem)) * 0.8);
+    // the pockets: the pocket's outline under its flap, a stud on the flap
+    vec2 pq = vec2(ax - 0.135, r.y - 0.84);
+    float pocket = band(max(abs(pq.x) - 0.046, abs(pq.y) - 0.045), 0.0009) * step(pq.y, 0.03) * step(r.z, 0.0) * body * (1.0 - d.y);
+    c = mix(c, uPal[R_JACKET_DEEP], pocket);
+    c = mix(c, c * 0.9, d.y * 0.25);
+    float pstud = fill(length(vec2(ax - 0.135, r.y - 0.874)) - 0.0045) * d.y;
+    c = mix(c, uPal[R_JACKET_DEEP] * 0.8, pstud);
+    // the hood: its seam down the middle
+    c = mix(c, uPal[R_JACKET_DEEP], d.x * band(r.x, 0.0012));
+    // smears of grime on his left front and sleeve
+    float sm = rdSmudge(r, vec3(-0.15, 0.88, -0.07), vec3(0.03, 0.025, 0.05), 5.0) * 0.5 + rdSmudge(r, vec3(0.29, 0.92, 0.02), vec3(0.03, 0.04, 0.05), 8.0) * 0.4;
+    c = mix(c, uPal[R_DIRT], sm * 0.7 * (1.0 - lining));
+    c = mix(c, uPal[R_JACKET_DEEP] * 0.82, lining * 0.7);
+  } else if (m == 5) {
+    // the orange waterproofs: welded seams, a stitched bib, grime and wet
+    // mud up the legs from the boots
+    float low = smoothstep(0.55, 0.28, r.y);
+    c = rdCloth(c, r, uPal[R_TROUSER_DEEP], 0.25 + 0.45 * low);
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float a = atan(r.z - 0.01, abs(r.x) - 0.092);
+    float seam = band(abs(a) - 1.57, 0.03) * step(r.y, 0.8) * d.x;
+    c = mix(c, uPal[R_TROUSER_DEEP], seam * 0.7);
+    // (the folds of the rolls over the boots, a shade deeper)
+    c = mix(c, uPal[R_TROUSER_DEEP], 0.3 * d.y);
+    // the bib: stitched round its edge, a pocket across its front
+    float bx = uRig[1].y, bt = uRig[1].x;
+    float onBib = step(r.y, bt + 0.005) * step(0.88, r.y) * step(abs(r.x), bx + 0.004) * step(r.z, -0.04);
+    float st = max(band(abs(r.x) - (bx - 0.008), 0.0007), band(r.y - (bt - 0.008), 0.0007)) * step(0.5, fract(r.y * 140.0 + abs(r.x) * 140.0));
+    c = mix(c, uPal[R_TROUSER_DEEP] * 0.8, st * onBib);
+    vec2 pq = vec2(r.x, r.y - (bt - 0.06));
+    float bp = band(max(abs(pq.x) - 0.045, abs(pq.y) - 0.032), 0.0008) * step(pq.y, 0.031) * onBib;
+    c = mix(c, uPal[R_TROUSER_DEEP] * 0.85, bp);
+    float sm = rdSmudge(r, vec3(0.105, 0.6, -0.07), vec3(0.03, 0.05, 0.05), 2.0) * 0.45 + rdSmudge(r, vec3(-0.08, 0.38, -0.08), vec3(0.03, 0.06, 0.05), 6.0) * 0.5;
+    c = mix(c, uPal[R_DIRT] * 0.9, sm);
+  } else if (m == 6) {
+    // rubber boots: black, a soft sheen; a chunky sole, its lugs; mud
+    // splashed up from the sole
+    float side = r.x < 0.0 ? -1.0 : 1.0;
+    float x = r.x - side * uRig[1].z;
+    float y = r.y - 0.026 * pow(smoothstep(-0.1, -0.2, r.z), 2.0);
+    float sole = fill(y - uRig[1].w);
+    vec3 so = c * 0.7;
+    so = mix(so, c * 0.45, lines(r.z * 55.0, 0.18) * step(y, uRig[1].w - 0.006));
+    so = mix(so, c * 1.4 + 0.03, band(y - uRig[1].w, 0.0012));
+    float n = rdNoise(r * 120.0);
+    vec3 up = mix(c, c * 1.35 + 0.03, 0.4 * smoothstep(0.5, 0.2, n));
+    float mud = smoothstep(0.62, 0.78, rdNoise(r * vec3(60.0, 26.0, 60.0)) * 0.7 + 0.5 * smoothstep(0.14, 0.04, y));
+    up = mix(up, uPal[R_DIRT] * 0.85, mud * 0.6);
+    c = mix(up, so, sole);
+  } else if (m == 8) {
+    // charcoal webbing: its weave, a dull buckle
+    c = mix(c, c * 1.35, lines(r.y * 220.0 + r.x * 60.0, 0.2) * 0.25);
+    c = mix(c, vec3(0.62, 0.64, 0.66), d.x * 0.6);
+  } else if (m == 9) {
+    // the tank's cap and base: charcoal, a sheen round their rims; a strip
+    // of cyan light round the middle of each (only round the back and the
+    // sides: it's dark against his back), small and restrained
+    float a = d.x;
+    float cap = d.z;
+    float rim = d.w;
+    c = mix(c, c * 1.6 + 0.04, rim * 0.6);
+    float mid = abs(cap) > 0.5 ? (cap > 0.0 ? uRig[2].z + 0.022 : -uRig[2].z - 0.022) : 99.0;
+    float strip = band(d.y - mid, 0.0035) * (1.0 - smoothstep(1.6, 2.0, abs(a)));
+    // (in short dashes)
+    strip *= step(0.25, fract(a * 4.0 / 3.1416 + 0.5));
+    c = mix(c, uPal[R_CYAN], strip);
+    unlit = max(unlit, strip * 0.9);
+    gKeep = max(gKeep, strip);
+  } else if (m == 10) {
+    // the blank: varnished brown, teal thread wraps under the guides and
+    // above the grip, a fine one between
+    float y = d.x;
+    float wrap = 0.0;
+    for (int k = 0; k < 5; k++) {
+      float gy = 0.27 + 0.125 * float(k) - 0.012 * float(k) * float(k) * 0.4;
+      wrap = max(wrap, band(y - gy, 0.009));
+    }
+    wrap = max(wrap, band(y - 0.165, 0.008));
+    c = mix(c, c * 1.4 + 0.03, 0.25 * band(fract(y * 30.0) - 0.5, 0.15));
+    c = mix(c, uPal[R_CYAN] * 0.75, wrap);
+  } else if (m == 11) {
+    // the reel and the guides: dark metal, a bright edge; the spool's teal
+    // band, the knob cream
+    c = mix(c, c * 1.8 + 0.05, 0.2);
+    c = mix(c, uPal[R_CYAN] * 0.8, d.y);
+    c = mix(c, vec3(0.92, 0.88, 0.8), d.z);
+    unlit = max(unlit, 0.12);
+  } else if (m == 12) {
+    // cork: speckled
+    float n = rdNoise(r * 900.0);
+    c = mix(c, c * 0.72, smoothstep(0.55, 0.75, n));
+    c = mix(c, c * 1.15, smoothstep(0.3, 0.1, n));
+  } else if (m == 13) {
+    // the alien fish: deep blue-violet over its back, fading through
+    // purple to a lavender belly; turquoise spots that glow down its
+    // flanks; lavender lips, white crooked teeth, amber eyes, dark inside
+    // its mouth; barbels pale toward their tips
+    vec3 q = d.xyz;
+    float part = d.w;
+    float belly = smoothstep(0.03, -0.07, q.x);
+    c = mix(c * 0.78, uPal[R_BELLY], belly * 0.85);
+    c = mix(c, c * 0.8 + vec3(0.02, 0.0, 0.06), smoothstep(0.03, 0.09, q.x) * 0.5);
+    // scales: a fine overlapping net
+    vec2 sc = vec2(q.y * 120.0 + q.x * 30.0, q.z * 120.0);
+    float sl = band(fract(sc.x + 0.5 * step(0.5, fract(sc.y * 0.5))) - 0.5, 0.08) * (1.0 - belly) * smoothstep(-0.06, -0.12, q.y);
+    c = mix(c, c * 0.82, sl * 0.4);
+    // the glowing spots, scattered over its back and flanks
+    vec3 sp = q * vec3(48.0, 40.0, 48.0);
+    vec3 si = floor(sp);
+    float sh = rdHash(si + 5.0);
+    vec3 so = sp - si - 0.5 - (vec3(rdHash(si + 1.0), rdHash(si + 2.0), rdHash(si + 3.0)) - 0.5) * 0.5;
+    float spot = fill(length(so) - (0.18 + 0.14 * sh)) * step(0.45, sh) * (1.0 - belly) * smoothstep(-0.04, -0.1, q.y) * step(part, 0.5);
+    float halo = (1.0 - smoothstep(0.2, 0.55, length(so))) * step(0.45, sh) * (1.0 - belly) * step(part, 0.5) * smoothstep(-0.04, -0.1, q.y);
+    c = mix(c, mix(c, uPal[R_GLOW], 0.45), halo * 0.5);
+    c = mix(c, uPal[R_GLOW] * 1.1 + 0.05, spot);
+    unlit = max(unlit, spot);
+    gKeep = max(gKeep, spot);
+    if (part > 0.5 && part < 1.5) c = mix(uPal[R_BELLY] * 1.05, vec3(0.95, 0.7, 0.85), 0.35);
+    if (part > 1.5 && part < 2.5) {
+      c = vec3(0.97, 0.95, 0.88);
+      unlit = max(unlit, 0.35);
+    }
+    if (part > 2.5 && part < 3.5) {
+      // the eye: amber, a dark slit of a pupil, a glint
+      vec2 e = vec2(q.x - 0.026, q.y + 0.058);
+      float er = length(e) / 0.0215;
+      vec3 amb = mix(vec3(1.0, 0.78, 0.25), vec3(0.85, 0.42, 0.06), smoothstep(0.2, 1.0, er));
+      amb = mix(amb, uPal[R_INK], fill((length(e / vec2(0.0045, 0.0125)) - 1.0) * 0.004));
+      amb = mix(amb, vec3(1.0), fill(length(e - vec2(0.006, 0.007)) - 0.0035));
+      amb = mix(amb, uPal[R_INK], fill(-(er - 1.0) * 0.01) * 0.0 + band(er - 1.0, 0.06));
+      c = mix(c * 0.6, amb, fill((er - 1.08) * 0.02));
+      unlit = max(unlit, 0.5 * fill((er - 1.0) * 0.02));
+      gKeep = max(gKeep, fill((er - 1.0) * 0.02));
+    }
+    if (part > 3.5 && part < 4.5) c = mix(c, uPal[R_BELLY] * 1.08, smoothstep(-0.06, -0.2, q.y));
+    if (part > 4.5) c = vec3(0.24, 0.06, 0.18);
+  } else if (m == 14) {
+    // its fins: violet, rays fanning through them, paler and see-through
+    // toward their frilled edges, a glow along them
+    vec3 q = d.xyz;
+    float which = d.w;
+    vec2 root = which > 2.5 ? vec2(0.0) : which > 1.5 ? vec2(0.006, -0.372) : which > 0.5 ? vec2(-0.03, -0.27) : vec2(0.02, -0.2);
+    vec2 pq = which > 2.5 ? vec2(abs(q.z) - 0.062, q.y + 0.128) : vec2(q.x - root.x, q.y - root.y);
+    float ang = atan(pq.y, pq.x);
+    float rr = length(pq);
+    float ray = band(fract(ang * 7.0) - 0.5, 0.09) * smoothstep(0.005, 0.03, rr);
+    c = mix(c, c * 0.7, ray * 0.6);
+    float edge = smoothstep(0.04, 0.12, rr);
+    c = mix(c, mix(c, uPal[R_BELLY] * 1.1 + 0.05, 0.55), edge);
+    c = mix(c, uPal[R_GLOW], 0.25 * edge * band(fract(ang * 7.0) - 0.5, 0.05));
+    unlit = max(unlit, 0.18 + 0.2 * edge);
+  } else if (m == 15) {
+    // the goldfish: bright orange, a paler belly, fine scales, a black
+    // eye with a glint, its fins paler and see-through at their edges
+    vec3 q = d.xyz;
+    c = mix(c, vec3(1.0, 0.93, 0.7), smoothstep(-0.002, -0.012, q.y) * 0.6 * (1.0 - d.w));
+    float sl = band(fract(q.z * 260.0 + 0.5 * step(0.5, fract(q.y * 130.0))) - 0.5, 0.1) * (1.0 - d.w);
+    c = mix(c, c * 0.85, sl * 0.35);
+    c = mix(c, vec3(1.0, 0.82, 0.6), d.w * smoothstep(0.012, 0.03, length(q.yz - vec2(0.0, 0.02))));
+    vec2 e = vec2(q.y - 0.003, q.z + 0.014);
+    float eye = fill(length(e) - 0.0032) * step(0.005, abs(q.x));
+    c = mix(c, uPal[R_INK], eye);
+    c = mix(c, vec3(1.0), fill(length(e - vec2(0.0012, -0.0012)) - 0.0011) * eye);
+    unlit = max(unlit, 0.3);
+    gKeep = 1.0;
+  } else if (m == 16) {
+    // the line
+    unlit = max(unlit, 0.4);
+  }
+  return c;
+}
 #elif !defined(EXPLORER)
 // The face, drawn on the front of the head like an illustration: big warm
 // brown eyes under relaxed lids (the upper lid sits a little over the iris, so
@@ -5336,6 +5689,10 @@ void main() {
     // (his red obi and wraps burn on through a drain - and his eyes: see
     // tgFace)
     gKeep = (m == 7 || m == 8) ? 1.0 : 0.0;
+  #elif defined(FISHER)
+    // (his yellow jacket burns on through a drain - and the fish's glowing
+    // spots and the goldfish: see charDetail)
+    gKeep = m == 4 ? 1.0 : 0.0;
   #elif defined(PITCHER)
     // (his coral rim, his leaf and the eyes in the dark keep their colour
     // through a drain)
@@ -5368,6 +5725,10 @@ void main() {
     float soft = (m == 10 || m == 14) ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
   #elif defined(BUNNY) && defined(PROPS)
     float soft = 0.1;
+  #elif defined(FISHER)
+    // (his face and hair soft; the waterproofs in soft gradients; rubber,
+    // the tank's caps and the rod crisp; the fish's scales a little soft)
+    float soft = (m == 1 || m == 7) ? 0.12 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 5) ? 0.085 : (m == 13 || m == 14 || m == 15) ? 0.1 : 0.04;
   #elif defined(SAMURAI)
     // (fur takes the light softly; heavy cotton in soft gradients; steel,
     // lacquer and gold crisp)
@@ -5432,6 +5793,8 @@ void main() {
   if (m == 2 || m == 13) {
   #elif defined(SAMURAI)
   if (m == 99) {
+  #elif defined(FISHER)
+  if (m == 2) {
   #elif defined(PITCHER)
   // (a waxy sheen on his pitcher and his leaves where they face the light)
   if (m == 1 || m == 4 || m == 2) {
@@ -5482,6 +5845,8 @@ void main() {
     gKeep = m == 3 ? 1.0 : 0.0;
   #elif defined(SAMURAI)
     gKeep = (m == 7 || m == 8) ? 1.0 : 0.0;
+  #elif defined(FISHER)
+    gKeep = (m == 4 || m == 15) ? 1.0 : 0.0;
   #elif defined(PITCHER)
     gKeep = (m == 2 || m == 3 || m == 4) ? 1.0 : 0.0;
   #else
@@ -6331,6 +6696,259 @@ void main() {
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), alpha * 0.9);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// The fisherman's aquarium (game/tank.js), drawn in the tank's own space
+// (its middle at the origin): the far side of the water seen through the
+// glass, its surface, the glass itself and the bubbles in it.
+// ---------------------------------------------------------------------------
+const VS_TANK = COMMON + /* glsl */ `
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec3 vNormal;
+varying vec3 vLocal;
+void main() {
+  vLocal = position;
+  vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+  vPos = wp;
+  wp = bendPos(wp);
+  vWorld = wp;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const TANK_HEAD = FS_HEAD + /* glsl */ `
+uniform vec3 uLightDir;
+uniform vec3 uShadowTint;
+uniform vec4 uTank; // x the glass's radius, y half its height, z the water's level
+uniform vec4 uWater; // xy how the surface slopes (across x, z), z its level, w how much it's rocking
+varying vec3 vLocal;
+// the water's surface height over (x, z), rocking in a little wave round it
+float tankSurf(vec3 l) {
+  return uWater.z + uWater.x * l.x + uWater.y * l.z + 0.0035 * uWater.w * sin(atan(l.z, l.x) * 2.0 + uTime * 5.0);
+}
+`;
+// The water, seen through the glass: the inside of the far side of it -
+// aqua, deeper toward the bottom, light wandering over it in ripples,
+// paler just under the surface, a darker teal at its edges so it holds its
+// shape (and nothing above the surface: there the glass shows what's behind).
+const FS_TANK_WATER = TANK_HEAD + /* glsl */ `
+void main() {
+  if (vLocal.y > tankSurf(vLocal)) discard;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  float h = clamp((vLocal.y + uTank.y) / (2.0 * uTank.y), 0.0, 1.0);
+  vec3 deep = vec3(0.13, 0.55, 0.62);
+  vec3 shallow = vec3(0.52, 0.86, 0.86);
+  vec3 col = mix(deep, shallow, smoothstep(0.0, 1.0, h));
+  // light rippling over it
+  float a = atan(vLocal.z, vLocal.x);
+  float c1 = sin(a * 9.0 + vLocal.y * 60.0 + uTime * 2.3 + 1.7 * sin(a * 4.0 - uTime * 1.1));
+  float c2 = sin(a * 13.0 - vLocal.y * 45.0 - uTime * 1.7);
+  float caus = smoothstep(0.55, 0.95, c1 * 0.6 + c2 * 0.4);
+  col = mix(col, vec3(0.82, 0.98, 0.96), caus * 0.3 * (0.4 + 0.6 * h));
+  // (paler in a band just under the surface)
+  float under = smoothstep(0.03, 0.0, tankSurf(vLocal) - vLocal.y);
+  col = mix(col, vec3(0.86, 0.99, 0.98), under * 0.55);
+  // (darker toward its edges, where you look through the most of it)
+  vec3 n = normalize(vNormal);
+  float edge = 1.0 - abs(dot(n, V));
+  col = mix(col, deep * 0.55, smoothstep(0.55, 0.95, edge) * 0.8);
+  float lit = smoothstep(-0.2, 0.4, dot(-n, uLightDir) + 0.3);
+  col *= mix(mix(vec3(0.84, 0.8, 0.86), uShadowTint, 0.3), vec3(1.0), 0.55 + 0.45 * lit);
+  gKeep = 0.6;
+  col = atmos(col, v, dist, 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), 1.0);
+}
+`;
+// Its surface, seen from above through the glass: bright, a ring of light
+// round its rim where it meets the glass, ripples crossing it.
+const FS_TANK_SURFACE = TANK_HEAD + /* glsl */ `
+void main() {
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  float r = length(vLocal.xz) / uTank.x;
+  vec3 col = vec3(0.6, 0.9, 0.9);
+  float rip = sin(r * 26.0 - uTime * 5.0 + 3.0 * vLocal.x / uTank.x) * 0.5 + 0.5;
+  col = mix(col, vec3(0.9, 1.0, 0.99), smoothstep(0.7, 0.95, rip) * 0.35);
+  col = mix(col, vec3(1.0), smoothstep(0.8, 0.97, r) * 0.6);
+  col = mix(col, vec3(0.2, 0.6, 0.66), smoothstep(0.96, 1.0, r) * 0.6);
+  gKeep = 0.6;
+  col = atmos(col, v, dist, 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), 1.0);
+}
+`;
+// The glass: clear face-on, a sheen toward its edges where you look through
+// more of it, a faint aqua tint, two bright streaks down it on the side
+// toward the light, a dark keyline at its silhouette (the ink the rest of
+// him has).
+const FS_TANK_GLASS = TANK_HEAD + /* glsl */ `
+void main() {
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  vec3 n = normalize(vNormal);
+  float fres = 1.0 - abs(dot(n, V));
+  // the streaks: along the cylinder, where it turns toward the light
+  vec3 hv = normalize(uLightDir - V);
+  float spec = pow(max(dot(n, hv), 0.0), 18.0);
+  float a = atan(vLocal.z, vLocal.x);
+  float streak = smoothstep(0.82, 0.98, spec) + 0.55 * smoothstep(0.3, 0.6, spec) * (1.0 - smoothstep(0.6, 0.75, spec));
+  streak *= 0.9 * smoothstep(-uTank.y, -uTank.y + 0.02, vLocal.y) * (1.0 - smoothstep(uTank.y - 0.02, uTank.y, vLocal.y));
+  vec3 col = mix(vec3(0.82, 0.97, 0.98), vec3(1.0), streak);
+  float alpha = 0.06 + 0.32 * pow(fres, 2.2) + 0.7 * streak;
+  // (the keyline at its very edge)
+  float key = smoothstep(0.93, 0.985, fres);
+  col = mix(col, vec3(0.08, 0.22, 0.26), key);
+  alpha = max(alpha, key * 0.85);
+  // (a meniscus line where the water meets it)
+  float men = 1.0 - smoothstep(0.0, 0.004, abs(vLocal.y - tankSurf(vLocal)));
+  col = mix(col, vec3(1.0), men * 0.7);
+  alpha = max(alpha, men * 0.55);
+  gKeep = 0.6;
+  col = atmos(col, v, dist, 0.0);
+  float f = smoothstep(uFog.x, uFog.y, dist);
+  gl_FragColor = vec4(grade(col, uTrip), alpha * (1.0 - f * 0.7));
+}
+`;
+const VS_TANK_BUBBLE = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute float aSize;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+  vPos = wp;
+  wp = bendPos(wp);
+  vWorld = wp;
+  vec4 mv = viewMatrix * vec4(wp, 1.0);
+  gl_PointSize = clamp(aSize * projectionMatrix[1][1] * uResolution.y * 0.5 / max(-mv.z, 0.3), 1.5, 64.0);
+  gl_Position = projectionMatrix * mv;
+}
+`;
+// A bubble: a clear bead, a bright rim and a glint.
+const FS_TANK_BUBBLE = FS_HEAD + /* glsl */ `
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float r = length(c);
+  if (r > 0.5) discard;
+  float rim = smoothstep(0.3, 0.46, r) * (1.0 - smoothstep(0.46, 0.5, r));
+  float glint = 1.0 - smoothstep(0.05, 0.12, length(c - vec2(-0.14, -0.14)));
+  float a = rim * 0.85 + glint + 0.12;
+  vec3 col = mix(vec3(0.75, 0.97, 0.98), vec3(1.0), glint);
+  vec3 v = vWorld - uCamPos;
+  gKeep = 0.6;
+  col = atmos(col, v, length(v), 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), min(1.0, a));
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Water splashing from the fisherman's boots (game/splashes.js): quads the
+// GPU turns to face you - strokes from a root to a head (fingers of water,
+// a jet), round drops (stretched along their way when fast), and flat on
+// the road a broken ring spreading out and an uneven splat. Drawn as a
+// cartoon's water: a white-aqua heart, a teal edge, a fine darker line.
+// ---------------------------------------------------------------------------
+const VS_SPLASH = COMMON + /* glsl */ `
+attribute vec3 aTan;
+attribute vec4 aQ; // xy the corner (-1 / +1), z the width or size (m), w the kind (0 a stroke, 1 a drop, 2 a ring, 3 a splat)
+attribute vec4 aInfo; // x how much is left, y a stroke's u (0 root .. 1 head) / a drop's stretch / a flat's age, z seed, w a stroke's kind (1 a jet)
+varying vec4 vQ;
+varying vec4 vInfo;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec2 vC;
+void main() {
+  vec3 p = position;
+  vec3 view = normalize(p - uCamPos);
+  if (aQ.w < 0.5) {
+    vec3 side = cross(aTan, view);
+    float l = length(side);
+    side = l > 1e-4 ? side / l : vec3(1.0, 0.0, 0.0);
+    p += side * aQ.x * aQ.z;
+    // (its ends rounded off a little past each end)
+    p += aTan * (aQ.y > 0.5 ? 1.0 : -0.6) * aQ.z * 0.7;
+    vC = vec2(aQ.x, aQ.y);
+  } else if (aQ.w < 1.5) {
+    vec3 right = normalize(vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]));
+    vec3 up = normalize(vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]));
+    // (stretched along its way, in the view)
+    vec3 t = aTan - view * dot(aTan, view);
+    float tl = length(t);
+    vec3 along = tl > 1e-3 ? t / tl : up;
+    vec3 across = normalize(cross(view, along));
+    p += across * aQ.x * aQ.z + along * aQ.y * aQ.z * aInfo.y;
+    vC = aQ.xy;
+  } else {
+    p += vec3(aQ.x, 0.0, aQ.y * 0.8) * aQ.z;
+    vC = aQ.xy;
+  }
+  vec3 wp = bendPos(p);
+  vPos = wp;
+  vWorld = wp;
+  vQ = aQ;
+  vInfo = aInfo;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_SPLASH = FS_HEAD + /* glsl */ `
+varying vec4 vQ;
+varying vec4 vInfo;
+varying vec2 vC;
+void main() {
+  float kind = vQ.w;
+  float seed = vInfo.z;
+  vec3 heart = vec3(0.86, 0.98, 1.0);
+  vec3 body = vec3(0.42, 0.83, 0.93);
+  vec3 edge = vec3(0.2, 0.62, 0.8);
+  vec3 line = vec3(0.1, 0.4, 0.56);
+  float d;
+  float shade = 0.0;
+  if (kind < 0.5) {
+    // a stroke: across it, round at its head; wavering a little down it
+    float x = abs(vC.x + 0.15 * sin(vC.y * 9.0 + seed * 20.0) * (1.0 - vC.y));
+    d = x;
+    shade = vC.x;
+    if (vC.y > 1.0) d = length(vec2(vC.x, (vC.y - 1.0) * 1.4));
+  } else if (kind < 1.5) {
+    // a drop
+    d = length(vC);
+    shade = vC.x * 0.6 - vC.y * 0.4;
+  } else if (kind < 2.5) {
+    // the ring: a thin ellipse on the road, broken into dashes as it thins
+    float r = length(vC);
+    float ang = atan(vC.y, vC.x);
+    float w = mix(0.07, 0.025, vInfo.y);
+    d = abs(r - 0.92) / w;
+    float dash = step(0.22 + 0.4 * vInfo.y, fract(ang * 3.0 / 3.1416 + seed * 7.0));
+    if (dash < 0.5) discard;
+    shade = -0.4;
+  } else {
+    // the splat: an uneven flat blob, its edge lumpy
+    float r = length(vC);
+    float ang = atan(vC.y, vC.x);
+    float lump = 0.12 * sin(ang * 5.0 + seed * 30.0) + 0.07 * sin(ang * 9.0 - seed * 17.0);
+    d = r / (0.78 + lump);
+    shade = -0.3;
+  }
+  if (d > 1.0) discard;
+  // a fine darker line at its edge, aqua inside it, a pale highlight up
+  // toward the light
+  vec3 col = mix(body, heart, (1.0 - smoothstep(0.1, 0.5, d - 0.35 * shade)) * 0.75);
+  col = mix(col, edge, smoothstep(0.6, 0.78, d));
+  col = mix(col, line, smoothstep(0.84, 0.93, d));
+  // (a glint on the drops and the jet)
+  if (kind > 0.5 && kind < 1.5) col = mix(col, vec3(1.0), 1.0 - smoothstep(0.12, 0.24, length(vC - vec2(-0.3, 0.35))));
+  float alpha = vInfo.x * (kind > 1.5 ? 0.75 : 0.95);
+  if (alpha < 0.02) discard;
+  vec3 v = vWorld - uCamPos;
+  gKeep = 0.6;
+  col = atmos(col, v, length(v), 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), alpha);
 }
 `;
 
@@ -7666,7 +8284,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', pitcher: 'PITCHER' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', fisher: 'FISHER', pitcher: 'PITCHER' };
   const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
@@ -8065,6 +8683,34 @@ export function makeRibbonMaterial(env) {
     uniforms: withShared(env, {}),
     vertexShader: VS_RIBBON,
     fragmentShader: FS_RIBBON,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
+// The fisherman's aquarium (game/tank.js): the water's far side, its
+// surface, the glass, the bubbles - lit, fogged and graded by env. dims:
+// Vector4 (the glass's radius, half its height, the water's level).
+export function makeTankMaterials(env, dims) {
+  const shared = { uTank: { value: dims }, uWater: { value: new THREE.Vector4(0, 0, dims.z, 0) } };
+  const mk = (fs, o) =>
+    new THREE.ShaderMaterial(Object.assign({ uniforms: withShared(env, { uTank: shared.uTank, uWater: { value: new THREE.Vector4(0, 0, dims.z, 0) } }), vertexShader: VS_TANK, fragmentShader: fs }, o));
+  const water = mk(FS_TANK_WATER, { side: THREE.BackSide });
+  const surface = mk(FS_TANK_SURFACE, { side: THREE.DoubleSide });
+  const glass = mk(FS_TANK_GLASS, { transparent: true, depthWrite: false, side: THREE.FrontSide });
+  // (the glass's surface line follows the water's)
+  glass.uniforms.uWater = water.uniforms.uWater;
+  const bubble = new THREE.ShaderMaterial({ uniforms: withShared(env, {}), vertexShader: VS_TANK_BUBBLE, fragmentShader: FS_TANK_BUBBLE, transparent: true, depthWrite: false });
+  return { water, surface, glass, bubble };
+}
+
+// The splashes off the fisherman's boots (game/splashes.js), lit by env.
+export function makeSplashMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_SPLASH,
+    fragmentShader: FS_SPLASH,
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,

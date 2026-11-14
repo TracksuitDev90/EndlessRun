@@ -4,6 +4,7 @@ import { Elder } from './elder.js';
 import { Bunny } from './bunny.js';
 import { Skater } from './skater.js';
 import { Samurai } from './samurai.js';
+import { Fisher } from './fisher.js';
 
 // Who you can run as. Each has their sculpted asset (tools/runner/), the art
 // their card on the title screen is cut from (tools/characters/cards.py), a
@@ -73,6 +74,16 @@ export const CHARACTERS = [
     card: 'assets/characters/samurai.webp',
     tint: ['#f2a48e', '#a3302a'],
     make: (env, asset) => new Samurai(env, asset),
+  },
+  {
+    id: 'fisher',
+    name: 'Reed',
+    title: 'the angler',
+    blurb: 'sturdy · a fish on his line · splashes where he lands',
+    asset: 'assets/fisher/',
+    card: 'assets/characters/fisher.webp',
+    tint: ['#9fe3ef', '#2f86b8'],
+    make: (env, asset) => new Fisher(env, asset),
   },
 ];
 

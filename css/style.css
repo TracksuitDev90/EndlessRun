@@ -447,14 +447,80 @@ body:not(.touch) .touch-only {
      figures pop up out of them into the gap above) */
   --gap: clamp(8px, 3vw, 18px);
   --w: clamp(70px, min((100vw - 2 * var(--gutter, 16px) - var(--safe-left) - var(--safe-right) - 2 * var(--gap)) / 3, 13.4 * var(--vh)), 136px);
+  /* (room either side of a page for the seals and shadows that stand out
+     past its cards: the window onto the pages clips at its edges) */
+  --side: 14px;
+  position: relative;
+  width: calc(3 * var(--w) + 2 * var(--gap) + 2 * var(--side));
+  max-width: calc(100vw - var(--safe-left) - var(--safe-right));
+  margin: 0 calc(-1 * var(--side)) 4px;
+  overflow: hidden;
+  touch-action: pan-y;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* the pages, side by side in a strip that slides across under the window */
+.pick-strip {
+  display: flex;
+  width: 100%;
+  transition: transform 0.42s cubic-bezier(0.22, 1.12, 0.36, 1);
+  will-change: transform;
+}
+.pick-strip-still {
+  transition: none;
+}
+.pick-page {
+  flex: 0 0 100%;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: repeat(3, var(--w));
   justify-content: center;
   column-gap: var(--gap);
   row-gap: calc(var(--w) * 0.33);
-  margin-bottom: 4px;
-  padding-top: calc(var(--w) * 0.31);
+  padding: calc(var(--w) * 0.31) var(--side) 9px;
   pointer-events: none;
+}
+/* a dot for each page under them, the one showing filled in */
+.pick-dots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 0 2px;
+  pointer-events: auto;
+}
+.pick-dots[hidden] {
+  display: none;
+}
+.pick-dot {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pick-dot::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 1px 2px 0 var(--ink);
+  transition: transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1), background 0.2s ease;
+}
+.pick-dot[aria-current='true']::before {
+  background: var(--coat);
+  transform: scale(1.3);
+}
+.pick-dot:focus-visible {
+  outline: 2px dashed var(--white);
+  outline-offset: -2px;
+  border-radius: 8px;
 }
 .pick-card {
   position: relative;
@@ -2370,7 +2436,7 @@ body.touch .pw-key {
   }
   .pick {
     --w: clamp(84px, min(9.6vw, 18 * var(--vh)), 150px);
-    margin: 0 0 6px;
+    margin: 0 calc(-1 * var(--side)) 6px;
   }
   .pals {
     display: flex;
@@ -2438,8 +2504,13 @@ body.touch .pw-key {
   .pick {
     --gap: 10px;
     --w: clamp(66px, min(10.5vw, 19 * var(--vh)), 96px);
-    margin: 0;
+    margin: 0 calc(-1 * var(--side));
+    flex: none;
+  }
+  .pick-page {
     padding-top: calc(var(--w) * 0.42);
+  }
+  .pick-dots {
     flex: none;
   }
   .pick-line,
@@ -2482,6 +2553,9 @@ body.touch .pw-key {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pick-strip {
+    transition: none;
+  }
   .pick-line.hop,
   .pick-card .pick-fig,
   .pick-card.hop .pick-fig,
