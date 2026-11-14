@@ -901,12 +901,15 @@ export default {
     },
   ],
 
-  build(b) {
+  *build(b) {
     // the roof underfoot: tar paper, its seams, its patches, its puddles
     // (ground pattern 14)
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 14);
+    yield;
     b.toon('void', groundStrip(420, 16, '#0c1636', 8, { y: -28 }), { ink: 0, cap: 40 });
+    yield;
     b.toon('walls', walkwayWallsGeo(), { cap: 40, ink: 0.035, anim: 'rise', brick: true });
+    yield;
     // the roofs either side: tenements, walk-ups and lofts, near ones with a
     // fire escape down the side toward the path too (L: on the right of the
     // path, its escape on its -x side; R: on the left), the far row plainer
@@ -916,43 +919,78 @@ export default {
     const KINDS = { tenement: { w: 6.2, d: 7, style: 'brick', seed: 3 }, walkup: { w: 5, d: 6, style: 'brick', seed: 9, litChance: 0.5 }, loft: { w: 7.6, d: 7.4, style: 'stone', seed: 17 } };
     for (const [k, o] of Object.entries(KINDS)) {
       b.toon(k + 'L', nyBuildingGeo({ ...o, path: -1 }), { cap: 60, anim: 'lift', brick: true });
+      yield;
       b.toon(k + 'R', nyBuildingGeo({ ...o, path: 1 }), { cap: 60, anim: 'lift', brick: true });
+      yield;
       b.toon(k + 'FarL', nyBuildingGeo({ ...o, path: -1, near: false, seed: o.seed + 20 }), { cap: 60, anim: 'lift', brick: true, ink: 0 });
+      yield;
       b.toon(k + 'FarR', nyBuildingGeo({ ...o, path: 1, near: false, seed: o.seed + 20 }), { cap: 60, anim: 'lift', brick: true, ink: 0 });
+      yield;
     }
     b.toon('waterTower', waterTowerGeo(), { cap: 90, anim: 'lift', marks: [1, 1] });
+    yield;
     b.toon('bulkhead', bulkheadGeo(), { cap: 60, anim: 'lift', brick: true });
+    yield;
     b.toon('antenna', antennaGeo(), { cap: 60, anim: 'lift', ink: 0 });
+    yield;
     b.toon('roofKit', roofKitGeo(), { cap: 60, anim: 'lift' });
+    yield;
     b.toon('sign', signGeo(), { cap: 12, anim: 'lift' });
+    yield;
     b.toon('towers', towersGeo(5), { cap: 60, anim: 'liftFar', ink: 0, brick: true });
+    yield;
     b.toon('towersB', towersGeo(12), { cap: 60, anim: 'liftFar', ink: 0, brick: true });
+    yield;
     b.toon('spire', spireGeo(), { cap: 4, anim: 'liftFar', ink: 0.08, brick: true });
+    yield;
     b.toon('tree', merge(roundTreeParts({ r: 1.6, trunkH: 1.4, lo: '#1a3a2c', hi: '#3e6e4a', trunk: '#2a2226' })), { cap: 80, anim: 'lift', marks: [2.2, 2], wobble: [0.004, 0, 1.1, 0] });
+    yield;
     b.toon('lamp', roofLampGeo(), { cap: 40, anim: 'pop' });
+    yield;
     b.toon('lights', lightsGeo(), { cap: 24, anim: 'popLate', ink: 0.02 });
+    yield;
     b.glow('glow', { cap: 120, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 200, anim: 'pop' });
+    yield;
     b.beam('lampCone', merge(lampConeParts({ top: 3.3, r0: 0.16, r1: 1.7 })), { cap: 40, anim: 'pop' });
+    yield;
     b.pool('pool', { cap: 40, anim: 'pop' });
+    yield;
     b.toon('skyLantern', merge(skyLanternParts()), { cap: 200, anim: 'lift', fly: [0, 0, 1.4, 0.22], ink: 0.03 });
+    yield;
     b.toon('balloon', merge(balloonParts()), { cap: 30, anim: 'liftFar', fly: [0, 0, 2.5, 0.12] });
+    yield;
 
     b.toon('skylight', skylightGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('chimneyPots', chimneyPotsGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('laundry', laundryGeo(0.98, 2, 4), { cap: 24, anim: 'popEarly', cloth: BREEZE });
+    yield;
     b.toon('laundryWide', laundryGeo(3.95, 9, 8), { cap: 10, anim: 'popEarly', cloth: BREEZE });
+    yield;
     b.toon('parapetWall', parapetWallGeo(), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('chimneyStack', chimneyStackGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('waterTank', waterTankGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('shed', shedGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     // the climbs (from the second time round: see climb, above)
     b.toon('climbRamp', maintRampGeo(), { cap: 8, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('climbAlley', climbAlleyGeo(), { cap: 12, anim: 'popEarly', ink: 0 });
+    yield;
     b.toon('climbAC', roofACGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('climbVent', roofVentGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('climbPost', landingPostGeo(), { cap: 80, anim: 'popEarly', ink: 0.025 });
+    yield;
     b.toon('climbTruss', trussGeo(), { cap: 80, anim: 'popEarly', ink: 0.025 });
+    yield;
     ROOFS.forEach((h, i) => {
       b.toon(`climbRoof${i}`, climbRoofGeo(h), { cap: 12, anim: 'popEarly', ink: 0.035, brick: true });
       b.toon(`climbRoofFace${i}`, climbRoofFaceGeo(h, 5 + i), { cap: 24, anim: 'popEarly', ink: 0.03 });
@@ -961,6 +999,7 @@ export default {
       b.toon(`footbridge${i}`, footbridgeGeo(h), { cap: 10, anim: 'popEarly', ink: 0.03 });
       b.toon(`footbridgeFace${i}`, footbridgeFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });
     });
+    yield;
 
   },
 

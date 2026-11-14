@@ -482,7 +482,15 @@ const H = {
       const g = Pw.game;
       if (Pw.folded || g.portal.active || g.warp.active || g.splash.active) return false;
       const b = g.course.boundaryAfter(g.dist + 1);
-      return !!b && b.d - g.dist > P.dragon.fold.minDoor;
+      if (!b || b.d - g.dist <= P.dragon.fold.minDoor) return false;
+      // (only into a world that's ready to be seen: if it's still being
+      // prepared - a moment into a world, at most - it's hurried along,
+      // and the portal opens once it is)
+      if (!b.to.world.ready) {
+        g.prepareWorld(b.to.world, 3);
+        return false;
+      }
+      return true;
     },
     start(Pw, A) {
       const g = Pw.game;

@@ -1,9 +1,3 @@
-import { Fox } from './fox.js';
-import { Dragon } from './dragon.js';
-import { Companion } from './companion.js';
-import { Flyer } from './flyer.js';
-import { Pitcher } from './pitcher.js';
-import { Sprout } from './sprout.js';
 import { CONFIG } from '../config.js';
 
 // Who can run with you, picked on the title screen. Each has their sculpted
@@ -13,7 +7,8 @@ import { CONFIG } from '../config.js';
 // flyer.js for one who flies; tune, hw, mouth and beats bend the runner's
 // mind to a different body). The first is the default (CONFIG.companion.id
 // picks; the title screen's pick, then ?companion=, override it; 'none' runs
-// alone).
+// alone). Each one's body and mind are in modules of their own, fetched only
+// when they're wanted (load(), as for the runners: see characters.js).
 export const COMPANIONS = [
   {
     id: 'fox',
@@ -23,8 +18,10 @@ export const COMPANIONS = [
     asset: 'assets/fox/',
     face: 'assets/characters/fox-face.webp',
     tint: ['#ffb36b', '#d9541e'],
-    make: (env, asset) => new Fox(env, asset),
-    mind: (game, def, body) => new Companion(game, def, body),
+    load: lazy(() => Promise.all([import('./fox.js'), import('./companion.js')]), ([b, m]) => ({
+      make: (env, asset) => new b.Fox(env, asset),
+      mind: (game, def, body) => new m.Companion(game, def, body),
+    })),
   },
   {
     id: 'dragon',
@@ -34,8 +31,10 @@ export const COMPANIONS = [
     asset: 'assets/dragon/',
     face: 'assets/characters/dragon-face.webp',
     tint: ['#8fe3e6', '#3b56c4'],
-    make: (env, asset) => new Dragon(env, asset),
-    mind: (game, def, body) => new Flyer(game, def, body),
+    load: lazy(() => Promise.all([import('./dragon.js'), import('./flyer.js')]), ([b, m]) => ({
+      make: (env, asset) => new b.Dragon(env, asset),
+      mind: (game, def, body) => new m.Flyer(game, def, body),
+    })),
   },
   {
     id: 'pitcher',
@@ -45,11 +44,13 @@ export const COMPANIONS = [
     asset: 'assets/pitcher/',
     face: 'assets/characters/pitcher-face.webp',
     tint: ['#d9ec6a', '#e0786a'],
-    make: (env, asset) => new Pitcher(env, asset),
     // (a mind of his own - sprout.js: slower, wobblier, never far from you -
     // built on the runner's for reading the road; his own tunables over
     // the fox's, his size, and his mouth on top)
-    mind: (game, def, body) => new Sprout(game, def, body),
+    load: lazy(() => Promise.all([import('./pitcher.js'), import('./sprout.js')]), ([b, m]) => ({
+      make: (env, asset) => new b.Pitcher(env, asset),
+      mind: (game, def, body) => new m.Sprout(game, def, body),
+    })),
     tune: CONFIG.companion.pitcher,
     hw: 0.27,
     mouth: [0.12, 0.66],
@@ -57,5 +58,21 @@ export const COMPANIONS = [
     extent: { front: 0.26, back: 0.26, side: 0.24, top: 0.98 },
   },
 ];
+
+// (load(): fetch the modules once, set def.make and def.mind from them; one
+// that failed is fetched afresh next time)
+function lazy(fetch, parts) {
+  let p = null;
+  return function () {
+    p ??= fetch().then(
+      (m) => Object.assign(this, parts(m)),
+      (e) => {
+        p = null;
+        throw e;
+      }
+    );
+    return p;
+  };
+}
 
 export const companionById = (id) => (id === 'none' ? null : COMPANIONS.find((c) => c.id === id) || COMPANIONS[0]);

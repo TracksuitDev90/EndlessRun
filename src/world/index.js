@@ -1,15 +1,3 @@
-import village from './village.js';
-import rooftops from './rooftops.js';
-import corridor from './corridor.js';
-import conservatory from './conservatory.js';
-import causeway from './causeway.js';
-import forest from './forest.js';
-import hell from './hell.js';
-import time from './time.js';
-import ocean from './ocean.js';
-import frost from './frost.js';
-import space from './space.js';
-
 // The worlds always nest inward in this order, and every lap comes back
 // round the same way, grouped so each leads into the next:
 //   green and growing - the Cypress Lane (the breather, every lap starts on
@@ -23,4 +11,21 @@ import space from './space.js';
 //     of the sea onto the ice of the Frostbound Pass, where the snow lies a
 //     little deeper every time you come back to it; and over the pass, the
 //     stars of the Red Drift.
-export const WORLD_DEFS = [village, conservatory, forest, rooftops, corridor, causeway, hell, time, ocean, frost, space];
+//
+// Each world's module is only fetched when it's wanted (see World.load): the
+// first world's before the title screen, the rest behind it, in this order,
+// a world or two ahead of the runner. (A bare import() each, written out, so
+// tools/preload.py can find them.)
+export const WORLD_ORDER = [
+  { id: 'village', load: () => import('./village.js') },
+  { id: 'conservatory', load: () => import('./conservatory.js') },
+  { id: 'forest', load: () => import('./forest.js') },
+  { id: 'rooftops', load: () => import('./rooftops.js') },
+  { id: 'corridor', load: () => import('./corridor.js') },
+  { id: 'causeway', load: () => import('./causeway.js') },
+  { id: 'hell', load: () => import('./hell.js') },
+  { id: 'time', load: () => import('./time.js') },
+  { id: 'ocean', load: () => import('./ocean.js') },
+  { id: 'frost', load: () => import('./frost.js') },
+  { id: 'space', load: () => import('./space.js') },
+];

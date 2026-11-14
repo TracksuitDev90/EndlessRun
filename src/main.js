@@ -6,6 +6,9 @@ import { Game, startingRunner, startingCompanion } from './game/game.js';
 import { loadRunner } from './game/runner-asset.js';
 import { CHARACTERS, characterById } from './game/characters.js';
 import { COMPANIONS, companionById } from './game/companions.js';
+import { WORLD_ORDER } from './world/index.js';
+import { World } from './world/world.js';
+import { compileObjects } from './game/prep.js';
 import { Input } from './core/input.js';
 import { Ambient } from './core/audio.js';
 import { UI } from './ui/ui.js';
@@ -32,13 +35,66 @@ function parseParams() {
     manual: q.has('manual'),
     runner: q.get('runner') || undefined,
     companion: q.get('companion') || undefined,
+    lazy: q.has('lazy'),
   };
+}
+
+// Run a generator's steps in slices of about `ms`, giving the page back
+// between them (to paint the loading screen, take in downloads, answer a
+// tap): long work at load that never freezes it.
+async function slices(it, ms = 24) {
+  for (;;) {
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) if (it.next().done) return;
+    await new Promise((r) => setTimeout(r, 0));
+  }
 }
 
 const params = parseParams();
 const ui = new UI(CONFIG.title);
 
 async function boot() {
+  const load = ui.loader;
+  // --- who's here before the title screen ----------------------------------------
+  // Only the world the run starts in, whoever's about to run and whoever runs
+  // with them: their modules and their two sculpted models fetched together
+  // (the models were asked for before any code had loaded: see index.html),
+  // the world built while the models are still on their way, then all of it
+  // warmed up (see Game.prepareStart). Every other world is prepared behind
+  // the title screen and the run, a world ahead (see Game.prepareWorld); the
+  // rest of the cast arrive behind the title screen (see "the rest of the
+  // cast" below).
+  // (?manual - the automated tests - has everyone and every world up front,
+  // as the game always used to, so anyone can be picked and anywhere
+  // reached the moment it's loaded.)
+  const everyone = params.manual;
+  const firstRunner = startingRunner(params);
+  const firstPal = startingCompanion(params);
+  const runnersFirst = everyone ? CHARACTERS : [firstRunner];
+  const palsFirst = everyone ? COMPANIONS : firstPal ? [firstPal] : [];
+  // (nobody still locked is fetched at all unless ?runner= asks for them,
+  // and no companion if you run alone)
+  const runnersLater = CHARACTERS.filter((c) => !runnersFirst.includes(c) && !c.locked);
+  const palsLater = firstPal ? COMPANIONS.filter((c) => !palsFirst.includes(c)) : [];
+  const worlds = WORLD_ORDER.map((e) => new World(e));
+  const start = worlds.find((w) => w.id === params.world) || worlds[0];
+  const assets = {};
+  const companionAssets = {};
+  // (a download that fails is tried once more before giving up)
+  const twice = (f) => f().catch(() => new Promise((r) => setTimeout(r, 1500)).then(f));
+  const fetches = [
+    twice(() => start.load()),
+    ...runnersFirst.map((c) => Promise.all([twice(() => c.load()), twice(() => loadRunner(c.asset, load.bytes))]).then(([, a]) => (assets[c.id] = a))),
+    ...palsFirst.map((c) => Promise.all([twice(() => c.load()), twice(() => loadRunner(c.asset, load.bytes))]).then(([, a]) => (companionAssets[c.id] = a))),
+  ];
+  const names = [firstRunner, firstPal].filter(Boolean).map((c) => c.name);
+  load.stage('fetch', names.length ? `fetching ${names.join(' and ')}` : 'fetching');
+  for (const f of fetches) f.then(() => load.fetched(), () => {});
+  load.expect(fetches.length);
+  const fetched = Promise.all(fetches);
+  let allHere = false;
+  fetched.then(() => (allHere = true), () => {});
+
   const canvas = document.getElementById('game');
   let renderer;
   try {
@@ -70,30 +126,33 @@ async function boot() {
   shared.uNoise.value = makeNoiseTexture();
   const gpu = gpuClass(renderer); // (named in the ?debug overlay)
 
-  // --- who's here before the title screen ----------------------------------------
-  // Only whoever's about to run and whoever runs with them: two sculpted
-  // models to fetch, build and warm up, not the whole cast's (most of what
-  // the game downloads). Everyone else arrives behind the title screen: see
-  // admitRest. (?manual - the automated tests - has everyone up front, as
-  // the game always used to, so anyone can be picked the moment it's loaded.)
-  const everyone = params.manual;
-  const firstRunner = startingRunner(params);
-  const firstPal = startingCompanion(params);
-  const runnersFirst = everyone ? CHARACTERS : [firstRunner];
-  const palsFirst = everyone ? COMPANIONS : firstPal ? [firstPal] : [];
-  // (nobody still locked is fetched at all unless ?runner= asks for them,
-  // and no companion if you run alone)
-  const runnersLater = CHARACTERS.filter((c) => !runnersFirst.includes(c) && !c.locked);
-  const palsLater = firstPal ? COMPANIONS.filter((c) => !palsFirst.includes(c)) : [];
-  const assets = {};
-  const companionAssets = {};
-  await Promise.all([
-    ...runnersFirst.map(async (c) => (assets[c.id] = await loadRunner(c.asset))),
-    ...palsFirst.map(async (c) => (companionAssets[c.id] = await loadRunner(c.asset))),
-  ]);
+  // the first world built and indexed as soon as its module's here, a slice
+  // at a time, while the models are still coming
+  await fetches[0];
+  performance.mark('er:world-module');
+  load.stage('build', `building ${start.name.replace(/^The /, 'the ')}`);
+  let built = 0;
+  await slices(
+    (function* () {
+      for (const _ of start.build()) {
+        load.built(++built);
+        yield;
+      }
+      for (const _ of start.weldAll()) yield;
+      // and, if the models are still on their way, its shaders asked for
+      // meanwhile, so the GPU compiles them while the network's busy (any
+      // camera will do: none changes a program)
+      if (!allHere) yield* compileObjects(renderer, new THREE.PerspectiveCamera(), [...start.root.children], { burst: true });
+    })()
+  );
+  performance.mark('er:world-built');
+  if (!allHere) load.stage('fetch', names.length ? `fetching ${names.join(' and ')}` : 'fetching');
+  await fetched;
+  performance.mark('er:assets');
   const audio = new Ambient();
-  const game = new Game({ renderer, ui, audio, params, assets, companionAssets });
+  const game = new Game({ renderer, ui, audio, params, assets, companionAssets, worlds, start });
   window.__game = game;
+  performance.mark('er:game');
   // Next time, the page starts fetching these two before any code has loaded
   // (see the script at the top of index.html).
   const remember = () => {
@@ -325,23 +384,31 @@ async function boot() {
   }
 
   // --- warm up --------------------------------------------------------------
-  await game.precompile();
+  load.stage('gpu', 'warming up');
+  await game.prepareStart((done, total) => load.gpu(done, total));
+  performance.mark('er:prepared');
+  // (the stylesheet isn't allowed to hold the loading screen up, but the
+  // title screen needs it)
+  await (window.__erCss || Promise.resolve());
   game.update(1 / 60);
   game.render();
   ui.loaded();
   ui.showTitle(true);
+  performance.mark('er:title');
 
   // --- the rest of the cast -------------------------------------------------------
-  // Behind the title screen: everyone else's model is fetched, one after
-  // another (so the first card comes to life soonest), and each is let into
-  // the game as it lands - built, their shaders compiled, everything of
-  // theirs drawn once out of sight (Game.admitRunner) - and only then can be
-  // picked. The building is a tenth of a second of work apiece, more on a
-  // phone, so it only ever happens while the title screen's up, with a
-  // breath between one and the next: if a run starts first, whoever's still
-  // to come waits for the next title screen (their download carries on).
-  // (And while someone's being let in, the title screen's frames say nothing
-  // about how fast this device draws: the adaptive resolution looks away.)
+  // Behind the title screen: everyone else's module and model are fetched,
+  // one after another (so the first card comes to life soonest), and each is
+  // let into the game as they land - built, their shaders compiled,
+  // everything of theirs drawn once out of sight (Game.admitRunner, a step at
+  // a time between frames) - and only then can be picked. That only ever
+  // happens while the title screen's up: if a run starts first, whoever's
+  // still to come waits for the next title screen (their download carries
+  // on). (And while someone's being let in, the title screen's frames say
+  // nothing about how fast this device draws: the adaptive resolution looks
+  // away.) The worlds' modules come after the companions: the next world or
+  // two along are fetched at once whenever the course needs them (see
+  // Course.ensure); the rest are here long before they're needed.
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let admitting = false;
   let downloads = Promise.resolve();
@@ -349,14 +416,15 @@ async function boot() {
   async function letIn(q) {
     let asset;
     try {
-      asset = await q.asset;
+      [, asset] = await Promise.all([q.c.load(), q.asset]);
     } catch (e) {
-      // (their card stays as it is, waiting; tapping it tries again: see pick)
+      // (their card says so; tapping it tries again: see pick)
       q.failed = true;
+      if (q.runner) ui.runnerFailed(q.c.id);
+      else ui.companionFailed(q.c.id);
       console.warn(`${q.c.name} couldn't be fetched`, e);
       return;
     }
-    await sleep(120);
     while (game.state !== 'title' || document.hidden) await sleep(250);
     admitting = true;
     try {
@@ -372,6 +440,8 @@ async function boot() {
       late.delete(q.c.id);
     } catch (e) {
       q.failed = true;
+      if (q.runner) ui.runnerFailed(q.c.id);
+      else ui.companionFailed(q.c.id);
       console.warn(`${q.c.name} couldn't be let in`, e);
     } finally {
       admitting = false;
@@ -379,18 +449,25 @@ async function boot() {
   }
   // one download at a time (one that fails is tried once more), and one
   // let in at a time, in the order they were asked for
+  const fetchTwice = (f) => f().catch(() => sleep(4000).then(f));
   fetchLater = (q) => {
     q.failed = false;
-    q.asset = downloads.then(() => loadRunner(q.c.asset).catch(() => sleep(4000).then(() => loadRunner(q.c.asset))));
+    if (q.runner) ui.runnerWaiting(q.c.id);
+    else ui.companionWaiting(q.c.id);
+    q.asset = downloads.then(() => Promise.all([fetchTwice(() => q.c.load()), fetchTwice(() => loadRunner(q.c.asset))]).then(([, a]) => a));
     downloads = q.asset.catch(() => {});
     line = line.then(() => letIn(q));
   };
   // (the companion's badge sits right under the cards: second in line)
-  for (const q of [
-    ...runnersLater.slice(0, 1).map((c) => ({ c, runner: true })),
-    ...palsLater.map((c) => ({ c, runner: false })),
-    ...runnersLater.slice(1).map((c) => ({ c, runner: true })),
-  ]) {
+  const queue = [...runnersLater.slice(0, 1).map((c) => ({ c, runner: true })), ...palsLater.map((c) => ({ c, runner: false }))];
+  for (const q of queue) {
+    late.set(q.c.id, q);
+    fetchLater(q);
+  }
+  downloads = downloads.then(async () => {
+    for (const w of worlds) await w.load().catch(() => {});
+  });
+  for (const q of runnersLater.slice(1).map((c) => ({ c, runner: true }))) {
     late.set(q.c.id, q);
     fetchLater(q);
   }
@@ -452,7 +529,9 @@ async function boot() {
           `js ${(jsSum / frames).toFixed(1)} ms  calls ${i.calls}  tris ${(i.triangles / 1000).toFixed(0)}k\n` +
           `${gpu.name.slice(0, 32)}\n` +
           `${game.current.id}  ${game.dist.toFixed(0)} m  ${game.speed.toFixed(1)} m/s\n` +
-          `${game.state}${game.god ? '  GOD' : ''}`
+          `${game.state}${game.god ? '  GOD' : ''}\n` +
+          // (the work ahead: what's queued, the last frame's share, worlds ready, and how often one wasn't in time)
+          `ahead ${game.prep.jobs.map((j) => j.key.replace(/^\w+:/, '')).join(' ') || '-'}  ${game.prep.ran.toFixed(1)} ms  ready ${game.worlds.filter((w) => w.ready).length}/${game.worlds.length}${game.late ? `  late ${game.late}` : ''}`
       );
       acc = 0;
       frames = 0;
@@ -475,5 +554,7 @@ async function boot() {
 
 boot().catch((e) => {
   console.error(e);
-  ui.error('Something went wrong while unfolding the world.');
+  // (most likely a download that failed twice: another go fetches only
+  // what didn't arrive - everything that did is in the browser's cache)
+  ui.error('Something went wrong while unfolding the world.', () => location.reload());
 });

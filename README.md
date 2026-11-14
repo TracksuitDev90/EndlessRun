@@ -1397,7 +1397,7 @@ Append to the URL:
 
 | Flag | Effect |
 |---|---|
-| `?debug` | FPS, how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU, distance overlay. **N** skips to just before the next doorway, **G** toggles god mode |
+| `?debug` | FPS, how many frames came late, frame-time p50/p95, script time, draw calls, triangles, pixel ratio, the GPU, distance overlay, and the work ahead (what's queued, its share of the last frame, how many worlds are ready, and how often one had to be finished at once: `late`). **N** skips to just before the next doorway, **G** toggles god mode |
 | `?world=rooftops` | start in a given world (`village`, `forest`, `rooftops`, `corridor`, `conservatory`, `causeway`, `hell`, `time`, `ocean`, `space`) |
 | `?visit=2` | start on a later lap's look (0 = first time through) |
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
@@ -1407,7 +1407,8 @@ Append to the URL:
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
-| `?manual` | no render loop; drive frames with `__step(frames, dt)` from the console (used for automated tests) |
+| `?manual` | no render loop; drive frames with `__step(frames, dt)` from the console (used for automated tests); everyone and every world is loaded up front |
+| `?manual&lazy` | the same, but the worlds are prepared as they are in play (a world ahead, between frames) |
 
 ## How it holds 60 fps
 
@@ -1470,11 +1471,12 @@ Append to the URL:
   figure is drawn into once more a frame, flattened onto the ground along
   the light — no depth, no ink hull, no fur — about three extra draw calls,
   and a few texture taps where it falls.
-- **No hitches.** All shaders are compiled during the loading screen, and
-  then everything is drawn once under it, so every world's buffers and
-  textures are on the GPU and every program has been used before the run
-  starts (otherwise each world uploads its geometry the first time its
-  doorway comes into view); no allocations in the hot loop.
+- **No hitches.** Nothing is compiled or uploaded the first time it comes
+  into view: every world is built, its shaders compiled and everything of it
+  drawn once out of sight before its doorway can be seen — the first world
+  under the loading screen, every other a step at a time between frames
+  well ahead of its doorway (see [Loading](#loading)); no allocations in
+  the hot loop.
 - **Gems are cheap too.** All of a world's stones share one geometry —
   every kind is in it, its triangles marked with their kind — and each kind
   present draws its own range of it, instanced; plus its ink, its halos and
@@ -1535,6 +1537,61 @@ Append to the URL:
   over half the frame's travel (as a camera's shutter would) and the forest's
   grass softens, so they read as speed instead. `CONFIG.motionBlur` sets the
   shutter (0 turns it off).
+
+## Loading
+
+The title screen waits only for what it shows: the world the run starts in
+(the Cypress Lane), whoever's about to run and whoever runs with them.
+Everything else comes behind it.
+
+- **What's fetched first.** `index.html` asks for every module the title
+  screen needs at once, alongside itself (`modulepreload`), and for the
+  modules and models of whoever ran last time (the game remembers them in
+  `er.assets`). The worlds' modules and each runner's and companion's class
+  are imported only when wanted (`import()` in `world/index.js`,
+  `game/characters.js`, `game/companions.js`), so the first visit downloads
+  and parses about two-fifths less code. Each model comes gzipped
+  (`runner.bin.gz`, unpacked in the browser by `DecompressionStream`; GitHub
+  Pages sends a `.bin` uncompressed), a little over half the size.
+- **The loading screen shows at once.** Its own look is in `index.html`; the
+  stylesheet loads alongside the code without holding the first paint up
+  (the title screen waits for it). The bar fills as the work is really done:
+  the modules as they arrive, the models by the byte, the first world by the
+  batch, the warm-up by the step. A download that fails is tried again; one
+  that fails twice puts up a *Try again* button.
+- **The first world is built while the models are still on their way**, a
+  slice at a time (each world's `build` is a generator that yields after
+  every batch), then it, the runner, the companion and the effects are
+  compiled and drawn once out of sight (`Game.prepareStart`).
+- **Every other world is prepared ahead, between frames** (`game/prep.js`, a
+  scheduler of small steps, a few milliseconds a frame): its module fetched,
+  its batches built and indexed one at a time, the door into it built into
+  the shared doors, every shader program it needs compiled (a frame to
+  itself for each new one, waited for where the browser compiles off the
+  main thread), then each batch drawn once into a pixel the frame's clear
+  wipes, which puts its buffers on the GPU. While the title screen or the
+  crash card is up the worlds ahead are prepared in the order they'll come,
+  as many as the time allows (a long frame there costs nothing); while
+  running, only the next world, a sliver of each frame from the moment it's
+  on the course — a whole world before its doorway. It must be ready
+  `viewAhead + 40` m short of the doorway, before anything of it is placed;
+  if it isn't (a slow phone), it's given more of each frame as the doorway
+  nears and finished there and then at the last: a hitch, never a blank
+  doorway (`?debug` counts these as `late`). If its module hasn't even
+  arrived, the world you're in runs on until it has (see `Course.ensure`).
+  World Fold opens only into a world that's ready, and hurries it along.
+- **The rest of the cast** arrive behind the title screen, one at a time,
+  and are let in a step at a time between its frames; a card says when
+  they're still coming, and when a download failed (tap to try again).
+- **Versions.** Every file's URL carries a hash of what's in it (`?v=`): an
+  import map in `index.html` for the modules, and a table for the models,
+  cards and stylesheet. GitHub Pages lets a browser keep a file for ten
+  minutes; with versioned URLs a browser never mixes files it kept from
+  before an update with the ones that came with it, and an unchanged file
+  keeps its URL (and its place in the cache) from one update to the next.
+  After changing any module, model, card or the stylesheet, run
+  `python3 tools/preload.py` (it rewrites that part of `index.html` and the
+  gzipped models; `--check` says whether they're up to date).
 
 The doorway effect renders in two passes while a door is in view: the doorway
 shape writes a stencil mask and the *next* world draws only inside it; then the
@@ -3208,6 +3265,9 @@ index.html, css/style.css     page shell, overlay UI
 src/config.js                 every gameplay / feel / camera tunable
 src/main.js                   boot, render loop, adaptive resolution, input wiring
 src/core/                     input (swipes + keys), ambient audio, seeded RNG
+src/game/prep.js              the work done ahead of time, a step at a time between
+                              frames: worlds built, compiled and put on the GPU, the
+                              rest of the cast let in (see Loading)
 src/render/                   shaders, geometry kit, instanced batches, textures, particles, the figures' shadows
 src/world/                    world runtime + one file per world (art, lighting, lap
                               variations, layout, obstacles, gem, doorway); whimsy.js holds
@@ -3266,6 +3326,8 @@ src/game/                     game loop, player (the runners' shared core:
                               (their abilities) and powerfx.js (what the
                               abilities leave in the world: soil, water,
                               wind, the water's sheen, Nep's roots)
+tools/preload.py              what index.html fetches first, every file's version,
+                              the gzipped models (run after changing any of them)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
 tools/runner/explorer.py      offline sculpt of the explorer -> assets/explorer/
 tools/runner/elder.py         offline sculpt of the elder -> assets/elder/
@@ -3296,7 +3358,12 @@ vendor/three/                 three.js r185 (MIT)
 
 Create `src/world/<name>.js` exporting `{ id, name, doorColor, env, visits,
 gate, gem, build(b), chunk(ctx), obstacles }` (copy any existing world as a
-template) and add it to `src/world/index.js`. `env` sets the palette and the
+template) and add it to `WORLD_ORDER` in `src/world/index.js`, then run
+`python3 tools/preload.py`. `build` is a generator (`*build(b)`) with a
+`yield` after each batch, so the game can build the world a step at a time
+between frames; a batch whose geometry takes long to make (more than a few
+milliseconds) can have a generator make it, yielding as it goes, and take
+it with `yield*` (see the Deepwood's `creekWideStonesGeo`). `env` sets the palette and the
 lighting (`light.soft` / `wrap` for harsh vs soft light, `rim`, `mist`,
 `dapple`, `grade`, `skyFx`, …, and `bloom`, the three colours its doorway bloom is made of); `visits` lists partial `env` overrides for
 each return. `build` registers prop batches from the geometry kit (`b.toon`,

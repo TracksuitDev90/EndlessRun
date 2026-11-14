@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js';
 import { shared, makeEnvUniforms, copyEnvUniforms, lerpEnvUniforms, DRAIN_NONE, DRAIN_ALL } from '../render/shaders.js';
 import { Particles } from '../render/particles.js';
 import { World } from '../world/world.js';
-import { WORLD_DEFS } from '../world/index.js';
+import { WORLD_ORDER } from '../world/index.js';
 import { RNG } from '../core/rng.js';
 import { Course } from './course.js';
 import { ChunkStreamer } from './chunks.js';
@@ -22,6 +22,7 @@ import { COMPANIONS, companionById } from './companions.js';
 import { Progress } from './progress.js';
 import { Powers, POWERS } from './powers.js';
 import { PowerFx } from './powerfx.js';
+import { Preparer, warmObjects, compileObjects, uploadObjects, waitFor } from './prep.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const smooth01 = (e0, e1, x) => {
@@ -30,6 +31,16 @@ const smooth01 = (e0, e1, x) => {
 };
 const NO_MOTES = { color: '#000000', size: 1, drift: [0, 0, 0], opacity: 0 };
 const CHEST = 0.9; // a collected gem is sucked into the runner's chest, this high above their feet
+// the work done ahead of time, per frame (ms; see prep.js and prepBudget)
+const PREP_IDLE = 8;
+const PREP_RUNNING = 2.5;
+const PREP_URGENT = 6;
+const PREP_REST = 1.2; // s with none, as a run starts or a doorway is crossed
+// the next world must be ready this far short of its doorway (m), before
+// anything of it can be placed or seen (see needWorld); and from this far
+// it's hurried
+const NEED_BY = CONFIG.viewAhead + 40;
+const NEED_SOON = NEED_BY + 220;
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const numeral = (n) => NUMERALS[n - 1] || String(n);
 
@@ -60,26 +71,30 @@ export function startingCompanion(params) {
 // Orchestrates one run: streaming, obstacles, the player, doorways between
 // worlds, the camera and the two-pass portal render.
 export class Game {
-  constructor({ renderer, ui, audio, params, assets, companionAssets = {} }) {
+  // start: the World the run starts in, already loaded (main.js fetched its
+  // module first); every other world is a shell until it's wanted (see
+  // prepareWorld)
+  constructor({ renderer, ui, audio, params, assets, companionAssets = {}, worlds, start }) {
     this.renderer = renderer;
     this.ui = ui;
     this.audio = audio;
     this.params = params;
 
-    this.worlds = WORLD_DEFS.map((d) => new World(d));
+    this.worlds = worlds || WORLD_ORDER.map((e) => new World(e));
+    this.startWorld = start || this.worlds[0];
+    // (whatever lights everything before a world does: overwritten each
+    // frame by the world the runner's in)
+    const env = this.startWorld.def.env;
+    this.env0 = env;
     // The doorways: every world's door - the way INTO it, built in its own
     // style (def.gate, def.door) - in one shared set that always stands in
-    // the world you're running through, lit by it (see updateDoors).
-    this.doors = new World({
-      id: 'doors',
-      name: 'doors',
-      env: WORLD_DEFS[0].env,
-      build: (b) => {
-        for (const d of WORLD_DEFS) d.door(b.prefixed(`${d.id}.`));
-      },
-    });
-    this.doors.root.remove(this.doors.sky);
-    this.course = new Course(this.worlds);
+    // the world you're running through, lit by it (see updateDoors). Each
+    // world's is added as that world is prepared.
+    this.doors = new World({ id: 'doors', name: 'doors', env, build() {} }, { sky: false });
+    // the work done ahead of time, between frames (see prep.js)
+    this.prep = new Preparer();
+    this.late = 0; // how many times a world had to be finished at once (?debug)
+    this.course = new Course(this.worlds, (w) => this.wantWorld(w));
     this.chunks = new ChunkStreamer(this);
     this.obstacles = new ObstacleField(this);
     this.gems = new GemField(this);
@@ -100,12 +115,11 @@ export class Game {
     // the animal who runs with you: built up front if their model's here, as
     // the runners are (?companion=none to run alone)
     this.companions = {};
-    for (const c of COMPANIONS) if (companionAssets[c.id]) this.companions[c.id] = c.mind(this, c, c.make(WORLD_DEFS[0].env, companionAssets[c.id]));
+    for (const c of COMPANIONS) if (companionAssets[c.id]) this.companions[c.id] = c.mind(this, c, c.make(env, companionAssets[c.id]));
     this.alone = params.companion === 'none';
     const cdef = startingCompanion(params);
     this.companionId = cdef && this.companions[cdef.id] ? cdef.id : null;
     this.companion = this.companionId ? this.companions[this.companionId] : null;
-    this.warming = null; // someone just arrived, waiting to be drawn once (see warm)
     this.cam = new ChaseCamera();
     this.portal = new Portal();
     // (room for more: the Frostbound Pass's snowfall, see updateSnow)
@@ -117,7 +131,7 @@ export class Game {
     this.dream = new Dream();
     // under the sea: the bubbles, swirl and sand round the runner, lit as
     // the runner is (see bubbles.js)
-    this.waterU = makeEnvUniforms(WORLD_DEFS[0].env);
+    this.waterU = makeEnvUniforms(env);
     this.water = new WaterFx(this.waterU);
     // coming into a world with env.splash, the screen is splashed with water
     this.splash = new Splash();
@@ -131,7 +145,7 @@ export class Game {
     // companions' abilities and what they leave in the world to be seen
     this.progress = new Progress(COMPANIONS.map((c) => c.id));
     this.powers = new Powers(this);
-    this.powerFx = new PowerFx(this);
+    this.powerFx = new PowerFx(this, env);
     this.shieldT = 0; // Pitcher Protection: nothing can hurt the runner while it lasts
     this.folding = false; // World Fold: the portal's closing over the screen
 
@@ -144,6 +158,7 @@ export class Game {
     this.scenePortal.add(this.portal.stencilMesh);
 
     this.time = 0;
+    this.prepRest = 0; // the work ahead rests until (see prepBudget)
     this.frameStep = 1 / 60; // the usual frame interval (set by the main loop)
     this.god = !!params.god;
     this.tutorialDone = readFlag('er.tutorialDone');
@@ -153,7 +168,7 @@ export class Game {
   }
 
   makeRunner(c, asset) {
-    const r = c.make(WORLD_DEFS[0].env, asset);
+    const r = c.make(this.env0, asset);
     // (a runner whose jump can keep them up longer asks first: see roadClear)
     r.roomAhead = (sec) => this.roadClear(sec);
     // (and one who plays about while cruising asks whether there's nothing
@@ -164,40 +179,221 @@ export class Game {
 
   // --- the rest of the cast ------------------------------------------------------
   // Someone whose model arrived after the loading screen (main.js, which only
-  // lets them in while the title screen's up): built now, then warmed up as
-  // precompile warms whoever was there at the start, and only then to be
-  // picked.
-  async admitRunner(c, asset) {
-    if (this.runners[c.id]) return;
-    const r = this.makeRunner(c, asset);
-    await this.warm(r.objects, (on) => r.forCompile?.(on), () => r.renderShadow(this.renderer));
-    this.runners[c.id] = r;
+  // lets them in while the title screen's up): built, then their shaders
+  // compiled and everything of theirs drawn once out of sight, a step at a
+  // time between the title screen's frames (see prep.js), and only then to
+  // be picked: nothing of theirs is ever compiled or uploaded mid-run.
+  admitRunner(c, asset) {
+    if (this.runners[c.id]) return Promise.resolve();
+    return this.prep.add(`runner:${c.id}`, (ctx) => this.admitSteps(ctx, () => this.makeRunner(c, asset), (r) => (this.runners[c.id] = r), (r) => r.forCompile?.bind(r), (r) => r.renderShadow(this.renderer)), 1, () => this.state === 'title').done;
   }
 
-  async admitCompanion(c, asset) {
-    if (this.companions[c.id]) return;
-    const m = c.mind(this, c, c.make(WORLD_DEFS[0].env, asset));
-    await this.warm(m.objects, (on) => m.forCompile(on), () => m.body.renderShadow(this.renderer));
-    this.companions[c.id] = m;
+  admitCompanion(c, asset) {
+    if (this.companions[c.id]) return Promise.resolve();
+    return this.prep.add(`companion:${c.id}`, (ctx) => this.admitSteps(ctx, () => c.mind(this, c, c.make(this.env0, asset)), (m) => (this.companions[c.id] = m), (m) => m.forCompile.bind(m), (m) => m.body.renderShadow(this.renderer)), 1, () => this.state === 'title').done;
   }
 
-  // Compile a newcomer's shaders - off the main thread, where the browser
-  // can - then draw everything of theirs once, out of sight, in a frame of
-  // the title screen (see render), so their buffers and textures are on the
-  // GPU and every program of theirs has been used before anyone can pick
-  // them: nothing of theirs is ever compiled or uploaded mid-run.
-  async warm(objects, forCompile, shadow) {
-    const scene = new THREE.Scene();
-    scene.add(...objects);
-    forCompile(true);
-    try {
-      if (this.renderer.compileAsync) await this.renderer.compileAsync(scene, this.cam.camera);
-      else this.renderer.compile(scene, this.cam.camera);
-      await new Promise((done) => (this.warming = { scene, shadow, done }));
-    } finally {
-      forCompile(false);
-      for (const o of objects) o.removeFromParent();
+  *admitSteps(ctx, make, admit, forCompile, shadow) {
+    const x = make();
+    yield;
+    // (their shadow's target allocated now, not the first time it's drawn)
+    shadow(x);
+    yield* warmObjects(this.renderer, this.cam.camera, x.objects, { ...ctx, get now() { return ctx.now; }, reveal: false, forCompile: forCompile(x) });
+    for (const o of x.objects) o.removeFromParent();
+    admit(x);
+  }
+
+  // --- worlds ahead of time --------------------------------------------------------
+  // Only the world the run starts in is built before the title screen. Every
+  // other is prepared before its doorway can come into view: its module
+  // fetched, every batch built and indexed (a batch a step), the door into
+  // it built into the shared doors, then all of it compiled and drawn once
+  // out of sight - in small steps between frames (see prep.js). While the
+  // title screen (or the crash card) is up, the worlds ahead are prepared
+  // one after another, in the order they'll come, as far as the time
+  // allows: there a long frame costs nothing. While running, only the next
+  // world along is, a sliver of each frame, from the moment it's on the
+  // course - a whole world before it's needed (see needWorld). World Fold
+  // waits for its world (see powers.js).
+
+  // Fetch a world's module (the course asks, see Course.ensure): once, and
+  // if that fails, again a few seconds later.
+  wantWorld(w) {
+    if (w.def || w.loading || performance.now() < (w.retryAt || 0)) return;
+    w.load().catch((e) => {
+      w.retryAt = performance.now() + 3000;
+      console.warn(`[world] ${w.id} couldn't be fetched`, e);
+    });
+  }
+
+  worldReady(w) {
+    return w.ready && w.doorReady;
+  }
+
+  // (the title screen or the crash card: no run to keep smooth)
+  idle = () => this.state === 'title' || this.state === 'crashed';
+
+  // Queue a world's preparation; door false: not the door into it (the
+  // world the run starts in, before the title screen); idleOnly: only while
+  // nobody's running (see idleAhead). Asked for again with more, the queued
+  // job does more. Returns the job, or null if there's nothing left to do.
+  prepareWorld(w, prio = 0, { door = true, idleOnly = false } = {}) {
+    if (w.ready && (w.doorReady || !door)) return null;
+    const job = this.prep.add(`world:${w.id}`, (ctx) => this.worldSteps(w, ctx), prio, idleOnly ? this.idle : null);
+    job.ctx.door ||= door;
+    if (!idleOnly) job.when = null;
+    return job;
+  }
+
+  *worldSteps(w, ctx) {
+    const r = this.renderer;
+    const cam = this.cam.camera;
+    const o = { get now() { return ctx.now; }, burst: ctx.burst, progress: () => ctx.progress?.('gpu') };
+    while (!w.def) {
+      try {
+        yield waitFor(w.load());
+      } catch (e) {
+        console.warn(`[world] ${w.id} couldn't be fetched`, e);
+        yield waitFor(new Promise((res) => setTimeout(res, 3000)));
+      }
     }
+    if (!w.built) {
+      ctx.stage = 'build';
+      for (const _ of w.build()) {
+        ctx.progress?.('build');
+        yield;
+      }
+    }
+    if (!w.ready) {
+      ctx.stage = 'weld';
+      for (const _ of w.weldAll()) yield;
+      ctx.stage = 'compile';
+      yield* compileObjects(r, cam, [...w.root.children], o);
+      ctx.stage = 'upload';
+      yield* uploadObjects(r, cam, [...w.root.children], o);
+      w.ready = true;
+    }
+    if (ctx.door && !w.doorReady) {
+      ctx.stage = 'door';
+      w.doorBatches ??= this.doors.addDoor(w.def);
+      yield;
+      for (const b of w.doorBatches) b.weld();
+      const objects = w.doorBatches.flatMap((b) => [b.mesh, b.ink]);
+      yield* compileObjects(r, cam, objects, o);
+      yield* uploadObjects(r, cam, objects, o);
+      w.doorReady = true;
+    }
+  }
+
+  // Every frame: the world through the next doorway must be ready before
+  // anything of it can be placed or seen - the doorway's own chunk, its
+  // gems, the portal - which starts about viewAhead short of the doorway.
+  // By then it always should be, a whole world after it was asked for; if
+  // it isn't (a slow phone), it's given more of each frame as the doorway
+  // nears, and finished there and then at the last (a hitch, never a blank
+  // doorway).
+  needWorld() {
+    const b = this.course.boundaryAfter(this.dist);
+    this.urgent = false;
+    if (b && !this.worldReady(b.to.world)) {
+      const w = b.to.world;
+      const ahead = b.d - this.dist;
+      const job = this.prepareWorld(w, ahead < NEED_SOON ? 3 : 2);
+      this.urgent = ahead < NEED_SOON;
+      if (job && ahead < NEED_BY && !this.idle()) {
+        const t0 = performance.now();
+        if (this.prep.finish(job.key)) {
+          this.late++;
+          console.warn(`[world] ${w.id} wasn't ready ${ahead.toFixed(0)} m before its doorway: finished at once (${(performance.now() - t0).toFixed(0)} ms)`);
+        }
+      }
+    }
+    if (this.idle()) this.idleAhead();
+  }
+
+  // While nobody's running: every world whose module is here prepared, in
+  // the order they'll come after this one.
+  idleAhead() {
+    const n = this.worlds.length;
+    const at = this.worlds.indexOf(this.current);
+    for (let k = 1; k < n; k++) {
+      const w = this.worlds[(at + k) % n];
+      if (!w.def || this.worldReady(w) || this.prep.pending(`world:${w.id}`)) continue;
+      this.prepareWorld(w, 0, { idleOnly: true });
+    }
+  }
+
+  // Before the title screen: the world the run starts in (main.js has built
+  // it already), whoever runs and with them, the motes, sparkles, doorway,
+  // the water round a runner under the sea - all compiled and drawn once out
+  // of sight (see prep.js), so the first frames of the run compile and
+  // upload nothing. The work is done in slices between frames so the loading
+  // screen stays alive; progress(done, total) counts its steps.
+  async prepareStart(progress = () => {}) {
+    const self = this;
+    const r = this.renderer;
+    const cam = this.cam.camera;
+    const fx = [this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh, ...this.water.objects, ...this.powerFx.objects, this.splash.mesh];
+    const cast = [];
+    for (const x of Object.values(this.runners)) cast.push([x.objects, x.forCompile?.bind(x), () => x.renderShadow(r)]);
+    for (const c of Object.values(this.companions)) cast.push([c.objects, c.forCompile.bind(c), () => c.body.renderShadow(r)]);
+    // (each object is two steps: compiled, then drawn)
+    let done = 0;
+    const total = 2 * (this.startWorld.root.children.length + fx.length + cast.reduce((n, [o]) => n + o.length, 0));
+    const tick = () => progress(Math.min(++done, total), total);
+    const first = this.prepareWorld(this.startWorld, 5, { door: false });
+    Object.assign(first.ctx, { burst: true, progress: (stage) => stage === 'gpu' && tick() });
+    const jobs = [first];
+    jobs.push(
+      this.prep.add(
+        'start:cast',
+        function* (ctx) {
+          const o = { get now() { return ctx.now; }, reveal: false, burst: true, progress: tick };
+          for (const [objects, forCompile, shadow] of cast) {
+            shadow();
+            yield* warmObjects(r, cam, objects, { ...o, get now() { return ctx.now; }, forCompile });
+          }
+          self.water.forCompile(true);
+          self.powerFx.forCompile(true);
+          try {
+            yield* warmObjects(r, cam, fx, o);
+          } finally {
+            self.water.forCompile(false);
+            self.powerFx.forCompile(false);
+          }
+        },
+        4
+      )
+    );
+    // (?manual - the automated tests - has every world here up front, as the
+    // game always used to, so a test can go anywhere at once)
+    if (this.params.manual && !this.params.lazy) for (const w of this.worlds) if (w !== this.startWorld) jobs.push(this.prepareWorld(w, 1));
+    if (this.params.manual && !this.params.lazy) jobs.push(this.prepareWorld(this.startWorld, 1));
+    let finished = false;
+    let failed = null;
+    Promise.all(jobs.filter(Boolean).map((j) => j.done)).then(
+      () => (finished = true),
+      (e) => (failed = e)
+    );
+    // (nothing's drawn yet: slices of work with the page given back between
+    // them, not a frame apiece)
+    while (!finished && !failed) {
+      this.prep.run(30);
+      await new Promise((res) => setTimeout(res, 0));
+    }
+    if (failed) throw failed;
+    // (put back where they're drawn: warmObjects moved each out and back)
+    this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects, ...this.powerFx.objects);
+    for (const c of Object.values(this.companions)) for (const o of c.objects) if (c !== this.companion) o.removeFromParent();
+    for (const r of Object.values(this.runners)) if (r !== this.player) for (const o of r.objects) o.removeFromParent();
+    if (this.companion) this.sceneMain.add(...this.companion.objects);
+    this.scenePortal.add(this.portal.stencilMesh);
+    this.splash.scene.add(this.splash.mesh);
+    this.renderer.clear(true, true, true);
+    // (and the splash's copy of the frame allocated now, not the instant the
+    // first one hits)
+    this.splash.warm(this.renderer);
+    this.warp.warm(this.renderer);
   }
 
   speedAt(t) {
@@ -282,6 +478,7 @@ export class Game {
     this.player.mode = title ? 'idle' : 'run';
     this.cam.introTarget = title ? 1 : 0;
     if (!title) {
+      this.prepRest = this.time + PREP_REST;
       this.cam.intro = 0.35;
       this.speed = CONFIG.speed.start * 0.5;
       this.announceWorld(this.course.segAt(0));
@@ -299,6 +496,7 @@ export class Game {
     this.player.mode = 'run';
     this.cam.introTarget = 0;
     this.speed = 2;
+    this.prepRest = this.time + PREP_REST;
     this.announceWorld(this.course.segAt(0));
     this.companion?.start();
   }
@@ -512,6 +710,7 @@ export class Game {
   // into it.
   foldTo(b) {
     const seg = b.to;
+    this.prepRest = this.time + PREP_REST;
     const C = CONFIG.powers.dragon.fold;
     const d = b.d + seg.world.def.gate.depth + 9;
     for (const w of this.worlds) {
@@ -1074,6 +1273,7 @@ export class Game {
 
   crossDoor() {
     const old = this.current;
+    this.prepRest = this.time + PREP_REST;
     this.chunks.dropWorld(old);
     this.obstacles.dropWorld(old);
     this.gems.dropWorld(old);
@@ -1126,6 +1326,9 @@ export class Game {
     this.origin = Math.floor(d / CONFIG.rebaseStep) * CONFIG.rebaseStep;
     this.course.ensure(d, Math.max(this.speed, CONFIG.speed.start));
     this.current = this.course.segAt(d).world;
+    // (wherever it lands, that world's there, built at once if it must be)
+    const job = this.prepareWorld(this.current, 5, { door: false });
+    if (job) this.prep.finish(job.key);
     this.current.applyVisit(this.course.segAt(d).visit);
     this.depth = this.course.segAt(d).ordinal;
     this.dream.reset(this.course.segAt(d).dream);
@@ -1221,6 +1424,7 @@ export class Game {
     }
 
     this.course.ensure(this.dist, Math.max(this.speed, CONFIG.speed.start));
+    this.needWorld();
     this.chunks.update(this.dist);
     if (st !== 'title') {
       this.obstacles.update(this.dist, this.runTime);
@@ -1283,7 +1487,7 @@ export class Game {
     shared.uBend.value.set(CONFIG.bend, sway, read, CONFIG.bendStart);
     this.particles.update(this.dist);
     this.particles2.update(this.dist);
-    for (const w of this.worlds) w.sky.position.copy(this.cam.camera.position);
+    for (const w of this.worlds) w.sky?.position.copy(this.cam.camera.position);
     // (the planets hang in the sky round the camera, drifting nearer and
     // further: see world/planets.js)
     this.current.planets?.update(this.cam.camera, this.time);
@@ -1320,19 +1524,10 @@ export class Game {
     // (see render/caster.js)
     this.player.renderShadow(r);
     this.companion?.body.renderShadow(r);
-    // someone just arrived (see warm): their shadow's target allocated, and
-    // all of them drawn into one pixel that the clear below wipes - on the
-    // title screen only, where a long frame is never a missed jump
-    if (this.warming && this.state === 'title') {
-      const w = this.warming;
-      this.warming = null;
-      w.shadow();
-      r.setScissorTest(true);
-      r.setScissor(0, 0, 1, 1);
-      r.render(w.scene, camera);
-      r.setScissorTest(false);
-      w.done();
-    }
+    // the work done ahead of time (see prep.js), a few milliseconds of it a
+    // frame - here, before the clear below, which wipes the pixel anything
+    // being put on the GPU was drawn into
+    if (this.prep.busy) this.prep.run(this.prepBudget());
     r.clear(true, true, true);
     this.portal.depthMesh.visible = this.portal.active;
     if (this.portal.active) {
@@ -1344,83 +1539,20 @@ export class Game {
     this.warp.render(r);
   }
 
-  resize(w, h) {
-    this.cam.resize(w, h);
+  // How much of this frame the work ahead may have (ms): plenty while the
+  // title screen's up or a run's over, a sliver while running - more as a
+  // doorway whose world isn't ready yet nears (see needWorld).
+  // (And none at all for a moment as a run starts or a doorway is crossed:
+  // those frames have enough to do, and there's a whole world to come.)
+  prepBudget() {
+    const st = this.state;
+    if (st === 'title' || st === 'crashed') return PREP_IDLE;
+    if (this.urgent) return PREP_URGENT;
+    return this.time < this.prepRest ? 0 : PREP_RUNNING;
   }
 
-  // Compile every shader up front so the first doorway never hitches; while
-  // the GPU compiles, index every world's geometry (see weld in geo.js); then
-  // draw everything once, out of sight under the loading screen, so every
-  // buffer and texture is on the GPU and every program has been used before
-  // the run begins (otherwise each world uploads its geometry the first time
-  // its doorway comes into view).
-  async precompile() {
-    const scene = new THREE.Scene();
-    const roots = [];
-    for (const w of [...this.worlds, this.doors]) {
-      roots.push([w.root, w.root.parent]);
-      w.setAllVisibleForCompile(true);
-      scene.add(w.root);
-    }
-    for (const r of Object.values(this.runners)) {
-      scene.add(...r.objects);
-      r.forCompile?.(true);
-    }
-    scene.add(this.particles.points, this.particles2.points, this.sparkles.points, this.portal.depthMesh, this.portal.stencilMesh, ...this.water.objects);
-    for (const c of Object.values(this.companions)) {
-      scene.add(...c.objects);
-      c.forCompile(true);
-    }
-    this.water.forCompile(true);
-    scene.add(...this.powerFx.objects);
-    this.powerFx.forCompile(true);
-    scene.add(this.splash.mesh);
-    try {
-      const compiling = this.renderer.compileAsync ? this.renderer.compileAsync(scene, this.cam.camera) : this.renderer.compile(scene, this.cam.camera);
-      let t = performance.now();
-      for (const w of [...this.worlds, this.doors]) {
-        for (const _ of w.weldAll()) {
-          if (performance.now() - t > 12) {
-            await new Promise((r) => setTimeout(r, 0));
-            t = performance.now();
-          }
-        }
-      }
-      await compiling;
-      const r = this.renderer;
-      r.setScissorTest(true);
-      r.setScissor(0, 0, 1, 1);
-      r.render(scene, this.cam.camera);
-      r.setScissorTest(false);
-      // (and every shadow's silhouette target allocated now)
-      for (const x of Object.values(this.runners)) x.renderShadow(r);
-      for (const c of Object.values(this.companions)) c.body.renderShadow(r);
-      r.clear(true, true, true);
-    } finally {
-      for (const w of [...this.worlds, this.doors]) w.setAllVisibleForCompile(false);
-      this.water.forCompile(false);
-      this.powerFx.forCompile(false);
-      this.splash.scene.add(this.splash.mesh);
-      for (const [root, parent] of roots) {
-        root.removeFromParent();
-        if (parent) parent.add(root);
-      }
-      for (const r of Object.values(this.runners)) {
-        r.forCompile?.(false);
-        for (const o of r.objects) o.removeFromParent();
-      }
-      this.sceneMain.add(...this.player.objects, this.portal.depthMesh, this.particles.points, this.particles2.points, this.sparkles.points, ...this.water.objects, ...this.powerFx.objects);
-      for (const c of Object.values(this.companions)) {
-        c.forCompile(false);
-        for (const o of c.objects) o.removeFromParent();
-      }
-      if (this.companion) this.sceneMain.add(...this.companion.objects);
-      this.scenePortal.add(this.portal.stencilMesh);
-    }
-    // (and the splash's copy of the frame allocated now, not the instant the
-    // first one hits)
-    this.splash.warm(this.renderer);
-    this.warp.warm(this.renderer);
+  resize(w, h) {
+    this.cam.resize(w, h);
   }
 }
 
