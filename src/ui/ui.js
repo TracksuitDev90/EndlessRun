@@ -552,6 +552,7 @@ export class UI {
       const grew = this.worldsShown >= 0 && worlds > this.worldsShown;
       this.worldsShown = worlds;
       this.multEl.textContent = String(worlds);
+      this.multEl.classList.toggle('none', worlds === 0);
       this.multEl.setAttribute('aria-label', worlds === 1 ? '1 world come through' : `${worlds} worlds come through`);
       if (grew) restart(this.multEl, 'bump');
     }
@@ -664,6 +665,7 @@ export class UI {
       $('pause-gems').textContent = fmt.format(offer.gems);
       $('pause-worth').textContent = offer.gems > 0 ? ` (worth +${fmt.format(offer.bonus)})` : '';
     }
+    if (on) $('pause').classList.remove('snap');
     $('pause').classList.toggle('show', on);
     this.layers();
   }
@@ -683,8 +685,10 @@ export class UI {
       restart(el, 'show');
       timer = setTimeout(step, 400);
     };
-    let timer = 0;
-    step();
+    // (the pause card gone at once - not fading out under the count - and
+    // the first beat a breath after)
+    $('pause').classList.add('snap');
+    let timer = setTimeout(step, 120);
     return () => {
       clearTimeout(timer);
       el.classList.remove('show', 'show-b');
@@ -702,6 +706,7 @@ export class UI {
     $('crash-best').textContent = fmt.format(Math.floor(best));
     $('crash-gems').textContent = fmt.format(offer.gems);
     $('crash').classList.toggle('is-new-best', isNewBest);
+    this.bestShort(score, best, isNewBest);
     $('crash').querySelector('.sub').textContent = continuesLeft > 0 ? 'Dust off and keep going?' : 'One more go?';
     // the exchange: cash the gems in hand in for points
     const ex = $('exchange');
@@ -739,6 +744,12 @@ export class UI {
     $('crash').classList.add('show');
     $('crash').querySelector('.card').scrollTop = 0;
     this.layers();
+  }
+
+  // How far short of the best this run fell (nothing when it's a new best).
+  bestShort(score, best, isNewBest) {
+    const short = Math.floor(best) - Math.floor(score);
+    $('crash-short').textContent = !isNewBest && short > 0 ? `· ${fmt.format(short)} to beat` : '';
   }
 
   // The gems banked from the crash card: the gem count drains away into the
@@ -779,6 +790,7 @@ export class UI {
       }
       $('crash-best').textContent = fmt.format(Math.floor(best));
       if (isNewBest && !$('crash').classList.contains('is-new-best')) $('crash').classList.add('is-new-best');
+      this.bestShort(to, best, isNewBest);
     };
     this.exchangeAnim = requestAnimationFrame(tick);
   }

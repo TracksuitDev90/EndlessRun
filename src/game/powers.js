@@ -141,6 +141,7 @@ export class Powers {
       c.powerBegin?.();
     }
     this.game.ui.powerUsed(i);
+    this.game.audio.power?.();
     return true;
   }
 

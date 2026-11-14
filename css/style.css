@@ -1126,6 +1126,10 @@ body:not(.touch) .touch-only {
    ui.js), and a change of animation-name starts it from the top. The other
    way to restart one - drop the class, make the page lay itself out, put it
    back - forces a layout in the middle of a frame, once for every gem.) */
+/* (none come through yet: no badge - it turns up at the first doorway) */
+.score-mult.none {
+  display: none;
+}
 .score-mult.bump {
   animation: bump 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
@@ -1315,6 +1319,10 @@ body:not(.touch) .touch-only {
 }
 
 /* --- counting back in from the pause card --------------------------------- */
+#pause.snap,
+#pause.snap .card {
+  transition: none;
+}
 .countdown {
   position: absolute;
   left: 50%;
@@ -1492,6 +1500,10 @@ body:not(.touch) .touch-only {
 }
 .tally-row.gems b {
   font-size: 20px;
+}
+.crash-short {
+  font-size: 0.85em;
+  opacity: 0.75;
 }
 .tally-row.best b {
   font-size: 17px;

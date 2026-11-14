@@ -848,6 +848,7 @@ export class Game {
       return;
     }
     if (!soft) this.stumbleWindow = CONFIG.stumbleWindow;
+    this.audio.bump();
     this.speedMul = CONFIG.stumbleSpeedMul;
     this.player.stumble();
     this.cam.kick(0.75);
@@ -864,6 +865,7 @@ export class Game {
     this.ui.setScore(this.score, this.depth - 1, true);
     this.player.crash();
     this.companion?.crashed();
+    this.audio.crash();
     this.cam.kick(1.25);
     this.crashTimer = 1.0;
     this.crashShown = false;

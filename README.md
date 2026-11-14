@@ -875,19 +875,20 @@ rolls in slow waves:
 ### Dream depth
 
 On top of the per-world looks, every doorway takes you one world *deeper*, and
-deep enough, the worlds stop holding their shape. It comes on slowly, in three
-movements:
+deep enough, the worlds stop holding their shape. It's counted in *laps* - one
+of every world, however many worlds there are (eleven now), set in
+`CONFIG.dream` - and comes on slowly, in three movements:
 
-1. **The real worlds.** The first three worlds (about two minutes) are exactly
-   as painted.
-2. **The morph.** From the fourth, the far distance quietly starts to misbehave:
-   props far off breathe, slow swells roll through the far road, and a world
-   or two later tall things far away go soft like jelly. Easy to miss at first.
-3. **The trip.** Only from the eighth world (about four minutes in, the Gallery
-   of Hours on the first lap) does the dream start to colour things — first a stir in
-   the sky, then rings of hue, a turned palette, neon ink and finally a
-   corkscrewing road — each effect joining at its own depth and growing over
-   several worlds; everything is in by about the eighteenth.
+1. **The real worlds.** The whole first lap is exactly as painted.
+2. **The stir.** Through the second lap, only the far distance quietly starts
+   to misbehave: props far off breathe, slow swells roll through the far road -
+   just the gentlest share of each, never featured. Easy to miss, alongside each
+   world's own new light for its return.
+3. **The trip.** From the first world of the third lap the dream proper comes
+   in, effect by effect - tall things far away going soft like jelly, a stir in
+   the sky, rings of hue, a turned palette, neon ink and finally a corkscrewing
+   road - each eased in with the trip as a whole and growing for several worlds
+   after; everything is in by about the middle of the fourth lap.
 
 Each stretch of the course is dealt its own seeded *dream recipe* from whatever
 has joined by then — a few effects, more of them and stronger the deeper it
@@ -895,16 +896,18 @@ lies (once the trip has begun, always at least one of its colours) — so no two
 passes through the same world look alike. A recipe blends into the next as you
 run up to each doorway, so the world morphs around you on the approach.
 
+With eleven worlds a lap:
+
 | Distortion | Joins in world | Full by | What happens |
 |---|---|---|---|
-| breathe | 4 | 13 | props in the distance swell and settle like living things |
-| waves | 4 | 14 | slow swells roll through the far world |
-| melt | 6 | 16 | the far world wobbles like jelly, the tall things most |
-| swirl | 8 | 16 | the sky stirs like wet paint, banded in rainbow |
-| rings | 9 | 17 | rings of hue roll toward you through the world |
-| palette | 10 | 18 | the whole world turns to new hues |
-| neon | 11 | 18 | ink lines burn in cycling neon |
-| twist | 12 | 19 | the road ahead corkscrews about its own axis |
+| breathe | 12 | 30 | props in the distance swell and settle like living things |
+| waves | 14 | 32 | slow swells roll through the far world |
+| melt | 23 | 34 | the far world wobbles like jelly, the tall things most |
+| swirl | 23 | 34 | the sky stirs like wet paint, banded in rainbow |
+| rings | 25 | 36 | rings of hue roll toward you through the world |
+| palette | 26 | 37 | the whole world turns to new hues |
+| neon | 29 | 38 | ink lines burn in cycling neon |
+| twist | 31 | 41 | the road ahead corkscrews about its own axis |
 
 **The doorway burst** is there from the very first door: coming through
 bursts a ring of colour out from the centre of the screen and off its edges in
@@ -1165,6 +1168,16 @@ roadside, with the phone on its side).
 bumping a high one, makes you *stumble* (ink creeps in from the screen edges
 while you're vulnerable). A second hit within ~4.5 s, or running head-on into
 a wall, knocks you down. You get one free **Continue** per run (configurable).
+
+**The first run** opens with three lessons, one at a time with room between:
+a hurdle across the road (jump), a bar (slide) and a wall (dodge). Each cue
+comes up as its obstacle does and holds until it's behind you — a tick and a
+"Nice!" if you got it. A lesson missed is only ever a stumble that never
+counts toward a crash, and if most were missed the lessons come round again
+next run; once they're done, every later run starts straight onto the road.
+The companion's abilities are introduced the same way, a word over each
+button the first couple of times it's ready (until it's been used). Resuming
+from the pause card counts you back in, 3-2-1.
 
 **Speed** starts at 12 m/s and eases toward 28 m/s over several minutes.
 Obstacles start out roughly 3 seconds apart and close in gradually to about a
