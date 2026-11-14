@@ -351,7 +351,8 @@ export class ObstacleField {
       }
     }
     // rest before the next pattern: long at first, tightening with the run
-    let gap = tutorial ? o.tutorialGap : lerp(o.gapEasy, o.gapHard, diff) * space * r.float(o.gapJitter[0], o.gapJitter[1]);
+    // (and after the last lesson, a longer breath before the road proper)
+    let gap = tutorial ? o.tutorialGap * (this.tutorial.length ? 1 : 1.5) : lerp(o.gapEasy, o.gapHard, diff) * space * r.float(o.gapJitter[0], o.gapJitter[1]);
     if (!tutorial && --this.untilBreather <= 0) {
       gap *= o.breatherMul;
       this.untilBreather = r.int(o.breatherEvery[0], o.breatherEvery[1]);

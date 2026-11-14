@@ -48,19 +48,19 @@ const _b = new THREE.Vector3();
 
 export const POWERS = {
   fox: [
-    { id: 'haul', name: 'Fox’s Haul', icon: 'paw', blurb: `Sorrel darts between lanes snapping up nearby gems for ${P.fox.haul.dur} s, then brings you her haul.` },
-    { id: 'treasure', name: 'Buried Treasure', icon: 'dig', blurb: 'Sorrel digs up a bonus gem trail along a safe route ahead - follow it: jumps, slides, dodges and all.' },
-    { id: 'lucky', name: 'Lucky Find', icon: 'clover', blurb: `Sorrel unearths a special gem. Take it and gems you collect yourself count double for ${P.fox.lucky.dur} s.` },
+    { id: 'haul', name: 'Fox’s Haul', icon: 'paw', tip: 'Sorrel snaps up the gems around you', blurb: `Sorrel darts between lanes snapping up nearby gems for ${P.fox.haul.dur} s, then brings you her haul.` },
+    { id: 'treasure', name: 'Buried Treasure', icon: 'dig', tip: 'Sorrel digs up a trail of gems - follow it', blurb: 'Sorrel digs up a bonus gem trail along a safe route ahead - follow it: jumps, slides, dodges and all.' },
+    { id: 'lucky', name: 'Lucky Find', icon: 'clover', tip: 'Grab the gem she finds: your gems count double', blurb: `Sorrel unearths a special gem. Take it and gems you collect yourself count double for ${P.fox.lucky.dur} s.` },
   ],
   dragon: [
-    { id: 'gift', name: 'Dragon’s Gift', icon: 'wind', blurb: `Iris’s flowing mane draws nearby gems to you for ${P.dragon.gift.dur} s.` },
-    { id: 'windbreak', name: 'Windbreak', icon: 'gust', blurb: 'Iris winds up and a gust clears one approaching row of obstacles off the road.' },
-    { id: 'fold', name: 'World Fold', icon: 'portal', blurb: 'Once a run: Iris opens a portal to the start of the next world. What you skip earns nothing.' },
+    { id: 'gift', name: 'Dragon’s Gift', icon: 'wind', tip: 'Iris draws the gems around you in', blurb: `Iris’s flowing mane draws nearby gems to you for ${P.dragon.gift.dur} s.` },
+    { id: 'windbreak', name: 'Windbreak', icon: 'gust', tip: 'A gust clears the next row of obstacles', blurb: 'Iris winds up and a gust clears one approaching row of obstacles off the road.' },
+    { id: 'fold', name: 'World Fold', icon: 'portal', tip: 'Skip ahead to the next world - once a run', blurb: 'Once a run: Iris opens a portal to the start of the next world. What you skip earns nothing.' },
   ],
   pitcher: [
-    { id: 'freshen', name: 'Freshen Up', icon: 'drop', blurb: 'After a stumble: Nep splashes it away - the second-hit danger gone, back up to pace.' },
-    { id: 'roots', name: 'Root Reach', icon: 'roots', blurb: 'Nep plants his feet and his roots fetch one cluster of gems ahead, across nearby lanes.' },
-    { id: 'shield', name: 'Pitcher Protection', icon: 'shield', blurb: `Nep drenches you: ${P.pitcher.shield.dur} s that nothing can hurt you.` },
+    { id: 'freshen', name: 'Freshen Up', icon: 'drop', tip: 'Shake off that stumble before the next hit', blurb: 'After a stumble: Nep splashes it away - the second-hit danger gone, back up to pace.' },
+    { id: 'roots', name: 'Root Reach', icon: 'roots', tip: 'Nep’s roots fetch the gems up ahead', blurb: 'Nep plants his feet and his roots fetch one cluster of gems ahead, across nearby lanes.' },
+    { id: 'shield', name: 'Pitcher Protection', icon: 'shield', tip: `${P.pitcher.shield.dur} s where nothing can hurt you`, blurb: `Nep drenches you: ${P.pitcher.shield.dur} s that nothing can hurt you.` },
   ],
 };
 
@@ -141,6 +141,7 @@ export class Powers {
       c.powerBegin?.();
     }
     this.game.ui.powerUsed(i);
+    this.game.audio.power?.();
     return true;
   }
 

@@ -55,6 +55,30 @@ function freshStyles(strip) {
   link.after(next);
 }
 
+// The abilities introduced so far (see UI.powerTip): how many runs each has
+// been pointed out in, or TIP_KNOWN once it's been used. Kept in this
+// browser; without storage they're introduced once a run.
+const TIP_TIMES = 2;
+const TIP_KNOWN = 99;
+let tipMemory = null;
+function tipsSeen() {
+  if (tipMemory) return tipMemory;
+  try {
+    const v = JSON.parse(localStorage.getItem('er.tips') || '{}');
+    tipMemory = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch {
+    tipMemory = {};
+  }
+  return tipMemory;
+}
+function saveTips(v) {
+  try {
+    localStorage.setItem('er.tips', JSON.stringify(v));
+  } catch {
+    /* storage unavailable (private mode) */
+  }
+}
+
 // how many cards a page of the title screen's grid holds (three by two)
 const SLOTS = 6;
 
@@ -181,6 +205,10 @@ export class UI {
     this.powerEls = [];
     this.powerSt = {};
     this.powersAt = 0;
+    // (the one-off word on an ability the first times it's ready: see powerTip)
+    this.tipsRun = new Set();
+    this.tipUntil = 0;
+    this.tipQuietUntil = 0;
     this.menuOpen = false;
     this.bank = 0;
   }
@@ -506,8 +534,9 @@ export class UI {
   // Called every frame; only touches the DOM when a shown digit changes.
   // worlds: how many worlds you've come through (the doorway-shaped badge on
   // the end of the score pill), bumping as you come through another.
-  setScore(score, worlds) {
+  setScore(score, worlds, force = false) {
     const n = Math.floor(score);
+    if (force) this.scoreAt = 0;
     if (n !== this.scoreShown) {
       // (ticking along with the road it's redrawn twenty times a second: any
       // more is a blur, and every change is a repaint over the game; a
@@ -523,6 +552,7 @@ export class UI {
       const grew = this.worldsShown >= 0 && worlds > this.worldsShown;
       this.worldsShown = worlds;
       this.multEl.textContent = String(worlds);
+      this.multEl.classList.toggle('none', worlds === 0);
       this.multEl.setAttribute('aria-label', worlds === 1 ? '1 world come through' : `${worlds} worlds come through`);
       if (grew) restart(this.multEl, 'bump');
     }
@@ -582,6 +612,8 @@ export class UI {
     this.toastTimer = setTimeout(() => el.classList.remove('show', 'show-b'), 3600);
   }
 
+  // A tutorial cue, held until the obstacle it's about is behind the runner
+  // (hintEnd), or a few seconds at most.
   hint(kind) {
     const h = HINTS[kind];
     if (!h) return;
@@ -590,9 +622,32 @@ export class UI {
     const icon = el.querySelector('.hint-icon');
     icon.className = `hint-icon dir-${kind}`;
     icon.innerHTML = `<span>${kind === 'up' ? '↑' : kind === 'down' ? '↓' : '↔'}</span>`;
+    el.classList.remove('done', 'ok');
     restart(el, 'show');
     clearTimeout(this.hintTimer);
-    this.hintTimer = setTimeout(() => el.classList.remove('show', 'show-b'), 2200);
+    this.hintTimer = setTimeout(() => this.hintEnd(false), 6000);
+  }
+
+  // The cue's obstacle is behind the runner: cleared (ok - a tick and a
+  // word of praise before it goes) or not (it just goes).
+  hintEnd(ok) {
+    const el = $('hint');
+    clearTimeout(this.hintTimer);
+    if (!el.classList.contains('show') && !el.classList.contains('show-b')) return;
+    if (ok) {
+      el.classList.add('ok');
+      el.querySelector('.hint-text').textContent = 'Nice!';
+      el.querySelector('.hint-icon').innerHTML = '<span>✓</span>';
+    }
+    el.classList.remove('show', 'show-b');
+    el.classList.add('done');
+  }
+
+  // (gone at once: a new run, or back to the title)
+  hideHint() {
+    const el = $('hint');
+    clearTimeout(this.hintTimer);
+    el.classList.remove('show', 'show-b', 'done', 'ok');
   }
 
   setInk(v) {
@@ -610,12 +665,40 @@ export class UI {
       $('pause-gems').textContent = fmt.format(offer.gems);
       $('pause-worth').textContent = offer.gems > 0 ? ` (worth +${fmt.format(offer.bonus)})` : '';
     }
+    if (on) $('pause').classList.remove('snap');
     $('pause').classList.toggle('show', on);
     this.layers();
   }
 
+  // The count back into a run from the pause card: 3, 2, 1 over the still
+  // picture, then done(). Returns a function that calls it off.
+  countdown(done) {
+    const el = $('countdown');
+    let n = 3;
+    const step = () => {
+      if (n === 0) {
+        el.classList.remove('show', 'show-b');
+        done();
+        return;
+      }
+      el.textContent = String(n--);
+      restart(el, 'show');
+      timer = setTimeout(step, 400);
+    };
+    // (the pause card gone at once - not fading out under the count - and
+    // the first beat a breath after)
+    $('pause').classList.add('snap');
+    let timer = setTimeout(step, 120);
+    return () => {
+      clearTimeout(timer);
+      el.classList.remove('show', 'show-b');
+    };
+  }
+
   showCrash(continuesLeft, score, best, isNewBest, offer = { gems: 0, bonus: 0, haul: 1 }) {
     cancelAnimationFrame(this.exchangeAnim);
+    this.hidePowerTip();
+    this.hintEnd(false);
     const btn = $('btn-continue');
     btn.style.display = continuesLeft > 0 ? '' : 'none';
     $('continue-count').textContent = continuesLeft === 1 ? '1 left' : `${continuesLeft} left`;
@@ -623,6 +706,7 @@ export class UI {
     $('crash-best').textContent = fmt.format(Math.floor(best));
     $('crash-gems').textContent = fmt.format(offer.gems);
     $('crash').classList.toggle('is-new-best', isNewBest);
+    this.bestShort(score, best, isNewBest);
     $('crash').querySelector('.sub').textContent = continuesLeft > 0 ? 'Dust off and keep going?' : 'One more go?';
     // the exchange: cash the gems in hand in for points
     const ex = $('exchange');
@@ -633,7 +717,24 @@ export class UI {
     xb.querySelector('.ex-label').innerHTML = `Exchange <b>${fmt.format(offer.gems)}</b> ${offer.gems === 1 ? 'gem' : 'gems'}`;
     $('exchange-pts').textContent = fmt.format(offer.bonus);
     const haul = Math.round(offer.haul * 100) / 100;
-    $('exchange-note').textContent = (haul >= 1.05 ? `×${haul} haul bonus · ` : '') + 'cash them in for points, or bank them to bring your companion on';
+    // (what each choice gets you, in so many words: points on this run's
+    // score now, or gems kept toward whoever ran with you's next ability)
+    const v = this.progressV;
+    const pal = v?.pals.find((p) => p.id === v.current);
+    const next = pal?.powers[pal.level];
+    const after = this.bank + offer.gems;
+    const note = $('exchange-note');
+    note.textContent = '';
+    const line = (label, text) => {
+      const sp = document.createElement('span');
+      sp.className = 'ex-line';
+      sp.innerHTML = '<b></b> ';
+      sp.querySelector('b').textContent = label;
+      sp.append(text);
+      note.appendChild(sp);
+    };
+    line('Exchange:', `+${fmt.format(offer.bonus)} points now` + (haul >= 1.05 ? ` (×${haul} haul bonus)` : ''));
+    line('Bank:', next ? `saved toward ${next.name} · ${fmt.format(Math.min(after, pal.price))}/${fmt.format(pal.price)}` : 'saved to spend on companions');
     // ...or bank them (one or the other: never both)
     const bb = $('btn-bank');
     bb.disabled = false;
@@ -643,6 +744,12 @@ export class UI {
     $('crash').classList.add('show');
     $('crash').querySelector('.card').scrollTop = 0;
     this.layers();
+  }
+
+  // How far short of the best this run fell (nothing when it's a new best).
+  bestShort(score, best, isNewBest) {
+    const short = Math.floor(best) - Math.floor(score);
+    $('crash-short').textContent = !isNewBest && short > 0 ? `· ${fmt.format(short)} to beat` : '';
   }
 
   // The gems banked from the crash card: the gem count drains away into the
@@ -683,6 +790,7 @@ export class UI {
       }
       $('crash-best').textContent = fmt.format(Math.floor(best));
       if (isNewBest && !$('crash').classList.contains('is-new-best')) $('crash').classList.add('is-new-best');
+      this.bestShort(to, best, isNewBest);
     };
     this.exchangeAnim = requestAnimationFrame(tick);
   }
@@ -742,6 +850,8 @@ export class UI {
       const st = powers.status(P.def, P.st);
       const was = P.shown;
       const cls = st.on ? 'on' : st.used ? 'used' : st.cd > 0 ? 'cool' : st.ready ? 'ready' : st.why === 'busy' ? 'busy' : 'idle';
+      // (not over the world's name card at the start, nor over a lesson)
+      if (cls === 'ready' && game.tutorialDone && game.state === 'running' && game.runTime > 6) this.powerTip(P, now);
       if (cls !== was.cls) {
         // (it's ready again: a little bounce to say so)
         if (cls === 'ready' && (was.cls === 'cool' || was.cls === 'on')) restart(P.b, 'ping');
@@ -782,7 +892,57 @@ export class UI {
   // An ability's button pressed and taken.
   powerUsed(i) {
     const P = this.powerEls[i];
-    if (P) restart(P.b, 'fire');
+    if (!P) return;
+    restart(P.b, 'fire');
+    // (used: it needs no more introducing)
+    const seen = tipsSeen();
+    if (seen[P.def.id] !== TIP_KNOWN) {
+      seen[P.def.id] = TIP_KNOWN;
+      saveTips(seen);
+    }
+    if (this.tipFor === P) this.hidePowerTip();
+  }
+
+  // The first few times an ability is ready in a run (and never once it's
+  // been used), a word over the buttons on what it does, the button
+  // glowing - one at a time, a breath between them, each once a run.
+  powerTip(P, now) {
+    const id = P.def.id;
+    if (this.tipFor || now < this.tipQuietUntil || this.tipsRun.has(id) || !P.def.tip) return;
+    const seen = tipsSeen();
+    if ((seen[id] || 0) >= TIP_TIMES) return;
+    seen[id] = (seen[id] || 0) + 1;
+    saveTips(seen);
+    this.tipsRun.add(id);
+    this.tipFor = P;
+    const el = $('power-tip');
+    el.querySelector('b').textContent = P.def.name;
+    el.querySelector('.pt-how').textContent = this.coarse ? 'tap it' : `press ${this.powerEls.indexOf(P) + 1}`;
+    el.querySelector('.pt-what').textContent = P.def.tip;
+    // (its pointer under the button it's about)
+    const r = P.b.getBoundingClientRect();
+    el.style.setProperty('--px', `${Math.max(18, window.innerWidth - (r.left + r.width / 2))}px`);
+    el.classList.add('show');
+    P.b.classList.add('tipped');
+    clearTimeout(this.tipTimer);
+    this.tipTimer = setTimeout(() => this.hidePowerTip(), 5200);
+  }
+
+  hidePowerTip() {
+    clearTimeout(this.tipTimer);
+    if (!this.tipFor) return;
+    this.tipFor.b.classList.remove('tipped');
+    this.tipFor = null;
+    this.tipQuietUntil = performance.now() + 7000;
+    $('power-tip').classList.remove('show');
+  }
+
+  // A new run: every ability can be introduced again (as far as it still
+  // needs to be).
+  resetPowerTips() {
+    this.hidePowerTip();
+    this.tipsRun.clear();
+    this.tipQuietUntil = 0;
   }
 
   // A word over the buttons (Sorrel's haul, ×2 gems...).
@@ -836,8 +996,10 @@ export class UI {
       $('up-face').src = pal.face;
       const next = pal.powers[pal.level];
       $('up-who').textContent = `${pal.name} · level ${pal.level}`;
-      $('up-next').innerHTML = next ? `next: <b></b>` : 'every ability unlocked';
+      const short = next ? Math.max(0, pal.price - v.bank) : 0;
+      $('up-next').innerHTML = next ? `next: <b></b>` + (short > 0 ? `<small class="up-short"></small>` : '') : 'every ability unlocked';
       if (next) $('up-next').querySelector('b').textContent = next.name;
+      if (short > 0) $('up-next').querySelector('.up-short').textContent = `${fmt.format(short)} more gems`;
       const buy = $('btn-buy');
       buy.hidden = !next;
       buy.dataset.id = pal.id;

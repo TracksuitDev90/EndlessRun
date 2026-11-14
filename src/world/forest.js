@@ -1053,7 +1053,7 @@ export default {
   build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 6);
     b.toon('floor', groundStrip(420, 16, C.floor, 8, { y: -0.03, mark: 0.45 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
-    b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 760, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
+    b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 860, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
     b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a', seeds: true })), { cap: 400, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
     b.toon('grassTuft', merge(grassParts({ n: 8, h: [0.2, 0.42], spread: 0.22, w: 0.035, seed: 8 })), { cap: 420, ink: 0, anim: 'popLate', wobble: [0.12, 0, 1.9, 0] });
     // a short, thick clump right along the path's edge, softening it
@@ -1065,7 +1065,7 @@ export default {
     b.toon('mossHang', merge(mossHangParts({ seed: 6 })), { cap: 200, anim: 'pop', ink: 0, wobble: [0.012, 0, 0.9, 0] });
     // fireflies: each a bright core and a soft halo, wandering and
     // flashing as one (see FIREFLY)
-    b.glow('firefly', { cap: 520, anim: 'pop', firefly: [0.7, 0.35, 0.32, 0.06] });
+    b.glow('firefly', { cap: 960, anim: 'pop', firefly: [0.7, 0.35, 0.32, 0.06] });
     b.toon('fern', merge(fernParts({ n: 9, len: 1.1, seed: 5 })), { cap: 160, anim: 'pop', wobble: [0.04, 0, 1.3, 0], ink: 0 });
     b.toon('flowers', merge(flowerPatchParts({ seed: 6 })), { cap: 120, anim: 'pop', marks: [2, 2], wobble: [0.08, 0, 1.6, 0], ink: 0 });
     b.toon('trunk', merge(trunkParts({ r: 1, h: 32, seed: 2 })), { cap: 170, anim: 'pop', marks: [1, 1], ink: 0.06, bark: true });
@@ -1104,7 +1104,7 @@ export default {
     b.beam('shaft', merge(shaftParts({ len: SHAFT_LEN, r0: 0.7, r1: 1.8, dir: SHAFT })), { cap: 40, anim: 'pop' });
     b.pool('sunspot', { cap: 40, anim: 'pop' });
     // later laps
-    b.toon('spirit', merge(spiritParts()), { cap: 90, anim: 'pop', wobble: [0.55, 0, 2.4, 0], ink: 0.02 });
+    b.toon('spirit', merge(spiritParts()), { cap: 112, anim: 'pop', wobble: [0.55, 0, 2.4, 0], ink: 0.02 });
     b.toon('toadstool', merge(giantToadstoolParts({ h: 7, capR: 3 })), { cap: 50, anim: 'popEarly', wobble: [0.0015, 0, 0.8, 0], marks: [1.5, 1.5] });
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', fly: [0, 0, 1.6, 0.22], wobble: [0.05, 0.4, 1.1, 0], ink: 0.02 });
 

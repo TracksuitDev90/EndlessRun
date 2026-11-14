@@ -49,7 +49,17 @@ const MODES = [
   ['neon', 0.9, 1.0, 0.7, true],
   ['twist', 0.6, 0.7, 1.0, true],
 ];
-const when = (name) => CONFIG.dream.schedule[name];
+// CONFIG.dream counts in laps; the course says how long a lap is (one world
+// of each kind), and these turn a lap count into the ordinal of a world.
+let LAP = 11;
+export function setLapLength(n) {
+  LAP = Math.max(1, n | 0);
+}
+const ord = (laps) => 1 + Math.round(laps * LAP);
+const MORPH = () => ord(CONFIG.dream.morphFrom);
+const TRIP = () => ord(CONFIG.dream.tripFrom);
+const FULL = () => ord(CONFIG.dream.full);
+const when = (name) => CONFIG.dream.schedule[name].map(ord);
 
 const KEYS = ['twist', 'waves', 'melt', 'breathe', 'rings', 'swirl', 'neon', 'hue', 'sat', 'trip'];
 
@@ -69,21 +79,21 @@ function ramp(ordinal, from, full) {
 // Overall depth of the n-th world (1 = the first): 0 through the real worlds,
 // 1 once everything has come in.
 export function dreamLevel(ordinal) {
-  return ramp(ordinal, CONFIG.dream.morphFrom, CONFIG.dream.full);
+  return ramp(ordinal, MORPH(), FULL());
 }
 
 // How far the colour trip has got (drives the doorway bloom's rainbow and the
 // camera's sway).
 function tripLevel(ordinal) {
-  return ramp(ordinal, CONFIG.dream.tripFrom, CONFIG.dream.full);
+  return ramp(ordinal, TRIP(), FULL());
 }
 
 // forced (?dream=n): deal every world the dream of the n-th world.
 export function makeDream(rng, ordinal, forced) {
   let o = forced ?? ordinal;
-  if (forced === undefined && o > CONFIG.dream.tripFrom + 1 && rng.chance(CONFIG.dream.lucidChance)) {
+  if (forced === undefined && o > TRIP() + 1 && rng.chance(CONFIG.dream.lucidChance)) {
     // lucid: as calm as a world several doors shallower
-    o = Math.max(CONFIG.dream.morphFrom, o - rng.int(4, 6));
+    o = Math.max(MORPH(), o - rng.int(4, 6));
   }
   const r = blank(dreamLevel(o));
   r.trip = tripLevel(o);
@@ -94,6 +104,9 @@ export function makeDream(rng, ordinal, forced) {
   for (const [name, amount] of open) {
     if (name === 'breathe' || name === 'waves') r[name] = 0.3 * amount * grown(name);
   }
+  // (and before the trip - all of the second lap - that's all there is: the
+  // far distance stirring, nothing featured)
+  if (r.trip <= 0) return r;
   // ...then a seeded handful features strongly, more of them the deeper it is
   // (once the trip has begun, always at least one of its colours)
   const n = Math.min(5, open.length, 1 + Math.floor(r.level * 4));
@@ -104,7 +117,10 @@ export function makeDream(rng, ordinal, forced) {
     const m = rng.weighted(from.map((e) => [e, e[3]]));
     pool.splice(pool.indexOf(m), 1);
     const [name, amount, cap] = m;
-    const k = amount * grown(name) * rng.float(0.75, 1.2);
+    // (eased in with the trip itself, so what's featured early in the third
+    // lap - an effect that's already been stirring for a lap - comes on by
+    // degrees rather than all at once)
+    const k = amount * grown(name) * rng.float(0.75, 1.2) * (0.4 + 0.6 * Math.min(1, r.trip / 0.5));
     if (name === 'palette') {
       r.hue = rng.sign() * rng.float(0.7, 2.6) * Math.min(1, k);
       r.sat = 0.18 * Math.min(1, k);

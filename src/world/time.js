@@ -1337,7 +1337,7 @@ export default {
 
     b.ground('ground', sandStrip(), 10, { dunes: true });
     b.toon('sandThread', threadGeo(), { cap: 64, ink: 0, thread: [11.3, 0.07] });
-    b.toon('bay', bayGeo(), { cap: 72, anim: 'rise', ink: 0.05 });
+    b.toon('bay', bayGeo(), { cap: 84, anim: 'rise', ink: 0.05 });
     b.toon('bracket', merge([part(P.box(0.9, 0.9, 1.6), C.ivoryLo, { y: 0.45 }), part(P.cyl(0.6, 0.7, 0.3, 12), C.brass, { y: 1.0 })]), { cap: 24, anim: 'pop', ink: 0.04 });
     b.toon('wallClock', merge(dialParts({ r: 2.6, depth: 0.4 })), { cap: 24, anim: 'pop', ink: 0.05 });
     hands('hands', [2.1, 0.14, 0.32], [1.4, 0.19, 0.4], { cap: 24, anim: 'pop' });
@@ -1413,7 +1413,7 @@ export default {
       b.toon(`highChute${k}`, highChuteGeo(s), { cap: 10, anim: 'popEarly', ink: 0.035 });
     }
     b.toon('chuteFall', sandfallGeo(), { cap: 30, anim: 'popEarly', ink: 0, sandfall: true });
-    b.toon('highRail', highRailGeo(), { cap: 90, anim: 'popEarly', ink: 0.03 });
+    b.toon('highRail', highRailGeo(), { cap: 170, anim: 'popEarly', ink: 0.03 });
     b.toon('highBridge', highBridgeGeo(), { cap: 4, anim: 'popEarly', ink: 0.04 });
     b.toon('highBridgeFace', highBridgeFaceGeo(), { cap: 8, anim: 'popEarly', ink: 0.035 });
     DECKS.forEach((h, i) => {

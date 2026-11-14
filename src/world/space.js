@@ -862,8 +862,8 @@ export default {
     for (let v = 0; v < 3; v++) b.toon(`moonlet${v}`, moonletGeo(v), { cap: 12, anim: 'liftFar', ink: 0.05, turn: [0, 0, 0, 0.06], fly: [0, 0, 7, 0.05] });
     b.toon('ufoFar', merge(ufoParts()), { cap: 16, anim: 'lift', ink: 0.03, turn: [0, 0, 0, 1.6], fly: [0, 0, 6, 0.32] });
     b.toon('astronaut', astronautGeo(), { cap: 16, anim: 'lift', ink: 0.03, tumble: [0.25, 0.4, 0.6], fly: [0, 0, 1.5, 0.15] });
-    b.glow('glow', { cap: 120, anim: 'pop' });
-    b.pool('pool', { cap: 60, anim: 'pop' });
+    b.glow('glow', { cap: 156, anim: 'pop' });
+    b.pool('pool', { cap: 84, anim: 'pop' });
     b.shadow('shadow', { cap: 140, anim: 'pop' });
 
     // obstacles

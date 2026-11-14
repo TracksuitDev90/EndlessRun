@@ -426,6 +426,9 @@ export class Ambient {
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
     g.connect(this.bus);
     for (const [mul, amp] of [[1, 1], [2.76, 0.22], [5.4, 0.08]]) {
+      // (a partial past what the device can play is left out, not clamped
+      // to a whine at the top of its range: a crown at the top of a run)
+      if (f * mul > ctx.sampleRate * 0.45) continue;
       const o = ctx.createOscillator();
       o.type = 'sine';
       o.frequency.value = f * mul;
@@ -447,6 +450,80 @@ export class Ambient {
     const m = GEM_NOTES[Math.min(step, GEM_NOTES.length - 1)];
     this.ting(hz(m), t, crown ? 0.07 : 0.05);
     if (crown) this.ting(hz(m + 12), t + 0.06, 0.035);
+  }
+
+  // A stumble: a soft, papery thud - a low knock with a scuff of noise on
+  // it - and a little wobble of a note dropping, enough to know you were hit
+  // without drowning the road.
+  bump() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    this.knock(t, 0.3, 140, 52);
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(hz(69), t + 0.03);
+    o.frequency.exponentialRampToValueAtTime(hz(62), t + 0.22);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g).connect(this.bus);
+    o.start(t + 0.03);
+    o.stop(t + 0.32);
+    setTimeout(() => g.disconnect(), 600);
+  }
+
+  // Down for good (until a continue): a heavier knock, then two soft notes
+  // falling away.
+  crash() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    this.knock(t, 0.45, 120, 38);
+    this.knock(t + 0.16, 0.18, 170, 60);
+    [74, 69].forEach((m, i) => this.chime(hz(m), t + 0.32 + i * 0.2, 0.045));
+  }
+
+  // A thump: noise through a falling lowpass, and a sine dropping under it.
+  knock(t, vol, f0, f1) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise();
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1800, t);
+    lp.frequency.exponentialRampToValueAtTime(240, t + 0.12);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(vol * 0.55, t + 0.006);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    src.connect(lp).connect(ng).connect(this.bus);
+    src.start(t);
+    src.stop(t + 0.2);
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + 0.18);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    o.connect(og).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.26);
+    setTimeout(() => {
+      ng.disconnect();
+      og.disconnect();
+    }, 700);
+  }
+
+  // A companion's ability taken: a quick glassy flourish up.
+  power() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    [78, 83, 90].forEach((m, i) => this.ting(hz(m), t + i * 0.045, 0.035));
   }
 
   // A whole run taken: a quick sparkle of notes on top.

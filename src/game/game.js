@@ -287,6 +287,10 @@ export class Game {
       this.announceWorld(this.course.segAt(0));
     }
     this.ui.setInk(0);
+    this.lesson = null;
+    this.lessonsMissed = 0;
+    this.ui.hideHint();
+    this.ui.resetPowerTips();
   }
 
   start() {
@@ -644,6 +648,7 @@ export class Game {
     this.gemWorth = 0;
     this.saveBest();
     this.ui.setGems(0);
+    this.ui.setScore(this.score, this.depth - 1, true);
     this.ui.exchanged(offer, from, this.score, this.best, this.score > this.bestBefore);
     this.audio.exchange(offer.gems);
   }
@@ -775,6 +780,18 @@ export class Game {
       const frontal = first && prevFront <= o.d + 0.05;
       const glancing = dx > 0.62;
       o.group.hit = true;
+      // a tutorial lesson missed: a stumble to feel, never one toward a crash,
+      // and the runner let through the rest of it
+      if (o.group.hint && !this.tutorialDone) {
+        o.grace = this.time + this.passTime(o) + 0.12;
+        if (frontal && o.kind === 'L') {
+          p.vy = 5.2;
+          p.grounded = false;
+        } else if (o.kind === 'H') p.slideT = Math.max(p.slideT, 0.35);
+        else p.nudgeAwayFrom(o.x);
+        this.stumble(true);
+        return;
+      }
       // dropping into water from a mistimed jump trips you just like running in
       if ((frontal || o.wade) && !glancing) {
         if (o.kind === 'W' && !o.soft) {
@@ -823,12 +840,15 @@ export class Game {
     this.player.scramble(o.pit ? o.next : o.y1);
   }
 
-  stumble() {
-    if (this.stumbleWindow > 0) {
+  // soft: a tutorial lesson missed - felt, but it neither ends the run nor
+  // leaves the next hit to end it
+  stumble(soft = false) {
+    if (this.stumbleWindow > 0 && !soft) {
       this.crash();
       return;
     }
-    this.stumbleWindow = CONFIG.stumbleWindow;
+    if (!soft) this.stumbleWindow = CONFIG.stumbleWindow;
+    this.audio.bump();
     this.speedMul = CONFIG.stumbleSpeedMul;
     this.player.stumble();
     this.cam.kick(0.75);
@@ -841,8 +861,11 @@ export class Game {
     this.powers.crashed();
     this.state = 'crashed';
     this.saveBest();
+    // (the score behind the card says what the card does)
+    this.ui.setScore(this.score, this.depth - 1, true);
     this.player.crash();
     this.companion?.crashed();
+    this.audio.crash();
     this.cam.kick(1.25);
     this.crashTimer = 1.0;
     this.crashShown = false;
@@ -1125,6 +1148,33 @@ export class Game {
     if (b) this.teleport(b.d - before);
   }
 
+  // --- the tutorial -------------------------------------------------------------
+  // The first run (until it's been finished once) opens with three lessons,
+  // one at a time with room between them: a hurdle across the road to jump, a
+  // bar to slide under, a wall to dodge (see TUTORIAL in obstacles.js). Each
+  // one's cue holds until the obstacle's behind you, and a lesson missed is
+  // only ever a stumble - it never counts toward a crash (see collide).
+  updateLesson() {
+    const L = this.lesson;
+    if (L && (L.dead || L.d + L.len < this.dist - CONFIG.player.halfDepth)) {
+      this.lesson = null;
+      this.ui.hintEnd(!L.hit);
+      if (L.hit) this.lessonsMissed = (this.lessonsMissed || 0) + 1;
+      // (missed most of them? they come round again next run)
+      if (L.hint === 'side' && this.lessonsMissed < 2) {
+        this.tutorialDone = true;
+        writeFlag('er.tutorialDone');
+      }
+    }
+    if (this.lesson) return;
+    const g = this.obstacles.nextHint(this.dist, this.speed * 1.9 + 6);
+    if (g) {
+      g.hinted = true;
+      this.lesson = g;
+      this.ui.hint(g.hint);
+    }
+  }
+
   // --- frame ------------------------------------------------------------------
   update(dt) {
     if (this.state === 'paused') return;
@@ -1252,18 +1302,10 @@ export class Game {
     if (this.next) this.next.cull(camDist, twisting);
     this.doors.cull(camDist, twisting);
 
-    // tutorial hints
-    if (st === 'running' && !this.tutorialDone) {
-      const g = this.obstacles.nextHint(this.dist, this.speed * 1.9 + 6);
-      if (g) {
-        g.hinted = true;
-        this.ui.hint(g.hint);
-        if (g.hint === 'side') {
-          this.tutorialDone = true;
-          writeFlag('er.tutorialDone');
-        }
-      }
-    }
+    // tutorial hints: each comes up as its obstacle does and holds until
+    // it's behind the runner (with a word of praise if they got it); the
+    // tutorial is over once the last of them is
+    if (st === 'running' && !this.tutorialDone) this.updateLesson();
     this.ui.setInk(this.stumbleWindow / CONFIG.stumbleWindow);
     if (st !== 'title') this.ui.updatePowers(this.powers, this);
     this.ui.setDouble(this.powers.doubleT > 0, this.powers.doubleT);

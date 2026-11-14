@@ -150,7 +150,29 @@ async function boot() {
   resize();
 
   // --- controls ---------------------------------------------------------------
-  const togglePause = () => (game.state === 'paused' ? game.resume() : game.pause());
+  // Resuming counts in - three quick beats with the picture still - so
+  // nobody's dropped back into a run mid-stride a step from a wall (after a
+  // call, say). Pausing again, or leaving the tab, calls it off and the card
+  // comes back.
+  let counting = null;
+  const resumeSoon = () => {
+    if (game.state !== 'paused' || counting) return;
+    ui.showPause(false);
+    counting = ui.countdown(() => {
+      counting = null;
+      game.resume();
+    });
+  };
+  const holdPause = () => {
+    if (counting) {
+      counting();
+      counting = null;
+      ui.showPause(true, game.score, game.exchangeOffer());
+      return;
+    }
+    game.pause();
+  };
+  const togglePause = () => (game.state === 'paused' && !counting ? resumeSoon() : holdPause());
   // (someone tapped before their model had arrived steps in when it does -
   // while you're still choosing: see "the rest of the cast", below. late:
   // everyone still to arrive, by id; fetchLater: go and get one of them)
@@ -228,9 +250,11 @@ async function boot() {
   window.addEventListener('keydown', unlockAudio);
 
   ui.setSound(audio.muted);
-  ui.on('pause', () => game.pause());
-  ui.on('resume', () => game.resume());
+  ui.on('pause', holdPause);
+  ui.on('resume', resumeSoon);
   ui.on('restart', () => {
+    counting?.();
+    counting = null;
     ui.showPause(false);
     audio.resume();
     game.restart();
@@ -283,7 +307,7 @@ async function boot() {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      game.pause();
+      holdPause();
       audio.suspend();
     }
     // the first frame back is not a late one
