@@ -1325,7 +1325,7 @@ export default {
     { env: { trip: [0.1, 0.3, 0.12] } },
   ],
 
-  build(b) {
+  *build(b) {
     // every hand turns at its own pace, either way round, and wonkier the
     // further you run (wonky: see WONKY in the shaders)
     // (a clock's two hands are one batch: the minute hand, then the hour hand
@@ -1336,86 +1336,146 @@ export default {
     const HG = (z, period) => [period, HG_WAIST, z, HG_WAIST - HG_FLOOR];
 
     b.ground('ground', sandStrip(), 10, { dunes: true });
+    yield;
     b.toon('sandThread', threadGeo(), { cap: 64, ink: 0, thread: [11.3, 0.07] });
+    yield;
     b.toon('bay', bayGeo(), { cap: 84, anim: 'rise', ink: 0.05 });
+    yield;
     b.toon('bracket', merge([part(P.box(0.9, 0.9, 1.6), C.ivoryLo, { y: 0.45 }), part(P.cyl(0.6, 0.7, 0.3, 12), C.brass, { y: 1.0 })]), { cap: 24, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('wallClock', merge(dialParts({ r: 2.6, depth: 0.4 })), { cap: 24, anim: 'pop', ink: 0.05 });
+    yield;
     hands('hands', [2.1, 0.14, 0.32], [1.4, 0.19, 0.4], { cap: 24, anim: 'pop' });
     b.toon('grandfather', merge(grandfatherParts(true)), { cap: 40, anim: 'pop', ink: 0.045 });
+    yield;
     hands('gfHands', [0.3, 0.03, 0.03], [0.2, 0.04, 0.05], { cap: 64, anim: 'pop', ink: 0.015 });
     b.toon('pendulum', merge(bigPendulumParts(6.2)), { cap: 20, anim: 'pop', ink: 0.04, turn: [0, 0.28, 1.4, 0] });
+    yield;
     b.toon('armillary', merge(armillaryStandParts()), { cap: 24, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('armillaryRings', merge(armillaryRingParts()), { cap: 24, anim: 'pop', ink: 0.025, turn: [0.35, 0, 0, 0.22] });
+    yield;
     b.toon('pedestal', merge(pedestalParts()), { cap: 24, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('hourglassSmall', merge(hourglassParts()), { cap: 24, anim: 'pop', ink: 0.03, sand: HG(0, 7) });
+    yield;
     b.glass('hourglassSmallGlass', merge(hourglassGlassParts()), { cap: 24, anim: 'pop', sand: HG(0, 7) });
+    yield;
     b.toon('cloud', merge(cloudParts({ r: 3, lo: '#e2e8f4', hi: '#ffffff' })), { cap: 140, anim: 'lift', wobble: [0, 0.5, 0.3, 0], ink: 0.04 });
+    yield;
     b.toon('skyDial', merge(dialParts({ r: 3.2, depth: 0.4 })), { cap: 40, ink: 0.05, ...SKY });
+    yield;
     hands('skyHands', [2.3, 0.16, 0.3], [1.6, 0.2, 0.36], { cap: 40, ...SKY });
     b.toon('skyHourglass', merge(hourglassParts()), { cap: 16, ink: 0.04, sand: HG(0, 9), ...SKY });
+    yield;
     b.glass('skyHourglassGlass', merge(hourglassGlassParts()), { cap: 16, sand: HG(0, 9), ...SKY });
+    yield;
     b.toon('watch', merge(watchParts()), { cap: 24, ink: 0.04, ...WATCH });
+    yield;
     hands('watchHands', [0.8, 0.07, 0.27], [0.55, 0.09, 0.31], { cap: 24, ...WATCH });
     b.glow('glow', { cap: 40, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    yield;
 
     b.toon('fallenHand', fallenHandGeo(2.1, 0.12, 1), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('dialSection', dialSectionGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('fallenMinute', fallenHandGeo(8.8, 0.18, 2), { cap: 10, anim: 'popEarly', ink: 0.045 });
+    yield;
     b.toon('crossbar', crossbarGeo(0.95), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('crossbarBobs', crossbarBobs(0.95).translate(0, CONFIG.duckLine + 1.35, 0), { cap: 24, anim: 'popEarly', ink: 0.035 });
+    yield;
     b.toon('crossbarWide', crossbarGeo(4.15), { cap: 10, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('crossbarWideBobs', crossbarBobs(4.15).translate(0, CONFIG.duckLine + 1.35, 0), { cap: 10, anim: 'popEarly', ink: 0.035 });
+    yield;
     b.toon('clockW', merge(grandfatherParts(true)).translate(0, 0, -0.35), { cap: 24, anim: 'popEarly', ink: 0.045 });
+    yield;
     b.toon('hourglass', hourglassGeo(), { cap: 24, anim: 'popEarly', ink: 0.04, sand: HG(-0.8, 6) });
+    yield;
     b.glass('hourglassGlass', hourglassGlassGeo(), { cap: 24, anim: 'popEarly', sand: HG(-0.8, 6) });
+    yield;
     b.toon('weight', weightGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
 
     // the sand pouring in off the architecture, and the dunes it has
     // drifted into out past the colonnade
     b.toon('sandfall', sandfallGeo(), { cap: 220, anim: 'pop', ink: 0, sandfall: true });
+    yield;
     b.toon('sandHeap', sandHeapGeo(), { cap: 90, anim: 'pop', ink: 0.02 });
+    yield;
     b.toon('dune', duneGeo(3), { cap: 60, anim: 'liftFar', ink: 0.02 });
+    yield;
     b.toon('duneB', duneGeo(11), { cap: 60, anim: 'liftFar', ink: 0.02 });
+    yield;
     // clockwork laid bare: an open movement in the bays, its train of
     // wheels meshing (each wheel its own batch, turning at the ratio of its
     // teeth: see MESH), its anchor rocking over the scape wheel; and the
     // great wheels standing in the dunes
     b.toon('movement', movementFrameGeo(), { cap: 16, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('trainWheel', merge(gearParts({ r: MESH.r[0], teeth: MESH.t[0], t: 0.22 })), { cap: 16, anim: 'pop', ink: 0.035, turn: [MESH.w, 0, 0, 0] });
+    yield;
     b.toon('trainPinion', merge(gearParts({ r: MESH.r[1], teeth: MESH.t[1], t: 0.26, spokes: 3, color: C.brassLo, hi: C.brass })), { cap: 16, anim: 'pop', ink: 0.035, turn: [(-MESH.w * MESH.t[0]) / MESH.t[1], 0, 0, 0] });
+    yield;
     b.toon('scape', scapeGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0.5, 0, 0, 0] });
+    yield;
     b.toon('anchor', anchorGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.22, 2.6, 0] });
+    yield;
     // the works out past the colonnade (see WORKS): the train of wheels and
     // pinions, the great wheels on the pinions' arbors, their pillars, and
     // the sand banked up through it all
     const { wheel: WH, pinion: PN, great: GR } = WORKS;
     b.toon('worksWheel', worksGearGeo({ r: WH.r, teeth: WH.t, t: 0.6, spokes: 6, hole: 0.12 }), { cap: 40, anim: 'lift', ink: 0.05, turn: [WORKS.w, 0, 0, 0] });
+    yield;
     b.toon('worksPinion', worksGearGeo({ r: PN.r, teeth: PN.t, t: 0.7, spokes: 4, color: C.brassLo, hi: C.brass }), { cap: 40, anim: 'lift', ink: 0.05, turn: [WORKS.wp, 0, 0, 0] });
+    yield;
     b.toon('worksGreat', merge(gearParts({ r: GR.r, teeth: GR.t, t: 0.8, spokes: 8, hole: 0.1 })), { cap: 40, anim: 'lift', ink: 0.05, turn: [WORKS.wp, 0, 0, 0] });
+    yield;
     b.toon('worksArbor', worksArborGeo(), { cap: 40, anim: 'lift', ink: 0.04 });
+    yield;
     b.toon('worksPost', worksPostGeo(), { cap: 120, anim: 'lift', ink: 0.04 });
+    yield;
     b.toon('worksBearing', worksBearingGeo(), { cap: 120, anim: 'lift', ink: 0.04 });
+    yield;
     b.toon('sandBank', sandBankGeo(), { cap: 40, anim: 'lift', ink: 0.02 });
+    yield;
 
     // the climbs (from the second time round: see climb, above)
     b.toon('climbRamp', sandRampGeo(), { cap: 8, anim: 'popEarly', ink: 0.02 });
+    yield;
     b.toon('climbGap', gapGeo(), { cap: 16, anim: 'popEarly', ink: 0 });
+    yield;
     b.toon('climbRubble', rubbleGeo(), { cap: 32, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('climbRail', terraceRailGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('climbPost', balconyPostGeo(), { cap: 60, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('climbTower', clockTowerGeo(), { cap: 8, anim: 'popEarly', ink: 0.05 });
+    yield;
     // the high walk (see high, above)
     for (const [k, s] of [['L', -1], ['R', 1]]) {
       b.toon(`highStair${k}`, highStairGeo(s), { cap: 6, anim: 'popEarly', ink: 0.035 });
+      yield;
       b.toon(`highDeck${k}`, highDeckGeo(s), { cap: 6, anim: 'popEarly', ink: 0.035 });
+      yield;
       b.toon(`highBay${k}`, highBayGeo(s), { cap: 40, anim: 'popEarly', ink: 0.03 });
+      yield;
       b.toon(`highChute${k}`, highChuteGeo(s), { cap: 10, anim: 'popEarly', ink: 0.035 });
+      yield;
     }
     b.toon('chuteFall', sandfallGeo(), { cap: 30, anim: 'popEarly', ink: 0, sandfall: true });
+    yield;
     b.toon('highRail', highRailGeo(), { cap: 170, anim: 'popEarly', ink: 0.03 });
+    yield;
     b.toon('highBridge', highBridgeGeo(), { cap: 4, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('highBridgeFace', highBridgeFaceGeo(), { cap: 8, anim: 'popEarly', ink: 0.035 });
+    yield;
     DECKS.forEach((h, i) => {
       b.toon(`terrace${i}`, terraceBodyGeo(h), { cap: 10, anim: 'popEarly', ink: 0.035 });
       b.toon(`terraceFace${i}`, terraceFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.03 });
@@ -1424,6 +1484,7 @@ export default {
       b.toon(`bridge${i}`, bridgeBodyGeo(h), { cap: 10, anim: 'popEarly', ink: 0.035 });
       b.toon(`bridgeFace${i}`, bridgeFaceGeo(h), { cap: 20, anim: 'popEarly', ink: 0.035 });
     });
+    yield;
   },
 
   // (the hands of the clock over the doorway out, at its centre)

@@ -432,14 +432,52 @@ export function groundStrip(width, length, color, segZ = 8, o = {}) {
 // GPU can reuse a transformed vertex instead of running the (heavy) vertex
 // shader again for each copy: about a third as many vertices to shade.
 export function weld(geo) {
-  if (geo.index) return geo;
+  for (const w of welding(geo)) if (w) return w;
+  return geo;
+}
+
+// The same, a step at a time (a generator: each yield a step of at most a
+// few tens of thousands of vertices; the last value it yields is the
+// result), so a big batch's weld can be spread over frames - see
+// Batch.welding. Exactly the same result as weld.
+const WELD_STEP = 32768;
+export function* welding(geo) {
+  if (geo.index) return yield geo;
   const names = Object.keys(geo.attributes);
   const attrs = names.map((nm) => geo.attributes[nm]);
   const n = geo.attributes.position.count;
-  if (n < 6 || attrs.some((a) => a.isInterleavedBufferAttribute || !(a.array instanceof Float32Array))) return geo;
+  if (n < 6 || attrs.some((a) => a.isInterleavedBufferAttribute || !(a.array instanceof Float32Array))) return yield geo;
   // every vertex's attributes side by side, as raw bits
   let S = 0;
   for (const a of attrs) S += a.itemSize;
+  const key = weldKeys(attrs, n, S);
+  // open-addressed hash of the distinct vertices. (Which hash only decides
+  // how often two different vertices meet in a slot, never the result: a
+  // vertex is merged only into one whose every bit matches, and the distinct
+  // ones are numbered in the order they first appear. So it hashes just the
+  // first eight words — the position, the normal and whatever comes next —
+  // which tells nearly all of them apart for half the work.)
+  let size = 1;
+  while (size < n * 2) size <<= 1;
+  const st = {
+    key,
+    S,
+    mask: size - 1,
+    slots: new Int32Array(size).fill(-1),
+    first: new Int32Array(n), // unique vertex -> its first source vertex
+    remap: new Uint32Array(n),
+    unique: 0,
+  };
+  for (let i = 0; i < n; i += WELD_STEP) {
+    if (n > WELD_STEP) yield null;
+    weldRange(st, i, Math.min(n, i + WELD_STEP));
+  }
+  if (st.unique > n * 0.9) return yield geo; // nothing much to gain
+  if (n > WELD_STEP) yield null;
+  yield weldOut(attrs, names, st.first, st.remap, st.unique);
+}
+
+function weldKeys(attrs, n, S) {
   // (as signed words: half of all floats' bits don't fit a small integer
   // unsigned, and the engine boxes every one it reads until it has optimised
   // the loop — which, for code that runs once at load, is most of the time)
@@ -472,21 +510,15 @@ export function weld(geo) {
     }
     off += s;
   }
-  // open-addressed hash of the distinct vertices. (Which hash only decides
-  // how often two different vertices meet in a slot, never the result: a
-  // vertex is merged only into one whose every bit matches, and the distinct
-  // ones are numbered in the order they first appear. So it hashes just the
-  // first eight words — the position, the normal and whatever comes next —
-  // which tells nearly all of them apart for half the work.)
+  return key;
+}
+
+// Vertices i0 .. i1 - 1 into the hash.
+function weldRange(st, i0, i1) {
+  const { key, S, mask, slots, first, remap } = st;
   const H = S < 8 ? S : 8;
-  let size = 1;
-  while (size < n * 2) size <<= 1;
-  const mask = size - 1;
-  const slots = new Int32Array(size).fill(-1);
-  const first = new Int32Array(n); // unique vertex -> its first source vertex
-  const remap = new Uint32Array(n);
-  let unique = 0;
-  for (let i = 0; i < n; i++) {
+  let unique = st.unique;
+  for (let i = i0; i < i1; i++) {
     const b = i * S;
     let h = 2166136261;
     for (let j = 0; j < H; j++) h = Math.imul(h ^ key[b + j], 16777619);
@@ -509,7 +541,10 @@ export function weld(geo) {
       p = (p + 1) & mask;
     }
   }
-  if (unique > n * 0.9) return geo; // nothing much to gain
+  st.unique = unique;
+}
+
+function weldOut(attrs, names, first, remap, unique) {
   const out = new THREE.BufferGeometry();
   for (const [k, a] of attrs.entries()) {
     const s = a.itemSize;

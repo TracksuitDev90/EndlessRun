@@ -53,32 +53,101 @@ const quadGeo = () => {
   return g;
 };
 
+// Every world's sky is the same sphere, drawn with its own colours.
+let skyGeo = null;
+
+// A World starts as an empty shell - its name and an empty root, enough for
+// the course to know it's coming - and is only filled in when it's wanted:
+// its definition arrives with its module (attach), then its batches are
+// built a step at a time between frames (build), and the game puts all of
+// it on the GPU before it can be seen (see Game.prepareWorld). `built` and
+// `ready` say how far it's got.
 export class World {
-  constructor(def) {
-    this.def = def;
-    this.id = def.id;
-    this.name = def.name;
+  // entry: { id, load } from WORLD_ORDER (world/index.js) - or a definition
+  // to attach at once
+  // (o.sky false: no sky - the shared doors)
+  constructor(entry, o = {}) {
+    this.entry = entry;
+    this.def = null;
+    this.id = entry.id;
+    this.name = entry.name || entry.id;
     this.root = new THREE.Group();
-    this.root.name = `world:${def.id}`;
-    this.env = def.env;
+    this.root.name = `world:${entry.id}`;
+    this.env = null;
     this.visit = 0;
-    this.u = makeEnvUniforms(def.env);
+    this.u = null;
+    this.sky = null;
     this.batches = new Map();
     this.allMaterials = [];
     this.stencilMaterials = [];
+    this.cullRise = [];
+    this.cullLift = [];
+    this.loading = null;
+    this.built = false; // every batch made (build)
+    this.ready = false; // and drawn once, out of sight (Game.prepareWorld)
+    if (!entry.load) this.attach(entry, o);
+  }
 
+  // Fetch the world's module (once; one that failed is tried again when
+  // asked again). Resolves to its definition.
+  load() {
+    if (this.def) return Promise.resolve(this.def);
+    if (!this.loading) {
+      this.loading = this.entry.load().then(
+        (m) => {
+          this.attach(m.default);
+          return this.def;
+        },
+        (e) => {
+          this.loading = null;
+          throw e;
+        }
+      );
+    }
+    return this.loading;
+  }
+
+  // Its definition is here: its light, and its sky (o.sky false: none).
+  attach(def, o = {}) {
+    if (this.def) return;
+    this.def = def;
+    this.name = def.name;
+    this.env = def.env;
+    this.u = makeEnvUniforms(def.env);
+    if (o.sky === false) return;
     const skyMat = makeSkyMaterial(this.u);
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16), skyMat);
+    skyGeo ??= new THREE.SphereGeometry(450, 32, 16);
+    this.sky = new THREE.Mesh(skyGeo, skyMat);
     this.sky.renderOrder = 50; // last of the opaque things (see VS_SKY)
     this.sky.frustumCulled = false;
     this.root.add(this.sky);
     this.track(skyMat, true);
+  }
 
+  // Build every batch the world places (def.build: a generator, a batch at
+  // a time, so the game can spread it over frames), then its gems.
+  *build() {
+    if (this.built) return;
     const b = new WorldBuilder(this);
-    def.build(b);
-    if (def.gem) b.gems(def.gem);
+    const steps = this.def.build(b);
+    if (steps && typeof steps.next === 'function') yield* steps;
+    if (this.def.gem) {
+      b.gems(this.def.gem);
+      yield;
+    }
     this.markObstacles();
     this.markHidden();
+    this.built = true;
+  }
+
+  // The door INTO `def`'s world (def.door), built into this shared set of
+  // doors (see Game), its batches named `<id>.<name>`. Returns them.
+  addDoor(def) {
+    const before = new Set(this.batches.values());
+    def.door(new WorldBuilder(this).prefixed(`${def.id}.`));
+    const added = [...this.batches.values()].filter((b) => !before.has(b));
+    this.markHidden(added);
+    return added;
   }
 
   // Props that rise up out of the ground (anim mode 2) are flattened to
@@ -87,10 +156,8 @@ export class World {
   // instances are left out of the draw (see Batch.cull). (Except that when
   // the dream twists the far road about its axis, it can swing what lies
   // sunk beside it up into view, so then the lifted ones are all drawn.)
-  markHidden() {
-    this.cullRise = [];
-    this.cullLift = [];
-    for (const b of this.batches.values()) {
+  markHidden(list = this.batches.values()) {
+    for (const b of list) {
       const anim = b.materials[0].uniforms.uAnim?.value;
       if (!anim || !(b instanceof Batch)) continue;
       const mode = Math.round(anim.x);
@@ -106,11 +173,11 @@ export class World {
     for (const b of this.cullLift) b.cull(twisting ? Infinity : camDist);
   }
 
-  // Index every batch's geometry (see weld in geo.js), a batch at a time;
-  // yields between batches so loading stays responsive.
+  // Index every batch's geometry (see weld in geo.js), a step at a time: a
+  // batch, or a part of a big one.
   *weldAll() {
     for (const b of this.batches.values()) {
-      b.weld();
+      yield* b.welding();
       yield;
     }
   }
@@ -233,10 +300,6 @@ export class World {
       m.stencilZFail = THREE.KeepStencilOp;
       m.stencilZPass = THREE.KeepStencilOp;
     }
-  }
-
-  setAllVisibleForCompile(on) {
-    for (const b of this.batches.values()) b.setCompileVisible(on);
   }
 }
 

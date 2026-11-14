@@ -640,46 +640,83 @@ export default {
     { env: { trip: [0.05, 0.3, 0.1] } },
   ],
 
-  build(b) {
+  *build(b) {
     b.ground('ground', groundStripWide(), 7);
+    yield;
     b.toon('rubble', rubbleGeo(3), { cap: 60, anim: 'pop', ink: 0.04, crust: ROCK });
+    yield;
     b.toon('rubbleB', rubbleGeo(9), { cap: 60, anim: 'pop', ink: 0.04, crust: ROCK });
+    yield;
     b.toon('columns', columnsGeo({ n: 7, r: 0.9, hMin: 4, hMax: 11, spread: 2.4, seed: 5 }), { cap: 40, anim: 'lift', ink: 0.05, crust: ROCK });
+    yield;
     b.toon('columnsB', columnsGeo({ n: 5, r: 0.7, hMin: 2.5, hMax: 6, spread: 1.6, seed: 11 }), { cap: 40, anim: 'lift', ink: 0.05, crust: ROCK });
+    yield;
     b.toon('spire', spireGeo(4), { cap: 24, anim: 'liftFar', ink: 0.06, crust: [0.6, 0.4, 0.25] });
+    yield;
     b.toon('spireB', spireGeo(17), { cap: 24, anim: 'liftFar', ink: 0.06, crust: [0.6, 0.4, 0.25] });
+    yield;
     b.toon('volcano', volcanoGeo(2), { cap: 8, anim: 'liftFar', ink: 0, crust: [0.8, 0.2, 0.125] });
+    yield;
     b.toon('volcanoSplash', splashGeo({ bursts: 3, n: 7, rx: 3.5, rz: 3.5, up: [9, 15], out: 4, size: [0.35, 0.8], period: [1.6, 3], seed: 21 }), { cap: 8, anim: 'liftFar', ink: 0, splash: true });
+    yield;
     b.toon('smoke', smokeGeo(6), { cap: 16, anim: 'liftFar', ink: 0, wobble: [0.004, 0.6, 0.25, 0] });
+    yield;
     b.toon('deadTree', deadTreeGeo(7), { cap: 30, anim: 'pop', ink: 0.03, crust: [0.4, 0.3, 1] });
+    yield;
     b.toon('deadTreeB', deadTreeGeo(13, 5.2, 7), { cap: 30, anim: 'pop', ink: 0.035, crust: [0.4, 0.3, 1] });
+    yield;
     b.toon('wraith', wraithGeo(), { cap: 40, anim: 'lift', ink: 0.025, wobble: [0.045, 0.3, 0.7, 0], fly: [0, 0, 1.4, 0.16] });
+    yield;
     b.toon('ribcage', ribcageGeo(5), { cap: 8, anim: 'lift', ink: 0.05 });
+    yield;
     b.toon('gibbet', gibbetPostGeo(), { cap: 16, anim: 'pop', ink: 0.04, crust: [0.5, 0.3, 1] });
+    yield;
     // the cage swings slowly along the road on its chain
     b.toon('cage', gibbetCageGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.12, 0.9, 0] });
+    yield;
     b.toon('lavaPool', lavaPoolGeo(4), { cap: 16, lava: true, ink: 0, anim: 'pop' });
+    yield;
     b.toon('crustRim', crustRimGeo(4), { cap: 16, anim: 'pop', ink: 0.03, crust: FINE });
+    yield;
     b.toon('poolSplash', splashGeo({ bursts: 3, n: 7, rx: 3.0, rz: 1.8, up: [4.5, 7], out: 1.8, size: [0.11, 0.26], period: [1.2, 2.2], seed: 7 }), { cap: 16, anim: 'pop', ink: 0, splash: true });
+    yield;
     b.toon('river', riverGeo(2.2, 1), { cap: 24, lava: true, ink: 0 });
+    yield;
     b.toon('riverBank', riverBankGeo(2.2, 1), { cap: 24, ink: 0.03, crust: FINE });
+    yield;
     b.toon('riverSplash', splashGeo({ bursts: 2, n: 6, rx: 1.6, rz: 6, cz: -8, up: [4, 7], out: 1.6, size: [0.12, 0.26], seed: 11 }), { cap: 24, ink: 0, splash: true });
+    yield;
     b.glow('glow', { cap: 100, anim: 'pop' });
+    yield;
     b.pool('pool', { cap: 60, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    yield;
 
     b.toon('ridge', ridgeGeo(0.95, 1), { cap: 24, anim: 'popEarly', ink: 0.04, crust: FINE });
+    yield;
     b.toon('ridgeB', ridgeGeo(0.95, 7), { cap: 24, anim: 'popEarly', ink: 0.04, crust: FINE });
+    yield;
     b.toon('fissureLava', fissureLavaGeo(1.05, 3), { cap: 24, lava: true, ink: 0, anim: 'popEarly' });
+    yield;
     b.toon('fissureLips', fissureLipsGeo(1.05, 3), { cap: 24, anim: 'popEarly', ink: 0.03, crust: FINE });
+    yield;
     b.toon('fissureSplash', fissureSplashGeo(1.05, 5), { cap: 24, anim: 'popEarly', ink: 0, splash: true });
+    yield;
     b.toon('fissureWideLava', fissureLavaGeo(4.4, 5), { cap: 10, lava: true, ink: 0, anim: 'popEarly' });
+    yield;
     b.toon('fissureWideLips', fissureLipsGeo(4.4, 5), { cap: 10, anim: 'popEarly', ink: 0.03, crust: FINE });
+    yield;
     b.toon('fissureWideSplash', fissureSplashGeo(4.4, 9), { cap: 10, anim: 'popEarly', ink: 0, splash: true });
+    yield;
     b.toon('beam', beamGeo(0.95), { cap: 24, anim: 'popEarly', ink: 0.045, crust: FINE });
+    yield;
     b.toon('beamWide', beamGeo(4.1), { cap: 10, anim: 'popEarly', ink: 0.045, crust: FINE });
+    yield;
     b.toon('basalt', columnsGeo({ n: 5, r: 0.36, hMin: 2.2, hMax: 3.8, spread: 0.55, seed: 2 }).translate(0, 0, -0.75), { cap: 24, anim: 'popEarly', ink: 0.045, crust: FINE });
+    yield;
     b.toon('obsidian', obsidianGeo(5), { cap: 24, anim: 'popEarly', ink: 0.04, crust: FINE });
+    yield;
 
   },
 

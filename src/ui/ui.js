@@ -38,23 +38,6 @@ const ICONS = {
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 const GEM_IC = '<svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg>';
 
-// A browser can keep an old copy of the stylesheet while it fetches this
-// script afresh (each file is cached on its own for a while after an
-// update): one from before the pages of cards came in can't lay them out,
-// so if the strip of them isn't laid out as one, the stylesheet is fetched
-// again, new.
-function freshStyles(strip) {
-  if (getComputedStyle(strip).display === 'flex') return;
-  const link = document.querySelector('link[rel=stylesheet][href*="css/style.css"]');
-  if (!link || link.dataset.fresh) return;
-  const next = link.cloneNode();
-  next.dataset.fresh = '1';
-  next.href = 'css/style.css?fresh=' + Date.now();
-  // (the old one goes once the new one's in, so nothing flashes unstyled)
-  next.addEventListener('load', () => link.remove());
-  link.after(next);
-}
-
 // The abilities introduced so far (see UI.powerTip): how many runs each has
 // been pointed out in, or TIP_KNOWN once it's been used. Kept in this
 // browser; without storage they're introduced once a run.
@@ -126,8 +109,109 @@ function buildLogo(logo, title) {
   });
 }
 
+// A file's URL with its version (see index.html).
+const url = globalThis.__erUrl || ((p) => p);
+
+// The loading screen: what's being done, and a bar for how far it's got -
+// each part of the load filling its share as its work is really done. The
+// page's own script fills the first part while the code is still arriving
+// (see index.html); then the models (by the byte), the first world (by the
+// batch: how many the last load took, here, or about as many as the
+// Cypress Lane has), and the warm-up (by the step: see Game.prepareStart).
+const SHARE = { code: 0.3, fetch: 0.3, build: 0.15, gpu: 0.25 };
+class Loader {
+  constructor() {
+    this.el = $('loading');
+    this.bar = this.el.querySelector('.loader-bar i');
+    this.line = this.el.querySelector('.loader-stage');
+    this.parts = { code: 1, fetch: 0, build: 0, gpu: 0 };
+    this.files = new Map();
+    this.expected = 1;
+    this.done = 0;
+    this.shown = -1;
+    this.steps = Number(readStore('er.loadSteps')) || 45;
+    window.__erLoader = this;
+    this.draw();
+  }
+
+  stage(name, text) {
+    if (text) this.line.textContent = text;
+  }
+
+  // how many downloads must arrive before the first world can be built
+  expect(n) {
+    this.expected = n;
+    this.fetchPart();
+  }
+
+  fetched() {
+    this.done++;
+    this.fetchPart();
+  }
+
+  // a model's download, as it goes
+  bytes = (key, got, total) => {
+    this.files.set(key, [got, Math.max(got, total)]);
+    this.fetchPart();
+  };
+
+  fetchPart() {
+    let got = 0;
+    let total = 0;
+    for (const [g, t] of this.files.values()) {
+      got += g;
+      total += t;
+    }
+    // (by the byte while the models come, and by the file overall)
+    const byFile = this.done / this.expected;
+    this.parts.fetch = Math.max(byFile, total ? (got / total) * 0.9 : 0);
+    this.draw();
+  }
+
+  built(n) {
+    this.builtSteps = n;
+    this.parts.build = Math.min(0.97, n / this.steps);
+    this.draw();
+  }
+
+  gpu(done, total) {
+    if (this.builtSteps && !this.stored) {
+      this.stored = true;
+      this.parts.build = 1;
+      writeStore('er.loadSteps', String(this.builtSteps));
+    }
+    this.parts.gpu = total ? done / total : 1;
+    this.draw();
+  }
+
+  draw() {
+    let k = 0;
+    for (const [part, share] of Object.entries(SHARE)) k += share * Math.min(1, this.parts[part]);
+    k = Math.max(k, this.shown);
+    if (k === this.shown) return;
+    this.shown = k;
+    this.bar.style.transform = `scaleX(${k.toFixed(3)})`;
+  }
+}
+
+function readStore(k) {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+}
+function writeStore(k, v) {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* storage unavailable (private mode) */
+  }
+}
+
 export class UI {
   constructor(title) {
+    this.loader = new Loader();
     this.coarse = window.matchMedia('(pointer: coarse)').matches;
     document.body.classList.toggle('touch', this.coarse);
     buildLogo($('logo'), title);
@@ -254,6 +338,7 @@ export class UI {
       b.type = 'button';
       b.dataset.id = c.id;
       b.setAttribute('role', 'radio');
+      b.dataset.name = `${c.name}, ${c.title}`;
       b.setAttribute('aria-label', c.locked ? `${c.name}, ${c.title}: back soon` : `${c.name}, ${c.title}`);
       if (c.locked) b.setAttribute('aria-disabled', 'true');
       if (coming) b.setAttribute('aria-busy', 'true');
@@ -261,7 +346,7 @@ export class UI {
       b.style.setProperty('--c2', c.tint[1]);
       b.innerHTML =
         `<span class="pick-bg"></span>` +
-        `<img class="pick-fig" src="${c.card}" alt="" draggable="false" />` +
+        `<img class="pick-fig" src="${url(c.card)}" alt="" draggable="false" />` +
         `<span class="pick-plate"><span class="pick-name"></span><span class="pick-title"></span></span>` +
         `<span class="pick-seal" aria-hidden="true">✓</span>` +
         (c.locked ? `<span class="pick-soon" aria-hidden="true">soon</span>` : '') +
@@ -292,7 +377,6 @@ export class UI {
     }
     this.pickStrip = strip;
     this.pickPages = pages;
-    freshStyles(strip);
     this.pickPage = 0;
     this.buildPageDots(pages);
     this.bindPageSwipe(root);
@@ -424,9 +508,28 @@ export class UI {
   runnerReady(id) {
     const b = this.cards?.[id];
     if (!b) return;
-    b.classList.remove('pick-loading', 'pick-wanted');
+    b.classList.remove('pick-loading', 'pick-wanted', 'pick-failed');
     b.removeAttribute('aria-busy');
     b.querySelector('.pick-wait')?.remove();
+    b.setAttribute('aria-label', `${b.dataset.name}`);
+  }
+
+  // Their download failed (twice): the stamp on their card says so, and
+  // tapping it tries again (see pick in main.js) ...
+  runnerFailed(id) {
+    const b = this.cards?.[id];
+    if (!b) return;
+    b.classList.add('pick-failed');
+    b.classList.remove('pick-wanted');
+    b.setAttribute('aria-label', `${b.dataset.name}: couldn't be fetched - tap to try again`);
+  }
+
+  // ... and is on its way again.
+  runnerWaiting(id) {
+    const b = this.cards?.[id];
+    if (!b || !b.classList.contains('pick-failed')) return;
+    b.classList.remove('pick-failed');
+    b.setAttribute('aria-label', `${b.dataset.name}`);
   }
 
   // Someone not here yet was tapped: their card shows it's been heard (they
@@ -462,7 +565,7 @@ export class UI {
       b.title = c.blurb;
       b.style.setProperty('--c1', c.tint[0]);
       b.style.setProperty('--c2', c.tint[1]);
-      b.innerHTML = `<span class="pal-face"><img src="${c.face}" alt="" draggable="false" /></span><span class="pal-text"><span class="pal-name"></span><span class="pal-title"></span></span>`;
+      b.innerHTML = `<span class="pal-face"><img src="${url(c.face)}" alt="" draggable="false" /></span><span class="pal-text"><span class="pal-name"></span><span class="pal-title"></span></span>`;
       b.querySelector('.pal-name').textContent = c.name;
       b.querySelector('.pal-title').textContent = c.title;
       b.addEventListener('click', (e) => {
@@ -480,8 +583,19 @@ export class UI {
   companionReady(id) {
     const b = this.pals?.[id];
     if (!b) return;
-    b.classList.remove('pal-loading', 'pal-wanted');
+    b.classList.remove('pal-loading', 'pal-wanted', 'pal-failed');
     b.removeAttribute('aria-busy');
+  }
+
+  companionFailed(id) {
+    const b = this.pals?.[id];
+    if (!b) return;
+    b.classList.add('pal-failed');
+    b.classList.remove('pal-wanted');
+  }
+
+  companionWaiting(id) {
+    this.pals?.[id]?.classList.remove('pal-failed');
   }
 
   companionWanted(id) {
@@ -501,9 +615,15 @@ export class UI {
     this.layers();
   }
 
-  error(msg) {
-    $('loading').classList.add('show');
-    $('loading').querySelector('.loader-title').textContent = msg;
+  // Something went wrong loading: said so, and (retry) a button to try again.
+  error(msg, retry) {
+    const el = $('loading');
+    el.classList.add('show');
+    el.classList.toggle('failed', !!retry);
+    el.querySelector('.loader-title').textContent = msg;
+    el.querySelector('.loader-stage').textContent = retry ? 'check the connection, then' : '';
+    const b = el.querySelector('.loader-retry');
+    if (b && retry) b.onclick = retry;
   }
 
   showTitle(on) {

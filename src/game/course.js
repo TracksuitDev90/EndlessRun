@@ -3,10 +3,22 @@ import { makeDream, holdBack, setLapLength } from './dream.js';
 
 // The course is the sequence of worlds laid out along the track. Each
 // segment is a stretch of one world; a doorway stands at every boundary.
+//
+// A segment is only laid down once its world's module is here (World.def):
+// everything that looks ahead along the course - the doorways, the gems
+// round them, World Fold's destination - can count on it. If the next
+// world's module hasn't arrived by the time the runner is getting near the
+// end of this one (a very slow or dropped connection), this world simply
+// runs on, its end kept out of reach, until it has (want: asks for it).
+
+// how far ahead the end of a world is kept while the next one's on its way:
+// room to prepare it once it's here (see Game.needWorld)
+const HOLD = 640;
 
 export class Course {
-  constructor(worlds) {
+  constructor(worlds, want = () => {}) {
     this.worlds = worlds;
+    this.want = want;
     this.byId = new Map(worlds.map((w) => [w.id, w]));
     this.segments = [];
     // (the dream's schedule counts in laps: one of every world)
@@ -48,9 +60,13 @@ export class Course {
 
   // The worlds always come in their authored order (world/index.js), lap
   // after lap: from the last one back round to the first.
-  nextWorldId() {
+  peekWorld() {
     const i = this.worlds.findIndex((w) => w.id === this.lastId);
-    const id = this.worlds[(i + 1) % this.worlds.length].id;
+    return this.worlds[(i + 1) % this.worlds.length];
+  }
+
+  nextWorldId() {
+    const id = this.peekWorld().id;
     this.lastId = id;
     return id;
   }
@@ -59,6 +75,12 @@ export class Course {
     const L = CONFIG.chunkLength;
     while (this.segments[this.segments.length - 1].end < d + 900) {
       const last = this.segments[this.segments.length - 1];
+      if (!this.peekWorld().def) {
+        // (not here yet: this world runs on meanwhile)
+        this.want(this.peekWorld());
+        if (last.end < d + HOLD) last.end = Math.ceil((d + HOLD) / L) * L;
+        break;
+      }
       let len = speed * CONFIG.worldSeconds;
       len = Math.min(CONFIG.worldMax, Math.max(CONFIG.worldMin, len));
       len = Math.round(len / L) * L;

@@ -1,11 +1,3 @@
-import { Wayfarer } from './wayfarer.js';
-import { Explorer } from './explorer.js';
-import { Elder } from './elder.js';
-import { Bunny } from './bunny.js';
-import { Skater } from './skater.js';
-import { Samurai } from './samurai.js';
-import { Fisher } from './fisher.js';
-
 // Who you can run as. Each has their sculpted asset (tools/runner/), the art
 // their card on the title screen is cut from (tools/characters/cards.py), a
 // name and a line about how they run, the colour their card is washed in, and
@@ -13,6 +5,12 @@ import { Fisher } from './fisher.js';
 // worked on: built with the rest, their card dealt greyed out, but not to be
 // picked (only ?runner=<id> runs as them). The first who isn't locked is the
 // default.
+//
+// Each one's class is in a module of its own, fetched only when they're
+// wanted - whoever runs before the title screen, everyone else behind it
+// (see main.js): load() fetches it (once; again if it failed), and make
+// works from then on. (A bare import() each, written out, so
+// tools/preload.py can find them.)
 export const CHARACTERS = [
   {
     id: 'wayfarer',
@@ -23,7 +21,7 @@ export const CHARACTERS = [
     card: 'assets/characters/wayfarer.webp',
     tint: ['#ffb54a', '#f2702a'],
     locked: true,
-    make: (env, asset) => new Wayfarer(env, asset),
+    load: lazy(() => import('./wayfarer.js'), (m) => (env, asset) => new m.Wayfarer(env, asset)),
   },
   {
     id: 'explorer',
@@ -33,7 +31,7 @@ export const CHARACTERS = [
     asset: 'assets/explorer/',
     card: 'assets/characters/explorer.webp',
     tint: ['#9fdcc8', '#3f9a8c'],
-    make: (env, asset) => new Explorer(env, asset),
+    load: lazy(() => import('./explorer.js'), (m) => (env, asset) => new m.Explorer(env, asset)),
   },
   {
     id: 'elder',
@@ -43,7 +41,7 @@ export const CHARACTERS = [
     asset: 'assets/elder/',
     card: 'assets/characters/elder.webp',
     tint: ['#9fd0c6', '#2f6f7c'],
-    make: (env, asset) => new Elder(env, asset),
+    load: lazy(() => import('./elder.js'), (m) => (env, asset) => new m.Elder(env, asset)),
   },
   {
     id: 'bunny',
@@ -53,7 +51,7 @@ export const CHARACTERS = [
     asset: 'assets/bunny/',
     card: 'assets/characters/bunny.webp',
     tint: ['#ffd36b', '#e0702e'],
-    make: (env, asset) => new Bunny(env, asset),
+    load: lazy(() => import('./bunny.js'), (m) => (env, asset) => new m.Bunny(env, asset)),
   },
   {
     id: 'skater',
@@ -63,7 +61,7 @@ export const CHARACTERS = [
     asset: 'assets/skater/',
     card: 'assets/characters/skater.webp',
     tint: ['#d9b3ff', '#7046c4'],
-    make: (env, asset) => new Skater(env, asset),
+    load: lazy(() => import('./skater.js'), (m) => (env, asset) => new m.Skater(env, asset)),
   },
   {
     id: 'samurai',
@@ -73,7 +71,7 @@ export const CHARACTERS = [
     asset: 'assets/samurai/',
     card: 'assets/characters/samurai.webp',
     tint: ['#f2a48e', '#a3302a'],
-    make: (env, asset) => new Samurai(env, asset),
+    load: lazy(() => import('./samurai.js'), (m) => (env, asset) => new m.Samurai(env, asset)),
   },
   {
     id: 'fisher',
@@ -83,9 +81,28 @@ export const CHARACTERS = [
     asset: 'assets/fisher/',
     card: 'assets/characters/fisher.webp',
     tint: ['#9fe3ef', '#2f86b8'],
-    make: (env, asset) => new Fisher(env, asset),
+    load: lazy(() => import('./fisher.js'), (m) => (env, asset) => new m.Fisher(env, asset)),
   },
 ];
+
+// (load(): fetch the module once, set def.make from it; one that failed is
+// fetched afresh next time)
+function lazy(fetch, maker) {
+  let p = null;
+  return function () {
+    p ??= fetch().then(
+      (m) => {
+        this.make = maker(m);
+        return this;
+      },
+      (e) => {
+        p = null;
+        throw e;
+      }
+    );
+    return p;
+  };
+}
 
 export const characterById = (id) => CHARACTERS.find((c) => c.id === id) || CHARACTERS[0];
 

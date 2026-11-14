@@ -844,61 +844,104 @@ export default {
     { env: { trip: [0.06, 0.3, 0.12] } },
   ],
 
-  build(b) {
+  *build(b) {
     b.ground('ground', groundStripWide(), 11);
+    yield;
     b.planets(this.planets);
+    yield;
     b.toon('boulder', boulderGeo(3), { cap: 60, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('boulderB', boulderGeo(17, 1.3), { cap: 60, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('hoodoo', merge(hoodooParts(4.2, 0.7, 4)), { cap: 30, anim: 'pop', ink: 0.045, marks: [2, 2] });
+    yield;
     b.toon('hoodooB', merge(hoodooParts(6.5, 1.0, 9)), { cap: 30, anim: 'lift', ink: 0.05, marks: [2, 2] });
+    yield;
     b.toon('craterRim', craterRimGeo(6), { cap: 24, anim: 'pop', ink: 0.04, marks: [3, 3] });
+    yield;
     b.toon('butte', butteGeo(2), { cap: 24, anim: 'liftFar', ink: 0.05 });
+    yield;
     b.toon('butteB', butteGeo(7), { cap: 24, anim: 'liftFar', ink: 0.05 });
+    yield;
     b.toon('arch', archGeo(), { cap: 6, anim: 'popLate', ink: 0.06, marks: [3, 3] });
+    yield;
     b.toon('crystals', crystalsGeo(2), { cap: 40, anim: 'pop', ink: 0.035 });
+    yield;
     b.toon('crystalsB', crystalsGeo(13, 1.6), { cap: 30, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('floatRock', merge([asteroidPart(0.7, 3, { detail: 1 })]), { cap: 60, anim: 'lift', ink: 0.04, tumble: [0.35, 0.22, 0], fly: [0, 0, 1.2, 0.12] });
+    yield;
     b.toon('floatRockB', merge([asteroidPart(1.4, 8, { detail: 1 })]), { cap: 30, anim: 'lift', ink: 0.05, tumble: [0.2, 0.14, 0], fly: [0, 0, 2.0, 0.08] });
+    yield;
     for (let v = 0; v < 3; v++) b.toon(`moonlet${v}`, moonletGeo(v), { cap: 12, anim: 'liftFar', ink: 0.05, turn: [0, 0, 0, 0.06], fly: [0, 0, 7, 0.05] });
+    yield;
     b.toon('ufoFar', merge(ufoParts()), { cap: 16, anim: 'lift', ink: 0.03, turn: [0, 0, 0, 1.6], fly: [0, 0, 6, 0.32] });
+    yield;
     b.toon('astronaut', astronautGeo(), { cap: 16, anim: 'lift', ink: 0.03, tumble: [0.25, 0.4, 0.6], fly: [0, 0, 1.5, 0.15] });
+    yield;
     b.glow('glow', { cap: 156, anim: 'pop' });
+    yield;
     b.pool('pool', { cap: 84, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 140, anim: 'pop' });
+    yield;
 
     // obstacles
     b.toon('asteroid', asteroidLowGeo(21), { cap: 24, anim: 'popEarly', ink: 0.04, tumble: [0.45, 0.3, LOW_Y] });
+    yield;
     b.toon('asteroidB', asteroidLowGeo(37), { cap: 24, anim: 'popEarly', ink: 0.04, tumble: [0.35, 0.4, LOW_Y] });
+    yield;
     b.toon('craterLow', craterLowGeo(5), { cap: 48, anim: 'popEarly', ink: 0.03 });
+    yield;
     // (dark basalt, so it reads at a glance against the red dust)
     b.toon('boulderL', merge([
       ...rockParts({ r: 0.55, lo: C.basalt, hi: C.basaltHi, sy: 0.8, seed: 61 }).map((g) => g.translate(-0.45, 0, 0)),
       ...rockParts({ r: 0.45, lo: C.basalt, hi: C.basaltHi, sy: 0.85, seed: 62 }).map((g) => g.translate(0.45, 0, 0.1)),
       ...rockParts({ r: 0.3, lo: C.basalt, hi: '#9a7a80', sy: 0.9, seed: 63 }).map((g) => g.translate(0.05, 0.3, -0.15)),
     ]).translate(0, 0, -0.5), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('asteroidBelt', asteroidBeltGeo(), { cap: 10, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('ufo', ufoGeo(), { cap: 24, anim: 'popEarly', ink: 0.035, turn: [0, 0, 0, 1.4], wobble: [0, 0.05, 2.4, 0] });
+    yield;
     b.toon('ufoFleet', ufoFleetGeo(), { cap: 10, anim: 'popEarly', ink: 0.035, wobble: [0, 0.04, 1.8, 0] });
+    yield;
     b.toon('asteroidHigh', asteroidHighGeo(44), { cap: 24, anim: 'popEarly', ink: 0.045, tumble: [0.45, 0.3, BIG_Y] });
+    yield;
     b.toon('holdRing', holdRingGeo(), { cap: 24, anim: 'popEarly', ink: 0.03, wobble: [0, 0.03, 1.6, 0] });
+    yield;
     // the light each thing hanging overhead throws down on the dust under
     // it: the open floor you skim through, lit up
     b.pool('underLight', { cap: 60, anim: 'popEarly', color: '#6ef0ff' });
+    yield;
     b.toon('pillar', pillarGeo(5), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
+    yield;
     b.toon('pillarB', pillarGeo(12), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2] });
+    yield;
     b.toon('spire', spireGeo(7), { cap: 24, anim: 'popEarly', ink: 0.045 });
+    yield;
     // alien life, glowing (each a colour of its own: see GLOWS), and rock
     // grown into shapes no rock should take
     b.toon('orbStalk', orbStalkGeo(3), { cap: 70, anim: 'pop', ink: 0.025, wobble: [0.012, 0, 1.1, 0] });
+    yield;
     b.toon('orbStalkB', orbStalkGeo(14), { cap: 70, anim: 'pop', ink: 0.025, wobble: [0.012, 0, 0.9, 0] });
+    yield;
     b.toon('puff', puffGeo(5), { cap: 60, anim: 'pop', ink: 0.025 });
+    yield;
     b.toon('parasol', parasolGeo(2), { cap: 40, anim: 'lift', ink: 0.035, wobble: [0.0025, 0.03, 0.5, 0] });
+    yield;
     b.toon('parasolB', parasolGeo(9), { cap: 40, anim: 'lift', ink: 0.035, wobble: [0.0025, 0.03, 0.6, 0] });
+    yield;
     b.toon('frond', frondGeo(4), { cap: 60, anim: 'pop', ink: 0.02, wobble: [0.03, 0, 1.4, 0] });
+    yield;
     b.toon('pods', podGeo(8), { cap: 60, anim: 'pop', ink: 0.02, wobble: [0.02, 0, 1.2, 0] });
+    yield;
     b.toon('twistSpire', twistSpireGeo(4), { cap: 24, anim: 'lift', ink: 0.045 });
+    yield;
     b.toon('cairn', cairnGeo(6), { cap: 30, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('ringRock', ringRockGeo(3), { cap: 12, anim: 'lift', ink: 0.05, marks: [2, 2] });
+    yield;
 
   },
 

@@ -12,19 +12,71 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
-    <!-- Start fetching the model of whoever ran last time (and whoever ran
-         with them) now, alongside the code, not after all of it has loaded
-         and run: src/game/runner-asset.js picks these up. The game leaves the
-         hint (er.assets) whenever someone's picked; on a first visit it's the
-         two who run by default. (Ahead of the stylesheets: a script waits
-         for any before it.) -->
+    <!-- The loading screen's own look, here so it shows the moment the page
+         arrives: the stylesheet loads alongside the code (see below) rather
+         than holding the first paint up, and until it's in, nothing but the
+         loading screen is shown. -->
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #3d8a36; color: #fffaf0; font-family: 'Fraunces', Georgia, 'Times New Roman', serif; }
+      html:not(.styled) body > :not(#ui):not(svg), html:not(.styled) #ui > :not(#loading) { display: none !important; }
+      #loading { position: fixed; inset: 0; display: grid; place-items: center; align-content: center; gap: 14px; background: radial-gradient(circle at 50% 40%, #6fb53e, #2f6e2c); opacity: 1; visibility: visible; z-index: 50; }
+      #loading:not(.show) { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+      .loader-title { font-size: clamp(18px, 4vw, 26px); font-style: italic; letter-spacing: 0.08em; }
+      .loader-bar { width: min(56vw, 240px); height: 6px; border-radius: 3px; background: rgba(20, 50, 18, 0.45); overflow: hidden; }
+      .loader-bar i { display: block; height: 100%; width: 100%; border-radius: 3px; background: #fbf3e0; transform-origin: left; transform: scaleX(0); transition: transform 0.25s ease-out; }
+      .loader-stage { margin: 0; min-height: 1.3em; font-size: 14px; font-style: italic; opacity: 0.8; }
+      .loader-retry { display: none; font: italic 600 16px/1 'Fraunces', Georgia, serif; padding: 10px 18px; border: 2px solid #2a1d14; border-radius: 999px; background: #fbf3e0; color: #2a1d14; pointer-events: auto; cursor: pointer; }
+      #loading.failed .loader-retry { display: block; }
+      #loading.failed .loader-bar { display: none; }
+    </style>
+    <!-- release:start (written by tools/preload.py) -->
+    <script type="importmap">
+    {"imports":{"./src/main.js":"./src/main.js?v=6f2a2a53da","./vendor/three/three.module.min.js":"./vendor/three/three.module.min.js?v=86bcee248b","./src/config.js":"./src/config.js?v=53e2678007","./src/render/shaders.js":"./src/render/shaders.js?v=b3b89be7d1","./src/render/textures.js":"./src/render/textures.js?v=6d802edcba","./src/game/game.js":"./src/game/game.js?v=f2fbab020f","./src/game/runner-asset.js":"./src/game/runner-asset.js?v=820ba20132","./src/game/characters.js":"./src/game/characters.js?v=33189eeacd","./src/game/companions.js":"./src/game/companions.js?v=7e1d32bea0","./src/world/index.js":"./src/world/index.js?v=1bb331e97c","./src/world/world.js":"./src/world/world.js?v=df5bfb4104","./src/game/prep.js":"./src/game/prep.js?v=e2e4f5b7a0","./src/core/input.js":"./src/core/input.js?v=03c1eb8ae7","./src/core/audio.js":"./src/core/audio.js?v=457e8cd97d","./src/ui/ui.js":"./src/ui/ui.js?v=aa87020e87","./src/core/pacer.js":"./src/core/pacer.js?v=def43f8ae2","./src/core/quality.js":"./src/core/quality.js?v=8bfe731f23","./vendor/three/three.core.min.js":"./vendor/three/three.core.min.js?v=05b2609338","./src/core/rng.js":"./src/core/rng.js?v=abd1388a55","./src/render/particles.js":"./src/render/particles.js?v=f36d3b3c33","./src/game/course.js":"./src/game/course.js?v=1e674488dc","./src/game/chunks.js":"./src/game/chunks.js?v=38d04c1929","./src/game/obstacles.js":"./src/game/obstacles.js?v=d05603f40c","./src/game/gems.js":"./src/game/gems.js?v=bca7e51afe","./src/render/sparkles.js":"./src/render/sparkles.js?v=997ba51a70","./src/game/camera.js":"./src/game/camera.js?v=1260744e47","./src/game/portal.js":"./src/game/portal.js?v=6d3c037577","./src/game/dream.js":"./src/game/dream.js?v=4e124d06a9","./src/game/bubbles.js":"./src/game/bubbles.js?v=4258f1e8c6","./src/game/splash.js":"./src/game/splash.js?v=8964c50b07","./src/game/warp.js":"./src/game/warp.js?v=240a501c67","./src/game/sands.js":"./src/game/sands.js?v=d0b8a8de44","./src/game/progress.js":"./src/game/progress.js?v=8904c5a353","./src/game/powers.js":"./src/game/powers.js?v=af0da9184c","./src/game/powerfx.js":"./src/game/powerfx.js?v=1d99fc925e","./src/game/wayfarer.js":"./src/game/wayfarer.js?v=41cb6a425d","./src/game/explorer.js":"./src/game/explorer.js?v=366568e27d","./src/game/elder.js":"./src/game/elder.js?v=136d99576d","./src/game/bunny.js":"./src/game/bunny.js?v=2b7d0f1765","./src/game/skater.js":"./src/game/skater.js?v=c729851aac","./src/game/samurai.js":"./src/game/samurai.js?v=2f82d9cd73","./src/game/fisher.js":"./src/game/fisher.js?v=ff1d8f5c0f","./src/game/fox.js":"./src/game/fox.js?v=a81905a96b","./src/game/companion.js":"./src/game/companion.js?v=008410158d","./src/game/dragon.js":"./src/game/dragon.js?v=11e0b82cd0","./src/game/flyer.js":"./src/game/flyer.js?v=934fb13ac5","./src/game/pitcher.js":"./src/game/pitcher.js?v=861a45cc75","./src/game/sprout.js":"./src/game/sprout.js?v=6f41f0c5be","./src/world/village.js":"./src/world/village.js?v=47d51ac366","./src/world/conservatory.js":"./src/world/conservatory.js?v=2e40981815","./src/world/forest.js":"./src/world/forest.js?v=500c880cf7","./src/world/rooftops.js":"./src/world/rooftops.js?v=5252d9ae61","./src/world/corridor.js":"./src/world/corridor.js?v=e2e5a154c5","./src/world/causeway.js":"./src/world/causeway.js?v=769bab5fac","./src/world/hell.js":"./src/world/hell.js?v=00421c6722","./src/world/time.js":"./src/world/time.js?v=3fba54db6b","./src/world/ocean.js":"./src/world/ocean.js?v=b53c74ec24","./src/world/frost.js":"./src/world/frost.js?v=728a55c0e2","./src/world/space.js":"./src/world/space.js?v=0d6ee9097b","./src/render/batch.js":"./src/render/batch.js?v=ac0ce8dd63","./src/render/geo.js":"./src/render/geo.js?v=65235bbcb7","./src/world/planets.js":"./src/world/planets.js?v=0ae3276c9e","./src/game/drift.js":"./src/game/drift.js?v=1af79ddf31","./src/game/dust.js":"./src/game/dust.js?v=6861b7d521","./src/game/rig.js":"./src/game/rig.js?v=98e7195ada","./src/game/cloth.js":"./src/game/cloth.js?v=c7724fb614","./src/game/kit.js":"./src/game/kit.js?v=d22167362f","./src/game/outfit.js":"./src/game/outfit.js?v=af7aad6ba3","./src/game/player.js":"./src/game/player.js?v=eeb483e042","./src/game/spill.js":"./src/game/spill.js?v=796bd6ce32","./src/game/sparks.js":"./src/game/sparks.js?v=38d7e86bf4","./src/game/props.js":"./src/game/props.js?v=db53ab6b6e","./src/game/seeds.js":"./src/game/seeds.js?v=2d185d41e4","./src/game/ribbon.js":"./src/game/ribbon.js?v=e630179469","./src/game/splashes.js":"./src/game/splashes.js?v=4a8f28cdb0","./src/game/tank.js":"./src/game/tank.js?v=cf10a6fda0","./src/render/caster.js":"./src/render/caster.js?v=565e8d80bc","./src/world/shapes.js":"./src/world/shapes.js?v=a1fade4ae2","./src/world/whimsy.js":"./src/world/whimsy.js?v=dc69d92aa1","./src/world/gems.js":"./src/world/gems.js?v=40d26f9f4a","./src/world/lane-art.js":"./src/world/lane-art.js?v=2245aa0fec","./src/world/hall-art.js":"./src/world/hall-art.js?v=8e03e0086f"}}
+    </script>
+    <script>
+      window.__erV = {"assets/bunny/runner.bin":"308ea93321","assets/bunny/runner.bin.gz":"ed12d57aef","assets/bunny/runner.json":"12252320f8","assets/characters/bunny.webp":"e3e0700019","assets/characters/dragon-face.webp":"dec51580b3","assets/characters/elder.webp":"945970510d","assets/characters/explorer.webp":"4bd879e804","assets/characters/fisher.webp":"00f718bb6c","assets/characters/fox-face.webp":"08dcc02601","assets/characters/pitcher-face.webp":"46a7e7bfb9","assets/characters/samurai.webp":"9ae98a0047","assets/characters/skater.webp":"55d60e95b9","assets/characters/wayfarer.webp":"0add36b52b","assets/dragon/runner.bin":"4734f30ca6","assets/dragon/runner.bin.gz":"685c2dcf90","assets/dragon/runner.json":"89910583e0","assets/elder/runner.bin":"158181f5ce","assets/elder/runner.bin.gz":"e68263fdea","assets/elder/runner.json":"4250919332","assets/explorer/runner.bin":"1f76f8e591","assets/explorer/runner.bin.gz":"5c8455314e","assets/explorer/runner.json":"9cc37d5830","assets/fisher/runner.bin":"2924e082f4","assets/fisher/runner.bin.gz":"65f797e234","assets/fisher/runner.json":"4c5e647f84","assets/fox/runner.bin":"8299cb8bf0","assets/fox/runner.bin.gz":"c619d91fda","assets/fox/runner.json":"5725b10771","assets/pitcher/runner.bin":"c56e931b0d","assets/pitcher/runner.bin.gz":"254931fac0","assets/pitcher/runner.json":"fdfe8c0bd3","assets/runner/runner.bin":"5420e75836","assets/runner/runner.bin.gz":"5eb574407e","assets/runner/runner.json":"7e56dd3e6f","assets/samurai/runner.bin":"b7ed3cb4ea","assets/samurai/runner.bin.gz":"b393becba8","assets/samurai/runner.json":"bf48bcbf27","assets/skater/runner.bin":"b5614f01dd","assets/skater/runner.bin.gz":"6da3d14757","assets/skater/runner.json":"2f0d0350c0","css/style.css":"d44555f083"};
+      window.__erStart = ["vendor/three/three.module.min.js","vendor/three/three.core.min.js","src/world/village.js","src/config.js","src/render/shaders.js","src/render/textures.js","src/game/game.js","src/game/runner-asset.js","src/game/characters.js","src/game/companions.js","src/world/index.js","src/world/world.js","src/game/prep.js","src/core/input.js","src/core/audio.js","src/ui/ui.js","src/core/pacer.js","src/core/quality.js","src/world/shapes.js","src/world/whimsy.js","src/world/gems.js","src/world/lane-art.js","src/render/geo.js","src/core/rng.js","src/render/particles.js","src/game/course.js","src/game/chunks.js","src/game/obstacles.js","src/game/gems.js","src/render/sparkles.js","src/game/camera.js","src/game/portal.js","src/game/dream.js","src/game/bubbles.js","src/game/splash.js","src/game/warp.js","src/game/sands.js","src/game/progress.js","src/game/powers.js","src/game/powerfx.js","src/render/batch.js","src/world/planets.js","src/game/drift.js","src/game/dust.js"];
+      window.__erBy = {"assets/runner/":["src/game/wayfarer.js","src/game/rig.js","src/game/cloth.js","src/game/kit.js","src/game/outfit.js","src/game/player.js","src/render/caster.js"],"assets/explorer/":["src/game/explorer.js","src/game/rig.js","src/game/cloth.js","src/game/kit.js","src/game/player.js","src/game/spill.js","src/render/caster.js"],"assets/elder/":["src/game/elder.js","src/game/rig.js","src/game/cloth.js","src/game/kit.js","src/game/player.js","src/game/sparks.js","src/render/caster.js"],"assets/bunny/":["src/game/bunny.js","src/game/rig.js","src/game/kit.js","src/game/player.js","src/game/props.js","src/game/seeds.js","src/render/caster.js","src/game/spill.js"],"assets/skater/":["src/game/skater.js","src/game/rig.js","src/game/kit.js","src/game/player.js","src/render/caster.js"],"assets/samurai/":["src/game/samurai.js","src/game/rig.js","src/game/kit.js","src/game/player.js","src/game/ribbon.js","src/render/caster.js"],"assets/fisher/":["src/game/fisher.js","src/game/rig.js","src/game/kit.js","src/game/player.js","src/game/splashes.js","src/game/tank.js","src/render/caster.js"],"assets/fox/":["src/game/fox.js","src/game/companion.js","src/game/kit.js","src/game/rig.js","src/render/caster.js"],"assets/dragon/":["src/game/dragon.js","src/game/flyer.js","src/game/kit.js","src/game/rig.js","src/render/caster.js"],"assets/pitcher/":["src/game/pitcher.js","src/game/sprout.js","src/game/kit.js","src/game/rig.js","src/render/caster.js","src/game/companion.js"]};
+    </script>
+    <!-- release:end -->
+    <!-- What the game needs first, asked for at once, before any of its code
+         has run: every module the title screen needs (the list above, from
+         tools/preload.py), then the runner who ran last time and whoever ran
+         with them - their modules and their models (src/game/runner-asset.js
+         picks the models up). The game leaves the hint (er.assets) whenever
+         someone's picked; on a first visit it's the two who run by default.
+         And the stylesheet, alongside, without holding the loading screen up
+         (the game waits for it before showing the title screen). -->
     <script>
       (function () {
+        var V = window.__erV || {};
+        var url = (window.__erUrl = function (p) {
+          return V[p] ? p + '?v=' + V[p] : p;
+        });
+        var head = document.head;
+        var map = {};
+        try {
+          if (HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')) map = JSON.parse(document.querySelector('script[type=importmap]').textContent).imports;
+        } catch (e) {
+          /* no import maps here: the modules load as they are */
+        }
+        var wanted = {};
+        var preload = function (p) {
+          var href = map['./' + p] || p;
+          if (wanted[href]) return;
+          wanted[href] = 1;
+          var l = document.createElement('link');
+          l.rel = 'modulepreload';
+          l.href = href;
+          head.appendChild(l);
+        };
+        (window.__erStart || []).forEach(preload);
+
         var bases = ['assets/explorer/', 'assets/fox/'];
         try {
-          if (/[?&](runner|companion|manual)\b/.test(location.search)) return;
+          if (/[?&](runner|companion|manual)\b/.test(location.search)) bases = [];
           var saved = JSON.parse(localStorage.getItem('er.assets') || 'null');
-          if (Array.isArray(saved)) {
+          if (bases.length && Array.isArray(saved)) {
             bases = saved.filter(function (b) {
               return typeof b === 'string' && /^assets\/[a-z0-9-]+\/$/.test(b);
             });
@@ -33,17 +85,58 @@
           /* storage unavailable: the defaults */
         }
         var early = (window.__erAssets = {});
+        // (the model packed, where the browser can unpack it: see runner-asset.js)
+        var packed = typeof DecompressionStream === 'function';
         bases.slice(0, 2).forEach(function (b) {
-          var e = (early[b] = { json: fetch(b + 'runner.json'), bin: fetch(b + 'runner.bin') });
+          ((window.__erBy || {})[b] || []).forEach(preload);
+          var bin = b + (packed ? 'runner.bin.gz' : 'runner.bin');
+          var e = (early[b] = { json: fetch(url(b + 'runner.json')), bin: fetch(url(bin)), packed: packed });
           // (a failure is the loader's to deal with, if it ever asks)
           e.json.catch(function () {});
           e.bin.catch(function () {});
         });
+
+        // (as a stylesheet for print, which no browser holds the page up
+        // for, switched over once it's here)
+        var css = document.createElement('link');
+        window.__erCss = new Promise(function (done) {
+          css.onload = css.onerror = function () {
+            css.onload = css.onerror = null;
+            css.media = 'all';
+            document.documentElement.classList.add('styled');
+            done();
+          };
+        });
+        css.rel = 'stylesheet';
+        css.media = 'print';
+        css.setAttribute('fetchpriority', 'high');
+        css.href = url('css/style.css');
+        head.appendChild(css);
+
+        // the loading screen's bar, while the code is still on its way: how
+        // many of the modules asked for above are here (see ui.js for the rest)
+        var all = Object.keys(wanted).length || 1;
+        var got = {};
+        window.__erCode = 0;
+        try {
+          new PerformanceObserver(function (list) {
+            list.getEntries().forEach(function (e) {
+              var p = e.name.replace(location.origin + location.pathname.replace(/[^/]*$/, ''), '');
+              if (wanted[p] && !got[p]) {
+                got[p] = 1;
+                window.__erCode = Object.keys(got).length / all;
+                var bar = document.querySelector('#loading .loader-bar i');
+                if (bar && !window.__erLoader) bar.style.transform = 'scaleX(' + (0.3 * window.__erCode).toFixed(3) + ')';
+              }
+            });
+          }).observe({ type: 'resource', buffered: true });
+        } catch (e) {
+          /* no resource timing: the bar starts once the code has run */
+        }
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="css/style.css?v=56" />
     <!-- The typeface comes from another server, and a stylesheet in the head
          holds up both the first paint and the game's own script until it has
          answered (or failed to: a slow or blocked font server would hold the
@@ -57,88 +150,6 @@
       media="print"
       onload="this.media = 'all'"
     />
-    <!-- Every module the game loads, fetched at once rather than found one
-         layer of imports at a time (see tools/preload.py, which writes this
-         list: run it after adding or removing a module). -->
-    <!-- modulepreload:start (written by tools/preload.py) -->
-    <link rel="modulepreload" href="vendor/three/three.module.min.js" />
-    <link rel="modulepreload" href="vendor/three/three.core.min.js" />
-    <link rel="modulepreload" href="src/config.js" />
-    <link rel="modulepreload" href="src/render/shaders.js" />
-    <link rel="modulepreload" href="src/render/textures.js" />
-    <link rel="modulepreload" href="src/game/game.js" />
-    <link rel="modulepreload" href="src/game/runner-asset.js" />
-    <link rel="modulepreload" href="src/game/characters.js" />
-    <link rel="modulepreload" href="src/game/companions.js" />
-    <link rel="modulepreload" href="src/core/input.js" />
-    <link rel="modulepreload" href="src/core/audio.js" />
-    <link rel="modulepreload" href="src/ui/ui.js" />
-    <link rel="modulepreload" href="src/core/pacer.js" />
-    <link rel="modulepreload" href="src/core/quality.js" />
-    <link rel="modulepreload" href="src/core/rng.js" />
-    <link rel="modulepreload" href="src/render/particles.js" />
-    <link rel="modulepreload" href="src/world/world.js" />
-    <link rel="modulepreload" href="src/world/index.js" />
-    <link rel="modulepreload" href="src/game/course.js" />
-    <link rel="modulepreload" href="src/game/chunks.js" />
-    <link rel="modulepreload" href="src/game/obstacles.js" />
-    <link rel="modulepreload" href="src/game/gems.js" />
-    <link rel="modulepreload" href="src/render/sparkles.js" />
-    <link rel="modulepreload" href="src/game/camera.js" />
-    <link rel="modulepreload" href="src/game/portal.js" />
-    <link rel="modulepreload" href="src/game/dream.js" />
-    <link rel="modulepreload" href="src/game/bubbles.js" />
-    <link rel="modulepreload" href="src/game/splash.js" />
-    <link rel="modulepreload" href="src/game/warp.js" />
-    <link rel="modulepreload" href="src/game/sands.js" />
-    <link rel="modulepreload" href="src/game/progress.js" />
-    <link rel="modulepreload" href="src/game/powers.js" />
-    <link rel="modulepreload" href="src/game/powerfx.js" />
-    <link rel="modulepreload" href="src/game/wayfarer.js" />
-    <link rel="modulepreload" href="src/game/explorer.js" />
-    <link rel="modulepreload" href="src/game/elder.js" />
-    <link rel="modulepreload" href="src/game/bunny.js" />
-    <link rel="modulepreload" href="src/game/skater.js" />
-    <link rel="modulepreload" href="src/game/samurai.js" />
-    <link rel="modulepreload" href="src/game/fox.js" />
-    <link rel="modulepreload" href="src/game/dragon.js" />
-    <link rel="modulepreload" href="src/game/companion.js" />
-    <link rel="modulepreload" href="src/game/flyer.js" />
-    <link rel="modulepreload" href="src/game/pitcher.js" />
-    <link rel="modulepreload" href="src/game/sprout.js" />
-    <link rel="modulepreload" href="src/render/batch.js" />
-    <link rel="modulepreload" href="src/render/geo.js" />
-    <link rel="modulepreload" href="src/world/planets.js" />
-    <link rel="modulepreload" href="src/world/village.js" />
-    <link rel="modulepreload" href="src/world/rooftops.js" />
-    <link rel="modulepreload" href="src/world/corridor.js" />
-    <link rel="modulepreload" href="src/world/conservatory.js" />
-    <link rel="modulepreload" href="src/world/causeway.js" />
-    <link rel="modulepreload" href="src/world/forest.js" />
-    <link rel="modulepreload" href="src/world/hell.js" />
-    <link rel="modulepreload" href="src/world/time.js" />
-    <link rel="modulepreload" href="src/world/ocean.js" />
-    <link rel="modulepreload" href="src/world/frost.js" />
-    <link rel="modulepreload" href="src/world/space.js" />
-    <link rel="modulepreload" href="src/game/drift.js" />
-    <link rel="modulepreload" href="src/game/dust.js" />
-    <link rel="modulepreload" href="src/game/rig.js" />
-    <link rel="modulepreload" href="src/game/cloth.js" />
-    <link rel="modulepreload" href="src/game/kit.js" />
-    <link rel="modulepreload" href="src/game/outfit.js" />
-    <link rel="modulepreload" href="src/game/player.js" />
-    <link rel="modulepreload" href="src/game/spill.js" />
-    <link rel="modulepreload" href="src/game/sparks.js" />
-    <link rel="modulepreload" href="src/game/props.js" />
-    <link rel="modulepreload" href="src/game/seeds.js" />
-    <link rel="modulepreload" href="src/game/ribbon.js" />
-    <link rel="modulepreload" href="src/render/caster.js" />
-    <link rel="modulepreload" href="src/world/shapes.js" />
-    <link rel="modulepreload" href="src/world/whimsy.js" />
-    <link rel="modulepreload" href="src/world/gems.js" />
-    <link rel="modulepreload" href="src/world/lane-art.js" />
-    <link rel="modulepreload" href="src/world/hall-art.js" />
-    <!-- modulepreload:end -->
   </head>
   <body>
     <!-- the pearl icon's sheen (the Kelp Deep's counter), shared by every copy of it -->
@@ -163,6 +174,9 @@
     <div id="ui">
       <div id="loading" class="screen show">
         <div class="loader-title">unfolding…</div>
+        <div class="loader-bar" aria-hidden="true"><i></i></div>
+        <p class="loader-stage" aria-live="polite">fetching the code</p>
+        <button class="loader-retry" type="button">Try again</button>
       </div>
 
       <div id="title" class="screen">
@@ -308,6 +322,6 @@
       <pre id="stats"></pre>
     </div>
 
-    <script type="module" src="src/main.js?v=56"></script>
+    <script type="module" src="src/main.js?v=6f2a2a53da"></script>
   </body>
 </html>

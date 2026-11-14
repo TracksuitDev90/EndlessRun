@@ -1299,57 +1299,94 @@ export default {
     { env: { snow: { lift: 1 }, trip: [0.08, 0.3, 0.12], particles2: { drift: [-0.3, 1.5, 0.1] } } },
   ],
 
-  build(b) {
+  *build(b) {
     const ICE = [1, 0.9, 0.9];
     b.ground('ground', snowStrip(), 15, { banks: true, cap: 24 });
+    yield;
     // the glacier: three stretches of wall that stand in any order, the
     // headlands their runs end in (and, smaller, icebergs out on the field),
     // frozen falls, the great arch
     const CLIFF = { cap: 44, anim: [2, 70, 140, 0], ink: 0.06, ice: ICE, snow: [0.72, 0.22, 0.22, 1] };
     b.toon('cliffA', cliffGeo(3, 0.1), CLIFF);
+    yield;
     b.toon('cliffB', cliffGeo(11, 0.3), CLIFF);
+    yield;
     b.toon('cliffC', cliffGeo(29, -0.06), CLIFF);
+    yield;
     b.toon('headland', headlandGeo(5), { cap: 24, anim: [4, 80, 150, 40], dream: 0, ink: 0.06, ice: ICE, snow: [0.72, 0.22, 0.22, 1] });
+    yield;
     b.toon('berg', headlandGeo(17, 16, 6.5), { cap: 40, anim: 'liftFar', ink: 0.05, ice: ICE, snow: [0.7, 0.2, 0.22, 1] });
+    yield;
     b.toon('fall', fallGeo(7), { cap: 24, anim: [2, 70, 140, 0], ink: 0.05, ice: [0.25, 1, 1], snow: [0.85, 0.5, 0.15, 0.8] });
+    yield;
     b.toon('arch', archGeo(), { cap: 6, anim: 'popLate', ink: 0.07, ice: ICE, snow: [0.74, 0.3, 0.22, 1] });
+    yield;
     b.toon('peak', peakGeo(4), { cap: 30, anim: 'liftFar', ink: 0 });
+    yield;
     b.toon('peakB', peakGeo(19), { cap: 30, anim: 'liftFar', ink: 0 });
+    yield;
     // by the route
     const SOFT = [0.86, 0.5, 0.2, 1];
     b.toon('fir', merge(firParts({ h: 9, tiers: 5, r: 2.3, seed: 3 })), { cap: 150, anim: 'pop', ink: 0.045, marks: [2.4, 2], bark: true, snow: SOFT });
+    yield;
     b.toon('firB', merge(firParts({ h: 12.5, tiers: 6, r: 2.9, seed: 8 })), { cap: 110, anim: 'pop', ink: 0.045, marks: [2.4, 2], bark: true, snow: SOFT });
+    yield;
     b.toon('firYoung', merge(firParts({ h: 4.6, tiers: 4, r: 1.5, seed: 14, seg: 7 })), { cap: 110, anim: 'pop', ink: 0.04, marks: [2, 2], bark: true, snow: SOFT });
+    yield;
     b.toon('rock', rockGeo(5), { cap: 90, anim: 'pop', ink: 0.045, snow: SOFT });
+    yield;
     b.toon('rockB', rockGeo(12, 1.5), { cap: 60, anim: 'pop', ink: 0.045, snow: SOFT });
+    yield;
     b.toon('drift', driftGeo({ seed: 1 }), { cap: 220, anim: 'pop', ink: 0.035, snow: [0, 0, 1, 0] });
+    yield;
     b.toon('driftLong', driftGeo({ rx: 2.0, h: 0.6, rz: 4.6, seed: 4, up: 2.2, out: 0.3 }), { cap: 160, anim: 'pop', ink: 0.035, snow: [0, 0, 1, 0] });
+    yield;
     b.toon('driftFar', farDriftGeo(2), { cap: 90, anim: 'pop', dream: 0, ink: 0, snow: [0, 0, 1, 0] });
+    yield;
     b.toon('floe', merge(floeParts({ seed: 2 })), { cap: 120, anim: 'pop', ink: 0.045, ice: ICE, snow: [0, 0, 1, 0] });
+    yield;
     b.toon('slab', slabGeo(6), { cap: 70, anim: 'pop', ink: 0.05, ice: ICE, snow: [0.6, 0.2, 0.25, 1] });
+    yield;
     b.toon('fence', fenceGeo(), { cap: 40, anim: 'pop', ink: 0.04, snow: [0, 0, 1, 0] });
+    yield;
     b.toon('cabin', cabinGeo(), { cap: 14, anim: 'pop', ink: 0.045, ice: [0, 1, 1], snow: [0, 0, 1, 0] });
+    yield;
     // later laps: plates of ice adrift over the field, turning
     b.toon('floeAloft', merge(floeParts({ r: 1.6, seed: 9 })), { cap: 40, anim: 'lift', ink: 0.045, ice: ICE, tumble: [0.05, 0.035, 0.3], fly: [0, 0, 1.6, 0.1] });
+    yield;
     b.glow('glow', { cap: 60, anim: 'pop' });
+    yield;
     b.pool('pool', { cap: 30, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 160, anim: 'pop' });
+    yield;
 
     // obstacles (none of them takes the settling snow)
     b.toon('trunk', trunkGeo(), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [1.6, 1.6], bark: true });
+    yield;
     // (what you play against holds less light than the glacier does: it
     // stays dark enough to stand off the ice and the snow)
     const HAZARD = [1, 0.8, 0.35];
     b.toon('ridge', ridgeGeo(), { cap: 24, anim: 'popEarly', ink: 0.05, ice: HAZARD });
+    yield;
     b.toon('fissureDeep', fissureMouth(-15, 15, 5), { cap: 10, anim: 'popEarly', ink: 0, crevasse: [FISSURE_W, 0.95, 0.18] });
+    yield;
     b.toon('fissureLips', fissureLipsGeo(9), { cap: 10, anim: 'popEarly', ink: 0.04, ice: HAZARD });
+    yield;
     b.toon('bough', boughGeo(), { cap: 24, anim: 'popEarly', ink: 0.045, marks: [2, 2], bark: true });
+    yield;
     b.toon('ledge', ledgeGeo(0.95, [-0.98, 0.98]), { cap: 24, anim: 'popEarly', ink: 0.045, ice: HAZARD });
+    yield;
     b.toon('lowArch', lowArchGeo(), { cap: 10, anim: 'popEarly', ink: 0.05, ice: HAZARD });
+    yield;
     b.toon('pillar', pillarGeo(3), { cap: 24, anim: 'popEarly', ink: 0.05, ice: HAZARD });
+    yield;
     b.toon('pillarB', pillarGeo(8), { cap: 24, anim: 'popEarly', ink: 0.05, ice: HAZARD });
+    yield;
     b.toon('boulderW', boulderWallGeo(), { cap: 24, anim: 'popEarly', ink: 0.05 });
+    yield;
     b.toon('sled', sledGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
   },
 
   // The door INTO this world, in its own style (built into the shared

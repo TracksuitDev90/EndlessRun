@@ -3,8 +3,16 @@
 // explorer) into assets/<runner>/, and loaded once: whoever's running (and
 // whoever with them) before the title screen, everyone else behind it (see
 // main.js).
+//
+// The model comes gzipped (runner.bin.gz, written by tools/preload.py:
+// GitHub Pages sends a .bin as it is, and packed it's a little over half the
+// size) and is unpacked here, as it streams in; a browser that can't unpack
+// it (no DecompressionStream) fetches the .bin. Every URL carries the file's
+// version (see index.html).
 
 const cache = new Map();
+const packed = typeof DecompressionStream === 'function';
+const url = globalThis.__erUrl || ((p) => p);
 
 // The page starts fetching the two who ran last time before any of this code
 // has loaded (see the script at the top of index.html): their responses, to
@@ -17,21 +25,49 @@ function request(base, file, kind) {
     return r;
   };
   const head = early[base] && early[base][kind];
-  if (head) {
+  if (head && (kind !== 'bin' || early[base].packed === packed)) {
     // (a response can be read only once; if the early try failed, ask again)
     early[base][kind] = null;
-    return head.then(ok).catch(() => fetch(base + file).then(ok));
+    return head.then(ok).catch(() => fetch(url(base + file)).then(ok));
   }
-  return fetch(base + file).then(ok);
+  return fetch(url(base + file)).then(ok);
+}
+
+// The body of a response, as it arrives: onBytes(got, total) as it does (for
+// the loading screen), unpacked if it's gzip. (If something on the way has
+// already unpacked it - a server that sent it as gzip-encoded - it's taken as
+// it is: a gzip stream starts 1f 8b.)
+async function body(r, onBytes, gz) {
+  const total = Number(r.headers.get('content-length')) || 0;
+  let stream = r.body;
+  if (onBytes && stream) {
+    let got = 0;
+    stream = stream.pipeThrough(
+      new TransformStream({
+        transform(chunk, c) {
+          got += chunk.byteLength;
+          onBytes(got, total);
+          c.enqueue(chunk);
+        },
+      })
+    );
+  }
+  if (!gz) return new Response(stream).arrayBuffer();
+  const raw = new Uint8Array(await new Response(stream).arrayBuffer());
+  if (raw[0] !== 0x1f || raw[1] !== 0x8b) return raw.buffer;
+  return new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
 
 // (asked for twice while it's on its way, it's fetched once; one that failed
-// can be asked for again)
-export function loadRunner(base) {
+// can be asked for again) onBytes(got, total): the model's download, as it
+// goes.
+export function loadRunner(base, onBytes) {
   if (cache.has(base)) return cache.get(base);
+  const bin = packed ? 'runner.bin.gz' : 'runner.bin';
+  const progress = onBytes && ((got, total) => onBytes(base, got, total));
   const loading = Promise.all([
     request(base, 'runner.json', 'json').then((r) => r.json()),
-    request(base, 'runner.bin', 'bin').then((r) => r.arrayBuffer()),
+    request(base, bin, 'bin').then((r) => body(r, progress, packed)),
   ]).then(
     ([meta, bin]) => ({ base, meta, bin }),
     (e) => {

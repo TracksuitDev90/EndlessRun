@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { weld } from './geo.js';
+import { welding } from './geo.js';
 
 // One prop type = one InstancedMesh (+ an ink-outline InstancedMesh sharing the
 // same instance buffers). Placements are kept as plain records in track
@@ -50,17 +50,28 @@ export class Batch {
     }
   }
 
-  // Index the geometry (see weld in geo.js) before it is first drawn.
-  weld() {
+  // Index the geometry (see weld in geo.js) before it is first drawn - a
+  // step at a time (welding), or at once (weld).
+  *welding() {
     const geo = this.mesh.geometry;
     if (geo.index) return;
-    geo.deleteAttribute('aInst');
-    const w = weld(geo);
+    // (welded without the per-instance attribute, which is put back after)
+    const bare = new THREE.BufferGeometry();
+    for (const [k, a] of Object.entries(geo.attributes)) if (k !== 'aInst') bare.setAttribute(k, a);
+    let w = bare;
+    for (const r of welding(bare)) {
+      if (r) w = r;
+      else yield;
+    }
+    if (w === bare) return;
     w.setAttribute('aInst', this.aux);
-    if (w === geo) return;
     this.mesh.geometry = w;
     if (this.ink) this.ink.geometry = w;
     geo.dispose();
+  }
+
+  weld() {
+    for (const _ of this.welding());
   }
 
   // An instance is invisible while it is more than `beyond` metres ahead of
@@ -93,13 +104,6 @@ export class Batch {
       this.ink.count = k;
       this.ink.visible = k > 0;
     }
-  }
-
-  setCompileVisible(on) {
-    if (on) this._wasVisible = this.mesh.visible;
-    const v = on ? true : this._wasVisible;
-    this.mesh.visible = v;
-    if (this.ink) this.ink.visible = v;
   }
 
   prep(mesh) {
@@ -256,12 +260,20 @@ export class KindBatch {
     });
   }
 
-  weld() {
-    const w = weld(this.base);
+  *welding() {
+    let w = this.base;
+    for (const r of welding(this.base)) {
+      if (r) w = r;
+      else yield;
+    }
     if (w === this.base) return;
     this.base.dispose();
     this.base = w;
     this.share();
+  }
+
+  weld() {
+    for (const _ of this.welding());
   }
 
   hideUntilNear() {}
@@ -269,10 +281,6 @@ export class KindBatch {
 
   set renderOrder(v) {
     for (const b of this.parts) b.renderOrder = v;
-  }
-
-  setCompileVisible(on) {
-    for (const b of this.parts) b.setCompileVisible(on);
   }
 
   add(it) {

@@ -277,10 +277,15 @@ function deckGeo() {
 // A colonnade along each side: four columns to a chunk, the architrave on
 // them painted in bands, the torus moulding along it and the cavetto
 // cornice over it striped like a temple's.
-function colonnadeGeo(variant) {
+// (a generator - a breath after each column: the build takes the geometry
+// with yield*)
+function* colonnadeGeo(variant) {
   const parts = [];
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 4; i++) parts.push(...papyrusColumn(variant, s * COL_X, -2 - i * 4));
+    for (let i = 0; i < 4; i++) {
+      parts.push(...papyrusColumn(variant, s * COL_X, -2 - i * 4));
+      yield;
+    }
     const y = STYLO_Y + COL_H;
     parts.push(part(P.box(1.5, 0.95, 16), E.lime, { x: s * COL_X, y: y + 0.47, z: -8 }));
     [E.lapis, E.gold, E.red].forEach((c, k) => parts.push(part(P.box(0.06, 0.18, 16), c, { x: s * (COL_X - 0.76), y: y + 0.2 + k * 0.26, z: -8, outline: 0 })));
@@ -710,34 +715,60 @@ export default {
     },
   ],
 
-  build(b) {
+  *build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 12);
+    yield;
     b.toon('cloudSea', groundStrip(420, 16, '#f2a04a', 8, { y: -15 }), { ink: 0, cap: 40 });
+    yield;
     b.toon('deck', deckGeo(), { cap: 40, ink: 0.04 });
-    b.toon('colonnadeA', colonnadeGeo(0), { cap: 40, anim: 'rise', ink: 0.045 });
-    b.toon('colonnadeB', colonnadeGeo(1), { cap: 40, anim: 'rise', ink: 0.045 });
+    yield;
+    b.toon('colonnadeA', yield* colonnadeGeo(0), { cap: 40, anim: 'rise', ink: 0.045 });
+    yield;
+    b.toon('colonnadeB', yield* colonnadeGeo(1), { cap: 40, anim: 'rise', ink: 0.045 });
+    yield;
     b.toon('sphinxes', sphinxesGeo([4, 12]), { cap: 30, anim: 'pop', ink: 0.045 });
+    yield;
     b.toon('sphinxesLate', sphinxesGeo([13]), { cap: 10, anim: 'pop', ink: 0.045 });
+    yield;
     b.toon('brazier', brazierGeo(), { cap: 40, anim: 'pop', ink: 0.03, flame: true });
+    yield;
     b.toon('obelisk', merge(obeliskParts(9)), { cap: 30, anim: 'pop', ink: 0.045 });
+    yield;
     b.toon('pylon', pylonGeo(), { cap: 6, anim: 'popLate', ink: 0.05 });
+    yield;
     b.toon('cloud', merge(cloudParts({ r: 3, lo: E.cloudLo, hi: E.cloudHi })), { cap: 240, anim: 'lift', wobble: [0, 0.5, 0.4, 0], ink: 0.05 });
+    yield;
     b.toon('island', islandGeo(4, 0), { cap: 40, anim: 'liftFar', wobble: [0, 0.7, 0.35, 0], marks: [2, 2] });
+    yield;
     b.toon('islandB', islandGeo(12, 1), { cap: 40, anim: 'liftFar', wobble: [0, 0.6, 0.3, 0], marks: [2, 2] });
+    yield;
     b.toon('islandC', islandGeo(7, 2), { cap: 30, anim: 'liftFar', wobble: [0, 0.65, 0.32, 0], marks: [2, 2] });
+    yield;
     b.toon('plateau', plateauGeo(), { cap: 8, anim: 'liftFar', ink: 0.04, wobble: [0, 0.4, 0.2, 0] });
+    yield;
     b.glow('glow', { cap: 80, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    yield;
     b.toon('ibis', merge(ibisParts()), { cap: 160, anim: 'lift', fly: [0.85, 6.5, 1.2, 0.5], ink: 0.02 });
+    yield;
     b.toon('barque', barqueGeo(), { cap: 16, anim: 'liftFar', fly: [0, 0, 4, 0.06], wobble: [0, 0.8, 0.25, 0], ink: 0.04 });
+    yield;
 
     b.toon('sarcophagus', sarcophagusGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('offering', offeringGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('screenWall', screenWallGeo(), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('lintel', lintelGeo(0.95), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('gateway', lintelGeo(4.0), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('obeliskW', merge(obeliskParts(7.5)).translate(0, 0, -0.65), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('colossus', colossusGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
   },
 
   // The door INTO this world, in its own style (built into the shared

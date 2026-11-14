@@ -1494,62 +1494,105 @@ export default {
     { env: { trip: [0.08, 0.3, 0.12] } },
   ],
 
-  build(b) {
+  *build(b) {
     const SWAY = { anim: 'pop', ink: 0.03 };
     b.ground('ground', seabedStrip(), 9);
+    yield;
     b.toon('seagrass', merge(seagrassParts({ seed: 2 })), { cap: 90, anim: 'pop', ink: 0, side: THREE.DoubleSide, current: [5, 1.4, 1.2, 3] });
+    yield;
     b.toon('anemone', merge(anemoneParts({ seed: 4 })), { ...SWAY, cap: 60, current: [3, 1.6, 2.0, 2] });
+    yield;
     b.toon('coralHead', merge(brainParts({ r: 0.6, color: '#ffffff', tint: 1 })), { cap: 60, anim: 'pop', ink: 0.035 });
+    yield;
     b.toon('staghorn', merge(staghornParts({ seed: 5, color: '#ffffff', tip: '#ffffff', tint: 1 })), { cap: 50, anim: 'pop', ink: 0.03 });
+    yield;
     b.toon('table', merge(tableParts({ seed: 2, color: '#ffffff', tint: 1 })), { cap: 40, anim: 'pop', ink: 0.035 });
+    yield;
     b.toon('sponge', merge(spongeParts({ seed: 3, color: '#ffffff', tint: 1 })), { cap: 40, anim: 'pop', ink: 0.03 });
+    yield;
     b.toon('fanSmall', lod(0.65, () => merge(fanParts({ seed: 7, color: '#ffffff', tint: 1 }))), { cap: 40, anim: 'pop', ink: 0.03 });
+    yield;
     b.toon('rockSmall', merge([boulder({ r: 0.8, sy: 0.6, seed: 3 })]), { cap: 50, anim: 'pop', ink: 0.04 });
+    yield;
     b.toon('reef', lod(0.65, () => merge(reefParts(1))), { cap: 30, anim: 'pop', ink: 0.035 });
+    yield;
     b.toon('reefB', lod(0.65, () => merge(reefParts(6))), { cap: 30, anim: 'pop', ink: 0.035 });
+    yield;
     b.toon('kelp', merge(kelpParts({ h: 13, seed: 3, flat: true })), { cap: 70, anim: 'rise', ink: 0, side: THREE.DoubleSide, current: [0.9, 0.55, 0.32, 0.5] });
+    yield;
     b.toon('kelpB', merge(kelpParts({ h: 17, stalks: 4, blades: 13, seed: 8, flat: true })), { cap: 50, anim: 'rise', ink: 0, side: THREE.DoubleSide, current: [1.1, 0.48, 0.28, 0.6] });
+    yield;
     b.toon('stack', lod(0.65, () => merge(stackParts({ seed: 2 }))), { cap: 30, anim: 'liftFar', ink: 0.05 });
+    yield;
     b.toon('stackB', merge(stackParts({ seed: 9, h: 10 })), { cap: 30, anim: 'liftFar', ink: 0.05 });
+    yield;
     b.toon('rockArch', merge(rockArchParts()), { cap: 6, anim: 'liftFar', ink: 0.05 });
+    yield;
     // schools: silver fish streaming by, dark shoals in the distance, bait
     // balls milling, and columns of bubbles from vents in the reef
     const silver = () => fishParts({ len: 0.42 });
     const dark = () => fishParts({ len: 0.6, back: C.fishDark, belly: '#2a5a62', deep: 0.42 });
     b.toon('school', lod(0.6, () => schoolGeo({ n: 70, mode: 0, L: 36, H: 1.4, W: 2.2, make: silver, seed: 3 })), { cap: 30, ink: 0, school: [3.2, 36, 1.8, 0] });
+    yield;
     b.toon('schoolDark', lod(0.6, () => schoolGeo({ n: 46, mode: 0, L: 44, H: 2.4, W: 3.4, make: dark, seed: 7 })), { cap: 24, ink: 0, school: [2.4, 44, 3, 0] });
+    yield;
     b.toon('baitball', schoolGeo({ n: 110, mode: 1, L: 40, H: 1.6, R: 3, make: () => fishParts({ len: 0.26 }), seed: 11 }), { cap: 10, ink: 0, school: [3.6, 40, 0, 1] });
+    yield;
     b.toon('bubbles', schoolGeo({ n: 26, mode: 2, L: 14, W: 0.5, make: (r) => [part(P.sphere(0.05 + r() * 0.07, 6, 4), '#e8fffa', { emit: 0.7, outline: 0 })], seed: 5 }), { cap: 16, ink: 0, school: [1.8, 14, 0, 2] });
+    yield;
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', ink: 0.018, side: THREE.DoubleSide, jelly: [0.5, 0.16, 1.0, 0.35], fly: [0, 0, 1.0, 0.1] });
+    yield;
     b.toon('manta', merge(mantaParts()), { cap: 6, anim: 'liftFar', ink: 0.035, fly: [0.75, 1.3, 2.0, 0.07] });
+    yield;
     b.toon('turtle', merge(turtleParts()), { cap: 8, anim: 'lift', ink: 0.035, fly: [0.5, 1.6, 1.4, 0.1] });
+    yield;
     // the critters, zooming round (see SWIM): sea lions racing big figures
     // of eight, flinging themselves into barrel rolls; octopuses jetting in
     // spurts; seahorses bobbing and darting about the seagrass
     b.toon('seaLion', merge(seaLionParts()), { cap: 16, anim: 'lift', ink: 0.03, swim: [0.95, 5, 0.8, 2.4], swim2: [0.5, 1, 1.7, 0.35], swim3: [0.45, 1, 0] });
+    yield;
     b.toon('octopus', lod(0.7, () => merge(octopusParts(3))), { cap: 16, anim: 'lift', ink: 0.028, swim: [0.9, 2.3, 0.6, 1.2], swim2: [0.3, 0, 1.2, 0.13], swim3: [0.7, 1, 1] });
+    yield;
     b.toon('seahorse', lod(0.65, () => merge(seahorseParts())), { cap: 40, anim: 'lift', ink: 0.022, swim: [1.0, 1.2, 0.35, 0.6], swim2: [0.12, 0, 1.0, 0.18], swim3: [0.55, 0, 2] });
+    yield;
     b.toon('whaleFar', merge(whaleParts()), { cap: 4, anim: 'liftFar', ink: 0.04, pleats: true, cross: [0, 1.3, 0.9, 0], fly: [0, 0, 3, 0.04] });
+    yield;
     b.beam('ray', merge(shaftParts({ len: 44, r0: 0.5, r1: 2.4, dir: RAY })), { cap: 60, anim: 'pop', wobble: [0.0011, 0, 0.3, 0] });
+    yield;
     b.glow('glow', { cap: 90, anim: 'pop' });
+    yield;
     b.pool('pool', { cap: 40, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    yield;
 
     b.toon('brain', brainGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('clam', clamGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
     // (now and then it pops open and bubbles pour out)
     b.toon('chest', chestGeo(), { cap: 24, anim: 'popEarly', ink: 0.04, lid: CHEST_LID });
+    yield;
     b.toon('ridge', ridgeGeo(), { cap: 10, anim: 'popEarly', ink: 0.04 });
+    yield;
     b.toon('arch', archGeo(0.95), { cap: 24, anim: 'popEarly', ink: 0.045 });
+    yield;
     // (the whale swims in from far off rather than unfolding)
     // (three kinds; the same swim, song and shadow - see the HW obstacles)
     b.toon('whale', merge(humpbackParts()).translate(0, 0, -WHALE_HALF), { cap: 6, ink: 0.05, pleats: true, cross: WHALE_CROSS });
+    yield;
     b.toon('whaleBlue', merge(blueParts()).translate(0, 0, -WHALE_HALF), { cap: 6, ink: 0.05, pleats: true, cross: WHALE_CROSS });
+    yield;
     b.toon('whaleSperm', merge(spermParts()).translate(0, 0, -WHALE_HALF), { cap: 6, ink: 0.05, pleats: true, cross: WHALE_CROSS });
+    yield;
     b.shadow('whaleShadow', { cap: 10, plane: { w: 15.5, d: 4.8, x: -1.4, z: -1.75 }, cross: WHALE_CROSS });
+    yield;
     b.toon('kelpW', kelpWallGeo(), { cap: 24, anim: 'popEarly', ink: 0.03, current: [0.7, 0.6, 0.35, 0.4] });
+    yield;
     b.toon('tower', towerGeo(), { cap: 24, anim: 'popEarly', ink: 0.045 });
+    yield;
     b.toon('fanW', fanWallGeo(), { cap: 24, anim: 'popEarly', ink: 0.04 });
+    yield;
 
   },
 

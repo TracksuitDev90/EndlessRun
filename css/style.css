@@ -120,6 +120,13 @@ button {
   letter-spacing: 0.08em;
   animation: breathe 1.6s ease-in-out infinite;
 }
+/* (the bar, the line under it and the retry button: index.html styles them,
+   so they show before this stylesheet has arrived) */
+#loading.failed .loader-title {
+  animation: none;
+  max-width: 80vw;
+  text-align: center;
+}
 
 /* --- title --------------------------------------------------------------- */
 /* On a phone held upright, top to bottom: the wordmark (kept small), the
@@ -699,6 +706,22 @@ body:not(.touch) .touch-only {
 }
 .pick-wanted .pick-wait {
   background: var(--c1);
+}
+/* their download failed (twice): the stamp turns to a retry - tapping the
+   card tries again */
+.pick-failed .pick-wait i {
+  display: none;
+}
+.pick-failed .pick-wait::after {
+  content: '↻';
+  font: 600 13px/4px var(--serif);
+  color: var(--ink);
+}
+.pal-failed .pal-text {
+  animation: none;
+}
+.pal-failed .pal-title::after {
+  content: ' · tap to retry';
 }
 .pal-loading .pal-face,
 .pal-loading[aria-checked='false'] .pal-face {

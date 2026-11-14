@@ -1,6 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeEnvUniforms, copyEnvUniforms, makeSheenMaterial, makeRootMaterial } from '../render/shaders.js';
-import { WORLD_DEFS } from '../world/index.js';
 import { Dust } from './dust.js';
 
 // What the companions' abilities (powers.js) leave in the world to be seen,
@@ -22,9 +21,10 @@ const _q = new THREE.Quaternion();
 const _UP = new THREE.Vector3(0, 1, 0);
 
 export class PowerFx {
-  constructor(game) {
+  // (env: whatever lights it until the game copies the runner's light over)
+  constructor(game, env) {
     this.game = game;
-    this.u = makeEnvUniforms(WORLD_DEFS[0].env);
+    this.u = makeEnvUniforms(env);
     this.dust = new Dust(this.u, 200);
     this.anchor = new THREE.Object3D();
     this.sheen = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 18), makeSheenMaterial(this.u));

@@ -726,54 +726,96 @@ export default {
     },
   ],
 
-  build(b) {
+  *build(b) {
     b.ground('ground', groundStrip(11.2, 16, '#ffffff', 8), 16);
+    yield;
     // the library: its floor running out under the stacks, the galleries,
     // the stacks, the roof, lamps, ladders and shafts of sunlight
     // (the same boards, a shade darker, on out under the stacks)
     b.ground('libFloor', groundStrip(110, 16, '#a89488', 8, { y: -0.02 }), 16);
+    yield;
     b.toon('gallery', tiersGeo(), { cap: 40, ink: 0.035, anim: 'rise', shelves: true });
+    yield;
     b.toon('stacksA', stacksGeo(3), { cap: 40, ink: 0.04, anim: 'rise', shelves: true });
+    yield;
     b.toon('stacksB', stacksGeo(11), { cap: 40, ink: 0.04, anim: 'rise', shelves: true });
+    yield;
     b.toon('roof', roofGeo(false), { cap: 40, ink: 0.03 });
+    yield;
     b.toon('roofArch', roofGeo(true), { cap: 40, ink: 0.04 });
+    yield;
     b.toon('hangLamp', hangingLampGeo(2.2), { cap: 60, anim: 'pop', ink: 0.03, wobble: [0.006, 0, 0.8, 0] });
+    yield;
     b.toon('railLamp', railLampGeo(), { cap: 220, anim: 'pop', ink: 0.025 });
+    yield;
     b.toon('wallLadder', ladderGeo(GALLERY_Y + 0.3, 1.25), { cap: 20, anim: 'pop', ink: 0.03 });
+    yield;
     b.toon('shelfLadder', ladderGeo(TIER_H - GALLERY_Y - 0.6, 0.8), { cap: 30, anim: 'pop', ink: 0.03 });
+    yield;
     b.toon('tierLadder', ladderGeo(6.0, 0.9), { cap: 90, anim: 'pop', ink: 0.035 });
+    yield;
     b.beam('sunShaft', merge(shaftParts({ len: 26, r0: 0.7, r1: 1.7, dir: [0.5, 0.8, -0.3] })), { cap: 24, anim: 'pop', wobble: [0, 0, 0.6, 0] });
+    yield;
     b.toon('walls', hallWallsGeo(), { cap: 40, ink: 0.04, anim: 'rise' });
+    yield;
     b.toon('door', merge(wallDoorParts({ w: 1.5, h: 3.1, depth: 0.2 })), { cap: 200, anim: 'pop' });
+    yield;
     b.toon('openDoor', openDoorGeo(1), { cap: 40, anim: 'pop' });
+    yield;
     b.toon('openDoorR', openDoorGeo(-1), { cap: 40, anim: 'pop' });
+    yield;
     b.toon('painting', paintingsGeo(), { cap: 120, anim: 'pop', kinds: true, ink: 0 });
+    yield;
     b.toon('doorPane', doorLightGeo(), { cap: 56, anim: 'pop', ink: 0 });
+    yield;
     b.beam('doorShaft', doorShaftGeo(), { cap: 56, anim: 'pop' });
+    yield;
     // books off the shelves: some flutter fast and close, some glide in wide loops
     b.toon('shelfBook', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [1.1, 11, 0.45, 0.95], ink: 0.035 });
+    yield;
     b.toon('shelfBookB', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [0.65, 5.5, 1.1, 0.42], ink: 0.035 });
+    yield;
     b.toon('sconce', sconceGeo(), { cap: 120, anim: 'pop', ink: 0.025 });
+    yield;
     b.glow('glow', { cap: 560, anim: 'pop' });
+    yield;
     b.toon('hallFrame', hallFrameGeo(), { cap: 24, anim: 'popLate' });
+    yield;
     b.toon('floatDoor', floatingDoorGeo(), { cap: 60, anim: 'liftFar', wobble: [0, 0.4, 0.6, 0] });
+    yield;
     b.toon('floatChair', armchairGeo(1.6), { cap: 30, anim: 'liftFar', wobble: [0, 0.5, 0.45, 0] });
+    yield;
     b.shadow('shadow', { cap: 120, anim: 'pop' });
+    yield;
     b.shadow('hardShadow', { cap: 80, anim: [0, 64, 122, 0], hard: true, order: 1 });
+    yield;
     b.toon('book', merge(flyingBookParts()), { cap: 160, anim: 'lift', fly: [0.95, 8.5, 0.9, 0.55], ink: 0.035 });
+    yield;
     b.toon('teacup', merge(teacupParts()), { cap: 60, anim: 'liftFar', wobble: [0, 0.35, 0.7, 0], fly: [0, 0, 1.6, 0.25] });
+    yield;
     b.toon('teapot', merge(teapotParts()), { cap: 30, anim: 'liftFar', wobble: [0, 0.35, 0.6, 0], fly: [0, 0, 1.8, 0.2] });
+    yield;
     b.toon('clock', merge(clockParts()), { cap: 40, anim: 'liftFar', wobble: [0, 0.4, 0.5, 0], fly: [0, 0, 1.4, 0.18] });
+    yield;
 
     b.toon('armchair', armchairGeo(1.8), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('books', booksGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('settee', armchairGeo(7.6), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('lowDoorway', valanceGeo(0.98, true), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('curtain', valanceGeo(3.95, false), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('wardrobe', wardrobeGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('bookshelf', bookshelfGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('swingDoor', swingDoorGeo(), { cap: 16, anim: [3, 42, 88, Math.PI / 2] });
+    yield;
     b.toon('doorway', doorwayGeo(), { cap: 16, anim: 'none', ink: 0.03 });
+    yield;
 
   },
 

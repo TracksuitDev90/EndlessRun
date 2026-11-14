@@ -1014,65 +1014,112 @@ export default {
     },
   ],
 
-  build(b) {
+  *build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 13);
+    yield;
     b.toon('lawn', groundStrip(420, 16, C.lawn, 8, { y: -0.04, mark: 0.4 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
+    yield;
     b.toon('rib', ribGeo(), { cap: 120, anim: 'rise', ink: 0.035 });
+    yield;
     b.toon('frameLong', lod(0.6, () => frameLongGeo()), { cap: 40, anim: 'rise', ink: 0.035 });
+    yield;
     b.glass('glass', glassGeo(), { cap: 40, anim: 'rise' });
+    yield;
     // (the beds' greenery grows up out of them as you come, and the vines let
     // down from the arches: the far stretch isn't drawn - see GROW below)
     const SPROUT = [2, 50, 96, 0];
     b.toon('fern', merge(bushParts({ r: 0.62, lo: C.fern, hi: C.fernHi }).slice(0, 2)), { cap: 300, anim: SPROUT, marks: [2, 1.6], wobble: [0.01, 0, 1.6, 0] });
+    yield;
     b.toon('monstera', merge(monsteraParts({ size: 1.2, leaves: 7, seed: 5 })), { cap: 160, anim: SPROUT, wobble: [0.012, 0, 1.3, 0], leaf: true });
+    yield;
     b.toon('potCypress', merge([...potParts({ r: 0.5, h: 0.75 }), ...cypressParts({ h: 4.4, r: 0.75, lo: C.leafDeep, hi: C.leafHi, trunkH: 1.2, seg: 8 }).map((g) => g.translate(0, 0.7, 0))]), { cap: 80, anim: 'pop', marks: [3, 2.4], wobble: [0.0015, 0, 1.1, 0] });
+    yield;
     b.toon('orangeTree', lod(0.65, () => merge(orangeTreeParts())), { cap: 40, anim: 'pop', marks: [2.2, 2] });
+    yield;
     b.toon('vineLong', merge(vineGeo(2.6, 1)), { cap: 200, anim: SPROUT, wobble: [0.03, 0, 1.0, 0] });
+    yield;
     b.toon('vineShort', merge(vineGeo(1.5, 7)), { cap: 200, anim: SPROUT, wobble: [0.04, 0, 1.2, 0] });
+    yield;
     b.toon('gardenTree', merge(roundTreeParts({ r: 2.4, trunkH: 2.6, lo: '#1f5a3a', hi: '#5fae5a' })), { cap: 160, anim: 'pop', marks: [2.4, 2] });
+    yield;
     b.toon('cypress', merge(cypressParts({ h: 10, r: 1.4, lo: '#1f5a3a', hi: '#7fc25a', seg: 8 })), { cap: 200, anim: 'pop', marks: [3, 2.6], ink: 0 });
+    yield;
     b.toon('lantern', merge(lanternPostParts({ h: 2.6, pole: '#24453c', glass: C.lantern, cap: '#24453c' })), { cap: 40, anim: 'pop' });
+    yield;
     b.glow('glow', { cap: 80, anim: 'pop' });
+    yield;
     b.shadow('shadow', { cap: 220, anim: 'pop' });
+    yield;
     b.beam('shaft', merge(shaftParts({ len: 13, r0: 0.5, r1: 1.2, dir: SUN })), { cap: 90, anim: 'pop' });
+    yield;
     b.toon('butterfly', merge(butterflyParts()), { cap: 120, anim: 'pop', fly: [1.1, 16, 0.7, 0.9], ink: 0.02 });
+    yield;
     b.toon('giantBloom', merge(giantFlowerParts({ h: 4.2, kind: 'daisy', stem: '#2f7a4a' })), { cap: 60, anim: 'popEarly', wobble: [0.003, 0, 0.9, 0] });
+    yield;
     b.toon('giantTulip', merge(giantFlowerParts({ h: 3.4, kind: 'tulip', stem: '#2f7a4a' })), { cap: 60, anim: 'popEarly', wobble: [0.004, 0, 1.0, 0] });
+    yield;
     // the beds run wild: zinnias, ivy, baskets, shelves of pots, flytraps -
     // all of it growing up out of the beds (and the baskets letting down from
     // their hooks) as you come, so the far stretch, lost in the haze anyway,
     // isn't drawn at all (rise mode: see World.markHidden)
     const GROW = [2, 36, 72, 0];
     b.toon('zinniaBedA', lod(0.6, () => zinniaBedGeo(3)), { cap: 96, anim: GROW, marks: [2, 1.4], wobble: [0.006, 0, 1.5, 0] });
+    yield;
     b.toon('zinniaBedB', lod(0.6, () => zinniaBedGeo(8)), { cap: 96, anim: GROW, marks: [2, 1.4], wobble: [0.006, 0, 1.3, 0] });
+    yield;
     b.toon('ivyRib', ivyRibGeo(4), { cap: 140, anim: GROW, ink: 0.03, wobble: [0.004, 0, 1.1, 0] });
+    yield;
     b.toon('bracketBasket', lod(0.65, () => bracketBasketGeo(6)), { cap: 60, anim: GROW, wobble: [0.01, 0, 0.9, 0] });
+    yield;
     b.toon('basketHigh', lod(0.65, () => merge(hungBasketParts(3.2, 12))), { cap: 70, anim: [2, 50, 92, 0], wobble: [0.004, 0, 0.7, 0] });
+    yield;
     b.toon('plantShelf', lod(0.6, () => plantShelfGeo(2)), { cap: 40, anim: GROW });
+    yield;
     b.toon('flytrapBed', lod(0.65, () => merge(flytrapParts({ traps: 8, size: 1.55, seed: 17, flowers: 2, closed: 0.2, tint: 1 }))), { cap: 40, anim: [2, 46, 90, 0], wobble: [0.004, 0, 1.2, 0] });
+    yield;
     // the jungle (see bananaGeo and on): it grows up as you come too, and
     // the moss lets down from the purlins
     b.toon('banana', lod(0.7, () => bananaGeo(5, 2.9)), { cap: 40, anim: [2, 44, 86, 0], wobble: [0.008, 0, 0.8, 0] });
+    yield;
     b.toon('bananaB', lod(0.7, () => bananaGeo(11, 2.5)), { cap: 40, anim: [2, 44, 86, 0], wobble: [0.009, 0, 0.9, 0] });
+    yield;
     b.toon('elephantEar', lod(0.7, () => elephantEarGeo(4)), { cap: 60, anim: GROW, wobble: [0.012, 0, 1.0, 0] });
+    yield;
     b.toon('elephantEarB', lod(0.7, () => elephantEarGeo(9)), { cap: 60, anim: GROW, wobble: [0.012, 0, 1.1, 0] });
+    yield;
     b.toon('calathea', lod(0.65, () => calatheaGeo(3)), { cap: 90, anim: GROW, wobble: [0.01, 0, 1.4, 0] });
+    yield;
     b.toon('frondFern', lod(0.65, () => frondFernGeo(6)), { cap: 90, anim: GROW, wobble: [0.014, 0, 1.2, 0] });
+    yield;
     b.toon('ficus', lod(0.6, () => ficusGeo(8)), { cap: 30, anim: [2, 46, 90, 0], marks: [2.4, 2], wobble: [0.004, 0, 0.7, 0] });
+    yield;
     b.toon('mossLong', mossGeo(3.6, 3), { cap: 220, anim: [2, 50, 96, 0], ink: 0.02, wobble: [0.035, 0, 0.6, 0] });
+    yield;
     b.toon('mossShort', mossGeo(2.2, 8), { cap: 220, anim: [2, 50, 96, 0], ink: 0.02, wobble: [0.04, 0, 0.7, 0] });
+    yield;
 
     b.toon('potRow', potRowGeo(), { cap: 24, anim: 'popEarly', marks: [2, 1.6] });
+    yield;
     b.toon('planterBox', planterBoxGeo(1.9), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('planterLong', planterBoxGeo(7.6), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('hangingBasket', hangingBasketGeo(0.98, 2), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('vineCurtain', hangingBasketGeo(3.95, 6), { cap: 10, anim: 'popEarly' });
+    yield;
     b.toon('bigMonstera', bigMonsteraGeo(), { cap: 24, anim: 'popEarly', wobble: [0.006, 0, 1.2, 0], leaf: true });
+    yield;
     b.toon('bigOrange', merge(orangeTreeParts({ potR: 0.72, canopy: 1.2, trunk: 1.3 })).translate(0, 0, -0.75), { cap: 24, anim: 'popEarly', marks: [2.2, 2] });
+    yield;
     b.toon('pottingBench', pottingBenchGeo(), { cap: 24, anim: 'popEarly' });
+    yield;
     b.toon('flytrapTrough', flytrapTroughGeo(), { cap: 24, anim: 'popEarly', wobble: [0.01, 0, 1.6, 0] });
+    yield;
     b.toon('giantFlytrap', giantFlytrapGeo(), { cap: 24, anim: 'popEarly', wobble: [0.003, 0, 1.1, 0] });
+    yield;
     b.toon('bloom', bloomGeo(), { cap: 120, anim: 'popEarly' });
+    yield;
 
   },
 

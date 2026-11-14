@@ -548,7 +548,9 @@ const CREEK_WATER = '#2f93a2';
 function foamStrip(parts, x0, x1, z, w, seed) {
   parts.push(part(creekShapeGeo(x0, x1, w, seed, 0.06), '#dff7f2', { y: 0.05, z, emit: 0.55, outline: 0 }));
 }
-function creekWideStonesGeo(seed) {
+// (a generator - a breath between its parts, it's a lot of stones: the build
+// takes the geometry with yield*)
+function* creekWideStonesGeo(seed) {
   const rnd = seeded(seed);
   const half = 14;
   const W = CREEK_W;
@@ -567,11 +569,13 @@ function creekWideStonesGeo(seed) {
       parts.push(part(P.sphere(0.16 + rnd() * 0.1, 7, 3), '#c8eeec', { x, y: 0.045, z: -zz, sx: 2.4, sy: 0.12, sz: 0.22, ry: (rnd() - 0.5) * 0.25, emit: 0.45, outline: 0 }));
     }
   }
+  yield;
   // the near bank: flat pebbles, low enough that the water shows over them
   for (let x = -half + 0.2; x < half; x += 0.34 * (0.7 + rnd() * 0.6)) {
     const r = 0.09 + rnd() * 0.08;
     parts.push(rockPart({ r, x, y: -r * 0.55, z: 0.04 + (rnd() - 0.5) * 0.12, sx: 1.4, sy: 0.5, seed: seed + x * 7.3, detail: 0, moss: false, ry: rnd() * 6 }));
   }
+  yield;
   // the far bank: an earth lip, big stones on it, reeds and ferns
   const fz = -W - 0.12;
   parts.push(part(P.cyl(0.42, 0.42, half * 2, 8, 1), null, { y: 0.02, z: fz - 0.16, rz: Math.PI / 2, sy: 0.66, grad: ['#2a2016', C.grassLo, -0.1, 0.3], mark: 0.4, outline: 0.6 }));
@@ -579,6 +583,7 @@ function creekWideStonesGeo(seed) {
     const r = 0.22 + rnd() * 0.2;
     parts.push(rockPart({ r, x, y: -r * 0.2, z: fz + (rnd() - 0.5) * 0.18, sx: 1.25, sy: 0.9, seed: seed + x * 3.1, detail: 0, moss: rnd() < 0.35, ry: rnd() * 6 }));
   }
+  yield;
   for (let x = -half + 0.6; x < half; x += 1.1 + rnd() * 0.9) {
     // a clump of reeds and cattails standing behind the water
     for (let i = 0; i < 4; i++) {
@@ -591,10 +596,12 @@ function creekWideStonesGeo(seed) {
       else parts.push(part(P.cone(0.05, h * 0.9, 3), C.fernHi, { x: rx + 0.06, y: h * 0.45, z: rz, rz: -lean * 2, sz: 0.3, outline: 0 }));
     }
   }
+  yield;
   // bigger rocks where the stream leaves the path, ferns beyond
   for (const s of [-1, 1]) {
     parts.push(rockPart({ r: 0.55, x: s * 4.9, y: -0.15, z: fz + 0.1, sx: 1.2, sy: 0.85, seed: seed + s * 3 }));
     for (let i = 0; i < 3; i++) parts.push(...fernParts({ n: 7, len: 0.8, seed: seed + i * 13 + (s > 0 ? 50 : 0) }).map((g) => g.translate(s * (6.5 + i * 2.6), 0, fz - 0.5)));
+    yield;
   }
   return merge(parts);
 }
@@ -1050,37 +1057,58 @@ export default {
     },
   ],
 
-  build(b) {
+  *build(b) {
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 6);
+    yield;
     b.toon('floor', groundStrip(420, 16, C.floor, 8, { y: -0.03, mark: 0.45 }), { ink: 0, cap: 40, marks: [0.3, 0.3] });
+    yield;
     b.toon('grassTall', merge(grassParts({ n: 16, h: [0.8, 1.7], spread: 0.5, seed: 3 })), { cap: 860, ink: 0, anim: 'pop', wobble: [0.05, 0, 1.5, 0] });
+    yield;
     b.toon('grassTaller', merge(grassParts({ n: 22, h: [1.2, 2.3], spread: 0.7, w: 0.06, seed: 19, hi: '#c2dc5a', seeds: true })), { cap: 400, ink: 0, anim: 'pop', wobble: [0.035, 0, 1.2, 0] });
+    yield;
     b.toon('grassTuft', merge(grassParts({ n: 8, h: [0.2, 0.42], spread: 0.22, w: 0.035, seed: 8 })), { cap: 420, ink: 0, anim: 'popLate', wobble: [0.12, 0, 1.9, 0] });
+    yield;
     // a short, thick clump right along the path's edge, softening it
     b.toon('grassClump', merge(grassParts({ n: 26, h: [0.35, 0.9], spread: 0.55, w: 0.045, seed: 27 })), { cap: 640, ink: 0, anim: 'popLate', wobble: [0.09, 0, 1.7, 0] });
+    yield;
     // moss: cushions of it on the forest floor and over the roots, beards
     // of it hanging from the boughs
     b.toon('moss', merge(mossParts({ seed: 4 })), { cap: 420, anim: 'pop', ink: 0.02, marks: [2, 2] });
+    yield;
     b.toon('mossBig', merge(mossParts({ n: 12, spread: 1.4, h: 0.45, stalks: 18, seed: 11 })), { cap: 220, anim: 'pop', ink: 0.02, marks: [2, 2] });
+    yield;
     b.toon('mossHang', merge(mossHangParts({ seed: 6 })), { cap: 200, anim: 'pop', ink: 0, wobble: [0.012, 0, 0.9, 0] });
+    yield;
     // fireflies: each a bright core and a soft halo, wandering and
     // flashing as one (see FIREFLY)
     b.glow('firefly', { cap: 960, anim: 'pop', firefly: [0.7, 0.35, 0.32, 0.06] });
+    yield;
     b.toon('fern', merge(fernParts({ n: 9, len: 1.1, seed: 5 })), { cap: 160, anim: 'pop', wobble: [0.04, 0, 1.3, 0], ink: 0 });
+    yield;
     b.toon('flowers', merge(flowerPatchParts({ seed: 6 })), { cap: 120, anim: 'pop', marks: [2, 2], wobble: [0.08, 0, 1.6, 0], ink: 0 });
+    yield;
     b.toon('trunk', merge(trunkParts({ r: 1, h: 32, seed: 2 })), { cap: 170, anim: 'pop', marks: [1, 1], ink: 0.06, bark: true });
+    yield;
     b.toon('trunkB', merge(trunkParts({ r: 1, h: 32, roots: 4, seed: 9 })), { cap: 120, anim: 'pop', marks: [1, 1], ink: 0.06, bark: true });
+    yield;
     b.toon('trunkFar', merge(trunkParts({ r: 1, h: 34, seg: 7, roots: 0, seed: 4 })), { cap: 200, anim: 'pop', marks: [1, 1], ink: 0, bark: true });
+    yield;
     b.toon('canopy', canopyGeo(11), { cap: 140, anim: 'popEarly', marks: [2.4, 2], wobble: [0, 0.15, 0.4, 0], ink: 0.05 });
+    yield;
     b.toon('canopyB', canopyGeo(23), { cap: 140, anim: 'popEarly', marks: [2.4, 2], wobble: [0, 0.15, 0.35, 0], ink: 0.05 });
+    yield;
     b.toon('mushrooms', merge(mushroomParts({ n: 5, seed: 2 })), { cap: 90, anim: 'pop', ink: 0.025 });
+    yield;
     b.glow('glow', { cap: 90, anim: 'pop' });
+    yield;
     b.toon('rock', merge([rockPart({ r: 0.7, sx: 1.2, sy: 0.8, seed: 41 })]), { cap: 60, anim: 'pop', marks: [1.6, 1.6] });
+    yield;
     b.toon('stump', merge([
       asBark(part(P.cyl(0.55, 0.7, 0.9, 16), null, { y: 0.45, grad: ['#2a1f17', C.barkHi, 0, 0.9] }), undefined, 0.4),
       sawnEnd(0.5, { y: 0.91, outline: 0.5 }),
       ...mushroomParts({ n: 3, seed: 14, glow: 0 }).map((g) => g.translate(0.45, 0, 0.35)),
     ]), { cap: 40, anim: 'pop', bark: true });
+    yield;
     b.toon('log', merge([
       asBark(part(P.cyl(0.42, 0.46, 5.5, 16), null, { y: 0.4, rx: Math.PI / 2, grad: ['#2a1f17', C.barkHi, 0, 0.85] }), alongZ, 0.5),
       sawnEnd(0.42 * 0.88, { y: 0.4, z: 2.755, rx: Math.PI / 2 }),
@@ -1088,7 +1116,9 @@ export default {
       part(P.sphere(1, 12, 6), null, { y: 0.74, sx: 0.32, sy: 0.12, sz: 2.2, grad: [C.moss, C.mossHi, 0.6, 0.9], mark: 0.7 }),
       ...fernParts({ n: 6, len: 0.7, seed: 21 }).map((g) => g.translate(0.5, 0, 1.4)),
     ]), { cap: 40, anim: 'pop', bark: true });
+    yield;
     b.toon('pond', waterGeo(pondShapeGeo(2.4, 1.6, 5)), { cap: 24, ink: 0, water: true, anim: 'pop' });
+    yield;
     {
       const rnd = seeded(77);
       const rim = [part(pondShapeGeo(2.4, 1.6, 5, 0.28), C.mud, { y: -0.012, outline: 0 })];
@@ -1101,25 +1131,42 @@ export default {
       b.toon('pondRim', merge(rim), { cap: 24, anim: 'pop' });
     }
     b.shadow('shadow', { cap: 320, anim: 'pop' });
+    yield;
     b.beam('shaft', merge(shaftParts({ len: SHAFT_LEN, r0: 0.7, r1: 1.8, dir: SHAFT })), { cap: 40, anim: 'pop' });
+    yield;
     b.pool('sunspot', { cap: 40, anim: 'pop' });
+    yield;
     // later laps
     b.toon('spirit', merge(spiritParts()), { cap: 112, anim: 'pop', wobble: [0.55, 0, 2.4, 0], ink: 0.02 });
+    yield;
     b.toon('toadstool', merge(giantToadstoolParts({ h: 7, capR: 3 })), { cap: 50, anim: 'popEarly', wobble: [0.0015, 0, 0.8, 0], marks: [1.5, 1.5] });
+    yield;
     b.toon('jelly', merge(jellyParts()), { cap: 50, anim: 'lift', fly: [0, 0, 1.6, 0.22], wobble: [0.05, 0.4, 1.1, 0], ink: 0.02 });
+    yield;
 
     // obstacles
     b.toon('campfireA', campfireGeo('teepee', 3), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true, bark: true });
+    yield;
     b.toon('campfireB', campfireGeo('crib', 8), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true, bark: true });
+    yield;
     b.toon('campfireC', campfireGeo('star', 13), { cap: 12, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03, flame: true, bark: true });
+    yield;
     b.glow('fireGlow', { cap: 30, anim: 'popEarly' });
+    yield;
     b.pool('firelight', { cap: 30, anim: 'popEarly', color: '#ff9a4a', flicker: true });
+    yield;
     b.toon('creekWideWater', waterGeo(creekShapeGeo(-14, 14, CREEK_W, 5, 0.22), 0.035, CREEK_WATER, 0.35), { cap: 10, ink: 0, water: true, anim: 'popEarly' });
-    b.toon('creekWideStones', creekWideStonesGeo(5), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03 });
+    yield;
+    b.toon('creekWideStones', yield* creekWideStonesGeo(5), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6], ink: 0.03 });
+    yield;
     b.toon('fallenLog', fallenLogGeo(), { cap: 24, anim: 'popEarly', marks: [1.6, 1.6], bark: true });
+    yield;
     b.toon('fallenTree', fallenTreeGeo(), { cap: 10, anim: 'popEarly', marks: [1.6, 1.6], bark: true });
+    yield;
     b.toon('boulder', boulderObstacleGeo(), { cap: 24, anim: 'popEarly', marks: [1.4, 1.4] });
+    yield;
     b.toon('shrineRock', shrineRockGeo(), { cap: 24, anim: 'popEarly', marks: [1.4, 1.4] });
+    yield;
 
     // threshold
   },
