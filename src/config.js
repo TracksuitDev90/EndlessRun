@@ -281,22 +281,29 @@ export const CONFIG = {
   doorClearBefore: 52, // no obstacles this close before a doorway
   doorClearAfter: 36, // ...or this close after it
 
-  // Dream depth (see game/dream.js), counted in worlds (1 = the first). The
-  // worlds are untouched until morphFrom, when the far distance starts quietly
-  // to morph; the colour trip begins at tripFrom; everything is in by full.
-  // schedule: the world each effect can first appear in and the world it
-  // reaches full strength. lucidChance: odds a deeper world comes up calm.
+  // Dream depth (see game/dream.js), counted in laps of the worlds (0 = the
+  // first world of the run, 1 = the first world of the second lap, ...; a lap
+  // is however many worlds there are, see world/index.js), so the shape of it
+  // holds whatever the world count:
+  //   - the whole first lap is exactly as painted;
+  //   - the second only stirs: from morphFrom the far distance breathes and
+  //     swells a little (only the gentlest share of each effect - none of
+  //     them featured), on top of each world's own new light for its return;
+  //   - the dream proper starts in the third (tripFrom), effect by effect,
+  //     and keeps growing until everything is in by `full`.
+  // schedule: the lap each effect can first appear in and the lap it reaches
+  // full strength. lucidChance: odds a deeper world comes up calm.
   // rushTime: how long a doorway burst lasts (seconds); rushBase: its
   // strength before the dream deepens it.
   // reducedMotion scales the shape warps and camera sway when the OS asks for
   // less motion (colour is untouched).
   dream: {
-    morphFrom: 4,
-    tripFrom: 8,
-    full: 18,
+    morphFrom: 1,
+    tripFrom: 2,
+    full: 3.6,
     schedule: {
-      breathe: [4, 13], waves: [4, 14], melt: [6, 16],
-      swirl: [8, 16], rings: [9, 17], palette: [10, 18], neon: [11, 18], twist: [12, 19],
+      breathe: [1, 2.6], waves: [1.2, 2.8], melt: [2, 3], swirl: [2, 3],
+      rings: [2.2, 3.2], palette: [2.3, 3.3], neon: [2.5, 3.4], twist: [2.7, 3.6],
     },
     lucidChance: 0.18,
     // read: [seconds, min m, max m] — how far ahead the world is kept true:

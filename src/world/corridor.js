@@ -748,8 +748,8 @@ export default {
     b.toon('openDoor', openDoorGeo(1), { cap: 40, anim: 'pop' });
     b.toon('openDoorR', openDoorGeo(-1), { cap: 40, anim: 'pop' });
     b.toon('painting', paintingsGeo(), { cap: 120, anim: 'pop', kinds: true, ink: 0 });
-    b.toon('doorPane', doorLightGeo(), { cap: 48, anim: 'pop', ink: 0 });
-    b.beam('doorShaft', doorShaftGeo(), { cap: 48, anim: 'pop' });
+    b.toon('doorPane', doorLightGeo(), { cap: 56, anim: 'pop', ink: 0 });
+    b.beam('doorShaft', doorShaftGeo(), { cap: 56, anim: 'pop' });
     // books off the shelves: some flutter fast and close, some glide in wide loops
     b.toon('shelfBook', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [1.1, 11, 0.45, 0.95], ink: 0.035 });
     b.toon('shelfBookB', merge(flyingBookParts()), { cap: 40, anim: 'popEarly', fly: [0.65, 5.5, 1.1, 0.42], ink: 0.035 });

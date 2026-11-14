@@ -426,6 +426,9 @@ export class Ambient {
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
     g.connect(this.bus);
     for (const [mul, amp] of [[1, 1], [2.76, 0.22], [5.4, 0.08]]) {
+      // (a partial past what the device can play is left out, not clamped
+      // to a whine at the top of its range: a crown at the top of a run)
+      if (f * mul > ctx.sampleRate * 0.45) continue;
       const o = ctx.createOscillator();
       o.type = 'sine';
       o.frequency.value = f * mul;

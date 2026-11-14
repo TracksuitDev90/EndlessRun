@@ -43,7 +43,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="css/style.css?v=55" />
+    <link rel="stylesheet" href="css/style.css?v=56" />
     <!-- The typeface comes from another server, and a stylesheet in the head
          holds up both the first paint and the game's own script until it has
          answered (or failed to: a slow or blocked font server would hold the
@@ -221,10 +221,14 @@
       <!-- the companion's abilities: one button for each unlocked (keys 1-3) -->
       <div id="powers" class="powers" aria-label="Companion abilities"></div>
       <div id="power-note" class="power-note" aria-live="polite"></div>
+      <!-- an ability's first times ready: what it does, pointing at its button -->
+      <div id="power-tip" class="power-tip" aria-live="polite"><span class="pt-head"><b></b> ready · <span class="pt-how"></span></span><span class="pt-what"></span></div>
       <!-- World Fold: Iris's portal, closing over the screen and opening on the next world -->
       <div id="fold" class="fold" aria-hidden="true"></div>
 
       <div id="toast"><span class="num"></span><span class="name"></span></div>
+
+      <div id="countdown" class="countdown" aria-live="assertive"></div>
 
       <div id="hint">
         <div class="hint-icon"></div>
@@ -304,6 +308,6 @@
       <pre id="stats"></pre>
     </div>
 
-    <script type="module" src="src/main.js?v=55"></script>
+    <script type="module" src="src/main.js?v=56"></script>
   </body>
 </html>

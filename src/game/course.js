@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { makeDream, holdBack } from './dream.js';
+import { makeDream, holdBack, setLapLength } from './dream.js';
 
 // The course is the sequence of worlds laid out along the track. Each
 // segment is a stretch of one world; a doorway stands at every boundary.
@@ -9,6 +9,8 @@ export class Course {
     this.worlds = worlds;
     this.byId = new Map(worlds.map((w) => [w.id, w]));
     this.segments = [];
+    // (the dream's schedule counts in laps: one of every world)
+    setLapLength(worlds.length);
   }
 
   // startVisit lets debug runs (?visit=n) begin on a later lap's look;
