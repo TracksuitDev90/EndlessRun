@@ -8,26 +8,29 @@ import { Dust } from './dust.js';
 import { Splashes } from './splashes.js';
 import { Tank } from './tank.js';
 
-// The fisherman: Reed, a sturdy boy of about thirteen in an open yellow rain
+// The fisherman: Reed, a boy of about thirteen in an open yellow rain
 // jacket, a teal tee and orange waterproof bib trousers, black rubber boots
 // (sculpted in tools/runner/fisher.py) - with a little aquarium on his back
 // and his rod over his right shoulder, a giant purple alien fish hanging off
 // it. On top of the shared runner (player.js):
-//   - he runs two ways, and every few seconds changes from one to the other
-//     (as the bunny does): upright and quick, his free fist pumping tight at
-//     his chest; or leaning into a hard sprint, head down, his free arm flung
-//     out wide - his right hand never leaves the rod;
+//   - he runs two ways, and every few seconds eases from one into the other
+//     (as the bunny does): upright and light, his free arm swinging compact
+//     at his side; or leaning into a longer stride, his arm swinging longer
+//     - both easy and flowing, his hips riding each stride in a round wave -
+//     and his right hand never leaves the rod;
 //   - the rod rides on his shoulder (carried by his chest, bouncing a little
 //     on it) and his right arm is solved to grip it wherever it is (armTo);
 //   - the fish on its line is a weighty pendulum off the rod's tip -
 //     damped, kept clear of him and of the tank - its tail and fins
 //     following its swings a moment late (catchStep);
-//   - the tank bounces on his back on its straps; inside it the water tips
+//   - the tank rides on his back on its straps, heaving and settling; inside it the water tips
 //     and the goldfish swims round and round, turning as it goes, a bubble
 //     now and then (tank.js);
-//   - and his boots splash: water springs up from under them as he takes off
-//     and splashes out where they come down (splashes.js) - only on land, and
-//     only ever for show: none of it touches the run.
+//   - and his boots splash: a thin sheet of water thrown out from under them
+//     where they come down, tearing into ligaments and fine spray, mist
+//     hanging over it and ripples running out over the wet (a smaller kick
+//     of it as he takes off; splashes.js) - only on land, and only ever for
+//     show: none of it touches the run.
 
 // Palette slots: 1-16 are the garment ids baked into the mesh, the rest are
 // colours the character shader draws his details with.
@@ -66,63 +69,67 @@ export const COL = {
 };
 
 // His two runs (the shared gait laid under each; see the bunny for how the
-// one he's in is blended from them):
-//   - 'pump': upright and quick on light feet, the heel kicked up high
-//     behind, his free (left) fist pumping tight in front of his chest, the
-//     elbow bent hard;
-//   - 'reach': leaning hard into a sprint, his head down and forward, the
-//     stride longer and lower, his free arm flung out wide to the side and
-//     swinging big.
+// one he's in is blended from them). Both are easy, flowing runs - an
+// unhurried cadence with a long float between footfalls, the arm swinging
+// loose from the shoulder with a soft elbow (nothing held rigid, nothing
+// snapped) - and differ in how he carries himself:
+//   - 'pump': upright and light on his feet, the heel kicked up behind, his
+//     free (left) arm swinging compactly at his side, the elbow bent about
+//     square and opening a little as it goes back;
+//   - 'reach': leaning into a longer stride, his head a little down, the
+//     stride lower and further, his free arm swinging longer and a little
+//     wider for balance.
 const STYLES = [
   {
     name: 'pump',
-    cadence: [1.66, 0.056],
-    stride: { reach: 0.64, hipY: 0.85, bob: 0.042, trackX: 0.072, swingX: 0.105, toeOut: 0.05, heelLift: 0.88, ballZ: -0.03 },
+    cadence: [1.5, 0.047],
+    stride: { reach: 0.66, hipY: 0.85, bob: 0.046, trackX: 0.066, swingX: 0.094, toeOut: 0.05, heelLift: 0.84, ballZ: -0.03 },
     swing: [
-      [0.16, 0.4, 0.34, 0.03, 0.035],
-      [0.4, 0.22, 0.54, 0.0, 0.08],
-      [0.65, -0.17, 0.43, -0.04, 0.03],
-      [0.84, -0.31, 0.28, -0.02, 0.0],
+      [0.16, 0.4, 0.33, 0.03, 0.035],
+      [0.4, 0.22, 0.52, 0.0, 0.08],
+      [0.65, -0.17, 0.42, -0.04, 0.03],
+      [0.84, -0.31, 0.27, -0.02, 0.0],
     ],
     arm: {
-      swing: [0.25, 0.68, 0.8, 0.5, -0.1, -0.5, -0.6, -0.35],
-      abd: [0.2, 0.18, 0.18, 0.2, 0.24, 0.27, 0.27, 0.24],
-      elbow: [1.95, 2.12, 2.2, 2.02, 1.7, 1.48, 1.45, 1.62],
-      amp: [0.82, 0.22],
+      swing: [0.2, 0.56, 0.68, 0.46, -0.06, -0.44, -0.56, -0.34],
+      abd: [0.2, 0.18, 0.17, 0.19, 0.22, 0.25, 0.26, 0.23],
+      elbow: [1.5, 1.68, 1.78, 1.66, 1.42, 1.26, 1.22, 1.32],
+      amp: [0.84, 0.2],
     },
     lean: [0.13, 0.1],
-    hipYaw: 0.17,
-    hipRoll: 0.06,
-    spTwist: 0.17,
-    chTwist: 0.13,
+    hipYaw: 0.15,
+    hipRoll: 0.055,
+    spTwist: 0.15,
+    chTwist: 0.12,
   },
   {
     name: 'reach',
-    cadence: [1.52, 0.054],
-    stride: { reach: 0.74, hipY: 0.815, bob: 0.052, trackX: 0.082, swingX: 0.125, toeOut: 0.06, heelLift: 0.82, ballZ: -0.05 },
+    cadence: [1.4, 0.045],
+    stride: { reach: 0.74, hipY: 0.825, bob: 0.054, trackX: 0.074, swingX: 0.108, toeOut: 0.06, heelLift: 0.8, ballZ: -0.05 },
     swing: [
       [0.16, 0.42, 0.33, 0.04, 0.035],
-      [0.4, 0.2, 0.52, 0.0, 0.09],
-      [0.65, -0.24, 0.46, -0.05, 0.035],
-      [0.84, -0.4, 0.29, -0.03, 0.0],
+      [0.4, 0.2, 0.51, 0.0, 0.09],
+      [0.65, -0.23, 0.45, -0.05, 0.035],
+      [0.84, -0.39, 0.28, -0.03, 0.0],
     ],
     arm: {
-      swing: [0.4, 0.95, 1.08, 0.7, -0.3, -0.85, -0.95, -0.6],
-      abd: [0.8, 0.9, 1.0, 0.9, 0.72, 0.82, 0.92, 0.84],
-      elbow: [0.65, 0.5, 0.45, 0.6, 0.8, 0.6, 0.5, 0.62],
-      amp: [0.9, 0.25],
+      swing: [0.3, 0.74, 0.88, 0.6, -0.16, -0.62, -0.76, -0.48],
+      abd: [0.36, 0.4, 0.44, 0.4, 0.34, 0.38, 0.42, 0.39],
+      elbow: [1.12, 1.26, 1.34, 1.24, 1.02, 0.86, 0.82, 0.92],
+      amp: [0.88, 0.22],
     },
-    lean: [0.3, 0.14],
-    hipYaw: 0.2,
-    hipRoll: 0.065,
-    spTwist: 0.22,
-    chTwist: 0.2,
+    lean: [0.24, 0.13],
+    hipYaw: 0.18,
+    hipRoll: 0.06,
+    spTwist: 0.19,
+    chTwist: 0.16,
   },
 ];
 // how long he keeps to a run (s: at least, plus up to), and how long he
-// takes to change from one into the other
+// takes to change from one into the other (a few strides: you shouldn't
+// see it happen)
 const STYLE_HOLD = [3.5, 4];
-const STYLE_EASE = 0.55;
+const STYLE_EASE = 0.95;
 
 function blendGait(out, a, b, k) {
   for (const key in out) {
@@ -131,15 +138,16 @@ function blendGait(out, a, b, k) {
   }
 }
 
-// How he handles: a sturdy boy - a steady spring between the lanes, the
-// plain jump, and he lands with a stomp, both boots down at once, as you
-// would in a puddle.
+// How he handles: a steady spring between the lanes, the plain jump, and he
+// lands with a stomp, both boots down at once, as you would in a puddle -
+// one deep, soft give into his knees and up out of it, not a rattle of
+// little bounces; his poses ease into each other without hurry.
 const FEEL = {
   laneSpring: 36,
   lean: [0.036, 0.42],
   turn: [0.026, 0.36],
-  blend: [5, 6.5, 7],
-  land: { freq: 4.4, zeta: 0.3, thud: 0.025 },
+  blend: [4.4, 5.4, 5.8],
+  land: { freq: 3.3, zeta: 0.52, thud: 0.025 },
 };
 
 // His jumps, dealt so the same one never comes twice running: a tuck (both
@@ -197,7 +205,7 @@ export class Fisher extends Player {
     const rig = [
       new THREE.Vector4(R.eye[0], R.eye[1], -0.088, R.mouth[0]),
       new THREE.Vector4(R.bib.top, R.bib.half, R.bootX, R.soleH),
-      new THREE.Vector4(R.jacket.hem, R.jacket.cuff, R.tank.half, 0),
+      new THREE.Vector4(R.jacket.hem, R.jacket.cuff, R.tank.half, R.trousers.hem),
     ];
     const mats = makeCharacterMaterials(this.u, palette(COL), rig, 0.0062, null, { style: 'fisher' });
     this.mat = mats.mat;
@@ -421,14 +429,26 @@ export class Fisher extends Player {
   // it is - it's solved onto the rod in afterPose.
   poseRun(r, f, sp) {
     super.poseRun(r, f, sp);
+    // his hips ride each stride in a rounder wave than the shared run's
+    // (which drops into every footfall like a bounced ball): they sink into
+    // the footfall and float up out of it with no corner at the bottom -
+    // and the legs are placed again under them
+    const ST = this.gait.stride;
+    const round = 0.5 - 0.5 * Math.cos(2 * f);
+    const ball = Math.pow(Math.abs(Math.sin(f)), 0.8);
+    r[C.hipY] = ST.hipY + ST.bob * (0.9 + 0.2 * sp) * (0.8 * round + 0.2 * ball);
+    this.runLegs(r, f, sp);
     const k = this.styleK;
     const p = 1 - k;
-    // pump: upright, chin up, eyes ahead; the fist tight, the wrist firm
-    // reach: head down and forward, driving
-    r[C.hdPitch] += -0.08 * p + 0.16 * k;
-    r[C.chLean] += 0.08 * k;
-    r[C.wrL] = 0.1 * p + 0.25 * k;
-    r[C.wrLz] = 0.3 * k;
+    // pump: upright, chin up, eyes ahead
+    // reach: his head a little down and forward
+    r[C.hdPitch] += -0.07 * p + 0.1 * k;
+    r[C.chLean] += 0.06 * k;
+    // (his free hand loose at the wrist, trailing the forearm's swing a
+    // little)
+    const lag = Math.sin(f + Math.PI - 0.9);
+    r[C.wrL] = 0.14 + 0.1 * k + 0.1 * lag;
+    r[C.wrLz] = 0.12 * k;
     // (the right arm's held at the rod: only the shoulder rolls with the
     // stride)
     r[C.clRy] *= 0.3;
@@ -667,9 +687,10 @@ export class Fisher extends Player {
     _m.compose(_a, _q, _s.set(1, 1, 1));
     this.rodF.multiplyMatrices(_m, this.relRod);
     const kick = this.pelvisD ? -this.pelvisD.y - 0.6 * (this.pelvisDP?.y || 0) : 0;
-    this.rodBob.v += clamp(kick, -3, 3) * 0.9 * live;
-    const bob = clamp(this.rodBob.step(0, 3.4, 0.32, dt), -0.2, 0.2);
-    const sway = this.rodSway.step(clamp(-this.vx * 0.012, -0.12, 0.12), 2.5, 0.45, dt);
+    // (a long, well-damped give: it settles in one swing, it doesn't chatter)
+    this.rodBob.v += clamp(kick, -3, 3) * 0.6 * live;
+    const bob = clamp(this.rodBob.step(0, 2.3, 0.55, dt), -0.16, 0.16);
+    const sway = this.rodSway.step(clamp(-this.vx * 0.012, -0.12, 0.12), 2.1, 0.62, dt);
     const g = bump(0.0, 0.2, 0.5, 0.9, this.greetT);
     // (turned about where it rests on his shoulder)
     _m.makeTranslation(this.rodPivot.x, this.rodPivot.y, this.rodPivot.z);
@@ -731,20 +752,22 @@ export class Fisher extends Player {
     this.tank.step(dt, this.time, this.accLocal, this.mode === 'run' ? this.speed : 0);
   }
 
-  // The tank bounces on his back on its straps: a spring on each axis,
-  // kicked by his own motion, about where it hangs.
+  // The tank rides on his back on its straps: a spring on each axis, kicked
+  // by his own motion, about where it hangs - slower than his footfalls
+  // and well damped (a full tank's heavy: it heaves and settles, it doesn't
+  // rattle).
   packStep(dt) {
     const S = this.packS;
     const live = 1 - (this.crashW || 0);
     const dv = this.pelvisD, dp = this.pelvisDP;
     if (dv) {
-      S.y.v += (-dv.y * 0.012 - dp.y * 0.03) * live;
-      S.x.v += (-dv.x * 0.004 - dp.x * 0.015) * live;
-      S.z.v += -dv.z * 0.002 * live;
+      S.y.v += (-dv.y * 0.009 - dp.y * 0.02) * live;
+      S.x.v += (-dv.x * 0.003 - dp.x * 0.011) * live;
+      S.z.v += -dv.z * 0.0016 * live;
     }
-    const y = clamp(S.y.step(0, 5.5, 0.28, dt), -0.025, 0.025);
-    const x = clamp(S.x.step(0, 4.5, 0.3, dt), -0.02, 0.02);
-    const z = clamp(S.z.step(0, 4.5, 0.3, dt), -0.02, 0.02);
+    const y = clamp(S.y.step(0, 3.1, 0.55, dt), -0.022, 0.022);
+    const x = clamp(S.x.step(0, 2.7, 0.58, dt), -0.018, 0.018);
+    const z = clamp(S.z.step(0, 2.7, 0.58, dt), -0.018, 0.018);
     const t = this.b.tank;
     t.position.copy(this.bindPos.tank).sub(this.bindPos.chest);
     t.position.y += y;
@@ -859,11 +882,11 @@ export class Fisher extends Player {
     // its tail sweeps after its swings, and on its own a little, slowly;
     // its fins fan
     this.tailS.v += clamp(angV, -8, 8) * 0.35;
-    const tail = clamp(this.tailS.step(0, 1.6, 0.18, dt), -0.6, 0.6);
+    const tail = clamp(this.tailS.step(0, 1.4, 0.36, dt), -0.6, 0.6);
     const lazy = 0.12 * Math.sin(this.time * 2.1) + 0.06 * Math.sin(this.time * 3.3 + 1);
     this.b.catchTail.rotation.set(tail + lazy, 0, 0);
     this.finS.v += clamp(angV, -8, 8) * 0.2;
-    const fin = clamp(this.finS.step(0, 2.2, 0.2, dt), -0.5, 0.5);
+    const fin = clamp(this.finS.step(0, 1.9, 0.38, dt), -0.5, 0.5);
     const fan = 0.15 * Math.sin(this.time * 2.6);
     this.b.catchFinL.rotation.set(0, -(fin + fan), 0);
     this.b.catchFinR.rotation.set(0, fin + fan, 0);

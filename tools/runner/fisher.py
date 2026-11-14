@@ -380,7 +380,7 @@ def tube(c, radius, sides, n, caps=True):
 # The tank: a clear cylinder between a cap and a base (centre, the glass's
 # radius and half its height); the caps' radius and depth; on a bone at its
 # centre (the game bounces it on his back).
-TANK = dict(c=V(0.0, 1.055, 0.25), r=0.092, half=0.096, capR=0.104, capH=0.044)
+TANK = dict(c=V(0.0, 1.055, 0.228), r=0.083, half=0.094, capR=0.094, capH=0.044)
 TANK_TOP = TANK['c'][1] + TANK['half']
 TANK_BOT = TANK['c'][1] - TANK['half']
 
@@ -391,9 +391,9 @@ TANK_BOT = TANK['c'][1] - TANK['half']
 ROD = dict(
     grip=V(0.18, 1.18, -0.13),
     over=V(0.21, 1.325, 0.005),  # where it passes over his shoulder
-    butt=-0.215, cork=(-0.2, 0.035), seat=(0.035, 0.105), fore=(0.105, 0.15), tip=0.8,
+    butt=-0.215, cork=(-0.2, 0.04), seat=(0.04, 0.125), fore=(0.125, 0.175), tip=0.8,
     bend=0.07,  # how far the tip bows down under the fish (m)
-    reel=0.07,  # where the reel's foot is along it
+    reel=0.084,  # where the reel's foot is along it
 )
 ROD_DIR = unit(ROD['over'] - ROD['grip'])
 # (its frame: +y up the rod, +z the side the reel hangs from - out and
@@ -843,18 +843,18 @@ def cran_free_onto(prim, p, lift, steps=8):
 
 JACKET = dict(
     y=[0.745, 0.8, 0.88, 0.96, 1.04, 1.12, 1.2, 1.26, 1.3, 1.325, 1.348, 1.366, 1.38],
-    rx=[0.214, 0.208, 0.192, 0.175, 0.163, 0.159, 0.159, 0.16, 0.156, 0.144, 0.115, 0.084, 0.064],
-    rz=[0.16, 0.153, 0.141, 0.128, 0.12, 0.117, 0.117, 0.113, 0.103, 0.092, 0.075, 0.063, 0.057],
-    cz=[-0.006, -0.002, 0.004, 0.008, 0.008, 0.007, 0.007, 0.009, 0.011, 0.012, 0.012, 0.012, 0.012],
+    rx=[0.183, 0.18, 0.172, 0.162, 0.154, 0.152, 0.156, 0.16, 0.156, 0.144, 0.115, 0.084, 0.064],
+    rz=[0.136, 0.133, 0.127, 0.12, 0.115, 0.113, 0.114, 0.111, 0.102, 0.091, 0.075, 0.063, 0.057],
+    cz=[0.008, 0.008, 0.008, 0.007, 0.006, 0.005, 0.005, 0.008, 0.011, 0.012, 0.012, 0.012, 0.012],
     hem=0.745,
     shell=0.0065,
 )
 # the sleeve's radius down the arm (it starts small up at the shoulder so
 # it runs on down the slope of it rather than bulging over it)
-SLEEVE = ([0.025, 0.06, 0.12, 0.2, UPPER_ARM, 0.38, UPPER_ARM + FOREARM - 0.035], [0.042, 0.054, 0.057, 0.056, 0.055, 0.052, 0.051])
+SLEEVE = ([0.025, 0.06, 0.12, 0.2, UPPER_ARM, 0.38, UPPER_ARM + FOREARM - 0.035], [0.04, 0.049, 0.0505, 0.0495, 0.048, 0.0455, 0.0445])
 CUFF_U = UPPER_ARM + FOREARM - 0.045  # the turned-back cuff, down the arm
 # how wide the fronts hang open (half the gap, by height)
-OPEN = ([0.74, 0.9, 1.1, 1.2, 1.28, 1.33, 1.4], [0.086, 0.082, 0.079, 0.077, 0.066, 0.052, 0.046])
+OPEN = ([0.74, 0.9, 1.1, 1.2, 1.28, 1.33, 1.4], [0.082, 0.08, 0.078, 0.076, 0.066, 0.052, 0.046])
 
 
 def open_gap(p):
@@ -875,10 +875,10 @@ def jacket_outer():
     collar = torus_y((0, 1.374, 0.014), 0.064, 0.016, 0.98)
     hood = [
         # its rim, rolled round behind the neck from shoulder to shoulder
-        Prim(lambda p, t=torus_y((0, 1.352, 0.03), 0.088, 0.034, 0.92): smax(t.fn(p), 0.0 - p[:, 2], 0.03), (-0.14, 1.3, -0.1), (0.14, 1.41, 0.16)),
+        Prim(lambda p, t=torus_y((0, 1.35, 0.028), 0.08, 0.027, 0.92): smax(t.fn(p), 0.0 - p[:, 2], 0.03), (-0.14, 1.3, -0.1), (0.14, 1.41, 0.16)),
         # and the hood itself, slumped in a soft pouch below it on his back
-        ellipsoid((0, 1.29, 0.112), (0.128, 0.084, 0.062)),
-        ellipsoid((0, 1.225, 0.122), (0.09, 0.045, 0.046)),
+        ellipsoid((0, 1.292, 0.1), (0.108, 0.07, 0.05)),
+        ellipsoid((0, 1.236, 0.108), (0.076, 0.04, 0.036)),
     ]
     return torso, sleeves, collar, hood
 
@@ -895,6 +895,9 @@ def jacket_smooth(p, parts=None):
     return t
 
 
+POCKET_X = 0.118
+
+
 def pocket(s):
     """A flap pocket on the front at his hip: where its flap sits on the
     jacket and which way it faces."""
@@ -903,7 +906,7 @@ def pocket(s):
     rx = float(curve(J['y'], J['rx'])(y))
     rz = float(curve(J['y'], J['rz'])(y))
     cz = float(curve(J['y'], J['cz'])(y))
-    x = s * 0.135
+    x = s * POCKET_X
     z = cz - rz * math.sqrt(max(0.0, 1 - (x / rx) ** 2))
     n = unit(x / rx ** 2, 0.0, (z - cz) / rz ** 2)
     return V(x, y, z), n
@@ -918,7 +921,7 @@ def g_jacket():
     for s, _ in SIDES:
         c, n = pocket(s)
         R = basis(unit(V(0, 1, 0) - n * n[1]), n)
-        flaps.append(round_box(c + 0.004 * n, (0.046, 0.021, 0.004), 0.004, R))
+        flaps.append(round_box(c + 0.004 * n, (0.04, 0.019, 0.004), 0.004, R))
 
     def outer(p):
         y = p[:, 1]
@@ -954,7 +957,7 @@ def g_jacket():
         d = smax(d, -yloft([1.33, 1.5], [0.05, 0.06], [0.048, 0.058], cz=[0.014, 0.016], bottom=None, top=None)(p), 0.004)
         # the cuffs turned back: a roll round each wrist
         for sl in sleeves:
-            d = smin(d, torus_axis(sl['S'] + (CUFF_U + 0.008) * sl['d'], sl['d'], SLEEVE[1][-1] + 0.001, 0.0085)(p), 0.006)
+            d = smin(d, torus_axis(sl['S'] + (CUFF_U + 0.008) * sl['d'], sl['d'], SLEEVE[1][-1] + 0.001, 0.0072)(p), 0.006)
         for f in flaps:
             d = smin(d, f(p), 0.002)
         return d
@@ -999,53 +1002,92 @@ def g_jacket():
 # waterproof trousers, rubber boots, hands
 # --------------------------------------------------------------------------------
 
-TROUSERS = dict(hem=0.272, waist=1.02)
-BOOT_X = 0.1
+TROUSERS = dict(hem=0.283, waist=1.02)
+BOOT_X = 0.096
 BOOT_TOP = 0.31
 SOLE_H = 0.032
-TLEG = dict(y=[0.272, 0.3, 0.33, 0.37, 0.42, 0.48, 0.55, 0.62, 0.7, 0.78, 0.88],
-            r=[0.091, 0.095, 0.093, 0.09, 0.091, 0.095, 0.098, 0.099, 0.096, 0.092, 0.088],
-            cx=[0.1, 0.1, 0.1, 0.099, 0.098, 0.097, 0.096, 0.094, 0.091, 0.086, 0.08],
-            cz=[0.012, 0.012, 0.01, 0.006, 0.0, -0.006, -0.004, 0.0, 0.006, 0.012, 0.016])
-PELVIS = dict(y=[0.705, 0.74, 0.8, 0.88, 0.96, 1.02], rx=[0.115, 0.148, 0.162, 0.158, 0.148, 0.142], rz=[0.088, 0.106, 0.116, 0.113, 0.106, 0.102], cz=[0.026, 0.026, 0.022, 0.018, 0.012, 0.01])
+# A leg of his waterproofs, up from its hem: gathered in over the boot's top,
+# ballooning out over it where the stiff cloth stacks up (the widest of the
+# leg), easing in a little to the knee - bagged out forward there - and up
+# the thigh, which tapers into the seat. Loose on him, but a boy's leg, not
+# a barrel.
+TLEG = dict(y=[0.283, 0.3, 0.325, 0.355, 0.4, 0.45, 0.5, 0.57, 0.65, 0.73, 0.8, 0.88],
+            r=[0.07, 0.076, 0.085, 0.088, 0.086, 0.083, 0.083, 0.082, 0.081, 0.079, 0.075, 0.07],
+            cx=[0.096, 0.096, 0.096, 0.096, 0.096, 0.095, 0.095, 0.094, 0.092, 0.088, 0.083, 0.077],
+            cz=[0.01, 0.01, 0.01, 0.012, 0.01, 0.002, -0.006, -0.004, 0.002, 0.008, 0.012, 0.014])
+PELVIS = dict(y=[0.705, 0.74, 0.8, 0.88, 0.96, 1.02], rx=[0.108, 0.138, 0.151, 0.149, 0.142, 0.138], rz=[0.084, 0.1, 0.108, 0.106, 0.1, 0.097], cz=[0.02, 0.02, 0.018, 0.015, 0.011, 0.009])
+
+
+def crumple(az, y, s):
+    """How the stiff waterproof cloth of a leg lies (m, + out from the leg):
+    not rings, and not smooth - it buckles into long slanting folds, each a
+    narrow raised ridge with broad flat cloth between, two sets of them
+    winding opposite ways round the leg and crossing in diamonds (each
+    wandering, so no two diamonds match), strongest where the cloth is
+    pushed together: stacked over the boot, behind and across the knee.
+    az: the angle round the leg (0 out to his side, + toward his back),
+    y: height."""
+    ph = 1.7 * s
+    # how much there is to crumple, by height: most just over the boot, a
+    # lot round the knee, less up the thigh (it hangs from his braces)
+    amt = 0.42 + 0.6 * np.exp(-(((y - 0.47) / 0.11) ** 2)) + 0.7 * np.exp(-(((y - 0.355) / 0.055) ** 2))
+    amt = amt * smooth(0.88, 0.7, y)
+    wob = 0.7 * np.sin(az * 3 + y * 13 + ph) + 0.45 * np.sin(y * 27 - az + 2 * ph)
+    a1 = az * 2 + y * 43 + wob + ph
+    a2 = az * 3 - y * 35 + 0.9 * np.sin(az * 2 - y * 11 + ph) + 2.2
+    ridge = lambda a: (0.5 + 0.5 * np.sin(a)) ** 3 - 0.31
+    # (each set comes and goes round the leg, so a fold starts and dies away
+    # rather than running all the way round)
+    k1 = 0.55 + 0.45 * np.sin(az * 1 + y * 9 + ph * 2)
+    k2 = 0.55 + 0.45 * np.sin(az * 2 - y * 7 - ph)
+    f = 0.0105 * k1 * ridge(a1) + 0.008 * k2 * ridge(a2)
+    # (and a slow unevenness under them: one side of a leg fuller than the
+    # other)
+    f = f + 0.0035 * np.sin(az + y * 6.5 + ph * 2)
+    return f * amt
 
 
 def g_trousers():
-    """Orange waterproof bib trousers: a pelvis and seat lofted round his
-    hips, the crotch rounded under it, and two distinct legs - loose, a
-    little fuller at the thigh, tapering to the knee and on to the boots -
-    their hems bunched in a few uneven rolls over the boots' tops; a crease
-    or two behind and across each knee. (The bib goes up his front: see
-    g_inner.)"""
+    """Orange waterproof bib trousers, as a fishing boy's bibs are: stiff,
+    coated cloth cut loose, hanging from his braces - a seat lofted round
+    his hips, the crotch rounded under it, and two distinct legs. Each
+    buckles in long slanting folds crossing each other (crumple), bags out
+    forward over the knee with tight creases behind it, and stacks up over
+    the boot: ballooning out above the boot's top and gathered in under
+    that to its hem, which sits just over the boot's rim, a couple of
+    uneven rolls where it's pushed down on itself. (The bib goes up his
+    front: see g_inner.)"""
     pelvis = yloft(PELVIS['y'], PELVIS['rx'], PELVIS['rz'], cz=PELVIS['cz'], bottom=0.045, top=0.01)
-    legs = [yloft(TLEG['y'], TLEG['r'], TLEG['r'], cx=s * np.array(TLEG['cx']), cz=TLEG['cz'], bottom=0.006, top=0.04) for s, _ in SIDES]
-    holes = [yloft([0.2, 0.3, 0.36], [0.07, 0.074, 0.074], [0.07, 0.074, 0.074], cx=[s * 0.1] * 3, cz=[0.01] * 3, bottom=None, top=0.02) for s, _ in SIDES]
+    legs = [yloft(TLEG['y'], TLEG['r'], np.array(TLEG['r']) * 1.04, cx=s * np.array(TLEG['cx']), cz=TLEG['cz'], bottom=0.007, top=0.04) for s, _ in SIDES]
+    holes = [yloft([0.2, 0.29, 0.33], [0.061, 0.063, 0.064], [0.066, 0.068, 0.069], cx=[s * BOOT_X] * 3, cz=[0.008] * 3, bottom=None, top=0.016) for s, _ in SIDES]
 
     def inseam(p):
         x, y = p[:, 0], p[:, 1]
-        return np.maximum(np.abs(x) - (0.003 + np.maximum(0, 0.72 - y) * 0.25), y - 0.72)
+        return np.maximum(np.abs(x) - (0.003 + np.maximum(0, 0.72 - y) * 0.2), y - 0.72)
 
     def leg_folds(p, s):
-        x, y, z = p[:, 0] - s * 0.098, p[:, 1], p[:, 2]
+        x, y, z = p[:, 0] - s * 0.095, p[:, 1], p[:, 2] - 0.004
         az = np.arctan2(z, x * s)
-        # (bunched over the boot: three rolls, each its own height round
-        # the leg, so they read as cloth gathered, not rings)
-        f = 0.0
-        for k, (y0, a, ph) in enumerate([(0.29, 0.0075, 0.3), (0.325, 0.0065, 2.1), (0.36, 0.005, 4.0)]):
-            yk = y0 + 0.012 * np.sin(az * 2 + ph) + 0.006 * np.sin(az * 3 - ph)
-            f = f - a * np.exp(-(((y - yk) / 0.011) ** 2))
-        # creases across the back of the knee, and two slanting over the front
-        back = smooth(-0.2, 0.6, np.sin(az)) if True else 0
-        for y0 in (0.455, 0.49):
-            f = f + 0.0035 * np.exp(-(((y - y0 - 0.02 * np.cos(az)) / 0.008) ** 2)) * smooth(0.0, 0.7, np.sin(az))
-        for y0, sl in ((0.5, 0.25), (0.44, -0.2)):
-            f = f - 0.003 * np.exp(-(((y - y0 - sl * x * s) / 0.009) ** 2)) * smooth(0.1, -0.6, np.sin(az))
+        f = -crumple(az, y, s)
+        # stacked over the boot: two rolls pushed down on each other, each
+        # its own height round the leg and broken where a slanting fold
+        # runs through it
+        for y0, a, ph in [(0.318, 0.006, 0.3 + s), (0.352, 0.0048, 2.1 - s)]:
+            yk = y0 + 0.011 * np.sin(az * 2 + ph) + 0.006 * np.sin(az * 3 - ph)
+            brk = 0.55 + 0.45 * np.sin(az * 2.0 + ph * 3 + 1.0)
+            f = f + a * brk * np.exp(-(((y - yk - 0.019) / 0.008) ** 2)) - 0.4 * a * np.exp(-(((y - yk) / 0.012) ** 2))
+        # tight creases across the back of the knee, fanning out from its
+        # corners; the knee itself bagged out a little in front
+        back = smooth(0.1, 0.8, np.sin(az))
+        for y0 in (0.445, 0.472, 0.5):
+            f = f + 0.0036 * np.exp(-(((y - y0 - 0.022 * np.cos(az)) / 0.0065) ** 2)) * back
+        f = f - 0.006 * np.exp(-(((y - 0.47) / 0.06) ** 2)) * smooth(-0.2, -0.9, np.sin(az))
         return f
 
     def field(p):
         d = pelvis(p)
         for (s, _), q in zip(SIDES, legs):
-            d = smin(d, q(p) + leg_folds(p, s), 0.035)
+            d = smin(d, q(p) + leg_folds(p, s), 0.03)
         d = smax(d, -inseam(p), 0.01)
         for q in holes:
             d = smax(d, -q(p), 0.005)
@@ -1054,23 +1096,33 @@ def g_trousers():
     kn = KNEE_Y
     owners = [(pelvis, rigid('hips'))]
     for q, (s, L) in zip(legs, SIDES):
-        owners.append((q, by_y([(0.33, 'shin' + L), (kn - 0.035, 'shin' + L), (kn + 0.035, 'thigh' + L), (0.74, 'thigh' + L), (0.86, 'hips')])))
+        owners.append((q, by_y([(0.33, 'shin' + L), (kn - 0.05, 'shin' + L), (kn + 0.05, 'thigh' + L), (0.72, 'thigh' + L), (0.85, 'hips')])))
 
     def details(p, n, own):
-        # x: on a leg (not the seat), y: in the rolls over the boot
-        rolls = smooth(0.38, 0.33, p[:, 1])
-        return np.stack([own[:, 1] + own[:, 2], rolls, np.zeros(len(p)), np.zeros(len(p))], 1)
+        # x: on a leg (not the seat), y: stacked over the boot, z: how a
+        # fold there faces the light from above (-1 the top of a fold,
+        # catching it .. 1 its underside, in its own shadow)
+        rolls = smooth(0.4, 0.33, p[:, 1])
+        s = np.where(p[:, 0] < 0, -1.0, 1.0)
+        e = V(0, 0.003, 0)
+        shade = np.zeros(len(p))
+        for sd in (-1, 1):
+            # (the cloth's height out from the leg, and how it changes going up)
+            dh = -(leg_folds(p + e, sd) - leg_folds(p - e, sd)) / 0.006
+            shade = np.where(s == sd, np.clip(dh / 0.3, -1, 1), shade)
+        onleg = own[:, 1] + own[:, 2]
+        return np.stack([onleg, rolls, shade * onleg, np.zeros(len(p))], 1)
 
-    return Garment('trousers', MAT['trousers'], 0.003, (-0.22, 0.25, -0.15), (0.22, 1.04, 0.17), field, owners, 9000, tau=0.016, details=details, outline=0.75)
+    return Garment('trousers', MAT['trousers'], 0.0026, (-0.22, 0.26, -0.15), (0.22, 1.04, 0.17), field, owners, 15000, tau=0.016, details=details, outline=0.75)
 
 
 # The boot, from heel to toe (z, m from the ankle): its half-width, and how
 # high its upper rises over the road - the heel counter up into the shaft,
 # the instep sloping down into a modest rounded toe.
-BOOT_PLAN = dict(z=[0.078, 0.062, 0.03, -0.02, -0.07, -0.11, -0.15, -0.18, -0.2, -0.21],
-                 w=[0.03, 0.045, 0.05, 0.052, 0.058, 0.06, 0.057, 0.048, 0.034, 0.02],
+BOOT_PLAN = dict(z=[0.074, 0.06, 0.03, -0.02, -0.07, -0.11, -0.15, -0.18, -0.198, -0.207],
+                 w=[0.028, 0.042, 0.047, 0.048, 0.053, 0.055, 0.052, 0.044, 0.031, 0.018],
                  top=[0.095, 0.12, 0.15, 0.152, 0.124, 0.1, 0.082, 0.07, 0.058, 0.045])
-BOOT_SHAFT = dict(y=[0.08, 0.12, 0.17, 0.22, 0.27, BOOT_TOP], rx=[0.051, 0.049, 0.052, 0.057, 0.062, 0.065], rz=[0.066, 0.058, 0.064, 0.07, 0.075, 0.078], cz=[0.016, 0.012, 0.01, 0.009, 0.008, 0.008])
+BOOT_SHAFT = dict(y=[0.08, 0.12, 0.17, 0.22, 0.27, BOOT_TOP], rx=[0.048, 0.046, 0.048, 0.052, 0.056, 0.058], rz=[0.062, 0.054, 0.058, 0.062, 0.065, 0.066], cz=[0.016, 0.012, 0.01, 0.009, 0.008, 0.008])
 
 
 def toe_lift(z):
@@ -1113,8 +1165,8 @@ def g_boots():
         sole = Prim(sole_fn, (bx - 0.08, -0.01, z0 - 0.02), (bx + 0.08, 0.06, z1 + 0.02))
         S_ = BOOT_SHAFT
         shaft = yloft(S_['y'], S_['rx'], S_['rz'], cx=[bx] * len(S_['y']), cz=S_['cz'], bottom=None, top=0.004)
-        inside = yloft([0.16, 0.24, BOOT_TOP + 0.05], [0.042, 0.052, 0.057], [0.05, 0.063, 0.07], cx=[bx] * 3, cz=[0.008] * 3, bottom=0.02, top=None)
-        rim = torus_y((bx, BOOT_TOP - 0.003, 0.008), 0.0615, 0.0045, 1.2)
+        inside = yloft([0.16, 0.24, BOOT_TOP + 0.05], [0.04, 0.047, 0.051], [0.047, 0.055, 0.059], cx=[bx] * 3, cz=[0.008] * 3, bottom=0.02, top=None)
+        rim = torus_y((bx, BOOT_TOP - 0.003, 0.008), 0.0548, 0.0042, 1.14)
         parts.append((foot, sole, shaft, inside, rim))
         low = along(lambda p: p[:, 2], [(-0.14, 'toe' + L), (-0.09, 'foot' + L)])
         high = by_y([(0.16, 'foot' + L), (0.23, 'shin' + L)])
@@ -1200,39 +1252,83 @@ def g_hands():
 
 
 def g_tank():
+    """The aquarium's hardware, built as a made thing: a stepped cap (a
+    collar the glass seats in, a shallower lid over it, a carry handle, a
+    filler cap off to one side), a base to match on a foot ring with four
+    rubber feet, a slim guard rail down each side from cap to base with the
+    straps' brackets on them, the plate against his back, a little pump box
+    on the base behind."""
     T = TANK
     c = T['c']
     up = V(0, 1, 0)
-    top_c = V(c[0], TANK_TOP + T['capH'] / 2 - 0.006, c[2])
-    bot_c = V(c[0], TANK_BOT - T['capH'] / 2 + 0.006, c[2])
-    top = cyl(top_c, up, T['capR'], T['capH'] / 2, 0.014)
-    base = cyl(bot_c, up, T['capR'], T['capH'] / 2, 0.012)
+    R, H = T['capR'], T['capH']
+    # each cap: a collar next the glass, a narrower step beyond it
+    col_h = H * 0.56
+    top_c = V(c[0], TANK_TOP + col_h / 2 - 0.006, c[2])
+    bot_c = V(c[0], TANK_BOT - col_h / 2 + 0.006, c[2])
+    top = cyl(top_c, up, R, col_h / 2, 0.006)
+    base = cyl(bot_c, up, R, col_h / 2, 0.006)
+    lid_y = top_c[1] + col_h / 2
+    lid = cyl(V(c[0], lid_y + 0.007, c[2]), up, R * 0.86, 0.011, 0.009)
+    dome = ellipsoid((c[0], lid_y + 0.014, c[2]), (R * 0.6, 0.012, R * 0.6))
+    foot_y = bot_c[1] - col_h / 2
+    foot = cyl(V(c[0], foot_y - 0.006, c[2]), up, R * 0.9, 0.009, 0.006)
+    feet = [cyl(V(c[0] + R * 0.62 * math.cos(a), foot_y - 0.017, c[2] + R * 0.62 * math.sin(a)), up, 0.013, 0.006, 0.004) for a in (0.79, 2.36, 3.93, 5.5)]
     # the lips the glass sits in
-    lips = [torus_y((c[0], TANK_TOP + 0.001, c[2]), T['r'] + 0.002, 0.0055), torus_y((c[0], TANK_BOT - 0.001, c[2]), T['r'] + 0.002, 0.0055)]
-    # a carry handle on the cap, and the plate down the side against his back
-    handle = torus_axis(top_c + V(0, T['capH'] / 2 + 0.004, 0.0), (1, 0, 0), 0.03, 0.0065)
-    plate = round_box(V(c[0], c[1], c[2] - T['r'] - 0.006), (0.034, T['half'] + 0.02, 0.008), 0.006)
+    lips = [torus_y((c[0], TANK_TOP + 0.001, c[2]), T['r'] + 0.002, 0.0052), torus_y((c[0], TANK_BOT - 0.001, c[2]), T['r'] + 0.002, 0.0052)]
+    # a carry handle on the lid (its two posts, the bar between), a filler cap
+    hy = lid_y + 0.016
+    handle = torus_axis(V(c[0], hy, c[2]), (1, 0, 0), 0.026, 0.0058)
+    filler = cyl(V(c[0] + R * 0.5, lid_y + 0.021, c[2] + R * 0.28), up, 0.0125, 0.006, 0.003)
+    # the guard rails, the brackets the straps are riveted to
+    rails, brackets = [], []
+    for sx in (-1, 1):
+        rx_, rz_ = c[0] + sx * (R - 0.0035), c[2] - 0.012
+        rails.append(round_cone((rx_, TANK_BOT - 0.004, rz_), (rx_, TANK_TOP + 0.004, rz_), 0.0048, 0.0048))
+        for yy in (TANK_TOP - 0.022, TANK_BOT + 0.022):
+            brackets.append(round_box(V(rx_ + sx * 0.003, yy, rz_ - 0.004), (0.006, 0.012, 0.012), 0.003))
+    plate = round_box(V(c[0], c[1], c[2] - T['r'] - 0.006), (0.03, T['half'] + 0.018, 0.007), 0.005)
+    # the pump: a little box on the base at the back, a vent tube up from it
+    pump = round_box(V(c[0], bot_c[1] - 0.002, c[2] + R + 0.004), (0.022, 0.014, 0.008), 0.004)
 
     def field(p):
-        d = smin(top(p), base(p), 0.001)
+        d = smin(top(p), lid(p), 0.004)
+        d = smin(d, dome(p), 0.006)
+        d = np.minimum(d, smin(base(p), foot(p), 0.004))
+        for q in feet:
+            d = smin(d, q(p), 0.002)
         for q in lips:
-            d = smin(d, q(p), 0.004)
-        d = smin(d, smax(handle(p), top_c[1] + T['capH'] / 2 - 0.004 - p[:, 1], 0.003), 0.005)
-        return smin(d, plate(p), 0.006)
+            d = smin(d, q(p), 0.003)
+        d = smin(d, smax(handle(p), lid_y + 0.004 - p[:, 1], 0.003), 0.004)
+        d = smin(d, filler(p), 0.002)
+        for q in rails:
+            d = smin(d, q(p), 0.003)
+        for q in brackets:
+            d = smin(d, q(p), 0.002)
+        d = smin(d, pump(p), 0.003)
+        return smin(d, plate(p), 0.005)
 
-    owners = [(top, rigid('tank')), (base, rigid('tank'))] + [(q, rigid('tank')) for q in lips] + [(handle, rigid('tank')), (plate, rigid('tank'))]
+    tk = rigid('tank')
+    names = [top, base] + lips + [lid, dome, foot] + feet + [handle, filler] + rails + brackets + [pump, plate]
+    owners = [(q, tk) for q in names]
+    i_top = [0, 4, 5]
+    i_bot = [1, 6]
+    i_metal = list(range(7 + len(feet), 7 + len(feet) + 2)) + list(range(9 + len(feet), 9 + len(feet) + len(rails) + len(brackets)))
 
     def details(p, n, own):
         # x: round the tank (rad, 0 straight back from him), y: up from its
-        # middle (m), z: on a cap (1 the top, -1 the base), w: on a lip
+        # middle (m), z: on a cap (1 the top, -1 the base; 0 its fittings),
+        # w: on a lip (1) / bare metal fittings - the handle, the filler
+        # cap, the rails and their brackets (-1)
         q = p - c
         a = np.arctan2(q[:, 0], q[:, 2])
-        cap = own[:, 0] - own[:, 1]
-        return np.stack([a, q[:, 1], cap, own[:, 2] + own[:, 3]], 1)
+        cap = own[:, i_top].sum(1) - own[:, i_bot].sum(1)
+        w = (own[:, 2] + own[:, 3]) - own[:, i_metal].sum(1)
+        return np.stack([a, q[:, 1], cap, w], 1)
 
-    lo = c - V(T['capR'] + 0.02, T['half'] + T['capH'] + 0.02, T['capR'] + 0.03)
-    hi = c + V(T['capR'] + 0.02, T['half'] + T['capH'] + 0.05, T['capR'] + 0.02)
-    return Garment('tank', MAT['tank'], 0.0028, lo, hi, field, owners, 3000, tau=0.005, details=details, outline=0.9)
+    lo = c - V(R + 0.03, T['half'] + H + 0.03, R + 0.03)
+    hi = c + V(R + 0.03, T['half'] + H + 0.06, R + 0.03)
+    return Garment('tank', MAT['tank'], 0.002, lo, hi, field, owners, 5200, tau=0.004, details=details, outline=0.9)
 
 
 def onto(field, p, lift, steps=6):
@@ -1268,7 +1364,15 @@ def g_straps():
     """Charcoal webbing on his jacket, flat, a buckle on each where it's
     adjusted."""
     parts_ = jacket_outer()
-    surf = lambda q: jacket_smooth(q, parts_)
+    hood_ = parts_[3]
+
+    def surf(q):
+        # (the jacket's outside and the hood slumped on it: what they lie on)
+        d = jacket_smooth(q, parts_)
+        for h in hood_:
+            d = smin(d, h(q), 0.028)
+        return d
+
     parts, owners = [], []
     for s, L in SIDES:
         pts = strap_path(s)
@@ -1320,65 +1424,127 @@ def g_straps():
 
 def rod_local_prims():
     """The rod's handle and reel, sculpted in the rod's own frame (+y up the
-    rod from where his fist holds it, +z the reel's side)."""
+    rod from where his fist holds it, +z the reel's side): a rubber butt
+    cap, a cork grip turned to a shape - swelling where the heel of the
+    hand sits, waisted, flared again at its top - the reel seat with its
+    two hoods and a knurled locking nut, a short cork fore grip tapering
+    into a metal winding check where the blank begins. The reel hangs from
+    the seat on its stem: the gear housing, the rotor cup turning round a
+    deep spool with a lip at each end, the drag knob on the spool's front,
+    the bail's wire hoop with its line roller, the crank cranked out to an
+    arm and a paddle knob."""
     R0 = ROD
     Y = V(0, 1, 0)
-    butt = round_cone((0, R0['butt'], 0), (0, R0['cork'][0] + 0.004, 0), 0.0135, 0.0135)
-    cork = round_cone((0, R0['cork'][0], 0), (0, R0['cork'][1], 0), 0.0128, 0.0118)
-    seat = round_cone((0, R0['seat'][0], 0), (0, R0['seat'][1], 0), 0.0105, 0.0098)
-    fore = round_cone((0, R0['fore'][0], 0), (0, R0['fore'][1], 0), 0.0108, 0.0085)
-    # the reel: its foot on the seat, the stem out to the body, the spool
-    # ahead of it (up the rod), the crank out to one side
+    c0, c1 = R0['cork']
+    butt = cyl((0, R0['butt'] + 0.006, 0), Y, 0.0158, 0.009, 0.006)
+    cork = aloft((0, 0, 0), Y, [c0, c0 + 0.03, c0 + 0.085, c0 + 0.15, c0 + 0.2, c1 - 0.012, c1], [0.0138, 0.0152, 0.0132, 0.0126, 0.0134, 0.014, 0.0128], start=0.004, end=0.004)
+    s0, s1 = R0['seat']
+    seat = round_cone((0, s0, 0), (0, s1, 0), 0.0098, 0.0095)
+    hoods = [cyl((0, s0 + 0.008, 0), Y, 0.0122, 0.007, 0.003), cyl((0, s1 - 0.02, 0), Y, 0.012, 0.006, 0.003)]
+    nut = cyl((0, s1 - 0.007, 0), Y, 0.0132, 0.0055, 0.002)
+    f0, f1 = R0['fore']
+    fore = aloft((0, 0, 0), Y, [f0, f0 + 0.012, f1 - 0.012, f1], [0.0118, 0.013, 0.0112, 0.0092], start=0.003, end=0.004)
+    check = cyl((0, f1 + 0.005, 0), Y, 0.0098, 0.0045, 0.002)
+    # the reel
     ry = R0['reel']
-    foot = round_box((0, ry, 0.011), (0.006, 0.022, 0.003), 0.002)
-    stem = round_cone((0, ry, 0.012), (0, ry - 0.004, 0.05), 0.0045, 0.0055)
-    body = ellipsoid((0, ry - 0.006, 0.056), (0.016, 0.02, 0.017))
-    spool = cyl((0, ry + 0.022, 0.056), Y, 0.0195, 0.011, 0.003)
-    skirt = cyl((0, ry + 0.008, 0.056), Y, 0.021, 0.004, 0.002)
-    crank = round_cone((-0.016, ry - 0.006, 0.056), (-0.044, ry - 0.012, 0.062), 0.0035, 0.003)
-    knob = ellipsoid((-0.047, ry - 0.012, 0.072), (0.0055, 0.0055, 0.009))
-    # the bail: a wire hoop round the front of the spool
-    bail = torus_axis((0, ry + 0.03, 0.056), Y, 0.024, 0.0018)
-    return dict(butt=butt, cork=cork, seat=seat, fore=fore, foot=foot, stem=stem, body=body, spool=spool, skirt=skirt, crank=crank, knob=knob, bail=bail)
+    zc = 0.064  # how far the spool's axis hangs below the rod
+    foot = round_box((0, ry, 0.0115), (0.0062, 0.03, 0.003), 0.002)
+    stem = round_cone((0, ry, 0.013), (0, ry - 0.006, zc - 0.016), 0.005, 0.0064)
+    body = ellipsoid((0, ry - 0.012, zc), (0.0185, 0.023, 0.021))
+    side = cyl((-0.016, ry - 0.012, zc), (1, 0, 0), 0.0135, 0.004, 0.003)
+    rotor = cyl((0, ry + 0.011, zc), Y, 0.0245, 0.0075, 0.004)
+    spool = cyl((0, ry + 0.034, zc), Y, 0.0182, 0.015, 0.002)
+    lips = [cyl((0, ry + 0.02, zc), Y, 0.0232, 0.0022, 0.0015), cyl((0, ry + 0.049, zc), Y, 0.0238, 0.0026, 0.0018)]
+    drag = cyl((0, ry + 0.0565, zc), Y, 0.0115, 0.005, 0.003)
+    crank = stroke([V(-0.02, ry - 0.012, zc), V(-0.034, ry - 0.012, zc), V(-0.05, ry - 0.022, zc + 0.012)], [0.0042, 0.0038, 0.0034])
+    knob = round_box((-0.053, ry - 0.024, zc + 0.022), (0.0052, 0.0052, 0.0105), 0.0045)
+    # the bail: a wire hoop round the front of the spool, its roller
+    bail = torus_axis((0, ry + 0.036, zc), unit(0.35, 1, 0), 0.0275, 0.0019)
+    roller = ellipsoid((0.026, ry + 0.027, zc), (0.0052, 0.0052, 0.0052))
+    return dict(butt=butt, cork=cork, seat=seat, fore=fore, foot=foot, stem=stem, body=body, spool=spool, skirt=rotor, crank=crank, knob=knob, bail=bail,
+                hood0=hoods[0], hood1=hoods[1], nut=nut, check=check, side=side, lip0=lips[0], lip1=lips[1], drag=drag, roller=roller)
 
 
 def g_reel():
     P = rod_local_prims()
-    order = ['butt', 'cork', 'seat', 'fore', 'foot', 'stem', 'body', 'spool', 'skirt', 'crank', 'knob', 'bail']
+    order = ['butt', 'cork', 'seat', 'fore', 'foot', 'stem', 'body', 'spool', 'skirt', 'crank', 'knob', 'bail', 'hood0', 'hood1', 'nut', 'check', 'side', 'lip0', 'lip1', 'drag', 'roller']
     pr = {k: placed(P[k], ROD_R, ROD['grip']) for k in order}
+    zc = 0.064
 
     def field(p):
-        d = smin(pr['butt'](p), pr['cork'](p), 0.002)
-        d = smin(d, pr['seat'](p), 0.003)
-        d = smin(d, pr['fore'](p), 0.003)
+        d = smin(pr['butt'](p), pr['cork'](p), 0.0015)
+        d = smin(d, pr['seat'](p), 0.002)
+        for k in ('hood0', 'hood1', 'nut'):
+            d = smin(d, pr[k](p), 0.0015)
+        d = smin(d, pr['fore'](p), 0.002)
+        d = smin(d, pr['check'](p), 0.0015)
         d = smin(d, pr['foot'](p), 0.003)
         d = smin(d, pr['stem'](p), 0.004)
         d = smin(d, pr['body'](p), 0.005)
+        d = smin(d, pr['side'](p), 0.003)
         d = smin(d, pr['skirt'](p), 0.003)
-        d = smin(d, pr['spool'](p), 0.002)
+        d = smin(d, pr['spool'](p), 0.0015)
+        for k in ('lip0', 'lip1', 'drag'):
+            d = smin(d, pr[k](p), 0.0012)
         d = smin(d, pr['crank'](p), 0.003)
         d = smin(d, pr['knob'](p), 0.002)
-        d = np.minimum(d, smax(pr['bail'](p), -((p - to_body(V(0, ROD['reel'] + 0.03, 0.056))) @ (ROD_R @ V(0, 0, 1))) - 0.004, 0.002))
+        # (the bail: only the half of its hoop that swings out over the
+        # spool's front)
+        hoop = smax(pr['bail'](p), -((p - to_body(V(0, ROD['reel'] + 0.036, zc))) @ (ROD_R @ V(0, 0, 1))) - 0.006, 0.002)
+        d = np.minimum(d, smin(hoop, pr['roller'](p), 0.002))
         return d
 
     owners = [(pr[k], rigid('rod')) for k in order]
+    ix = {k: i for i, k in enumerate(order)}
 
     def mats(p, n, own):
-        cork = own[:, 1] + own[:, 3]
+        cork = own[:, ix['cork']] + own[:, ix['fore']]
         return np.where(cork > 0.5, MAT['cork'], MAT['reel'])
 
     def details(p, n, own):
-        # x: along the rod (m), y: on the spool (its teal band), z: on the
-        # knob, w: the butt cap
+        # x: along the rod (m), y: on the spool (the line wound on it: 1) /
+        # the seat's barrel (its thread: -1), z: on the crank's knob, w: the
+        # butt cap (1) / bright metal - the spool's lips, the drag knob, the
+        # seat's hoods and nut, the winding check, the bail (-1)
         q = (p - ROD['grip']) @ ROD_R
-        return np.stack([q[:, 1], own[:, 7] + own[:, 8], own[:, 10], own[:, 0]], 1)
+        bright = own[:, [ix['lip0'], ix['lip1'], ix['drag'], ix['hood0'], ix['hood1'], ix['nut'], ix['check'], ix['bail'], ix['roller']]].sum(1)
+        y = own[:, ix['spool']] - own[:, ix['seat']]
+        w = own[:, ix['butt']] - bright
+        return np.stack([q[:, 1], y, own[:, ix['knob']], w], 1)
 
     lo = np.min([q.lo for q in pr.values()], 0) - 0.01
     hi = np.max([q.hi for q in pr.values()], 0) + 0.01
-    return Garment('reel', MAT['reel'], 0.0013, lo, hi, field, owners, 3000, tau=0.003, details=details, mats=mats, outline=0.6)
+    return Garment('reel', MAT['reel'], 0.0011, lo, hi, field, owners, 5600, tau=0.0025, details=details, mats=mats, outline=0.6)
 
 
-GUIDES = [(0.27, 0.0085), (0.41, 0.0068), (0.54, 0.0054), (0.66, 0.0044), (0.76, 0.0036)]
+# The guides (where along the rod, the ring's radius): a big stripper guide
+# nearest the reel, each smaller than the last; and the tip-top at the tip.
+GUIDES = [(0.29, 0.0115), (0.41, 0.009), (0.52, 0.0072), (0.615, 0.0058), (0.695, 0.0047), (0.755, 0.0039)]
+TIP_TOP = 0.0032
+FERRULE = 0.47  # where the rod's two pieces join
+
+
+def blank_r(y):
+    """The blank's radius at y along the rod: a true taper - stout over the
+    fore grip, fine at the tip - a metal ferrule where its two pieces join,
+    and the thread whipped over each guide's feet standing a little proud."""
+    u = (y - ROD['fore'][1]) / (ROD['tip'] - ROD['fore'][1])
+    r = 0.0086 * (1 - u) ** 1.25 + 0.0019
+    r += 0.0013 * math.exp(-(((y - FERRULE) / 0.011) ** 4))
+    for gy, gr in GUIDES:
+        r += 0.0009 * math.exp(-(((y - gy) / (0.013 + gr)) ** 4))
+    return r
+
+
+def wrap_at(y):
+    """How much thread is whipped round the blank at y (0 / 1): over each
+    guide's feet, a band above the winding check, a trim band at the tip."""
+    w = 0.0
+    for gy, gr in GUIDES:
+        w = max(w, 1.0 if abs(y - gy) < 0.011 + gr else 0.0)
+    w = max(w, 1.0 if y < ROD['fore'][1] + 0.03 else 0.0)
+    w = max(w, 1.0 if y > ROD['tip'] - 0.014 else 0.0)
+    return w
 
 
 def torus_mesh(c, axis, R, r, seg=16, sides=5):
@@ -1410,33 +1576,57 @@ def torus_mesh(c, axis, R, r, seg=16, sides=5):
 
 
 def g_blank():
-    """The blank, meshed directly: from the fore grip to the tip, tapering,
-    bowing a little under the fish; its guides, small rings stood off it
-    on the reel's side."""
-    y0, y1 = ROD['fore'][1] - 0.01, ROD['tip']
-    cl = np.array([rod_point(y) for y in np.linspace(y0, y1, 48)])
-    v, n, f, U = tube(cl, lambda u: 0.0068 - 0.0044 * u, 8, 48)
+    """The blank, meshed directly: from the winding check to the tip, a
+    true taper bowing a little under the fish, a ferrule where its pieces
+    join; its guides - each a ring stood off it on the reel's side on a
+    frame of two legs, one foot ahead of the ring and one behind, whipped
+    to the blank - smaller toward the tip, and a tip-top at the very end."""
+    y0, y1 = ROD['fore'][1] - 0.004, ROD['tip']
+    N = 128
+    cl = np.array([rod_point(y) for y in np.linspace(y0, y1, N)])
+    v, n, f, U = tube(cl, lambda u: blank_r(y0 + (y1 - y0) * u), 10, N)
     ys = y0 + (y1 - y0) * U
-    V_, N_, F_, D_ = [v], [n], [f], [np.stack([ys, np.zeros(len(v)), np.zeros(len(v)), np.zeros(len(v))], 1)]
+    wr = np.array([wrap_at(y) for y in ys])
+    fer = (np.abs(ys - FERRULE) < 0.012).astype(float)
+    # (x: along the rod (m), y: -, z: whipped with thread, w: the ferrule
+    # (1) / a guide's wire (-1))
+    V_, N_, F_, D_ = [v], [n], [f], [np.stack([ys, np.zeros(len(v)), wr, fer], 1)]
     base = len(v)
-    for gy, gr in GUIDES:
-        c = rod_point(gy) + V(0, 0, 0.0068 + gr + 0.002)
-        tv, tn, tf = torus_mesh(c, (0, 1, 0), gr, 0.0011, 14, 4)
+    n_blank = len(v)
+
+    def add(tv, tn, tf, gy):
+        nonlocal base
         V_.append(tv), N_.append(tn), F_.append(tf + base)
-        D_.append(np.stack([np.full(len(tv), gy), np.ones(len(tv)), np.zeros(len(tv)), np.zeros(len(tv))], 1))
+        D_.append(np.stack([np.full(len(tv), gy), np.zeros(len(tv)), np.zeros(len(tv)), -np.ones(len(tv))], 1))
         base += len(tv)
-        # (its foot down to the blank)
-        st = np.array([rod_point(gy) + V(0, 0, 0.005), c - V(0, 0, gr - 0.0005)])
-        sv, sn, sf, _ = tube(st, lambda u: 0.0011, 4, 2)
-        V_.append(sv), N_.append(sn), F_.append(sf + base)
-        D_.append(np.stack([np.full(len(sv), gy), np.ones(len(sv)), np.zeros(len(sv)), np.zeros(len(sv))], 1))
-        base += len(sv)
+
+    Z = V(0, 0, 1)
+    for gy, gr in GUIDES:
+        rb = blank_r(gy)
+        wire = 0.0011 + 0.035 * gr
+        c = rod_point(gy) + Z * (rb + gr + 0.0035 + 0.25 * gr)
+        add(*torus_mesh(c, (0, 1, 0), gr, wire * 1.25, 16, 5), gy)
+        # (its frame: a leg from the ring's shoulder down to a foot on the
+        # blank ahead of it, and one behind)
+        for sg in (-1, 1):
+            fy = gy + sg * (0.007 + 0.75 * gr)
+            ft = rod_point(fy) + Z * (blank_r(fy) * 0.7)
+            for sx in (-1, 1):
+                st = np.array([ft, c - Z * (gr * 0.55) + V(sx * gr * 0.8, 0, 0)])
+                sv, sn, sf, _ = tube(st, lambda u: wire, 4, 2)
+                add(sv, sn, sf, gy)
+    # the tip-top: a small ring at the very tip, its tube sleeved over the blank
+    tip = rod_point(y1)
+    add(*torus_mesh(tip + Z * (TIP_TOP + 0.002) + V(0, 0.002, 0), (0, 1, 0), TIP_TOP, 0.0011, 12, 4), y1)
+    st = np.array([rod_point(y1 - 0.016), tip + V(0, 0.002, 0)])
+    sv, sn, sf, _ = tube(st, lambda u: 0.0034, 6, 2)
+    add(sv, sn, sf, y1)
     v, n, f, D = np.concatenate(V_), np.concatenate(N_), np.concatenate(F_), np.concatenate(D_)
     vb = ROD['grip'] + v @ ROD_R.T
     nb = n @ ROD_R.T
     W = np.zeros((len(vb), len(BONES)))
     W[:, IDX['rod']] = 1
-    mats = np.where(D[:, 1] > 0.5, MAT['reel'], MAT['rod']).astype(np.uint8)
+    mats = np.where(np.arange(len(v)) >= n_blank, MAT['reel'], MAT['rod']).astype(np.uint8)
     return MeshGarment('blank', MAT['rod'], vb, nb, f, W, D, mats=mats, outline=0.55)
 
 
