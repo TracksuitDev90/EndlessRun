@@ -38,6 +38,23 @@ const ICONS = {
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 const GEM_IC = '<svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg>';
 
+// A browser can keep an old copy of the stylesheet while it fetches this
+// script afresh (each file is cached on its own for a while after an
+// update): one from before the pages of cards came in can't lay them out,
+// so if the strip of them isn't laid out as one, the stylesheet is fetched
+// again, new.
+function freshStyles(strip) {
+  if (getComputedStyle(strip).display === 'flex') return;
+  const link = document.querySelector('link[rel=stylesheet][href*="css/style.css"]');
+  if (!link || link.dataset.fresh) return;
+  const next = link.cloneNode();
+  next.dataset.fresh = '1';
+  next.href = 'css/style.css?fresh=' + Date.now();
+  // (the old one goes once the new one's in, so nothing flashes unstyled)
+  next.addEventListener('load', () => link.remove());
+  link.after(next);
+}
+
 // how many cards a page of the title screen's grid holds (three by two)
 const SLOTS = 6;
 
@@ -247,6 +264,7 @@ export class UI {
     }
     this.pickStrip = strip;
     this.pickPages = pages;
+    freshStyles(strip);
     this.pickPage = 0;
     this.buildPageDots(pages);
     this.bindPageSwipe(root);
