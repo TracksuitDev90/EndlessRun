@@ -1181,6 +1181,8 @@ export class Game {
     // a doorway into the sea counts)
     this.sands.surf(dt, this);
     this.player.wet = this.obstacles.wetAt(this.player.x, this.dist) || this.sands.wetAt(this.player.x, this.dist);
+    // (under the sea: nothing splashes)
+    this.player.submerged = !!this.current?.def.env.bubbles;
     // (this world's stones: the elder's sparks come in their colours)
     this.player.gemSpec = this.current.def.gem;
     // low gravity from the moment the runner is through the doorway into it

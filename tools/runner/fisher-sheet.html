@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fisherman turnaround</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #f9f3ef; overflow: hidden; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      // Reed turned round like his reference sheet (front, his left side,
+      // back, his right side), drawn orthographically at a fixed scale (500
+      // px to the metre, the road 25 px off the foot of the frame) so the
+      // views can be laid next to the sheet's at matching heights
+      // (tools/characters/compare.py). Serve the repository root and open
+      // tools/runner/fisher-sheet.html.
+      //   ?pose=stand|run|bind   stood still and neutral (the idle at its
+      //                  even moment), running (&t= into it), or as bound
+      //   &flat=1        every surface one flat dark colour: the silhouette
+      //   &ink=0         no outlines
+      //   &asset=assets/fisher-body/   another build (the mannequin)
+      //   &views=front,left,back,right
+      import * as THREE from '../../vendor/three/three.module.min.js';
+      import { shared } from '../../src/render/shaders.js';
+      import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
+      import { loadRunner } from '../../src/game/runner-asset.js';
+      import { characterById } from '../../src/game/characters.js';
+      import { WORLD_DEFS } from '../../src/world/index.js';
+
+      const q = new URLSearchParams(location.search);
+      const pose = q.get('pose') || 'stand';
+      const views = (q.get('views') || 'front,left,back,right').split(',');
+      const PXM = 500;
+      const VW = 500;
+      const H = 1000;
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(VW * views.length, H);
+      renderer.autoClear = false;
+      document.body.appendChild(renderer.domElement);
+      shared.uMarks.value = makeMarksTexture();
+      shared.uNoise.value = makeNoiseTexture();
+      shared.uResolution.value.set(VW * views.length, H);
+      const char = characterById('fisher');
+      const asset = await loadRunner('../../' + (q.get('asset') || char.asset));
+      const runner = char.make(WORLD_DEFS[0].env, asset);
+      runner.reset();
+      const dt = 1 / 60;
+      if (pose === 'run') {
+        runner.mode = 'run';
+        if (q.get('style')) runner.holdStyle(q.get('style'));
+        const n = Math.round(Number(q.get('t') || 1.2) / dt);
+        for (let i = 0; i < n; i++) runner.update(dt, Number(q.get('speed') || 14), () => 0);
+      } else if (pose === 'stand') {
+        // (settled, then held at the idle's even moment: weight on both
+        // feet, looking ahead)
+        runner.mode = 'idle';
+        for (let i = 0; i < 150; i++) runner.update(dt, 0, () => 0);
+        runner.time = -dt;
+        runner.update(dt, 0, () => 0);
+      }
+      runner.place(0, 0);
+      runner.shadow.visible = false;
+      const scene = new THREE.Scene();
+      scene.add(runner.root);
+      if (q.get('flat') === '1') {
+        const flat = new THREE.MeshBasicMaterial({ color: 0x2a2320 });
+        runner.root.traverse((o) => {
+          if (o.isPoints) o.visible = false;
+          else if (o.isMesh) o.material = flat;
+        });
+      }
+      if (q.get('ink') === '0') runner.inkMesh.visible = false;
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(3, 3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xece2d8 }));
+      ground.position.y = -0.002;
+      scene.add(ground);
+      const w = VW / PXM, h = H / PXM;
+      const cam = new THREE.OrthographicCamera(-w / 2, w / 2, h - 0.05, -0.05, 0.1, 30);
+      const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2 };
+      renderer.setClearColor(0xf9f3ef, 1);
+      renderer.clear();
+      views.forEach((v, i) => {
+        const a = yaws[v] ?? 0;
+        cam.position.set(Math.sin(a) * 8, 0, -Math.cos(a) * 8);
+        cam.lookAt(0, 0, 0);
+        shared.uCamPos.value.copy(cam.position);
+        renderer.setViewport(i * VW, 0, VW, H);
+        renderer.setScissor(i * VW, 0, VW, H);
+        renderer.setScissorTest(true);
+        renderer.render(scene, cam);
+      });
+      window.__ready = true;
+    </script>
+  </body>
+</html>

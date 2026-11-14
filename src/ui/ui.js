@@ -38,7 +38,7 @@ const ICONS = {
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 const GEM_IC = '<svg class="gem-ic" viewBox="0 0 24 21" aria-hidden="true"><path class="gem-body" d="M6 1.5h12l4.5 6.2L12 19.5 1.5 7.7z" /><path class="gem-cut" d="M1.5 7.7h21M6 1.5l3 6.2 3 11.8 3-11.8 3-6.2M9 7.7l3-6.2 3 6.2" /></svg>';
 
-// how many cards the title screen's grid holds (three by two)
+// how many cards a page of the title screen's grid holds (three by two)
 const SLOTS = 6;
 
 const HINTS = {
@@ -172,23 +172,37 @@ export class UI {
     this.handlers[name] = fn;
   }
 
-  // The title screen's cards, one per runner (see game/characters.js), in a
-  // grid three by two: each their cut-out art standing up out of a card in
-  // their colours, and under the grid a line about whoever's picked. Tapping
-  // one picks them (it doesn't start the run). A runner still being worked
-  // on (locked) is dealt greyed out, a 'soon' seal on them, and can't be
-  // picked. The grid is always full: any slot no runner fills yet holds a
-  // mystery card, greyed out - someone's still to come. ready(id): whether
-  // that runner's model has arrived (see main.js): one who hasn't yet is
-  // dealt all the same, washed out, three dots stamped on their corner until
-  // runnerReady; tapping them meanwhile picks them the moment they are
-  // (runnerWanted).
+  // The title screen's cards, one per runner (see game/characters.js), dealt
+  // onto pages three by two, side by side in a strip you swipe (or drag)
+  // across - the dots under it turn them too: each their cut-out art
+  // standing up out of a card in their colours, and under the grid a line
+  // about whoever's picked. Tapping one picks them (it doesn't start the
+  // run). A runner still being worked on (locked) is dealt greyed out, a
+  // 'soon' seal on them, and can't be picked. Every page is always full:
+  // any slot no runner fills yet holds a mystery card, greyed out -
+  // someone's still to come. ready(id): whether that runner's model has
+  // arrived (see main.js): one who hasn't yet is dealt all the same, washed
+  // out, three dots stamped on their corner until runnerReady; tapping them
+  // meanwhile picks them the moment they are (runnerWanted). Whoever's
+  // picked, their page is the one that shows.
   setRunners(list, selected, ready = () => true) {
     this.runnerDefs = Object.fromEntries(list.map((c) => [c.id, c]));
     const root = $('pick');
     root.textContent = '';
     this.cards = {};
-    for (const c of list) {
+    this.cardPage = {};
+    const pages = Math.max(1, Math.ceil(list.length / SLOTS));
+    const strip = document.createElement('div');
+    strip.className = 'pick-strip';
+    root.appendChild(strip);
+    const pageEls = [];
+    for (let p = 0; p < pages; p++) {
+      const pg = document.createElement('div');
+      pg.className = 'pick-page';
+      strip.appendChild(pg);
+      pageEls.push(pg);
+    }
+    list.forEach((c, i) => {
       const b = document.createElement('button');
       const coming = !c.locked && !ready(c.id);
       b.className = c.locked ? 'pick-card pick-locked' : coming ? 'pick-card pick-loading' : 'pick-card';
@@ -212,13 +226,15 @@ export class UI {
       b.title = c.locked ? `${c.name} is in the workshop - back soon` : c.blurb;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
+        // (the end of a drag across the pages isn't a tap)
+        if (this.pageDragged) return;
         if (!c.locked) this.handlers.pick?.(c.id);
       });
-      b.addEventListener('pointerdown', (e) => e.stopPropagation());
-      root.appendChild(b);
+      pageEls[Math.floor(i / SLOTS)].appendChild(b);
       this.cards[c.id] = b;
-    }
-    for (let k = list.length; k < SLOTS; k++) {
+      this.cardPage[c.id] = Math.floor(i / SLOTS);
+    });
+    for (let k = list.length; k < pages * SLOTS; k++) {
       const m = document.createElement('div');
       m.className = 'pick-card pick-mystery';
       m.setAttribute('aria-hidden', 'true');
@@ -227,11 +243,119 @@ export class UI {
         `<span class="pick-bg"></span>` +
         `<span class="pick-fig pick-q">?</span>` +
         `<span class="pick-plate"><span class="pick-name">? ? ?</span><span class="pick-title">coming soon</span></span>`;
-      root.appendChild(m);
+      pageEls[Math.floor(k / SLOTS)].appendChild(m);
     }
+    this.pickStrip = strip;
+    this.pickPages = pages;
+    this.pickPage = 0;
+    this.buildPageDots(pages);
+    this.bindPageSwipe(root);
     // (the arrow keys and swipes step over anyone locked)
     this.runnerOrder = list.filter((c) => !c.locked).map((c) => c.id);
     this.showRunner(selected, false);
+  }
+
+  // The dots under the pages: one each, the page showing filled in; tapping
+  // one turns to it. (None with only the one page.)
+  buildPageDots(pages) {
+    let dots = $('pick-dots');
+    if (!dots) {
+      dots = document.createElement('div');
+      dots.id = 'pick-dots';
+      dots.className = 'pick-dots';
+      $('pick').after(dots);
+    }
+    dots.textContent = '';
+    dots.hidden = pages < 2;
+    this.pageDots = [];
+    for (let p = 0; p < pages; p++) {
+      const d = document.createElement('button');
+      d.type = 'button';
+      d.className = 'pick-dot';
+      d.setAttribute('aria-label', `Runners, page ${p + 1} of ${pages}`);
+      d.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.turnPage(p);
+      });
+      d.addEventListener('pointerdown', (e) => e.stopPropagation());
+      dots.appendChild(d);
+      this.pageDots.push(d);
+    }
+  }
+
+  // Turn to page p (animated unless told not to).
+  turnPage(p, animate = true) {
+    p = Math.max(0, Math.min((this.pickPages || 1) - 1, p));
+    this.pickPage = p;
+    const strip = this.pickStrip;
+    if (!strip) return;
+    strip.classList.toggle('pick-strip-still', !animate);
+    strip.style.transform = `translateX(${-100 * p}%)`;
+    if (!animate) void strip.offsetWidth;
+    strip.classList.remove('pick-strip-still');
+    (this.pageDots || []).forEach((d, i) => d.setAttribute('aria-current', String(i === p)));
+    $('pick').dataset.page = String(p);
+  }
+
+  // Dragging across the cards turns the pages: the strip follows the finger
+  // (stiffly past either end), and let go it settles on whichever page is
+  // nearer - or the next one along, flicked. A drag that turns into one
+  // isn't a tap on the card it started on. (Up and down are left alone:
+  // on a phone on its side the cards scroll that way.)
+  bindPageSwipe(root) {
+    if (this.pageSwipeBound) return;
+    this.pageSwipeBound = true;
+    let drag = null;
+    const width = () => root.getBoundingClientRect().width || 1;
+    root.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (this.pickPages < 2 || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), on: false, dx: 0 };
+      this.pageDragged = false;
+    });
+    root.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.on) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) {
+          if (Math.abs(dy) > 12) drag = null;
+          return;
+        }
+        drag.on = true;
+        this.pageDragged = true;
+        try {
+          root.setPointerCapture(e.pointerId);
+        } catch {
+          /* not capturable */
+        }
+        this.pickStrip.classList.add('pick-strip-still');
+      }
+      const last = this.pickPages - 1;
+      let off = -this.pickPage * width() + dx;
+      // (past either end it only gives a little)
+      const lo = -last * width();
+      if (off > 0) off *= 0.3;
+      else if (off < lo) off = lo + (off - lo) * 0.3;
+      drag.dx = dx;
+      this.pickStrip.style.transform = `translateX(${off}px)`;
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag;
+      drag = null;
+      if (!d.on) return;
+      this.pickStrip.classList.remove('pick-strip-still');
+      const w = width();
+      const v = d.dx / Math.max(1, performance.now() - d.t);
+      let p = this.pickPage;
+      if (d.dx < -w * 0.22 || v < -0.45) p++;
+      else if (d.dx > w * 0.22 || v > 0.45) p--;
+      this.turnPage(p);
+      // (the click that follows the release is the drag's, not a tap)
+      setTimeout(() => (this.pageDragged = false), 0);
+    };
+    root.addEventListener('pointerup', end);
+    root.addEventListener('pointercancel', end);
   }
 
   showRunner(id, hop = true) {
@@ -241,6 +365,8 @@ export class UI {
       if (k === id && hop) replay(b, 'hop');
     }
     this.runnerShown = id;
+    // (their page turned to)
+    if (this.cardPage && id in this.cardPage && (this.cardPage[id] !== this.pickPage || !hop)) this.turnPage(this.cardPage[id], hop);
     const line = $('pick-line');
     if (line) {
       line.textContent = this.runnerDefs?.[id]?.blurb || '';
