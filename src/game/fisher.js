@@ -7,6 +7,7 @@ import { CONFIG } from '../config.js';
 import { Dust } from './dust.js';
 import { Splashes } from './splashes.js';
 import { Tank } from './tank.js';
+import { CastLine } from './castline.js';
 
 // The fisherman: Reed, a boy of about thirteen in an open yellow rain
 // jacket, a teal tee and orange waterproof bib trousers, black rubber boots
@@ -30,7 +31,13 @@ import { Tank } from './tank.js';
 //     where they come down, tearing into ligaments and fine spray, mist
 //     hanging over it and ripples running out over the wet (a smaller kick
 //     of it as he takes off; splashes.js) - only on land, and only ever for
-//     show: none of it touches the run.
+//     show: none of it touches the run;
+//   - and now and then the fish slips the hook: it drops off behind him,
+//     bounces and flops on the road and is gone - and he casts straight out
+//     again, ahead of him, off to one side or back over his shoulder (never
+//     to quite the same place twice), and yanks a new catch up out of the
+//     ground on the end of his line, one of five (CATCHES), swinging in to
+//     hang off his rod (hookStep; the line while it's out, castline.js).
 
 // Palette slots: 1-16 are the garment ids baked into the mesh, the rest are
 // colours the character shader draws his details with.
@@ -156,6 +163,82 @@ const FEEL = {
 // wide and snapped back in to land).
 const TRICKS = ['puddle', 'stride', 'puddle', 'star', 'stride', 'puddle'];
 
+// What can come up on his line - the same fish, sculpted once, dressed and
+// reproportioned (the palette slots it's drawn with; its body scaled along
+// [back to belly, length, flank to flank], from the rod's tip; its tail and
+// pectoral fins scaled on their own). Each new catch is dealt so the one
+// he's just lost never comes straight back:
+//   - the alien: deep blue-violet, turquoise spots glowing down its flanks
+//     (the one he starts every run with);
+//   - the puffer: round as a ball, sunshine yellow, big fins, a pale belly
+//     and brown freckles;
+//   - the needlefish: long and slender, silver-blue, a cyan shine;
+//   - the koi: white, big orange patches and a great flowing orange tail;
+//   - the lanternfish: a deep-sea thing, midnight blue, chunky, golden
+//     lights all down it.
+const CATCHES = [
+  { name: 'alien', body: '#5f49c4', fin: '#8a66d8', belly: '#ccb4f5', glow: '#52f5df', size: [1, 1, 1], tail: 1, fins: 1 },
+  { name: 'puffer', body: '#f5b000', fin: '#ffd23f', belly: '#ffe7a0', glow: '#6b3f17', size: [1.5, 0.68, 1.5], tail: 0.85, fins: 1.45 },
+  { name: 'needle', body: '#86aec0', fin: '#c4e6f0', belly: '#eef6f8', glow: '#2fd6ff', size: [0.62, 1.42, 0.62], tail: 1.05, fins: 0.7 },
+  { name: 'koi', body: '#f7f1e6', fin: '#ff7a2a', belly: '#fffaf1', glow: '#ff4a14', size: [1.02, 1.04, 0.95], tail: 1.4, fins: 1.3 },
+  { name: 'lantern', body: '#1e2650', fin: '#35458a', belly: '#6170b0', glow: '#ffe45c', size: [1.22, 0.9, 1.18], tail: 0.9, fins: 0.9 },
+];
+// (the palette slots a catch is drawn with: see COL)
+const FISH_SLOTS = [
+  [13, 'body'],
+  [14, 'fin'],
+  [29, 'belly'],
+  [31, 'glow'],
+];
+// Where he casts, round him (yaw: 0 straight ahead, + to his left; dist: m
+// out along it). Each cast's dealt one of these, never the one before, and
+// lands somewhere new inside it.
+const CASTS = [
+  { name: 'ahead', yaw: [-0.5, 0.5], dist: [5, 8] },
+  { name: 'left', yaw: [0.95, 1.75], dist: [3, 4.8] },
+  { name: 'right', yaw: [-1.75, -0.95], dist: [3, 4.8] },
+  { name: 'behind', yaw: [2.35, 3.93], dist: [2.4, 3.6] },
+];
+// The fish slipping the hook, and the cast for the next (s): how long he
+// runs between drops (at least, plus up to; the first a little sooner); how
+// long the dropped one is followed (at most); from the drop to the cast,
+// the rod drawn back, the flick, the line flying out; the bite (at least,
+// plus up to); the strike (the rod yanked up) and the reel in.
+const HOOK = {
+  every: [12, 10],
+  first: [8, 7],
+  drop: 1.3,
+  cast: 0.42,
+  load: 0.2,
+  flick: 0.12,
+  fly: 0.4,
+  bite: [0.16, 0.16],
+  strike: 0.12,
+  reel: 0.52,
+};
+// (a fish too small to see: how a dropped one is hidden)
+const HIDDEN = 1e-3;
+
+// Deal from a deck of 0..n-1, refilled and shuffled whenever it's empty -
+// never the one just had (last).
+function deal(deck, n, last) {
+  if (!deck.length) {
+    for (let i = 0; i < n; i++) if (i !== last) deck.push(i);
+    for (let i = deck.length - 1; i > 0; i--) {
+      const k = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[k]] = [deck[k], deck[i]];
+    }
+  }
+  let k = deck.pop();
+  if (k === last && deck.length) {
+    const j = deck.pop();
+    deck.unshift(k);
+    k = j;
+  }
+  return k;
+}
+const pick = (r) => r[0] + (r[1] - r[0]) * Math.random();
+
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -172,6 +255,17 @@ const _m3 = new THREE.Matrix4();
 const _o1 = new THREE.Vector3();
 const _o2 = new THREE.Vector3();
 const _before = new THREE.Vector3();
+const _h0 = new THREE.Vector3();
+const _h1 = new THREE.Vector3();
+const _h2 = new THREE.Vector3();
+const _h3 = new THREE.Vector3();
+const _hq = new THREE.Quaternion();
+const _hq2 = new THREE.Quaternion();
+const _hm = new THREE.Matrix4();
+const _rest = new THREE.Vector3();
+const _da = new THREE.Vector3();
+const _db = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
 const AX = new THREE.Vector3(1, 0, 0);
 const AY = new THREE.Vector3(0, 1, 0);
 const AZ = new THREE.Vector3(0, 0, 1);
@@ -215,6 +309,10 @@ export class Fisher extends Player {
     this.splashes = new Splashes(this.u);
     this.tank = new Tank(this.u, R.tank, this.b);
     this.buildRod();
+    // the line while it's out (on runner space, so with the runner)
+    this.line = new CastLine(COL[16], COL[24]);
+    this.root.add(this.line.mesh);
+    this.applyCatch(this.hook?.kind ?? 0);
   }
 
   // The frames the rod and the fish are posed by: the rod as it rides on
@@ -242,8 +340,11 @@ export class Fisher extends Player {
     this.rodF = new THREE.Matrix4();
     this.rodPivot = new THREE.Vector3(0, 0.27, 0); // (where it rests on his shoulder, along it)
     this.lineLen = R.rod.line;
-    // the fish's centre of mass, below the hook (m)
+    // the fish's centre of mass, below the hook (m), and how big it is (as
+    // dressed for whichever catch is on: applyCatch)
+    this.catchSize = new THREE.Vector3(1, 1, 1);
     this.catchL = R.rod.line + 0.2;
+    this.catchR = 0.1;
     this.fishCols = R.colliders.map((c) => ({ ...c, a: c.a && new THREE.Vector3(...c.a), b: c.b && new THREE.Vector3(...c.b), c: c.c && new THREE.Vector3(...c.c), r: c.r && new THREE.Vector3(...c.r) }));
     this.cols = this.fishCols.map((c) => ({ kind: c.kind, c: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(), ax: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], r: [0, 0, 0], ra: c.ra || 0, rb: c.rb || 0 }));
   }
@@ -256,6 +357,7 @@ export class Fisher extends Player {
     this.dust.forCompile(on);
     this.splashes.forCompile(on);
     this.tank.forCompile(on);
+    this.line.forCompile(on);
   }
 
   // --- state ------------------------------------------------------------------------
@@ -270,6 +372,36 @@ export class Fisher extends Player {
     this.rodBob = new Spring();
     this.rodSway = new Spring();
     this.packS = { y: new Spring(), x: new Spring(), z: new Spring() };
+    // the fish slipping the hook and the cast for the next (hookStep)
+    this.hook = {
+      on: false,
+      t: 0,
+      next: 0,
+      kind: 0,
+      nextKind: 0,
+      kinds: [],
+      sides: [],
+      side: -1,
+      yaw: 0,
+      dist: 0,
+      R0: 0,
+      lost: false,
+      reeled: false,
+      landed: false,
+      grounded: false,
+      flopT: 0,
+      target: new THREE.Vector3(),
+      tip: new THREE.Vector3(),
+      dp: new THREE.Vector3(),
+      dv: new THREE.Vector3(),
+      dq: new THREE.Quaternion(),
+      dw: new THREE.Vector3(),
+      rp: new THREE.Vector3(),
+      rv: new THREE.Vector3(),
+    };
+    this.lookS = new Spring();
+    this.fishQ = new THREE.Quaternion();
+    this.fishH = 1 / 120;
   }
 
   resetSim() {
@@ -287,6 +419,19 @@ export class Fisher extends Player {
     for (const s of [this.twist, this.tailS, this.finS, this.rodBob, this.rodSway]) s?.reset();
     for (const s of Object.values(this.packS || {})) s.reset();
     this.prevAng = null;
+    // (every run starts with the alien on the line, the next drop a little
+    // way off)
+    if (this.hook) {
+      const H = this.hook;
+      H.on = false;
+      H.next = pick(HOOK.first);
+      H.kinds.length = 0;
+      H.sides.length = 0;
+      H.side = -1;
+      this.lookS.reset();
+      this.applyCatch(0);
+      this.line?.hide();
+    }
     this.tank?.reset();
     this.dust?.clear();
     this.splashes?.clear();
@@ -301,6 +446,9 @@ export class Fisher extends Player {
 
   update(dt, speed, groundAt) {
     this.lastDt = dt;
+    this.prevX = this.x;
+    this.prevY = this.y;
+    this.hookClock(dt);
     this.styleStep(dt);
     this.greetT += dt;
     this.dodgeT += dt;
@@ -641,8 +789,12 @@ export class Fisher extends Player {
     Pz[C.elL] -= 0.3 * e * w;
   }
 
-  // (an elbow never bends backward)
+  // (an elbow never bends backward; and while he's lost his fish and is
+  // casting for another, he looks where it's going)
   applyPose(Pz, roll) {
+    const look = this.lookS ? this.lookS.step(this.hookLook(), 5, 0.6, this.lastDt || 0) : 0;
+    Pz[C.hdYaw] += look;
+    Pz[C.chTwist] += 0.3 * look;
     Pz[C.elL] = Math.max(0, Pz[C.elL]);
     Pz[C.elR] = Math.max(0, Pz[C.elR]);
     super.applyPose(Pz, roll);
@@ -697,6 +849,7 @@ export class Fisher extends Player {
     _m2.makeRotationFromEuler(new THREE.Euler(bob - 0.3 * g, 0, sway + 0.1 * g));
     _m3.makeTranslation(-this.rodPivot.x, -this.rodPivot.y, -this.rodPivot.z);
     this.rodF.multiply(_m).multiply(_m2).multiply(_m3);
+    if (this.hook.on) this.rodCast(live);
     const rod = this.b.rod;
     this.rodF.decompose(rod.position, rod.quaternion, _s);
     rod.updateMatrix();
@@ -748,7 +901,8 @@ export class Fisher extends Player {
   // --- secondary motion ---------------------------------------------------------------
   simulate(dt, steps) {
     this.packStep(dt);
-    this.catchStep(dt, steps);
+    if (this.hook.on) this.hookStep(dt);
+    else this.catchStep(dt, steps);
     this.tank.step(dt, this.time, this.accLocal, this.mode === 'run' ? this.speed : 0);
   }
 
@@ -851,16 +1005,17 @@ export class Fisher extends Player {
       }
       p.copy(_p).addScaledVector(_v, L);
       // kept off him (its middle, and its head nearer the tip)
-      this.pushOut(p, 0.1);
+      this.pushOut(p, this.catchR);
       _v2.copy(_p).addScaledVector(_v, L * 0.45);
       const before = _before.copy(_v2);
-      this.pushOut(_v2, 0.085);
+      this.pushOut(_v2, 0.85 * this.catchR);
       if (_v2.distanceToSquared(before) > 0) p.add(_v2.sub(before).multiplyScalar(1.6));
       // (and back on its line)
       _v.subVectors(p, _p).normalize();
       p.copy(_p).addScaledVector(_v, L);
     }
     F.tip.copy(tip);
+    this.fishH = h;
     // the line and the fish along it, turned back into runner space
     const Qi = _q2.copy(Q).invert();
     const dir = _v.subVectors(F.p, tip).normalize().applyQuaternion(Qi);
@@ -877,8 +1032,12 @@ export class Fisher extends Player {
     const c = this.b.catch;
     c.position.copy(tipR);
     c.quaternion.copy(_q);
+    c.scale.copy(this.catchSize);
     c.updateMatrix();
     c.matrixWorld.copy(c.matrix);
+    // (and how it hangs, in simulation space: if it slips the hook, it
+    // falls from just as it was)
+    this.fishQ.copy(Q).multiply(_q);
     // its tail sweeps after its swings, and on its own a little, slowly;
     // its fins fan
     this.tailS.v += clamp(angV, -8, 8) * 0.35;
@@ -890,11 +1049,363 @@ export class Fisher extends Player {
     const fan = 0.15 * Math.sin(this.time * 2.6);
     this.b.catchFinL.rotation.set(0, -(fin + fan), 0);
     this.b.catchFinR.rotation.set(0, fin + fan, 0);
+    this.finsOn(c);
+  }
+
+  // The tail and the fins onto the fish wherever it is (each scaled for the
+  // catch that's on).
+  finsOn(c) {
     for (const k of ['catchTail', 'catchFinL', 'catchFinR']) {
       const o = this.b[k];
+      o.scale.setScalar(k === 'catchTail' ? this.catchTailS : this.catchFinS);
       o.updateMatrix();
       o.matrixWorld.multiplyMatrices(c.matrixWorld, o.matrix);
     }
+  }
+
+  // --- the one that got away ----------------------------------------------------------
+  // Dress the fish on his line as one of CATCHES (its colours, its size).
+  applyCatch(k) {
+    const K = CATCHES[k];
+    if (this.mat) {
+      const P = this.mat.uniforms.uPal.value;
+      for (const [slot, key] of FISH_SLOTS) P[slot].set(K[key]);
+    }
+    if (this.hook) this.hook.kind = k;
+    if (!this.catchSize) return;
+    this.catchSize.set(...K.size);
+    this.catchTailS = K.tail;
+    this.catchFinS = K.fins;
+    this.catchL = (this.lineLen + 0.2) * K.size[1];
+    this.catchR = 0.1 * Math.max(K.size[0], K.size[2]);
+  }
+
+  // The clock of it: while he runs, every so often the fish slips the hook
+  // (dropFish); from then on its own clock runs the drop, the cast and the
+  // reel, and when the new one's in, back to waiting. (A crash, or leaving
+  // the run, puts things straight: the new catch is simply on the line.)
+  hookClock(dt) {
+    const H = this.hook;
+    if (!H) return;
+    if (this.mode !== 'run' || this.crashed) {
+      if (H.on) this.endHook(false);
+      return;
+    }
+    if (!H.on) {
+      H.next -= dt;
+      if (H.next <= 0 && this.speed > 4 && !this.sliding && this.fish.ready) this.dropFish();
+      return;
+    }
+    H.t += dt;
+    if (H.t >= H.R0 + HOOK.reel) this.endHook(true);
+  }
+
+  // The fish slips the hook: it falls from just as it was swinging, popped
+  // up a little and off to one side as the hook tears out - and he deals
+  // himself the next catch and where he'll cast for it (for the viewer,
+  // side: a CASTS name, kind: a CATCHES name).
+  dropFish(side, kind) {
+    const H = this.hook, F = this.fish;
+    if (!F.ready) return;
+    H.on = true;
+    H.t = 0;
+    H.lost = H.reeled = H.landed = H.grounded = H.splashed0 = false;
+    H.flopT = 0;
+    const ki = CATCHES.findIndex((K) => K.name === kind);
+    H.nextKind = ki >= 0 ? ki : deal(H.kinds, CATCHES.length, H.kind);
+    const si = CASTS.findIndex((S) => S.name === side);
+    H.side = si >= 0 ? si : deal(H.sides, CASTS.length, H.side);
+    const S = CASTS[H.side];
+    H.yaw = pick(S.yaw);
+    H.dist = pick(S.dist);
+    H.R0 = HOOK.cast + HOOK.load + HOOK.flick * 0.5 + HOOK.fly + pick(HOOK.bite);
+    // (the fish's own way through the air: its swing, his run, the pop)
+    const rv = _h0.subVectors(F.p, F.q).divideScalar(this.fishH);
+    H.dp.copy(F.p);
+    H.dv.set(rv.x + this.vx, rv.y + (this.grounded ? 0 : this.vy) + 1.3, rv.z - this.speed);
+    H.dv.x += (Math.random() - 0.5) * 1.6;
+    H.dq.copy(this.fishQ);
+    H.dw.set((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 7);
+    // (he takes it in his stride: the rod jumps as the weight comes off it)
+    this.rodBob.v -= 2.2;
+  }
+
+  // The new catch is in: it hangs off the rod and swings on from the way
+  // it came in (or, cut short, is simply there); the line's back on it.
+  endHook(caught) {
+    const H = this.hook, F = this.fish;
+    H.on = false;
+    H.next = pick(HOOK.every);
+    if (!H.reeled) this.applyCatch(H.nextKind);
+    if (caught && H.reeled) {
+      F.p.copy(H.rp);
+      F.q.copy(H.rp).addScaledVector(H.rv.clampLength(0, 6), -this.fishH);
+      F.tip.copy(H.tip);
+    } else F.ready = false;
+    this.prevAng = null;
+    this.tailS.v += 4;
+    this.line?.hide();
+  }
+
+  // Where he looks (head yaw): back at the fish as it goes, then out to
+  // where he's casting, and back ahead as the new one comes in.
+  hookLook() {
+    const H = this.hook;
+    if (!H?.on) return 0;
+    const t = H.t;
+    const out = clamp(H.yaw, -1.0, 1.0) * (Math.abs(H.yaw) > 2.2 ? 0.9 : 1);
+    const back = H.dp.x > 0 ? -0.75 : 0.75;
+    if (t < HOOK.cast) return back * smooth(0.0, 0.15, t);
+    const k = smooth(HOOK.cast - 0.05, HOOK.cast + HOOK.load, t);
+    return mix(back, out, k) * (1 - smooth(H.R0 + 0.1, H.R0 + HOOK.reel, t));
+  }
+
+  // The cast, on the rod (runner space): drawn back away from where he's
+  // casting, flicked out toward it - and held there, its tip nodding as it
+  // bites - then the strike, yanked up and back, and down onto his shoulder
+  // again as the catch comes in. His fist comes up and forward off his
+  // shoulder with it; the rod turns in his fist.
+  rodCast(live) {
+    const H = this.hook, t = H.t;
+    const C0 = HOOK.cast, L1 = C0 + HOOK.load, F1 = L1 + HOOK.flick, S1 = H.R0 + HOOK.strike;
+    if (t < C0) return;
+    const hx = -Math.sin(H.yaw), hz = -Math.cos(H.yaw);
+    // (forward of him a little whichever way, unless it's behind: clear of
+    // his face as it crosses)
+    const fwd = hz > 0.3 ? 0 : -0.25;
+    const rest = _rest.setFromMatrixColumn(this.rodF, 1).normalize();
+    const aim = _h1.set(hx * 0.8, 0.5, hz * 0.8 + fwd).normalize();
+    const load = _h2.set(-hx * 0.45, 0.9, -hz * 0.45 + fwd * 0.5).normalize();
+    const strike = _h3.set(-hx * 0.25, 0.95, -hz * 0.25 + fwd * 0.3).normalize();
+    let A, B, k, w;
+    if (t < L1) {
+      k = smooth(0, 1, (t - C0) / HOOK.load);
+      A = rest;
+      B = load;
+      w = k;
+    } else if (t < F1) {
+      k = 1 - Math.pow(1 - (t - L1) / HOOK.flick, 2.5);
+      A = load;
+      B = aim;
+      w = 1;
+    } else if (t < H.R0) {
+      // (held out at it, the tip dipping as the line goes out and as it
+      // bites)
+      A = aim;
+      B = _db.copy(aim).addScaledVector(UP, -0.35).normalize();
+      const land = F1 + HOOK.fly;
+      k = 0.4 * smooth(F1, land, t) * (1 - smooth(land, land + 0.15, t)) + 0.55 * smooth(H.R0 - 0.1, H.R0 - 0.02, t);
+      w = 1;
+    } else if (t < S1) {
+      k = 1 - Math.pow(1 - (t - H.R0) / HOOK.strike, 2);
+      A = aim;
+      B = strike;
+      w = 1;
+    } else {
+      k = smooth(0, 1, (t - S1) / (HOOK.reel - HOOK.strike));
+      A = strike;
+      B = rest;
+      w = 1 - k;
+    }
+    // (the way from one to the other, turned rather than cut across)
+    _hq.setFromUnitVectors(A, B);
+    _hq2.identity().slerp(_hq, k);
+    const D = _da.copy(A).applyQuaternion(_hq2);
+    _hq.setFromUnitVectors(rest, D);
+    _hq2.identity().slerp(_hq, live);
+    const grip = _h0.setFromMatrixPosition(this.rodF);
+    const lift = w * live;
+    _hm.makeTranslation(grip.x + 0.03 * hx * lift, grip.y + 0.12 * lift, grip.z - 0.08 * lift);
+    _m2.makeRotationFromQuaternion(_hq2);
+    _m3.makeTranslation(-grip.x, -grip.y, -grip.z);
+    this.rodF.premultiply(_m3).premultiply(_m2).premultiply(_hm);
+  }
+
+  // While the fish is off the hook (simulation space: the world's axes,
+  // from the runner): the dropped one tumbling down and flopping on the
+  // road as it's left behind; then nothing on the line while it flies out
+  // and lies there; then the new one yanked up out of the ground and
+  // reeled in over an arc, spinning, to hang off the tip.
+  hookStep(dt) {
+    if (dt <= 0) return;
+    const H = this.hook;
+    const Q = this.root.quaternion;
+    const tip = H.tip.copy(this.tipLocal).applyMatrix4(this.rodF).applyQuaternion(Q);
+    const g = (this.groundY || 0) - this.y;
+    H.target.set(-Math.sin(H.yaw) * H.dist, g, -Math.cos(H.yaw) * H.dist);
+    if (H.t >= H.R0) this.reelStep(tip, g);
+    else if (H.t < HOOK.drop && !H.lost) this.dropStep(dt, g);
+    else this.placeCatch(tip, _hq.identity(), false);
+    this.lineStep(tip, g);
+  }
+
+  dropStep(dt, g) {
+    const H = this.hook;
+    const p = H.dp, v = H.dv;
+    // (the runner's own way this frame: the fish keeps its own)
+    const rvx = (this.x - this.prevX) / dt, rvy = (this.y - this.prevY) / dt;
+    v.y -= 9.8 * this.gk * dt;
+    p.x += (v.x - rvx) * dt;
+    p.y += (v.y - rvy) * dt;
+    p.z += (v.z + this.speed) * dt;
+    const r = 0.07 * Math.max(this.catchSize.x, this.catchSize.z);
+    H.grounded = false;
+    if (p.y - r < g) {
+      p.y = g + r;
+      H.grounded = true;
+      if (!H.landed && v.y < -0.5) {
+        // (it slaps down: a splash, and it bounces, flipping)
+        H.landed = true;
+        this.hookSplash(p, 0.55);
+        H.dw.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 12);
+      }
+      v.y = v.y < -1 ? -v.y * 0.3 : Math.max(v.y, 0);
+      const f = Math.exp(-6 * dt);
+      v.x *= f;
+      v.z *= f;
+      // it flops: a hop every so often, twisting as it goes
+      H.flopT -= dt;
+      if (H.flopT <= 0) {
+        H.flopT = 0.22 + 0.16 * Math.random();
+        v.y = 1.5 * Math.sqrt(this.gk);
+        H.dw.set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 10);
+      }
+    }
+    // tumbling (the spin dies away on the road), and when it's down, laid
+    // flat on its side between the flops
+    _hq.setFromAxisAngle(_h0.copy(H.dw).normalize(), H.dw.length() * dt);
+    H.dq.premultiply(_hq).normalize();
+    if (H.grounded) {
+      H.dw.multiplyScalar(Math.exp(-5 * dt));
+      const Y = _h1.set(0, 1, 0).applyQuaternion(H.dq);
+      Y.y = 0;
+      if (Y.lengthSq() < 1e-6) Y.set(0, 0, 1);
+      Y.normalize();
+      const X = _h2.crossVectors(Y, UP);
+      _hm.makeBasis(X, Y, UP);
+      _hq2.setFromRotationMatrix(_hm);
+      H.dq.slerp(_hq2, 1 - Math.exp(-7 * dt));
+    }
+    // (gone once it's well behind, or fallen off the edge of things)
+    if (p.z > 10 || p.y < g - 3) H.lost = true;
+    const o = _h3.set(0, this.catchL, 0).applyQuaternion(H.dq).add(p);
+    this.placeCatch(o, H.dq, !H.lost, H.grounded ? 0.6 : 0.3, 24);
+  }
+
+  reelStep(tip, g) {
+    const H = this.hook;
+    const u = clamp((H.t - H.R0) / HOOK.reel, 0, 1);
+    if (!H.reeled) {
+      // the strike: up it comes, out of the ground in a burst of water,
+      // dressed as whatever it is
+      H.reeled = true;
+      this.applyCatch(H.nextKind);
+      this.hookSplash(H.target, 1.1);
+      H.rp.copy(H.target);
+      H.rv.set(0, 0, 0);
+    }
+    // the way in: up out of the ground at the hook, high over an arc, to
+    // hang under the tip - quick off the mark, easing in at the end
+    const e = 1 - Math.pow(1 - u, 2.2);
+    const P0 = _h0.copy(H.target);
+    P0.y -= 0.25;
+    const P2 = _h1.copy(tip);
+    P2.y -= this.catchL;
+    const P1 = _h2.addVectors(P0, P2).multiplyScalar(0.5);
+    P1.y += 0.9 + 0.16 * H.dist;
+    const w0 = (1 - e) * (1 - e), w1 = 2 * e * (1 - e), w2 = e * e;
+    const P = _h3.set(P0.x * w0 + P1.x * w1 + P2.x * w2, P0.y * w0 + P1.y * w1 + P2.y * w2, P0.z * w0 + P1.z * w1 + P2.z * w2);
+    const dt = this.lastDt || 1 / 60;
+    H.rv.subVectors(P, H.rp).divideScalar(Math.max(dt, 1e-3));
+    H.rp.copy(P);
+    // hung by its lip off the line to the tip, spinning on it as it comes
+    const d = _da.subVectors(tip, P);
+    if (d.lengthSq() < 1e-6) d.set(0, 1, 0);
+    d.normalize();
+    _hq.setFromUnitVectors(DOWN, _db.copy(d).negate());
+    _hq.multiply(_hq2.setFromAxisAngle(AY, 7 * (1 - e) * (1 - e) + 0.3 * Math.sin(H.t * 9) * (1 - u)));
+    const o = _h1.copy(P).addScaledVector(d, Math.min(this.catchL, P.distanceTo(tip)));
+    this.placeCatch(o, _hq, true, 0.55 * (1 - u) + 0.1, 30);
+  }
+
+  // The fish's bone at o, turned q (simulation space), shown or not; its
+  // tail thrashing (amp, how fast) and its fins fanning.
+  placeCatch(o, q, show, amp = 0, rate = 0) {
+    const Qi = _q.copy(this.root.quaternion).invert();
+    const c = this.b.catch;
+    c.position.copy(o).applyQuaternion(Qi);
+    c.quaternion.copy(Qi).multiply(q);
+    if (show) c.scale.copy(this.catchSize);
+    else c.scale.setScalar(HIDDEN);
+    c.updateMatrix();
+    c.matrixWorld.copy(c.matrix);
+    const T = this.time;
+    this.b.catchTail.rotation.set(amp * Math.sin(T * rate), 0, 0);
+    const fan = 0.15 * Math.sin(T * 2.6) + 0.5 * amp * Math.sin(T * rate * 0.7 + 1);
+    this.b.catchFinL.rotation.set(0, -fan, 0);
+    this.b.catchFinR.rotation.set(0, fan, 0);
+    this.finsOn(c);
+  }
+
+  // The line while there's no fish on it (and while the new one comes in):
+  // flying out from the tip behind the hook over its arc; lying slack out
+  // to where it landed, the hook bobbing, a twitch as it bites; then taut
+  // to the fish coming in.
+  lineStep(tip, g) {
+    const H = this.hook, t = H.t;
+    const rel = HOOK.cast + HOOK.load + HOOK.flick * 0.5;
+    const land = rel + HOOK.fly;
+    if (t < rel) {
+      this.line.hide();
+      return;
+    }
+    const a = _h0.copy(tip);
+    const b = _h1;
+    const c = _h2;
+    const arc = 0.8 + 0.12 * H.dist;
+    if (t < land) {
+      const u = 1 - Math.pow(1 - (t - rel) / HOOK.fly, 1.5);
+      b.lerpVectors(tip, H.target, u);
+      b.y += arc * 4 * u * (1 - u);
+      c.lerpVectors(a, b, 0.5);
+      c.y += arc * 0.6 * (1 - u) - 0.15 * u;
+    } else if (t < H.R0) {
+      if (!H.splashed0) {
+        H.splashed0 = true;
+        this.hookSplash(H.target, 0.35);
+      }
+      const bite = smooth(H.R0 - 0.12, H.R0 - 0.03, t);
+      b.copy(H.target);
+      b.y += 0.03 * Math.sin(t * 17) - 0.06 * bite;
+      c.lerpVectors(a, b, 0.5);
+      c.y -= (0.22 + 0.05 * H.dist) * (1 - 0.7 * bite);
+      c.y = Math.max(c.y, g + 0.04);
+    } else {
+      // (to where the fish's own line starts)
+      b.setFromMatrixPosition(this.b.catch.matrixWorld).applyQuaternion(this.root.quaternion);
+      const u = clamp((t - H.R0) / HOOK.reel, 0, 1);
+      c.lerpVectors(a, b, 0.5);
+      c.y -= 0.06 * (1 - u);
+      if (u > 0.92) {
+        this.line.hide();
+        return;
+      }
+    }
+    // (into runner space)
+    const Qi = _q.copy(this.root.quaternion).invert();
+    a.applyQuaternion(Qi);
+    b.applyQuaternion(Qi);
+    c.applyQuaternion(Qi);
+    this.line.lay(a, c, b);
+  }
+
+  // A splash where the fish hits the road, or where it bursts up out of it
+  // (simulation space; it stays where it happened). Only on land.
+  hookSplash(p, hit) {
+    if (this.submerged) return;
+    _v.copy(p).applyQuaternion(_q.copy(this.root.quaternion).invert());
+    _v.y += 0.004;
+    this.splashes.burst(_v, _dv.set(0, 0, 0), true, hit, 0);
   }
 
   // A point pushed out of whatever of him it's inside (r: its own size).

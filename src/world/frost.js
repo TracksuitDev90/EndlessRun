@@ -113,13 +113,22 @@ const hash2 = (a, b) => {
 // How deep it lies (0 a dusting, 1 as deep as it gets) on the visit-th time
 // through the pass this run (0 the first), t of the way along it: what it
 // has come to by the time you arrive, and what settles while you're there —
-// a little during each visit, a lot between one and the next, and no more
-// once it's full.
-const SNOW_AT = [0, 0.42, 0.74, 0.9];
-const SNOW_GROWS = [0.12, 0.12, 0.1, 0.1];
+// a good deal during each visit (you watch it pile up as you run), more
+// between one and the next, and no more once it's full.
+const SNOW_AT = [0, 0.55, 0.86, 1];
+const SNOW_GROWS = [0.34, 0.3, 0.16, 0];
 export function snowAt(visit, t) {
   const v = Math.min(Math.max(0, visit | 0), SNOW_AT.length - 1);
   return Math.min(1, SNOW_AT[v] + SNOW_GROWS[v] * clamp01(t));
+}
+
+// How heavy the flakes in the air are on the visit-th time through (1 the
+// first): a little bigger, falling a little faster and a little thicker
+// every lap, on and on - by the seventh time round, half as heavy again -
+// and a touch heavier through each visit too (t of the way along it).
+export function snowWeight(visit, t) {
+  const v = Math.max(0, visit | 0) + 0.5 * clamp01(t);
+  return 1 + 0.5 * Math.min(1, v / 6);
 }
 
 // Where the canyon opens out on this side of the route (as openAt in the
@@ -1205,8 +1214,9 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   // how deep the snow lies, by visit and by how far through it you are (see
-  // Game.updateSnow)
+  // Game.updateSnow), and how heavy the flakes falling on it are
   snowAt,
+  snowWeight,
   // The dream is held back here (see holdBack in game/dream.js), by visit:
   // [how much of its shape warps come through, how much of its colour]. The
   // first time, none of it; the second, the faintest stir far off; then by

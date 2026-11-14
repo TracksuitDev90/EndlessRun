@@ -756,8 +756,8 @@ export default {
   gate: { opening: OPENING, depth: GATE_DEPTH },
   gem: GEM,
   // low gravity (see game/drift.js), and more open road after the doorway
-  // in (seconds of running: the jump to light speed has the screen a second
-  // and a half, then a moment to find your feet)
+  // in (seconds of running: the jump to light speed has the screen for
+  // under a second, then a moment to find your feet)
   lowGravity: true,
   clearAfter: 4.5,
   // and a breather, gentler still than the Cypress Lane: laid at less of

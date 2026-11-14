@@ -1,23 +1,27 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 
 // Through a doorway into a world with env.warp (the Red Drift), the runner
-// jumps to light speed. The instant they're through, the stars stretch into
-// streaks pouring out of the point the road runs to - white, ice blue,
-// cyan, violet, a few hot magenta - faster and longer as the jump takes
-// hold, the world smeared out along them toward the centre and sunk in a
-// blue tunnel, a white-hot core blazing where they all come from; then they
-// drop out of it: the streaks snap back into points, a flash rings out
-// across the screen, and there they are, running on the red dust under the
-// planets. About a second and a half in all - the streaks racing faster
-// and faster the whole time it holds, the tunnel turning round them.
+// jumps to light speed - and is sucked into it. The instant they're through
+// the world itself comes apart into light: the camera lunges at the point
+// the road runs to, everything round it is drawn out toward that point into
+// long trails of its own colour, split into the spectrum along their length
+// (red at the tail, violet at the head - the world's red dust, the doorway's
+// violet, the planets' blues all pulled into ribbons), twisting into a
+// vortex that tightens toward the centre, while bright dashes race out along
+// every trail past the edges of the screen, faster and faster. It isn't
+// streaks painted on top of the picture: the picture is the streaks. Then
+// they drop out - the trails snap back into the world, a flash and a ring
+// of rainbow light race out across the screen, and there they are, running
+// on the red dust under the planets. Quick: under nine-tenths of a second
+// in all, the drop out at a little past half a second.
 //
-// The runner is left out of the smear (and the streaks thin round them):
-// it's the universe that's moving, not them, and the road stays readable.
+// The runner is left out of it (the trails thin round them): it's the
+// universe that's moving, not them, and the road stays readable.
 //
 // Like the splash, it's drawn over the finished frame (copied into a
 // texture) in one full-screen pass, only while it runs.
 
-export const WARP_TIME = 1.5;
+export const WARP_TIME = 0.85;
 
 const VS = /* glsl */ `
 varying vec2 vUv;
@@ -32,97 +36,116 @@ uniform sampler2D uFrame;
 uniform vec2 uRes;
 uniform float uT;
 uniform float uSeed;
-uniform vec2 uVP;     // where the streaks pour from (uv)
+uniform vec2 uVP;     // where it all pours into (uv)
 uniform vec3 uRunner; // the runner on screen: xy (uv), z their height on it
 varying vec2 vUv;
 
 float h1(float n) {
   return fract(sin(n * 127.1 + uSeed * 13.7) * 43758.5453);
 }
-vec3 streakColor(float h) {
-  if (h < 0.34) return vec3(0.92, 0.96, 1.0);
-  if (h < 0.58) return vec3(0.55, 0.82, 1.0);
-  if (h < 0.74) return vec3(0.3, 0.9, 1.0);
-  if (h < 0.86) return vec3(0.45, 0.5, 1.0);
-  if (h < 0.95) return vec3(0.68, 0.42, 1.0);
-  return vec3(1.0, 0.42, 0.86);
+// a rainbow, round the colour wheel
+vec3 spectrum(float x) {
+  return 0.5 + 0.5 * cos(6.2831853 * (x + vec3(0.0, 0.33, 0.67)));
 }
 
 void main() {
   float aspect = uRes.x / uRes.y;
   float t = uT;
-  // how far in: the jump takes hold at once, holds, and drops out
-  float I = smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(1.0, 1.16, t));
-  // how long the streaks are: they stretch as it takes hold and snap back
-  // to points as it drops out
-  float S = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.96, 1.07, t));
-  float flash = exp(-pow((t - 1.05) / 0.045, 2.0));
-  float settle = 1.0 - smoothstep(1.1, 1.5, t);
+  // how far in: it grabs at once, holds, and lets go
+  float I = smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.5, 0.6, t));
+  // how long the trails are drawn: out as it takes hold, snapping back as
+  // it drops out
+  float S = smoothstep(0.0, 0.11, t) * (1.0 - smoothstep(0.47, 0.57, t));
+  float flash = exp(-pow((t - 0.56) / 0.03, 2.0));
+  float settle = 1.0 - smoothstep(0.58, 0.85, t);
 
   vec2 q = (vUv - uVP) * vec2(aspect, 1.0);
   float r = length(q);
-  // (the tunnel turns as it goes)
-  float th = atan(q.y, q.x) + t * t * 0.5 * I;
+  float th = atan(q.y, q.x);
 
   // the runner, kept clear of it all
   vec2 rq = (vUv - uRunner.xy) * vec2(aspect, 1.0) / vec2(uRunner.z * 0.34, uRunner.z * 0.56);
   float keep = 1.0 - smoothstep(0.45, 1.25, length(rq));
+  float free = 1.0 - keep;
 
-  // the world, smeared out toward the point it's all pouring from
-  vec2 dir = uVP - vUv;
-  float k = 0.34 * I * S * (1.0 - keep);
-  vec3 acc = vec3(0.0);
-  for (int i = 0; i < 10; i++) {
-    float s = float(i) / 9.0;
-    acc += texture2D(uFrame, vUv + dir * k * s * s).rgb;
+  vec3 orig = texture2D(uFrame, vUv).rgb;
+  vec3 c = orig;
+  if (I > 0.0) {
+    float pull = I * S * free;
+    // the vortex: a twist, tightening toward the centre and winding up
+    // faster the longer it holds
+    float tw = 0.2 * pull * (0.5 + 3.0 * t) / (r + 0.28);
+    float cs = cos(tw), sn = sin(tw);
+    vec2 qr = vec2(cs * q.x - sn * q.y, sn * q.x + cs * q.y);
+    // the lunge: the picture swelling out of the centre as the camera is
+    // dragged into it
+    vec2 d = qr / vec2(aspect, 1.0) * (1.0 - 0.3 * pull);
+    // the trails themselves: this pixel's colour gathered from all the
+    // way in along its ray, each step of the way tinted further round the
+    // spectrum - so the world is pulled into long ribbons of its own
+    // colours, rainbowed along their length
+    float k = 0.8 * pull;
+    float a0 = floor((th / 6.2831853 + 0.5) * 70.0);
+    float hue = h1(a0 + 77.0) * 0.5 + t * 0.8;
+    vec3 acc = vec3(0.0);
+    vec3 wsum = vec3(0.0);
+    for (int i = 0; i < 12; i++) {
+      float s = float(i) / 11.0;
+      vec3 w = mix(vec3(1.0), spectrum(hue + s * 0.85), 0.8 * I * free);
+      acc += texture2D(uFrame, uVP + d * (1.0 - k * s * (0.4 + 0.6 * s))).rgb * w;
+      wsum += w;
+    }
+    vec3 smear = acc / wsum;
+
+    // light racing out along them: two sets of thin rays out of the
+    // centre, each a run of long-tailed dashes flying outward (in log
+    // space, like something rushing past), faster and faster
+    float lr = log(max(r, 1e-3));
+    float T = t * 7.0 + t * t * 26.0;
+    float lines = 0.0;
+    vec3 tint = vec3(0.0);
+    for (int L = 0; L < 2; L++) {
+      float fl = float(L);
+      float N = L == 0 ? 110.0 : 230.0;
+      float a = ((th + tw * 0.8) / 6.2831853 + 0.5) * N;
+      float i = floor(a);
+      float f = fract(a);
+      float hA = h1(i + fl * 1013.0);
+      float hB = h1(i * 1.71 + 3.1 + fl * 1013.0);
+      float hC = h1(i * 2.37 + 7.3 + fl * 1013.0);
+      if (hA < 0.28) continue;
+      float dAcross = abs(f - (0.25 + 0.5 * hA)) / N * 6.2831853 * r;
+      float w = (0.5 + 3.2 * r) / 750.0 * (0.6 + 0.8 * hB);
+      float line = 1.0 - smoothstep(w * 0.3, w + 1.4 / uRes.y, dAcross);
+      float glow = 1.0 - smoothstep(0.0, w * 5.0, dAcross);
+      float ph = fract(lr * (0.8 + 0.7 * hC) - T * (0.6 + 0.8 * hB) + hA * 5.0);
+      float len = mix(0.12, 0.92, S);
+      float dash = smoothstep(1.0 - len, 1.0, ph) * (1.0 - smoothstep(0.975, 1.0, ph));
+      float v = (line + glow * 0.3) * dash * (0.45 + 0.75 * hC);
+      lines += v;
+      tint += spectrum(hC + fl * 0.37 + t * 0.9) * v;
+    }
+    float on = I * free * smoothstep(0.012, 0.09, r);
+    float lum = dot(smear, vec3(0.3, 0.59, 0.11));
+    // the dashes take the colour of the world they're made of, lit up and
+    // pushed round the spectrum
+    vec3 lit = smear * 1.7 + lum * 0.35 + 0.08;
+    vec3 trailCol = mix(lit, lit * 0.45 + tint / max(lines, 1e-3) * 0.85, 0.6);
+    // between them the world, drawn into the tunnel, darker toward its walls
+    c = mix(orig, smear, I) * (1.0 - 0.42 * I * free * smoothstep(0.05, 0.7, r));
+    c += trailCol * clamp(lines, 0.0, 2.0) * on * 0.8;
+    // the mouth of it, glowing with what's being pulled in
+    float core = exp(-r * 22.0) * 0.95 + exp(-r * 5.0) * 0.14;
+    c += mix(vec3(1.0, 0.96, 1.0), smear * 1.6 + 0.35, 0.35) * core * I;
   }
-  acc /= 10.0;
-  vec3 c = mix(texture2D(uFrame, vUv).rgb, acc, step(0.0001, k));
-  // sunk in a blue tunnel, darkest round the edges
-  float tunnel = I * (1.0 - 0.6 * keep) * (0.45 + 0.4 * smoothstep(0.2, 0.9, r));
-  c = mix(c, c * vec3(0.3, 0.38, 0.75) + vec3(0.0, 0.02, 0.07), tunnel);
 
-  // the streaks: three layers of them, each a ray out of the centre
-  vec3 st = vec3(0.0);
-  for (int L = 0; L < 3; L++) {
-    float fl = float(L);
-    float N = L == 0 ? 90.0 : L == 1 ? 180.0 : 340.0;
-    float a = (th / 6.2831853 + 0.5) * N;
-    float i = floor(a);
-    float f = fract(a);
-    float hA = h1(i + fl * 1013.0);
-    float hB = h1(i * 1.71 + 3.1 + fl * 1013.0);
-    float hC = h1(i * 2.37 + 7.3 + fl * 1013.0);
-    if (hA < 0.16) continue;
-    // across: how far this pixel is from the ray (in screen heights)
-    float c0 = 0.2 + 0.6 * hA;
-    float dAcross = abs(f - c0) / N * 6.2831853 * r;
-    // along: its head flies outward, faster the further out (in log space,
-    // like something rushing past), faster and faster as the jump holds,
-    // its tail trailing behind it
-    float spd = (1.0 + 1.8 * hB) * (1.7 + 0.6 * fl);
-    float u = fract(hB * 7.31 + hC * 3.7 + t * spd * (1.0 + 0.9 * t));
-    float head = exp(mix(log(0.02), log(1.8), u));
-    float len = head * (0.05 + 1.2 * S) * (0.4 + 0.6 * hC);
-    float tail = clamp((r - (head - len)) / max(len, 1e-4), 0.0, 1.0);
-    float along = step(head - len, r) * (1.0 - smoothstep(head, head + 0.006 + 0.01 * head, r));
-    float w = (0.9 + 2.6 * head) / 900.0 * (L == 0 ? 1.7 : 1.0);
-    float line = 1.0 - smoothstep(w * 0.35, w + 1.2 / uRes.y, dAcross);
-    float glow = 1.0 - smoothstep(0.0, w * 4.0, dAcross);
-    float b = (0.35 + 0.65 * tail * tail) * (0.6 + 0.6 * hA) * smoothstep(0.015, 0.08, r);
-    st += streakColor(hC) * (line + glow * 0.25) * along * b;
-  }
-  st *= max(I, 0.0) * (1.0 - 0.75 * keep);
-  c += st * 1.5;
-
-  // the white-hot core they all pour out of
-  c += vec3(0.75, 0.88, 1.0) * (exp(-r * 16.0) * 1.6 + exp(-r * 4.0) * 0.28) * I;
-  // dropping out: a flash, and a ring of light racing out across the screen
-  float ringR = smoothstep(1.0, 1.22, t) * 1.8;
-  float ring = exp(-pow((r - ringR) / 0.06, 2.0)) * (1.0 - smoothstep(1.1, 1.28, t)) * step(1.0, t);
-  c += vec3(0.8, 0.9, 1.0) * (flash * 0.38 + ring * 0.5);
+  // dropping out: a flash, and a ring of rainbow light racing out across
+  // the screen
+  float ringR = smoothstep(0.52, 0.7, t) * 1.8;
+  float ring = exp(-pow((r - ringR) / 0.07, 2.0)) * (1.0 - smoothstep(0.62, 0.74, t)) * step(0.52, t);
+  c += vec3(0.85, 0.92, 1.0) * flash * 0.42 + spectrum(th / 6.2831853 + r * 0.6) * ring * 0.45;
   // and a faint blue afterglow that lets go of the picture
-  c = mix(c, c + vec3(0.02, 0.05, 0.12), settle * (1.0 - I) * step(1.05, t) * 0.8);
+  c = mix(c, c + vec3(0.02, 0.05, 0.12), settle * (1.0 - I) * step(0.56, t) * 0.8);
   gl_FragColor = vec4(c, 1.0);
 }
 `;

@@ -32,7 +32,9 @@
       import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
       import { loadRunner } from '../../src/game/runner-asset.js';
       import { Dragon } from '../../src/game/dragon.js';
-      import { WORLD_DEFS } from '../../src/world/index.js';
+      import { WORLD_ORDER } from '../../src/world/index.js';
+      // (the worlds' modules, loaded as the game loads them)
+      const WORLD_DEFS = await Promise.all(WORLD_ORDER.map((e) => e.load().then((m) => m.default)));
 
       const q = new URLSearchParams(location.search);
       const pose = q.get('pose') || 'stand';

@@ -519,8 +519,8 @@ and faster, its front a rounded, bright, wavering lip, the picture soft and
 tinted beneath it; and behind it, left on the glass, drops big and small hang
 a moment and then streak away down the screen, stretching as they speed up,
 each one a little lens (the world upside down in it, a glint on top, a dark
-edge) with a wet trail beaded with tiny drops behind it. A second and a half
-in all, and a rush of water with a deep whump and bubbles burbling after
+edge) with a wet trail beaded with tiny drops behind it. Under a second and
+a half in all (its clock runs a fifth fast: `SPLASH_SPEED`), and a rush of water with a deep whump and bubbles burbling after
 (`src/game/splash.js`). It's drawn over the finished frame — the frame is
 copied into a texture and one full-screen pass refracts it through the water
 — only while a splash is running, so it costs nothing the rest of the time
@@ -629,8 +629,11 @@ step plain to see, and a few flakes in the air. Come back round and the
 caps are thicker, the banks deeper, the rocks and fences half under and
 less of the ice showing; from the third time the drifts are great heaps,
 the cabins going under to their sills, the firs' boughs sagging under their
-pillows of snow, and it's snowing hard. It builds a little during each
-visit too. How deep it lies is counted by visits to the pass this run
+pillows of snow, and it's snowing hard. It builds quickly during each
+visit too — you can watch it pile up on the ground as you run — and the
+flakes in the air get a little heavier every lap: bigger, falling faster
+and coming thicker, on and on, until by the seventh time round they're half
+as heavy again (`def.snowWeight(visit, t)`). How deep it lies is counted by visits to the pass this run
 (`def.snowAt(visit, t)`; `Game.updateSnow` hands it to the shaders as
 `uSnow.x`), so it starts afresh with every new run and carries straight on
 through a Continue; it stops getting deeper once it's full.
@@ -651,7 +654,7 @@ laid over the picture rather than light added to it (`particles.flake`:
 white with a faint cool rim, so they show against the snow and the sky as
 well as the ice), and more of them in the air the deeper the snow
 (`env.snow.fall`, up to three times as many motes as float in any other
-world).
+world, and more again as the laps make them heavier).
 
 The footprints are the Gallery's (game/sands.js): the same prints, pressed a
 little deeper the deeper the snow, shown only where there's snow to press
@@ -791,18 +794,19 @@ curve, so a boost taken at the right moment sweeps up every gem in the air,
 the crown at the top.
 
 **The jump to light speed.** Run through the doorway into it and you jump to
-light speed (`env.warp`, `game/warp.js`): the instant you're through, the
-stars stretch into streaks pouring out of the point the road runs to —
-white, ice blue, cyan, violet, a few hot magenta — longer and faster as it
-takes hold, the world behind them smeared toward the centre and sunk in a
-blue tunnel, a white-hot core blazing where they all come from; the runner
-is left out of the smear, so you never lose them. Then you drop out of it:
-the streaks snap back into points, a flash rings out across the screen, and
-you're running on red dust under the planets — a second and a half in all,
-the streaks racing faster and faster the whole time it holds and the tunnel
-turning round them, with a rush of noise tearing up to a shriek, a deep
-swell under it and a glassy chord gliding up, then a falling whoom as you
-drop out. Like the splash it's one full-screen pass over the finished
+light speed (`env.warp`, `game/warp.js`) — and you're sucked into it. The
+instant you're through, the world itself comes apart into light: the camera
+lunges at the point the road runs to and everything round it is drawn out
+toward that point into long trails of its own colour, split into the
+spectrum along their length, twisting into a vortex that tightens toward
+the centre, bright dashes racing out along every trail past the edges of
+the screen faster and faster. It isn't streaks painted over the picture:
+the picture is the streaks. The runner is left out of it, so you never lose
+them. Then you drop out: the trails snap back into the world, a flash and a
+ring of rainbow light race out across the screen, and you're running on red
+dust under the planets — quick, under nine-tenths of a second in all, with
+a rush of noise tearing up to a shriek, a deep swell under it and a glassy
+chord gliding up, then a falling whoom as you drop out. Like the splash it's one full-screen pass over the finished
 frame, only while it runs; and the road past this doorway is kept clear of
 obstacles for four and a half seconds of running (`def.clearAfter`: about
 110 m at full tilt, three times the usual), so you've found your feet
@@ -1496,7 +1500,7 @@ Append to the URL:
   skips them on a uniform). The runner's bubbles are a hundred points written
   by the CPU and its swirl a fixed buffer worked out on the GPU (one draw
   call each, none out of the water). The splash's extra full-screen pass runs
-  only for its second and a half.
+  only for its second and a bit.
 - **Sand that moves, for one draw call.** The Gallery's drifts and piles are
   heaped in the vertex shader of its floor strip (2.4k triangles a chunk, fine
   only where the sand heaps up: about 50k more on screen than the flat ivory
