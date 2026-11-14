@@ -79,7 +79,7 @@ export const CHARACTERS = [
     id: 'fisher',
     name: 'Reed',
     title: 'the angler',
-    blurb: 'sturdy · a fish on his line · splashes where he lands',
+    blurb: 'easy-striding · a fish on his line · splashes where he lands',
     asset: 'assets/fisher/',
     card: 'assets/characters/fisher.webp',
     tint: ['#9fe3ef', '#2f86b8'],

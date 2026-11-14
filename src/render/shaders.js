@@ -4942,10 +4942,10 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
 // --- the fisherman -----------------------------------------------------------------
 // (palette: see COL in game/fisher.js; r is the rest position - he is
 // sculpted where he stands; see tools/runner/fisher.py. uRig[0]: x, y the
-// middle of his eyes, z how far forward his face is there, w the trousers'
-// hem; uRig[1]: x the bib's top, y its half width, z the boots' x, w how
+// middle of his eyes, z how far forward his face is there, w his mouth's
+// height; uRig[1]: x the bib's top, y its half width, z the boots' x, w how
 // high the boots' soles are; uRig[2]: x the jacket's hem, y the cuffs down
-// the arm, z the tank's glass's half height.)
+// the arm, z the tank's glass's half height, w the trousers' hem.)
 #define R_SKIN_DEEP 17
 #define R_SKIN_LIGHT 18
 #define R_BLUSH 19
@@ -5105,7 +5105,7 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     float ax = abs(r.x);
     float body = d.z * (1.0 - lining);
     // (the front's edge: where it hangs open, half the gap by height)
-    float edgeX = mix(0.084, 0.05, smoothstep(1.2, 1.33, r.y));
+    float edgeX = mix(0.08, 0.05, smoothstep(1.2, 1.33, r.y));
     float facing = (1.0 - smoothstep(0.003, 0.016, ax - edgeX)) * step(r.z, -0.02) * body;
     c = mix(c, uPal[R_JACKET_DEEP], 0.55 * facing);
     float stud = 0.0;
@@ -5121,29 +5121,40 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     float hem = band(r.y - (uRig[2].x + 0.028), 0.0007) * body * step(0.4, fract(atan(r.x, r.z) * 60.0));
     c = mix(c, uPal[R_JACKET_DEEP], max(max(side, yoke), max(cuff, hem)) * 0.8);
     // the pockets: the pocket's outline under its flap, a stud on the flap
-    vec2 pq = vec2(ax - 0.135, r.y - 0.84);
-    float pocket = band(max(abs(pq.x) - 0.046, abs(pq.y) - 0.045), 0.0009) * step(pq.y, 0.03) * step(r.z, 0.0) * body * (1.0 - d.y);
+    vec2 pq = vec2(ax - 0.118, r.y - 0.84);
+    float pocket = band(max(abs(pq.x) - 0.04, abs(pq.y) - 0.045), 0.0009) * step(pq.y, 0.03) * step(r.z, 0.0) * body * (1.0 - d.y);
     c = mix(c, uPal[R_JACKET_DEEP], pocket);
     c = mix(c, c * 0.9, d.y * 0.25);
-    float pstud = fill(length(vec2(ax - 0.135, r.y - 0.874)) - 0.0045) * d.y;
+    float pstud = fill(length(vec2(ax - 0.118, r.y - 0.874)) - 0.0045) * d.y;
     c = mix(c, uPal[R_JACKET_DEEP] * 0.8, pstud);
     // the hood: its seam down the middle
     c = mix(c, uPal[R_JACKET_DEEP], d.x * band(r.x, 0.0012));
     // smears of grime on his left front and sleeve
-    float sm = rdSmudge(r, vec3(-0.15, 0.88, -0.07), vec3(0.03, 0.025, 0.05), 5.0) * 0.5 + rdSmudge(r, vec3(0.29, 0.92, 0.02), vec3(0.03, 0.04, 0.05), 8.0) * 0.4;
+    float sm = rdSmudge(r, vec3(-0.13, 0.88, -0.07), vec3(0.03, 0.025, 0.05), 5.0) * 0.5 + rdSmudge(r, vec3(0.28, 0.92, 0.02), vec3(0.03, 0.04, 0.05), 8.0) * 0.4;
     c = mix(c, uPal[R_DIRT], sm * 0.7 * (1.0 - lining));
     c = mix(c, uPal[R_JACKET_DEEP] * 0.82, lining * 0.7);
   } else if (m == 5) {
-    // the orange waterproofs: welded seams, a stitched bib, grime and wet
-    // mud up the legs from the boots
+    // the orange waterproofs: stiff coated cloth, so its folds read hard -
+    // a deeper orange under each fold (darkest right in under it), the
+    // light caught along the top of it; welded seams, a stitched bib, grime
+    // and wet mud up the legs from the boots (gathered in the folds)
     float low = smoothstep(0.55, 0.28, r.y);
-    c = rdCloth(c, r, uPal[R_TROUSER_DEEP], 0.25 + 0.45 * low);
+    // (d.z: how a fold faces the light from above - its underside in its
+    // own shadow, its top catching the light)
+    float valley = max(d.z, 0.0) * d.x;
+    float ridge = max(-d.z, 0.0) * d.x;
+    c = rdCloth(c, r, uPal[R_TROUSER_DEEP], 0.25 + 0.45 * low + 0.3 * valley);
+    c = mix(c, uPal[R_TROUSER_DEEP], 0.75 * smoothstep(0.1, 0.5, valley));
+    c = mix(c, uPal[R_TROUSER_DEEP] * 0.6, 0.6 * smoothstep(0.55, 0.95, valley));
+    c = mix(c, c * 1.18 + vec3(0.06, 0.04, 0.01), 0.6 * smoothstep(0.15, 0.7, ridge));
     float side = r.x < 0.0 ? -1.0 : 1.0;
-    float a = atan(r.z - 0.01, abs(r.x) - 0.092);
+    float a = atan(r.z - 0.01, abs(r.x) - 0.095);
     float seam = band(abs(a) - 1.57, 0.03) * step(r.y, 0.8) * d.x;
     c = mix(c, uPal[R_TROUSER_DEEP], seam * 0.7);
-    // (the folds of the rolls over the boots, a shade deeper)
-    c = mix(c, uPal[R_TROUSER_DEEP], 0.3 * d.y);
+    // (where it's stacked over the boots, a shade deeper; the hem's turned
+    // edge)
+    c = mix(c, uPal[R_TROUSER_DEEP], 0.22 * d.y);
+    c = mix(c, uPal[R_TROUSER_DEEP] * 0.7, band(r.y - (uRig[2].w + 0.012), 0.0011) * d.x);
     // the bib: stitched round its edge, a pocket across its front
     float bx = uRig[1].y, bt = uRig[1].x;
     float onBib = step(r.y, bt + 0.005) * step(0.88, r.y) * step(abs(r.x), bx + 0.004) * step(r.z, -0.04);
@@ -5174,44 +5185,105 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     c = mix(c, c * 1.35, lines(r.y * 220.0 + r.x * 60.0, 0.2) * 0.25);
     c = mix(c, vec3(0.62, 0.64, 0.66), d.x * 0.6);
   } else if (m == 9) {
-    // the tank's cap and base: charcoal, a sheen round their rims; a strip
-    // of cyan light round the middle of each (only round the back and the
-    // sides: it's dark against his back), small and restrained
+    // the tank's hardware: moulded charcoal caps - a fine grain in them,
+    // ribbed round their collars for grip, scuffed pale along their edges
+    // and worn where they're handled; the lips the glass seats in a
+    // brighter band; its fittings (the handle, the filler cap, the guard
+    // rails and their brackets) bare brushed metal, a rivet in each
+    // bracket; a strip of cyan light round the middle of each collar
+    // (only round the back and the sides: it's dark against his back),
+    // small and restrained
     float a = d.x;
     float cap = d.z;
-    float rim = d.w;
-    c = mix(c, c * 1.6 + 0.04, rim * 0.6);
-    float mid = abs(cap) > 0.5 ? (cap > 0.0 ? uRig[2].z + 0.022 : -uRig[2].z - 0.022) : 99.0;
-    float strip = band(d.y - mid, 0.0035) * (1.0 - smoothstep(1.6, 2.0, abs(a)));
+    float lip = clamp(d.w, 0.0, 1.0);
+    float metal = clamp(-d.w, 0.0, 1.0);
+    float tkH = uRig[2].z;
+    float onCap = step(0.5, abs(cap));
+    // (how far up or down its collar it is, from the glass's end)
+    float cy = abs(d.y) - tkH;
+    float collar = onCap * step(-0.004, cy) * step(cy, 0.02);
+    float grain = rdNoise(r * 520.0) * 0.6 + rdNoise(r * 1300.0) * 0.4;
+    c = mix(c, c * 1.5 + 0.03, 0.35 * smoothstep(0.55, 0.85, grain));
+    c = mix(c, c * 0.72, 0.3 * smoothstep(0.45, 0.2, grain));
+    float ribs = lines(a * 34.0 / 3.1416, 0.22) * collar * (1.0 - band(cy - 0.007, 0.0065));
+    c = mix(c, c * 0.5, ribs * 0.55);
+    c = mix(c, c * 1.7 + 0.05, lines(a * 34.0 / 3.1416 + 0.3, 0.07) * collar * 0.35 * (1.0 - band(cy - 0.007, 0.0065)));
+    // (scuffs: paler, broken, along the collars' edges and over the lid)
+    float scuff = smoothstep(0.6, 0.8, rdNoise(r * vec3(70.0, 240.0, 70.0)) * 0.7 + rdNoise(r * 300.0) * 0.3);
+    float edge = max(band(cy - 0.019, 0.003), band(cy + 0.003, 0.003)) * onCap;
+    c = mix(c, vec3(0.5, 0.52, 0.54), scuff * (0.5 * edge + 0.14 * onCap));
+    c = mix(c, c * 1.7 + 0.05, lip * 0.6);
+    // bare metal: brushed along its length, a bright edge, dull in patches
+    vec3 steel = mix(vec3(0.5, 0.53, 0.56), vec3(0.78, 0.8, 0.82), smoothstep(0.3, 0.8, rdNoise(r * vec3(900.0, 60.0, 900.0))));
+    steel = mix(steel, steel * 0.6, 0.5 * smoothstep(0.6, 0.85, rdNoise(r * 180.0 + 9.0)));
+    c = mix(c, steel, metal * 0.92);
+    float strip = band(cy - 0.007, 0.0032) * onCap * (1.0 - smoothstep(1.6, 2.0, abs(a))) * (1.0 - metal);
     // (in short dashes)
     strip *= step(0.25, fract(a * 4.0 / 3.1416 + 0.5));
+    // (a soft glow off it onto the collar either side)
+    float glow = (1.0 - smoothstep(0.0, 0.011, abs(cy - 0.007))) * onCap * (1.0 - smoothstep(1.6, 2.0, abs(a))) * (1.0 - metal);
+    c = mix(c, mix(c, uPal[R_CYAN], 0.45), glow * 0.5);
     c = mix(c, uPal[R_CYAN], strip);
-    unlit = max(unlit, strip * 0.9);
+    unlit = max(unlit, max(strip * 0.9, metal * 0.1));
     gKeep = max(gKeep, strip);
   } else if (m == 10) {
-    // the blank: varnished brown, teal thread wraps under the guides and
-    // above the grip, a fine one between
+    // the blank: dark varnished cane, its grain running along it under the
+    // gloss; thread whipped round it over each guide's feet, above the
+    // grip and at the tip - teal, every turn of it showing, a darker trim
+    // turn at each end and a bead of varnish over it; a metal ferrule
+    // where its two pieces join
     float y = d.x;
-    float wrap = 0.0;
-    for (int k = 0; k < 5; k++) {
-      float gy = 0.27 + 0.125 * float(k) - 0.012 * float(k) * float(k) * 0.4;
-      wrap = max(wrap, band(y - gy, 0.009));
-    }
-    wrap = max(wrap, band(y - 0.165, 0.008));
-    c = mix(c, c * 1.4 + 0.03, 0.25 * band(fract(y * 30.0) - 0.5, 0.15));
-    c = mix(c, uPal[R_CYAN] * 0.75, wrap);
+    float gr = rdNoise(vec3(r.x * 900.0, y * 26.0, r.z * 900.0));
+    c = mix(c, c * 0.62, 0.55 * smoothstep(0.5, 0.8, gr));
+    c = mix(c, c * 1.5 + vec3(0.06, 0.035, 0.01), 0.45 * smoothstep(0.42, 0.15, gr));
+    c = mix(c, c * 1.35 + 0.03, 0.2 * band(fract(y * 9.0) - 0.5, 0.2));
+    float wrap = smoothstep(0.35, 0.65, d.z);
+    vec3 th = uPal[R_CYAN] * 0.72;
+    th = mix(th, th * 0.7, lines(y * 700.0, 0.28) * 0.5);
+    th = mix(th, uPal[R_CYAN] * 0.34, 1.0 - smoothstep(0.66, 0.9, d.z));
+    th = mix(th, th * 1.3 + 0.06, 0.3 * smoothstep(0.55, 0.3, gr));
+    c = mix(c, th, wrap);
+    vec3 steel = mix(vec3(0.6, 0.6, 0.58), vec3(0.88, 0.86, 0.8), smoothstep(0.3, 0.7, gr));
+    steel = mix(steel, steel * 0.6, max(band(d.w - 0.5, 0.12), lines(y * 160.0, 0.08) * 0.5));
+    c = mix(c, steel, smoothstep(0.4, 0.6, d.w));
+    unlit = max(unlit, 0.1 * smoothstep(0.4, 0.6, d.w));
   } else if (m == 11) {
-    // the reel and the guides: dark metal, a bright edge; the spool's teal
-    // band, the knob cream
-    c = mix(c, c * 1.8 + 0.05, 0.2);
-    c = mix(c, uPal[R_CYAN] * 0.8, d.y);
+    // the reel, the seat and the guides: dark anodised metal with a bright
+    // edge; the spool teal, the line wound on it turn by turn; its lips,
+    // the drag knob, the seat's hoods and nut, the bail and the guides'
+    // wire bright steel; the seat's barrel threaded; the butt cap ribbed
+    // rubber; the crank's knob cream
+    float y = d.x;
+    float spool = clamp(d.y, 0.0, 1.0);
+    float thread = clamp(-d.y, 0.0, 1.0);
+    float bright = clamp(-d.w, 0.0, 1.0);
+    float butt = clamp(d.w, 0.0, 1.0);
+    float n = rdNoise(r * 700.0);
+    c = mix(c, c * 1.8 + 0.05, 0.2 + 0.2 * smoothstep(0.55, 0.85, n));
+    c = mix(c, c * 0.6, thread * lines(y * 520.0, 0.3) * 0.6);
+    vec3 wound = mix(uPal[R_CYAN] * 0.78, vec3(0.86, 0.95, 0.94), 0.3);
+    wound = mix(wound, wound * 0.66, lines(y * 900.0, 0.3) * 0.55);
+    wound = mix(wound, uPal[R_CYAN] * 0.55, smoothstep(0.6, 0.8, rdNoise(r * 240.0)) * 0.4);
+    c = mix(c, wound, smoothstep(0.4, 0.6, spool));
+    vec3 steel = mix(vec3(0.56, 0.58, 0.6), vec3(0.9, 0.9, 0.88), smoothstep(0.35, 0.75, n));
+    c = mix(c, steel, smoothstep(0.4, 0.6, bright));
+    c = mix(c, c * 0.55, butt * lines(y * 260.0, 0.25) * 0.6);
     c = mix(c, vec3(0.92, 0.88, 0.8), d.z);
-    unlit = max(unlit, 0.12);
+    unlit = max(unlit, 0.12 + 0.14 * smoothstep(0.4, 0.6, bright));
   } else if (m == 12) {
-    // cork: speckled
+    // cork: rings of it glued up along the grip (a fine dark joint between
+    // each), speckled and pitted, filler in the bigger pits; darkened
+    // where his hand's worn it
+    float y = d.x;
     float n = rdNoise(r * 900.0);
     c = mix(c, c * 0.72, smoothstep(0.55, 0.75, n));
     c = mix(c, c * 1.15, smoothstep(0.3, 0.1, n));
+    float pit = smoothstep(0.7, 0.82, rdNoise(r * vec3(330.0, 330.0, 330.0) + 3.0));
+    c = mix(c, c * 0.5, pit * 0.7);
+    c = mix(c, c * 0.62, lines(y / 0.0125, 0.045) * 0.75);
+    c = mix(c, c * 0.93, step(0.5, fract(y / 0.025)) * 0.5);
+    float worn = (1.0 - smoothstep(0.02, 0.075, abs(y))) * smoothstep(0.35, 0.75, rdNoise(r * 120.0 + 5.0));
+    c = mix(c, mix(c, uPal[R_DIRT], 0.5) * 0.85, worn * 0.55);
   } else if (m == 13) {
     // the alien fish: deep blue-violet over its back, fading through
     // purple to a lavender belly; turquoise spots that glow down its
@@ -6786,28 +6858,55 @@ void main() {
 // toward the light, a dark keyline at its silhouette (the ink the rest of
 // him has).
 const FS_TANK_GLASS = TANK_HEAD + /* glsl */ `
+float tgHash(vec2 p) {
+  return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453);
+}
 void main() {
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   vec3 V = v / dist;
   vec3 n = normalize(vNormal);
   float fres = 1.0 - abs(dot(n, V));
-  // the streaks: along the cylinder, where it turns toward the light
+  // the streaks: along the cylinder, where it turns toward the light - a
+  // narrow bright one and a fainter, broader one beside it, both fading
+  // out before the glass's ends
   vec3 hv = normalize(uLightDir - V);
-  float spec = pow(max(dot(n, hv), 0.0), 18.0);
+  float spec = pow(max(dot(n, hv), 0.0), 26.0);
   float a = atan(vLocal.z, vLocal.x);
-  float streak = smoothstep(0.82, 0.98, spec) + 0.55 * smoothstep(0.3, 0.6, spec) * (1.0 - smoothstep(0.6, 0.75, spec));
-  streak *= 0.9 * smoothstep(-uTank.y, -uTank.y + 0.02, vLocal.y) * (1.0 - smoothstep(uTank.y - 0.02, uTank.y, vLocal.y));
+  float ends = smoothstep(-uTank.y, -uTank.y + 0.03, vLocal.y) * (1.0 - smoothstep(uTank.y - 0.03, uTank.y, vLocal.y));
+  float streak = (smoothstep(0.86, 0.97, spec) + 0.3 * smoothstep(0.25, 0.5, spec) * (1.0 - smoothstep(0.5, 0.62, spec))) * ends;
   vec3 col = mix(vec3(0.82, 0.97, 0.98), vec3(1.0), streak);
-  float alpha = 0.06 + 0.32 * pow(fres, 2.2) + 0.7 * streak;
-  // (the keyline at its very edge)
+  float alpha = 0.05 + 0.26 * pow(fres, 2.4) + 0.5 * streak;
+  // (the glass has a thickness: a paler band just inside its edge, then
+  // the keyline at its very edge)
+  float thick = smoothstep(0.78, 0.9, fres) * (1.0 - smoothstep(0.9, 0.95, fres));
+  col = mix(col, vec3(0.9, 1.0, 1.0), thick * 0.6);
+  alpha = max(alpha, thick * 0.4);
   float key = smoothstep(0.93, 0.985, fres);
   col = mix(col, vec3(0.08, 0.22, 0.26), key);
   alpha = max(alpha, key * 0.85);
   // (a meniscus line where the water meets it)
-  float men = 1.0 - smoothstep(0.0, 0.004, abs(vLocal.y - tankSurf(vLocal)));
+  float surf = tankSurf(vLocal);
+  float men = 1.0 - smoothstep(0.0, 0.004, abs(vLocal.y - surf));
   col = mix(col, vec3(1.0), men * 0.7);
   alpha = max(alpha, men * 0.55);
+  // beads of water on the inside of it above the surface, where it's
+  // slopped up: little clear beads, a glint on each, a run or two below
+  vec2 g = vec2(a * uTank.x, vLocal.y) * 210.0;
+  vec2 gi = floor(g);
+  float gh = tgHash(gi);
+  vec2 gf = fract(g) - 0.5 - (vec2(tgHash(gi + 3.1), tgHash(gi + 7.7)) - 0.5) * 0.5;
+  float above = smoothstep(0.002, 0.008, vLocal.y - surf) * (1.0 - smoothstep(uTank.y - 0.01, uTank.y, vLocal.y));
+  float br = 0.16 + 0.2 * gh;
+  float bead = (1.0 - smoothstep(br - 0.06, br, length(gf))) * step(0.52, gh) * above;
+  float bglint = (1.0 - smoothstep(0.03, 0.09, length(gf - vec2(-0.07, 0.08)))) * step(0.52, gh) * above;
+  col = mix(col, vec3(0.7, 0.92, 0.95), bead * 0.6);
+  col = mix(col, vec3(1.0), bglint);
+  alpha = max(alpha, max(bead * 0.4, bglint * 0.9));
+  // (and a faint film of scale low down, where the water's stood)
+  float film = (1.0 - smoothstep(-uTank.y, -uTank.y + 0.025, vLocal.y)) * (0.5 + 0.5 * tgHash(floor(g * 0.35)));
+  col = mix(col, vec3(0.86, 0.95, 0.93), film * 0.4);
+  alpha = max(alpha, film * 0.16);
   gKeep = 0.6;
   col = atmos(col, v, dist, 0.0);
   float f = smoothstep(uFog.x, uFog.y, dist);
@@ -6848,43 +6947,58 @@ void main() {
 
 // ---------------------------------------------------------------------------
 // Water splashing from the fisherman's boots (game/splashes.js): quads the
-// GPU turns to face you - strokes from a root to a head (fingers of water,
-// a jet), round drops (stretched along their way when fast), and flat on
-// the road a broken ring spreading out and an uneven splat. Drawn as a
-// cartoon's water: a white-aqua heart, a teal edge, a fine darker line.
+// GPU turns to face you - ligaments from a root to a beaded head, droplets
+// (stretched along their way when fast), soft puffs of mist, and flat on
+// the road ripples running out and the wet left behind. Drawn as water is
+// seen: clear, a faint cool tint through its middle, darker where its edge
+// bends what's behind it, white where it catches the light - never an
+// outline. (The fine spray is kept from shrinking away under a pixel: far
+// off, a droplet is drawn a little bigger and that much fainter.)
 // ---------------------------------------------------------------------------
 const VS_SPLASH = COMMON + /* glsl */ `
 attribute vec3 aTan;
-attribute vec4 aQ; // xy the corner (-1 / +1), z the width or size (m), w the kind (0 a stroke, 1 a drop, 2 a ring, 3 a splat)
-attribute vec4 aInfo; // x how much is left, y a stroke's u (0 root .. 1 head) / a drop's stretch / a flat's age, z seed, w a stroke's kind (1 a jet)
+attribute vec4 aQ; // xy the corner (-1 / +1), z the width or size (m), w the kind (0 a ligament, 1 a droplet, 2 a ripple, 3 the wet, 4 mist)
+attribute vec4 aInfo; // x how much is left, y a ligament's length over its width / a droplet's stretch / a flat's age, z seed, w a ligament's kind (1 a jet; + 2 its bead gone; 4 a sheet)
 varying vec4 vQ;
 varying vec4 vInfo;
 varying vec3 vWorld;
 varying vec3 vPos;
 varying vec2 vC;
+varying float vK;
 void main() {
   vec3 p = position;
-  vec3 view = normalize(p - uCamPos);
+  vec3 toCam = p - uCamPos;
+  float dist = length(toCam);
+  vec3 view = toCam / max(dist, 1e-4);
+  vK = 1.0;
   if (aQ.w < 0.5) {
     vec3 side = cross(aTan, view);
     float l = length(side);
     side = l > 1e-4 ? side / l : vec3(1.0, 0.0, 0.0);
-    p += side * aQ.x * aQ.z;
-    // (its ends rounded off a little past each end)
-    p += aTan * (aQ.y > 0.5 ? 1.0 : -0.6) * aQ.z * 0.7;
+    float w = max(aQ.z, dist * 0.0017);
+    vK = aQ.z / w;
+    p += side * aQ.x * w;
     vC = vec2(aQ.x, aQ.y);
   } else if (aQ.w < 1.5) {
-    vec3 right = normalize(vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]));
     vec3 up = normalize(vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]));
     // (stretched along its way, in the view)
     vec3 t = aTan - view * dot(aTan, view);
     float tl = length(t);
     vec3 along = tl > 1e-3 ? t / tl : up;
     vec3 across = normalize(cross(view, along));
-    p += across * aQ.x * aQ.z + along * aQ.y * aQ.z * aInfo.y;
+    float s = max(aQ.z, dist * 0.0019);
+    vK = aQ.z / s;
+    // (seen end on, it isn't stretched at all)
+    float st = mix(1.0, aInfo.y, clamp(tl, 0.0, 1.0));
+    p += across * aQ.x * s + along * aQ.y * s * st;
+    vC = aQ.xy;
+  } else if (aQ.w < 3.5) {
+    p += vec3(aQ.x, 0.0, aQ.y * 0.8) * aQ.z;
     vC = aQ.xy;
   } else {
-    p += vec3(aQ.x, 0.0, aQ.y * 0.8) * aQ.z;
+    vec3 right = normalize(vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]));
+    vec3 up = normalize(vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]));
+    p += (right * aQ.x + up * aQ.y) * aQ.z;
     vC = aQ.xy;
   }
   vec3 wp = bendPos(p);
@@ -6899,52 +7013,128 @@ const FS_SPLASH = FS_HEAD + /* glsl */ `
 varying vec4 vQ;
 varying vec4 vInfo;
 varying vec2 vC;
+varying float vK;
+float spHash(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
 void main() {
   float kind = vQ.w;
   float seed = vInfo.z;
-  vec3 heart = vec3(0.86, 0.98, 1.0);
-  vec3 body = vec3(0.42, 0.83, 0.93);
-  vec3 edge = vec3(0.2, 0.62, 0.8);
-  vec3 line = vec3(0.1, 0.4, 0.56);
-  float d;
-  float shade = 0.0;
+  // clear water: its tint, the dark at its edges, the light on it
+  vec3 tint = vec3(0.7, 0.88, 0.96);
+  vec3 deep = vec3(0.17, 0.42, 0.6);
+  vec3 col = tint;
+  float alpha = 0.0;
   if (kind < 0.5) {
-    // a stroke: across it, round at its head; wavering a little down it
-    float x = abs(vC.x + 0.15 * sin(vC.y * 9.0 + seed * 20.0) * (1.0 - vC.y));
-    d = x;
-    shade = vC.x;
-    if (vC.y > 1.0) d = length(vec2(vC.x, (vC.y - 1.0) * 1.4));
+    // a ligament: broad where it leaves the road, drawn out thin, a bead
+    // at its head (till that pinches off: then it tapers to nothing);
+    // wavering a little down its length
+    float asp = max(vInfo.y, 1.0);
+    float ex = vInfo.w;
+    if (ex > 3.5) {
+      // the sheet: a thin film of water stood up off the road - all but
+      // clear, the light running down it in faint streaks, a thickened
+      // rim along its ragged top catching it; soft at its sides, where
+      // it runs into the next
+      float top = 1.0 - 0.14 * (0.5 + 0.5 * sin(vC.x * 4.0 + seed * 30.0)) - 0.07 * (0.5 + 0.5 * sin(vC.x * 11.0 - seed * 19.0));
+      float yy = vC.y / top;
+      if (yy > 1.0) discard;
+      float sides = 1.0 - smoothstep(0.45, 1.0, abs(vC.x));
+      float streaks = 0.5 + 0.5 * sin(vC.x * 13.0 + seed * 40.0 + 2.0 * sin(vC.y * 5.0));
+      float rimT = smoothstep(0.86, 0.97, yy);
+      col = mix(mix(tint, deep, 0.25), vec3(1.0), max(rimT * 0.9, 0.35 * smoothstep(0.75, 1.0, streaks)));
+      alpha = (0.1 + 0.1 * streaks + 0.55 * rimT) * sides * smoothstep(0.0, 0.15, vC.y) * vInfo.x;
+      if (alpha < 0.012) discard;
+      vec3 vv = vWorld - uCamPos;
+      gKeep = 0.6;
+      col = atmos(col, vv, length(vv), 0.0);
+      gl_FragColor = vec4(grade(col, uTrip), alpha);
+      return;
+    }
+    float gone = step(1.5, ex);
+    float jet = step(0.5, ex - 2.0 * gone);
+    float y = vC.y;
+    float x = vC.x + 0.16 * sin(y * asp * 0.9 + seed * 20.0) * y * (1.0 - y) * 2.0;
+    float prof = mix(mix(0.85, 0.3, smoothstep(0.0, 0.8, y)), mix(1.0, 0.55, y), jet);
+    prof *= mix(1.0, pow(max(1.0 - y, 0.0), 0.6), gone);
+    float d = abs(x) / max(prof, 0.02);
+    // (the bead: a round drop sat at the head)
+    vec2 bq = vec2(vC.x, (1.0 - y) * asp - 0.95);
+    float bead = length(bq) / 0.95;
+    bead = mix(bead, 9.0, gone);
+    float e = min(d, bead);
+    if (e > 1.0) discard;
+    float rim = smoothstep(0.5, 0.97, e);
+    col = mix(tint, deep, rim * 0.85);
+    alpha = mix(0.2, 0.62, rim);
+    // the light down one side of it, and a glint on the bead
+    float sx = -x / max(prof, 0.02);
+    float hl = smoothstep(0.2, 0.42, sx) * (1.0 - smoothstep(0.55, 0.8, sx)) * step(d, 1.0);
+    hl = max(hl, (1.0 - smoothstep(0.18, 0.34, length(bq / 0.95 - vec2(-0.3, 0.3)))) * step(bead, 1.0));
+    col = mix(col, vec3(1.0), hl);
+    alpha = max(alpha, hl * 0.95);
+    // (rising out of the wet at its root)
+    alpha *= smoothstep(0.0, 0.12, y) * vInfo.x * mix(0.55, 1.0, vK);
   } else if (kind < 1.5) {
-    // a drop
-    d = length(vC);
-    shade = vC.x * 0.6 - vC.y * 0.4;
+    // a droplet: a clear bead - dark round the side away from the light,
+    // the light gathered in a bright crescent just inside that, a hard
+    // glint toward it; blurred out at its ends when it's flying fast
+    float r = length(vC);
+    if (r > 1.0) discard;
+    vec2 n2 = vC / max(r, 1e-4);
+    float away = dot(n2, vec2(0.6, -0.8));
+    float rim = smoothstep(0.45, 1.0, r);
+    col = mix(tint, deep, rim * (0.55 + 0.45 * away));
+    alpha = 0.16 + 0.6 * rim * (0.6 + 0.4 * away);
+    float caus = smoothstep(0.3, 0.6, r) * (1.0 - smoothstep(0.68, 0.9, r)) * max(away, 0.0);
+    float glint = 1.0 - smoothstep(0.16, 0.3, length(vC - vec2(-0.34, 0.38)));
+    float lightK = max(caus * 0.85, glint);
+    col = mix(col, vec3(1.0), lightK);
+    alpha = max(alpha, lightK);
+    float st = vInfo.y;
+    alpha *= 1.0 - smoothstep(0.45, 1.0, abs(vC.y)) * smoothstep(1.3, 2.2, st);
+    // (too small to see its inside: just the light off it)
+    float tiny = 1.0 - vK;
+    col = mix(col, vec3(0.93, 0.98, 1.0), tiny * 0.75);
+    alpha = mix(alpha, 0.8 * (1.0 - r * r), tiny) * mix(0.5, 1.0, vK) * vInfo.x;
   } else if (kind < 2.5) {
-    // the ring: a thin ellipse on the road, broken into dashes as it thins
-    float r = length(vC);
+    // a ripple: a crest running out over the wet road and a lower one
+    // behind it, lit on the side toward the light, dark on the other
     float ang = atan(vC.y, vC.x);
-    float w = mix(0.07, 0.025, vInfo.y);
-    d = abs(r - 0.92) / w;
-    float dash = step(0.22 + 0.4 * vInfo.y, fract(ang * 3.0 / 3.1416 + seed * 7.0));
-    if (dash < 0.5) discard;
-    shade = -0.4;
+    float r = length(vC) * (1.0 + 0.035 * sin(ang * 5.0 + seed * 20.0) + 0.02 * sin(ang * 9.0 - seed * 13.0));
+    float w = mix(0.085, 0.03, vInfo.y);
+    float c1 = 1.0 - smoothstep(0.0, w, abs(r - 0.9));
+    float c2 = (1.0 - smoothstep(0.0, w * 0.8, abs(r - 0.6))) * 0.5 * smoothstep(0.1, 0.4, vInfo.y);
+    float c = max(c1, c2);
+    if (c < 0.01) discard;
+    float lit = dot(vC / max(length(vC), 1e-4), vec2(-0.45, -0.9));
+    col = mix(deep, vec3(1.0), smoothstep(-0.5, 0.6, lit));
+    alpha = c * 0.7 * vInfo.x;
+  } else if (kind < 3.5) {
+    // the wet: an uneven film on the road, a shade darker and cooler than
+    // it, glinting here and there
+    float ang = atan(vC.y, vC.x);
+    float r = length(vC);
+    float lump = 0.13 * sin(ang * 5.0 + seed * 30.0) + 0.08 * sin(ang * 9.0 - seed * 17.0) + 0.05 * sin(ang * 14.0 + seed * 7.0);
+    float d = r / (0.76 + lump);
+    if (d > 1.0) discard;
+    col = deep * 0.75;
+    alpha = (1.0 - smoothstep(0.55, 1.0, d)) * 0.24;
+    float sp = step(0.9, spHash(floor(vC * 9.0 + seed * 40.0)));
+    vec2 f = fract(vC * 9.0 + seed * 40.0) - 0.5;
+    float glint = sp * (1.0 - smoothstep(0.05, 0.3, length(f * vec2(1.0, 2.2)))) * (1.0 - smoothstep(0.5, 0.9, d));
+    col = mix(col, vec3(1.0), glint);
+    alpha = max(alpha, glint * 0.8) * vInfo.x;
   } else {
-    // the splat: an uneven flat blob, its edge lumpy
+    // mist: the finest spray, a soft uneven puff
     float r = length(vC);
-    float ang = atan(vC.y, vC.x);
-    float lump = 0.12 * sin(ang * 5.0 + seed * 30.0) + 0.07 * sin(ang * 9.0 - seed * 17.0);
-    d = r / (0.78 + lump);
-    shade = -0.3;
+    if (r > 1.0) discard;
+    float n = 0.5 + 0.5 * sin(vC.x * 6.0 + seed * 30.0 + 2.0 * vC.y) * sin(vC.y * 5.0 - seed * 17.0);
+    float grain = spHash(floor(vC * 22.0 + seed * 50.0));
+    alpha = exp(-r * r * 3.2) * (1.0 - smoothstep(0.65, 1.0, r)) * (0.55 + 0.45 * n) * (0.75 + 0.5 * grain) * 0.3 * vInfo.x;
+    col = mix(tint, vec3(1.0), 0.65);
   }
-  if (d > 1.0) discard;
-  // a fine darker line at its edge, aqua inside it, a pale highlight up
-  // toward the light
-  vec3 col = mix(body, heart, (1.0 - smoothstep(0.1, 0.5, d - 0.35 * shade)) * 0.75);
-  col = mix(col, edge, smoothstep(0.6, 0.78, d));
-  col = mix(col, line, smoothstep(0.84, 0.93, d));
-  // (a glint on the drops and the jet)
-  if (kind > 0.5 && kind < 1.5) col = mix(col, vec3(1.0), 1.0 - smoothstep(0.12, 0.24, length(vC - vec2(-0.3, 0.35))));
-  float alpha = vInfo.x * (kind > 1.5 ? 0.75 : 0.95);
-  if (alpha < 0.02) discard;
+  if (alpha < 0.012) discard;
   vec3 v = vWorld - uCamPos;
   gKeep = 0.6;
   col = atmos(col, v, length(v), 0.0);

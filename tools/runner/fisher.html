@@ -24,6 +24,7 @@
       //   &deck=<m>      the road under him that high (a rooftop, a walk)
       //   &view=chase|side|front      where the camera is (chase: as the game's)
       //   &jump=0        no jump: just running
+      //   &look=feet     close in on his boots (the splashes), from the side
       import * as THREE from '../../vendor/three/three.module.min.js';
       import { shared } from '../../src/render/shaders.js';
       import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
@@ -86,7 +87,8 @@
       renderer.setClearColor(0xf6efe4, 1);
       renderer.clear();
       for (let f = 0; f < n; f++) {
-        if (view === 'side') cam.position.set(-4.2, deck + 1.1, -0.3), cam.lookAt(0, deck + 0.85, -0.3);
+        if (q.get('look') === 'feet') cam.position.set(-3.6, deck + 0.75, 1.1), cam.lookAt(0, deck + 0.42, -0.2);
+        else if (view === 'side') cam.position.set(-4.2, deck + 1.1, -0.3), cam.lookAt(0, deck + 0.85, -0.3);
         else if (view === 'front') cam.position.set(0.3, deck + 1.2, -4.5), cam.lookAt(0, deck + 0.9, 0);
         else cam.position.set(0, deck + 2.3, 3.9), cam.lookAt(0, deck + 0.9, -2.5);
         shared.uCamPos.value.copy(cam.position);
