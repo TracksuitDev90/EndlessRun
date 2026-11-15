@@ -119,10 +119,31 @@ rack and on its sign - and the giant one you dodge stands in a display
 stand). Sweets grow in spaced patches with open, rolling frosting between
 them, low knolls of it set back from the road, and the verge right by the
 road is kept mostly clear; behind it all rolling frosting hills, cake mesas
-and more ice-cream towers.
+and more ice-cream towers. None of it ever comes onto the road: every prop's
+reach is measured as the world is built, and anything beside the road that
+would reach in over its piped edge, however it's scaled or turned, is left
+out (or, a big frosting hill, pushed back).
+
+In the road: chocolate bars, cookie stacks, caramel heaps and gumdrops as
+big as footstools to jump; a candy-striped bag of pick-and-mix tipped over,
+its sweets poured out in a heap with a lollipop lying on top - big and
+bright, so it never reads as one of the verge's little heaps - and, right
+across the road, a long heap of them between two tipped bags, or a row of
+big gumdrops in every colour; wafer beams on striped pillars to slide
+under; and to go round, giant cookies on their edge, gummy bears, lollipops,
+cones in their display stands, and a gumdrop the size of a haystack.
+
+The gems are hard candy: Jolly Ranchers above all, bars of boiled sugar
+clear as glass, cut off the slab with their ends a little rough, laid in
+runs that go through the rainbow a flavour a gem (cherry, fire, lemon,
+green apple, blue raspberry, grape); with them sugar-dusted fruit drops,
+sour balls boiled up in layers, a boiled sweet in its twist of cellophane
+and a ring of hard candy; and for the prize spots, a Jolly Rancher still in
+its wrapper.
 
 **The chocolate river** (see `world/river.js`) is planned whole each time
-through the world, from the run's seed: a few crossings spaced out along it,
+through the world, from the run's seed: four crossings spaced out along it -
+four jumps over the chocolate each time through -
 and between them the river running alongside the road — close beside it, or
 winding off into the hills and back, or out wide and round in a hairpin to
 come down toward you — then turning in across the road at a slant, its
