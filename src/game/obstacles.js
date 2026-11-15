@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { rgb } from '../render/geo.js';
+import { planRiver, planRiverSteps } from '../world/river.js';
 
 // Obstacle director: lays out fair, readable patterns of themed obstacles
 // ahead of the player and answers collision queries.
@@ -161,7 +162,10 @@ export class ObstacleField {
   }
 
   clear() {
-    for (const g of this.groups) g.world.removeOwner(g);
+    for (const g of this.groups) {
+      g.world.removeOwner(g);
+      if (g.crossing) g.crossing.laid = false;
+    }
     for (const b of this.blowing) b.g.world.removeOwner(b.g);
     this.blowing.length = 0;
     this.groups.length = 0;
@@ -188,6 +192,9 @@ export class ObstacleField {
       if (pred(g)) {
         g.world.removeOwner(g);
         g.dead = true;
+        // (a river's crossing taken off the road is laid again if it's
+        // come back to before it's passed)
+        if (g.crossing) g.crossing.laid = false;
       } else this.groups[w++] = g;
     }
     this.groups.length = w;
@@ -222,8 +229,8 @@ export class ObstacleField {
   rowBetween(d0, d1) {
     for (const row of this.rows) {
       if (row.d < d0 || row.d > d1) continue;
-      // (a gust doesn't carry off the road itself)
-      if (row.climb || row.high) continue;
+      // (a gust doesn't carry off the road itself, or a river)
+      if (row.climb || row.high || row.river) continue;
       if (row.lanes.some((r) => r && !r.group.dead && !r.group.blown)) return row;
     }
     return null;
@@ -305,6 +312,21 @@ export class ObstacleField {
       this.nextD = here.start + after;
       return;
     }
+    // A river (Candy World's): where it runs across the road it's laid as a
+    // row of its own - the chocolate's span in each lane, a jump - and every
+    // pattern before it is kept far enough short of it to land and take off
+    // again. (limit: where the last row before it must end.)
+    const X = this.nextCrossing();
+    let limit = Infinity;
+    if (X) {
+      const room = Math.max(11, v * o.minAfterVertical);
+      if (X.d0 < d + room + 3.5) {
+        this.placeCrossing(X);
+        this.nextD = Math.max(d, X.d1 + Math.max(12, v * lerp(o.gapEasy, o.gapHard, this.difficultyFor(X.d0, eta)) * 0.8, v * o.minAfterVertical));
+        return;
+      }
+      limit = X.d0 - room;
+    }
     const calm = this.calmAt(d);
     const diff = this.difficultyFor(d, eta);
     const tutorial = this.tutorial.length > 0;
@@ -341,6 +363,8 @@ export class ObstacleField {
         last = null;
         break;
       }
+      // (no room before a river's crossing: the rest of the pattern waits)
+      if (d + 3.5 > limit) break;
       const world = course.segAt(d).world;
       const len = this.placeRow(world, d, row);
       d += len;
@@ -359,6 +383,71 @@ export class ObstacleField {
     }
     if (last) gap = Math.max(gap, needsVertical(last) ? o.minAfterVertical * airMul : o.minAfterLane);
     this.nextD = d + Math.max(12, v * gap);
+    // (and never past a river's crossing without laying it)
+    if (X) this.nextD = Math.min(this.nextD, Math.max(d, X.d0));
+  }
+
+  // --- rivers --------------------------------------------------------------------
+  // A world with a river (def.river) has it planned once each time through
+  // (see world/river.js), and kept with its stretch of the course: planned
+  // a try at a time between frames as soon as the stretch is laid down
+  // (planAhead), long before anything needs it - or, if something does
+  // first, there and then.
+  riverKey(seg) {
+    return `river:${this.game.seed ?? 1}:${seg.start}:${seg.visit || 0}`;
+  }
+
+  riverOf(seg) {
+    if (seg.river) return seg.river;
+    const prep = this.game.prep;
+    if (prep?.pending(this.riverKey(seg))) prep.finish(this.riverKey(seg));
+    return seg.river || (seg.river = planRiver(seg, this.game.seed ?? 1));
+  }
+
+  planAhead() {
+    const prep = this.game.prep;
+    if (!prep) return;
+    for (const seg of this.game.course.segments) {
+      if (seg.river || seg.riverAsked || !seg.world.def?.river) continue;
+      seg.riverAsked = true;
+      prep.add(this.riverKey(seg), () => planRiverSteps(seg, this.game.seed ?? 1, (p) => (seg.river ||= p)));
+    }
+  }
+
+  // The next crossing of a river not yet laid that the runner hasn't passed
+  // (in a stretch of the course near enough to matter).
+  nextCrossing() {
+    const dist = this.game.dist;
+    this.planAhead();
+    for (const seg of this.game.course.segments) {
+      if (!seg.world.def?.river || seg.end < dist || seg.start > dist + CONFIG.viewAhead + 60) continue;
+      for (const X of this.riverOf(seg).crossings) {
+        if (!X.laid && X.d1 > dist + 2) {
+          X.world = seg.world;
+          return X;
+        }
+      }
+    }
+    return null;
+  }
+
+  // A crossing: a row of its own, the chocolate's span in each lane a hurdle
+  // you can't land in (wade). Nothing of it is drawn here - the river is the
+  // scenery's (see the world's chunk).
+  placeCrossing(X) {
+    const world = X.world;
+    const group = this.group(world, X.d0, X.d1 - X.d0, null, CONFIG.score.wide);
+    group.crossing = X;
+    group.spec = world.def.river;
+    X.laid = true;
+    const lanes = [null, null, null];
+    for (let lane = 0; lane < 3; lane++) {
+      const L = X.lanes[lane];
+      const rec = { group, lane, x: CONFIG.laneX[lane], hw: CONFIG.obstacleHalfWidth, d: L.d0, len: L.d1 - L.d0, y0: 0, y1: X.top, kind: 'L', wade: true, hit: false };
+      this.records.push(rec);
+      lanes[lane] = rec;
+    }
+    this.rows.push({ d: X.d0, end: X.d1, lanes, hint: null, river: true });
   }
 
   // --- climbs -------------------------------------------------------------------

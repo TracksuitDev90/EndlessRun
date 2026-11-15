@@ -1,4 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
+import { BEND_VS_HEAD, BEND_VS_MAIN, CHOCO_FS, CANDY_FS, BISCUIT_GROUND } from './candy.js';
 
 // We author every color in sRGB and want it on screen untouched — the look is
 // flat illustration, not physically based lighting.
@@ -580,7 +581,7 @@ float easeOutBack(float t) {
   float u = t - 1.0;
   return 1.0 + 2.5 * u * u * u + 1.5 * u * u;
 }
-
+` + BEND_VS_HEAD + /* glsl */ `
 void main() {
   mat4 M = modelMatrix;
   float phase = 0.0;
@@ -608,6 +609,7 @@ void main() {
     // the snow that has settled on it so far
     lp += snow.xyz * uSnow.x;
   #endif
+` + BEND_VS_MAIN + /* glsl */ `
   #ifdef SCHOOL
     {
       // each fish along its loop, turned the way it's heading, its tail
@@ -1975,6 +1977,7 @@ vec3 bookSpines(vec2 p, float dist, float along) {
   return mix(col, avg * 0.9, rowSoft);
 }
 #endif
+` + CHOCO_FS + CANDY_FS + /* glsl */ `
 #ifdef GROUND
 uniform vec3 uGroundA;
 uniform vec3 uGroundB;
@@ -2540,6 +2543,7 @@ vec3 groundColor(vec2 p, float dist) {
     // a little warmth and a little cold, painted in patches
     c *= 0.9 + 0.2 * n1;
     return mix(c, mix(uGroundA, uGroundB, 0.5) * 0.85, far * 0.6);
+` + BISCUIT_GROUND + /* glsl */ `
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -2692,6 +2696,13 @@ void main() {
           base = towerWindows(n, base);
         }
       #endif
+      #ifdef CANDY
+        // sweets: what each part is made of (see CANDY_FS)
+        if (vFx.x > 0.095 && vFx.x < 0.565) {
+          m = 0.0;
+          candySurface(base, n, v / dist, dist);
+        }
+      #endif
       base = mix(base, base * 0.64, m);
     #endif
   #endif
@@ -2736,6 +2747,12 @@ void main() {
   shade *= 1.0 + caustic(vPos, n, dist) * (1.0 - vFx.y);
   vec3 col = mix(base * shade, base, max(vFx.y, gEmit));
   gKeep = max(gKeep, vFx.y);
+  #ifdef CANDY
+    if (cId >= 0.0) candyLight(col, base, n, V, shade, lit);
+  #endif
+  #ifdef CHOCO
+    col = chocolateRiver(V, dist);
+  #endif
   #ifdef GROUND
     #if GROUND == 10 || GROUND == 14
       // wet sand just bared by the backwash (a puddle on a roof) shines
@@ -8364,6 +8381,11 @@ export function makeToonMaterial(env, o = {}) {
   if (o.ground) defines.GROUND = o.ground;
   if (o.water) defines.WATER = '';
   if (o.lava) defines.LAVA = '';
+  // Candy World (see render/candy.js): sweets' stuff picked by each part's
+  // mark flag; a river piece bent along its arc; its chocolate
+  if (o.candy) defines.CANDY = '';
+  if (o.bend) defines.BEND = '';
+  if (o.choco) defines.CHOCO = '';
   if (o.kinds) defines.KINDS = '';
   if (o.splash) defines.SPLASH = '';
   if (o.wonky) defines.WONKY = '';
@@ -8481,7 +8503,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW', 'BEND']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,

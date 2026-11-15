@@ -22,8 +22,14 @@ export class ChunkStreamer {
       continuation: false,
       chunk: null,
       world: null,
+      seg: null, // the stretch of the course this chunk is part of
       put(name, x, y, dz, o) {
-        self.ctx.world.put(self.ctx.chunk, name, x, y, self.ctx.d0 + dz, o);
+        return self.ctx.world.put(self.ctx.chunk, name, x, y, self.ctx.d0 + dz, o);
+      },
+      // the world's river this time through (a world with def.river: see
+      // world/river.js), the same one the obstacles lay its crossings from
+      river() {
+        return self.game.obstacles.riverOf(self.ctx.seg);
       },
     };
   }
@@ -102,6 +108,7 @@ export class ChunkStreamer {
     ctx.continuation = continuation;
     ctx.chunk = chunk;
     ctx.world = world;
+    ctx.seg = seg;
     world.def.chunk(ctx);
     this.live.push(chunk);
     return chunk;
