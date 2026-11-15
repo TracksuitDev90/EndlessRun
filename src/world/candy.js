@@ -4,6 +4,7 @@ import { crystal, stone, crystalPoint, hexPrism, nugget, barrel, tabular, lumps,
 import { groundStrip, lod } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { clearOfRiver } from './river.js';
+import { teapotParts, teacupParts } from './whimsy.js';
 
 // IV · Candy World — out of the Deepwood's shade into a country made of
 // sweets. The road is biscuit and wafer, dead flat and straight on through
@@ -13,11 +14,17 @@ import { clearOfRiver } from './river.js';
 // winds through it all, alongside the road for a while and then right across
 // it (jump it: see world/river.js); low chocolate bars and heaps of sweets
 // lie in the lanes (jump), wafer beams sit on striped candy pillars (slide),
-// and giant cookies, gummy bears and ice-cream cones stand in the way (go
-// round). Every kind of sweet there is grows along the verges, and the mix
-// changes as you go - a gingerbread village, a lollipop orchard, a
-// patisserie's window, a chocolate quarry, a gummy meadow, an ice-cream
-// parlour - so it never looks stamped out.
+// and giant cookies, gummy bears, lollipops and ice-cream cones in their
+// display stands stand in the way (go round). It's a land, not a sweet shop
+// tipped out: the candy is its nature - frosting for earth, lollipops and
+// cotton candy for trees, gummy succulents and rock-candy crystals,
+// gumdrop bushes, meringue peaks, chocolate outcrops and truffle boulders,
+// gummy bears grazing - and what's baked is its towns: gingerbread houses
+// with gardens, an ice-cream district with a parlour's stand, a picnic laid
+// out for a garden party. Each side of the road is one landscape for a
+// while - an open meadow, a village, an orchard in rows, a quarry, a gummy
+// wood, the ice-cream district - its sweets growing in patches with open
+// frosting between, the verge by the road kept mostly clear.
 //
 // Returns: a sunset of spun sugar; a sugar-lantern night, the windows lit and
 // the gummies glowing; and a dream where the sweets float off into the sky.
@@ -458,13 +465,6 @@ function strip(path, w, { n = 60, along = true } = {}) {
   return g;
 }
 
-// ribbon candy: a glossy striped ribbon folded back and forth in loops
-function ribbonCandy(L, h, w, color, o = {}) {
-  const loops = 4;
-  const g = strip((t) => [t * L - (L / loops) * 0.5 * Math.sin(t * Math.PI * 2 * loops), h * 0.5 * (1 - Math.cos(t * Math.PI * 2 * loops)) + 0.02], w, { n: 90, along: false });
-  return mat(g, color, K.STRIPE, { tint: 1, ...o, outline: 0 });
-}
-
 // a sour belt, coated in sour sugar, its bands of colour along it
 const sourBelt = (path, w, o = {}) => mat(strip(path, w, { n: 40 }), C.white, K.SOUR, { ...o, outline: 0 });
 
@@ -579,18 +579,6 @@ function chocoBarParts(nx, nz, sq, t, { wrapper = C.red, foil = true, milk = fal
     const fw = w * 0.42;
     parts.push(mat(roundBox(fw, t * 1.08, d * 1.04, 0.15, 2), C.foil, K.WRAP, { x: w / 2 - fw / 2 + 0.01, y: t * 0.52 }));
     parts.push(mat(roundBox(fw * 0.7, t * 1.16, d * 1.08, 0.12, 2), wrapper, 0, { x: w / 2 - fw * 0.35 + 0.02, y: t * 0.55, tint: 1 }));
-  }
-  return parts;
-}
-
-// candy buttons: a paper strip dotted with little sugar buttons
-function candyButtons(L, o = {}) {
-  const parts = [mat(P.box(L, 0.01, 0.22), C.white, 0, { y: 0.005, ...o, outline: 0.4 })];
-  const cols = [C.hot, C.sky, C.butter];
-  for (let i = 0; i < Math.floor(L / 0.09); i++) {
-    for (let j = 0; j < 3; j++) {
-      parts.push(mat(P.sphere(0.03, 6, 4), cols[j], K.MACARON, { x: -L / 2 + 0.05 + i * 0.09, y: 0.012, z: (j - 1) * 0.065, sy: 0.6, ...o, outline: 0 }));
-    }
   }
   return parts;
 }
@@ -753,6 +741,79 @@ function cakeStandParts() {
   return parts;
 }
 
+// an ice-cream parlour's stand by the road: a striped counter under a
+// striped awning on candy-cane poles, tubs of ice cream along it, a rack of
+// cones waiting, and a sign on top - a cone and its scoop (faces +z)
+function kioskParts() {
+  const parts = [];
+  const W = 2.6;
+  parts.push(mat(roundBox(W, 1.0, 1.0, 0.1, 2), C.white, K.CREAM, { y: 0.5 }));
+  for (let i = 0; i < 7; i++) parts.push(mat(P.box(0.18, 0.94, 0.02), C.pink, K.CREAM, { x: -W / 2 + 0.25 + i * 0.35, y: 0.5, z: 0.51, outline: 0 }));
+  parts.push(mat(roundBox(W + 0.2, 0.08, 1.15, 0.3, 2), C.wafer, K.WAFER, { y: 1.04 }));
+  // tubs of ice cream, scooped into
+  const cols = [C.pink, '#fff0c8', C.mint, '#8a5230'];
+  for (let i = 0; i < 4; i++) {
+    const x = -0.9 + i * 0.5;
+    parts.push(mat(P.cyl(0.2, 0.18, 0.22, 12), C.foil, K.WRAP, { x, y: 1.19, z: -0.12 }));
+    parts.push(mat(P.sphere(0.2, 10, 6), cols[i], K.CREAM, { x, y: 1.3, z: -0.12, sy: 0.5 }));
+  }
+  // a rack of empty cones
+  parts.push(mat(P.box(0.9, 0.06, 0.24), C.wafer, K.WAFER, { x: 0.55, y: 1.38, z: 0.3 }));
+  for (let i = 0; i < 4; i++) parts.push(...moved(coneParts(0.07, 0.3), { x: 0.22 + i * 0.22, y: 1.12, z: 0.3 }));
+  // the awning on its poles
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(mat(roundAlong(P.cyl(0.05, 0.05, 2.4, 8, 3), { along: 2.4 }), C.red, K.STRIPE, { x: sx * (W / 2 + 0.05), y: 1.2, z: sz * 0.5 }));
+  for (let i = 0; i < 8; i++) {
+    parts.push(mat(P.box(W / 8 + 0.01, 0.06, 1.5), i % 2 ? C.white : C.hot, K.CREAM, { x: -W / 2 + (i + 0.5) * (W / 8), y: 2.45, z: 0.12, rx: -0.22 }));
+    parts.push(mat(P.sphere(W / 16, 8, 4, 0), i % 2 ? C.white : C.hot, K.CREAM, { x: -W / 2 + (i + 0.5) * (W / 8), y: 2.27, z: 0.86, sz: 0.4, sy: 0.7, outline: 0.3 }));
+  }
+  // the sign: a cone and its scoop
+  parts.push(...moved([...coneParts(0.32, 0.9), ...moved(scoopParts(0.36, { color: C.pink, tint: 0, drips: 4 }), { y: 0.86 })], { y: 2.55, z: 0.05 }));
+  return parts;
+}
+
+// a picnic for a garden party: a gingham blanket on the frosting, a cake
+// stand, a plate of donuts, cupcakes, a stack of macarons, and tea
+function picnicParts() {
+  const parts = [mat(P.box(3.0, 0.02, 2.4), C.pink, 0, { y: 0.01, outline: 0 })];
+  for (let i = 0; i < 6; i++) {
+    parts.push(mat(P.box(0.2, 0.025, 2.4), C.white, 0, { x: -1.25 + i * 0.5, y: 0.015, outline: 0 }));
+    if (i < 5) parts.push(mat(P.box(3.0, 0.026, 0.2), C.white, 0, { z: -1.0 + i * 0.5, y: 0.016, outline: 0 }));
+  }
+  parts.push(...moved(cakeStandParts(), { x: -0.7, z: -0.5, ry: 0.4 }).map((g) => g.scale(0.6, 0.6, 0.6).translate(-0.28, 0, -0.2)));
+  // a plate of donuts
+  parts.push(mat(P.cyl(0.38, 0.32, 0.04, 18), C.white, K.HARD, { x: 0.7, y: 0.04, z: 0.4 }));
+  parts.push(...moved(donutParts(0.14, 0.07, { glaze: C.pink }), { x: 0.62, y: 0.06, z: 0.36 }));
+  parts.push(...moved(donutParts(0.14, 0.07, { glaze: '#8a4a28', sprinkled: false, seed: 9 }), { x: 0.8, y: 0.06, z: 0.5 }));
+  parts.push(...moved(donutParts(0.14, 0.07, { glaze: C.white, seed: 4 }), { x: 0.72, y: 0.18, z: 0.42, rz: 0.15 }));
+  // cupcakes, macarons, tea
+  for (let i = 0; i < 3; i++) parts.push(...moved(cupcakeParts(0.36, { caseColor: PASTELS[i * 2], frost: C.white, glazed: i === 1 }), { x: -0.2 + i * 0.36, z: 0.75 }));
+  let y = 0.02;
+  for (let i = 0; i < 4; i++) {
+    parts.push(...moved(macaronParts(0.12, { color: PASTELS[(i + 1) % 6] }), { x: 1.0, y, z: -0.6 }));
+    y += 0.14;
+  }
+  parts.push(...moved(teapotParts({ color: C.white, trim: C.gold }), { x: 0.35, z: -0.45 }).map((g) => g.scale(0.55, 0.55, 0.55)));
+  for (const [x, z] of [[-0.9, 0.7], [0.1, -0.85]]) parts.push(...moved(teacupParts({ color: C.white, trim: C.gold }), { x, z }).map((g) => g.scale(0.5, 0.5, 0.5)));
+  return parts;
+}
+
+// lollipop flowers: a patch of little lollipops growing like tulips, every
+// one its own height and colour
+function lollipopFlowersParts(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = rnd() * Math.PI * 2;
+    const rr = Math.sqrt(rnd()) * 0.75;
+    const h = 0.45 + rnd() * 0.5;
+    const r = 0.12 + rnd() * 0.06;
+    const col = i % 3 === 0 ? C.white : BRIGHT[(i * 3 + seed) % BRIGHT.length];
+    parts.push(...moved(lollipopParts(r, r * 0.25, col, h, {}), { x: Math.cos(a) * rr, y: h + r * 0.9, z: Math.sin(a) * rr, ry: rnd() * 1.2 - 0.6 }));
+    parts.push(mat(P.cone(0.05, 0.16, 4), '#5fd64a', K.HARD, { x: Math.cos(a) * rr + 0.05, y: h * 0.35, z: Math.sin(a) * rr, rz: -0.9, sz: 0.4, outline: 0 }));
+  }
+  return parts;
+}
+
 // --- buildings ----------------------------------------------------------------------
 // A gingerbread house, iced: walls of spiced gingerbread, a roof of frosting
 // (or chocolate tiles, or wafer), icing piped along every edge and dripping
@@ -856,6 +917,15 @@ function iceTowerParts(seed) {
   }
   const by = H * 0.62;
   parts.push(mat(P.torus(0.9 + ((R - 0.9) * by) / H + 0.25, 0.14, 6, 26), C.choc, K.CHOC, { y: by, rx: Math.PI / 2 }));
+  // its front door, a chocolate one under an icing arch, a scoop of a step
+  parts.push(mat(roundBox(0.9, 1.5, 0.2, 0.2, 2), C.choc, K.CHOC, { y: 0.95, z: 1.12 }));
+  parts.push(mat(P.cyl(0.45, 0.45, 0.2, 14, 1, false, 0, Math.PI), C.choc, K.CHOC, { y: 1.7, z: 1.12, rx: Math.PI / 2, rz: Math.PI / 2 }));
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 8) * Math.PI;
+    parts.push(mat(P.sphere(0.07, 6, 4), C.white, K.CREAM, { x: Math.cos(a) * 0.55, y: 1.7 + Math.sin(a) * 0.55, z: 1.24, outline: 0 }));
+  }
+  parts.push(mat(P.cyl(0.8, 0.9, 0.22, 16), C.white, K.CREAM, { y: 0.31, z: 1.4, sz: 0.6, tint: 1 }));
+  parts.push(gumdrop(0.07, 0.09, C.hot, { x: 0.28, y: 0.95, z: 1.24, rx: Math.PI / 2 }));
   // the scoops
   let y = H - 0.2;
   const sizes = [R * 1.15, R * 0.95];
@@ -865,15 +935,6 @@ function iceTowerParts(seed) {
   });
   parts.push(...moved(swirlParts(1.4, 1.8, C.white, { tint: 0, turns: 2.5, seg: 40 }), { y: y - 0.3 }));
   parts.push(...cherry(0.5, { y: y + 1.45 }));
-  return parts;
-}
-
-// a soft-serve tower: a swirl of ice cream as tall as a church, in its cone
-function softServeTowerParts(seed) {
-  const H = 6;
-  const parts = [...coneParts(2.1, H)];
-  parts.push(...moved(swirlParts(2.6, 9, C.white, { tint: 1, turns: 3.4, tube: 0.36, seg: 70 }), { y: H - 0.5 }));
-  parts.push(mat(P.cyl(2.4, 2.9, 0.18, 20), C.white, K.CREAM, { y: 0.09, tint: 1 }));
   return parts;
 }
 
@@ -955,26 +1016,6 @@ function* cakeMesaParts(seed) {
     const a = rnd() * 6.28;
     parts.push(...cherry(0.7, { x: Math.cos(a) * r * 0.6, y: y + 0.2, z: Math.sin(a) * r * 0.6 }));
   }
-  return parts;
-}
-
-// a giant slice of layer cake on its side
-function cakeSliceParts(seed) {
-  const sponge = [C.butter, '#c9875a', '#ffc2cf'][seed % 3];
-  const s = new THREE.Shape();
-  s.moveTo(0, 0);
-  s.lineTo(2.6, -1.0);
-  s.absarc(0, 0, 2.8, -0.37, 0.37, false);
-  s.closePath();
-  const parts = [];
-  const layers = [[0.5, sponge, K.SPONGE], [0.14, C.cream, K.CREAM], [0.5, sponge, K.SPONGE], [0.14, '#e8364e', K.CREAM], [0.5, sponge, K.SPONGE], [0.22, C.white, K.CREAM]];
-  let y = 0;
-  for (const [h, c, k] of layers) {
-    parts.push(mat(P.extrude(s, h, 10), c, k, { y: y + h / 2, rx: Math.PI / 2, tint: k === K.CREAM && c === C.white ? 1 : 0 }));
-    y += h;
-  }
-  parts.push(...moved(swirlParts(0.45, 0.5, C.white, { tint: 1, turns: 1.8, seg: 20 }), { x: 2.2, y }));
-  parts.push(...cherry(0.32, { x: 2.2, y: y + 0.45 }));
   return parts;
 }
 
@@ -1121,41 +1162,22 @@ function assortParts(kind, seed) {
       const [x, z] = at(0.9);
       parts.push(bean(0.07, 0.04, BRIGHT[Math.floor(rnd() * BRIGHT.length)], { x, y: 0.035, z, ry: rnd() * 6, outline: 0.4 }));
     }
-  } else if (kind === 'mints') {
-    // peppermints and wrapped sweets, a candy cane fallen over them
-    for (let i = 0; i < 4; i++) {
-      const [x, z] = at(0.6);
-      const up = rnd() < 0.5;
-      parts.push(...moved(peppermint(0.16, 0.06, i % 2 ? C.red : '#2fb86a'), up ? { x, y: 0.16, z, rx: Math.PI / 2, ry: rnd() * 3 } : { x, y: 0.03, z }));
-    }
-    for (let i = 0; i < 3; i++) {
+  } else if (kind === 'meringues') {
+    // meringue peaks standing up out of the frosting like little hills
+    const cols = [C.white, C.pink, C.white, C.lav, C.mint, C.butter];
+    for (let i = 0; i < 6; i++) {
       const [x, z] = at(0.7);
-      parts.push(...moved(wrapped(0.09, pick(rnd, BRIGHT)), { x, y: 0.08, z, ry: rnd() * 6 }));
-    }
-    parts.push(...moved(caneParts(0.9, 0.045, pick(rnd, STRIPES)), { x: -0.2, y: 0.05, z: 0.15, rz: -Math.PI / 2 + 0.05, ry: rnd() }));
-  } else if (kind === 'patisserie') {
-    // a stack of macarons, meringue kisses round it
-    const cols = [C.pink, C.mint, C.lav, C.butter, C.peach, C.blue];
-    let y = 0;
-    for (let i = 0; i < 3; i++) {
-      parts.push(...moved(macaronParts(0.17, { color: cols[(i + seed) % 6], fill: i === 1 ? '#ffe0a0' : C.white }), { y, ry: rnd() }));
-      y += 0.17 * 1.15;
-    }
-    for (let i = 0; i < 5; i++) {
-      const [x, z] = at(0.65);
-      parts.push(meringue(0.1 + rnd() * 0.05, 0.16 + rnd() * 0.06, cols[(i * 2 + seed) % 6], { x: x + (x > 0 ? 0.2 : -0.2), z }));
+      const r = 0.1 + rnd() * 0.12;
+      parts.push(meringue(r, r * 1.6, cols[(i + seed) % cols.length], { x, z }));
     }
   } else if (kind === 'chocolates') {
-    // truffles, bonbons in their foil cups, squares broken off a bar
-    for (let i = 0; i < 3; i++) {
+    // chocolate pebbles: truffles weathered round, chunks broken off the
+    // outcrops
+    for (let i = 0; i < 4; i++) {
       const [x, z] = at(0.55);
-      parts.push(...moved(truffle(0.12 + rnd() * 0.04, i % 3), { x, z }));
+      parts.push(...moved(truffle(0.1 + rnd() * 0.06, i % 3), { x, z }));
     }
-    for (let i = 0; i < 2; i++) {
-      const [x, z] = at(0.6);
-      parts.push(...moved(bonbon(0.13, i ? C.gold : '#e85a8a'), { x, z }));
-    }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const [x, z] = at(0.75);
       parts.push(mat(roundBox(0.16, 0.08, 0.16, 0.3, 2), i % 2 ? C.milk : C.choc, K.CHOC, { x, y: 0.04, z, ry: rnd() * 6, rz: (rnd() - 0.5) * 0.4 }));
     }
@@ -1165,57 +1187,15 @@ function assortParts(kind, seed) {
       const [x, z] = at(0.55);
       parts.push(caramel(0.16 + rnd() * 0.05, { x, y: 0.07, z, ry: rnd() * 6 }));
     }
-    for (let i = 0; i < 2; i++) {
-      const [x, z] = at(0.6);
-      parts.push(...moved(wrapped(0.08, '#ffd27a'), { x, y: 0.07, z, ry: rnd() * 6 }));
-    }
     parts.push(brittle(0.32, 0.05, seed + 3, { x: 0.35, y: 0.16, z: -0.25, rz: 0.5, ry: 0.4 }));
     parts.push(brittle(0.26, 0.05, seed + 9, { x: -0.4, y: 0.03, z: 0.2 }));
   } else if (kind === 'fruity') {
-    // sugared jelly slices, a sour belt curled up, licorice twists
+    // gummy fruit fallen under the gummy plants: sugared jelly slices
     const fr = [['#ff9a1f', '#ffd27a'], ['#ffe02e', '#fff2a0'], ['#7fe04a', '#d8ff9a'], ['#ff4a6a', '#ffb0c0']];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const [x, z] = at(0.6);
       const [c0, c1] = fr[(i + seed) % 4];
       parts.push(...moved(jellySlice(0.14, 0.06, c0, c1), { x, y: 0.0, z, ry: rnd() * 6, rx: rnd() < 0.5 ? 0 : -Math.PI / 2 }));
-    }
-    parts.push(sourBelt((t) => [Math.cos(t * 4.5) * 0.25 * (1 - t * 0.5), 0.04 + t * 0.12], 0.07, { ry: rnd(), x: 0.2, z: -0.2 }));
-    for (let i = 0; i < 2; i++) {
-      const [x, z] = at(0.5);
-      const L = 0.7;
-      parts.push(licorice([[x - L / 2, 0.05, z], [x - L / 6, 0.08, z + 0.08], [x + L / 6, 0.05, z - 0.05], [x + L / 2, 0.07, z]], 0.035, i ? '#2a1a20' : '#d8263a'));
-    }
-  } else if (kind === 'bakery') {
-    // cookies, a wafer bar or two, marshmallows
-    for (let i = 0; i < 3; i++) {
-      const [x, z] = at(0.5);
-      parts.push(...moved(cookieParts(0.2, 0.05, { seed: seed + i, chips: 6, faces: 1 }), { x, y: i * 0.02, z, rx: (rnd() - 0.5) * 0.3 }));
-    }
-    parts.push(...moved(waferBar(0.5, 0.12, 0.1, { cream: pick(rnd, [C.pink, C.white, '#ffd27a']) }), { x: 0.3, z: 0.25, ry: rnd() }));
-    parts.push(...moved(waferBar(0.5, 0.12, 0.1, { dipped: true, cream: C.white }), { x: -0.25, y: 0, z: -0.3, ry: rnd() }));
-    for (let i = 0; i < 4; i++) {
-      const [x, z] = at(0.7);
-      parts.push(mallow(0.09, 0.15, pick(rnd, [C.white, C.pink, '#fff3b0', C.mint]), { x, z, rx: rnd() < 0.4 ? Math.PI / 2 : 0, y: rnd() < 0.4 ? 0.09 : 0, ry: rnd() * 6 }));
-    }
-  } else if (kind === 'parlour') {
-    // scoops of ice cream fallen in the frosting, a cone stuck in, wafers
-    const cols = [C.pink, C.mint, '#fff0c8', '#8a5230', C.lav];
-    for (let i = 0; i < 2; i++) {
-      const [x, z] = at(0.55);
-      parts.push(...moved(scoopParts(0.18, { color: cols[(i + seed) % 5], tint: 0, drips: 3, seed: seed + i, sprinkles: i === 1 }), { x, y: -0.05, z }));
-    }
-    parts.push(...moved([...coneParts(0.14, 0.5), ...moved(scoopParts(0.16, { color: cols[seed % 5], tint: 0, drips: 3 }), { y: 0.46 })], { x: 0.35, y: 0.45, z: -0.3, rx: Math.PI * 0.85 }));
-    parts.push(...moved(waferBar(0.35, 0.08, 0.07, { cream: C.white }), { x: -0.3, z: 0.3, ry: rnd() }));
-  } else if (kind === 'buttons') {
-    // strips of candy buttons and a few candy hearts
-    for (let i = 0; i < 2; i++) parts.push(...moved(candyButtons(0.7), { x: (rnd() - 0.5) * 0.4, z: i * 0.35 - 0.15, ry: rnd() * 0.6 }));
-    for (let i = 0; i < 5; i++) {
-      const [x, z] = at(0.6);
-      const h = new THREE.Shape();
-      h.moveTo(0, -0.06);
-      h.bezierCurveTo(0.09, 0.0, 0.08, 0.07, 0.0, 0.035);
-      h.bezierCurveTo(-0.08, 0.07, -0.09, 0.0, 0, -0.06);
-      parts.push(mat(P.extrude(h, 0.03, 6), pick(rnd, PASTELS), K.MACARON, { x, y: 0.015, z, rx: -Math.PI / 2, rz: rnd() * 6 }));
     }
   }
   return parts;
@@ -1303,18 +1283,19 @@ function sandwichWallGeo() {
 // W · a gummy bear as big as a person (tinted)
 const gummyBearWallGeo = () => merge(gummyBearParts()).scale(1.5, 1.5, 1.5).translate(0, 0, -0.62);
 
-// W · an ice-cream cone planted point-down, two scoops on it and a cherry,
-// melting into a puddle round its foot (the scoops tinted)
+// W · a giant ice-cream cone standing in a parlour's display stand - a
+// striped pedestal with a wafer ring holding the cone upright - two scoops
+// on it and a cherry (the scoops tinted)
 function coneWallGeo() {
-  const parts = [mat(P.cyl(0.9, 1.05, 0.06, 20), C.white, K.CREAM, { y: 0.03, tint: 1 })];
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + 0.4;
-    parts.push(mat(P.sphere(0.32, 10, 5), C.white, K.CREAM, { x: Math.cos(a) * 0.8, y: 0.02, z: Math.sin(a) * 0.8, sy: 0.15, tint: 1, outline: 0 }));
-  }
-  parts.push(...coneParts(0.74, 2.0));
-  parts.push(...moved(scoopParts(0.82, { tint: 1, drips: 8, seed: 5, chips: 8 }), { y: 1.92 }));
-  parts.push(...moved(scoopParts(0.66, { color: '#ffd8e6', tint: 0, drips: 6, seed: 9, sprinkles: true }), { y: 3.05 }));
-  parts.push(...cherry(0.2, { y: 3.95 }));
+  const parts = [
+    mat(P.cyl(0.62, 0.72, 0.16, 20), C.white, K.HARD, { y: 0.08 }),
+    mat(roundAlong(P.cyl(0.36, 0.46, 1.0, 16, 4), { along: 1.0 }), '#ff7eb6', K.STRIPE, { y: 0.6 }),
+    mat(P.torus(0.5, 0.08, 6, 20), C.wafer, K.WAFER, { y: 1.12, rx: Math.PI / 2 }),
+  ];
+  parts.push(...moved(coneParts(0.74, 2.0), { y: 0.55 }));
+  parts.push(...moved(scoopParts(0.82, { tint: 1, drips: 8, seed: 5, chips: 8 }), { y: 2.47 }));
+  parts.push(...moved(scoopParts(0.66, { color: '#ffd8e6', tint: 0, drips: 6, seed: 9, sprinkles: true }), { y: 3.6 }));
+  parts.push(...cherry(0.2, { y: 4.5 }));
   return merge(parts).translate(0, 0, -0.85);
 }
 
@@ -1664,9 +1645,8 @@ export default {
 
     // the verges: little heaps of sweets, each its own mix
     for (const [name, kind, seed] of [
-      ['assortGumdrops', 'gumdrops', 3], ['assortMints', 'mints', 5], ['assortPatisserie', 'patisserie', 7],
+      ['assortGumdrops', 'gumdrops', 3], ['assortMeringues', 'meringues', 7],
       ['assortChocolates', 'chocolates', 11], ['assortCaramels', 'caramels', 13], ['assortFruity', 'fruity', 17],
-      ['assortBakery', 'bakery', 19], ['assortParlour', 'parlour', 23], ['assortButtons', 'buttons', 29],
     ]) {
       b.toon(name, merge(coarse(0.55, () => assortParts(kind, seed))), { ...sweet, cap: 150, anim: 'pop', ink: 0.025 });
       yield;
@@ -1677,21 +1657,7 @@ export default {
     yield;
     b.toon('gummyPlant', merge(coarse(0.6, () => gummyPlantParts(3))), { ...sweet, cap: 220, anim: 'pop', ink: 0.025, wobble: [0.03, 0, 1.2, 0] });
     yield;
-    b.toon('lollipop', merge(coarse(0.6, () => moved(lollipopParts(0.34, 0.08, C.white, 0.9, { tint: 1 }), { y: 1.2 }))), { ...sweet, cap: 160, anim: 'pop', wobble: [0.012, 0, 1.4, 0] });
-    yield;
-    b.toon('cane', merge(coarse(0.6, () => caneParts(1.3, 0.06, C.white))), { ...sweet, cap: 160, anim: 'pop' });
-    yield;
     b.toon('rockCandy', merge(coarse(0.6, () => [...rockCandy(0.9, C.white, 3), ...moved(rockCandy(0.7, C.white, 8), { x: 0.2, z: 0.12, rz: -0.2 }), ...moved(rockCandy(0.8, C.white, 13), { x: -0.18, z: -0.1, rz: 0.25 })])), { ...sweet, cap: 120, anim: 'pop' });
-    yield;
-    b.toon('cupcake', merge(coarse(0.55, () => cupcakeParts(1.0, { caseColor: '#ffb3d1', frost: C.white }))), { ...sweet, cap: 120, anim: 'pop' });
-    yield;
-    b.toon('cupcakeB', merge(coarse(0.55, () => cupcakeParts(1.0, { caseColor: '#9fdcff', frost: C.white, glazed: true }))), { ...sweet, cap: 120, anim: 'pop' });
-    yield;
-    b.toon('donut', merge(coarse(0.55, () => [...donutParts(0.32, 0.15, { glaze: C.white }), ...moved(donutParts(0.3, 0.14, { glaze: C.white, sprinkled: false, seed: 9 }), { y: 0.3, x: 0.06, rz: 0.08 })])), { ...sweet, cap: 120, anim: 'pop' });
-    yield;
-    b.toon('softServe', merge(coarse(0.55, () => [...coneParts(0.2, 0.62), ...moved(swirlParts(0.26, 0.5, C.white, { turns: 2.6, seg: 36 }), { y: 0.58 })])), { ...sweet, cap: 100, anim: 'pop' });
-    yield;
-    b.toon('ribbon', merge([ribbonCandy(0.9, 0.32, 0.12, C.white), ...moved([ribbonCandy(0.7, 0.24, 0.1, C.white)], { z: 0.3, x: 0.1, ry: 0.4 })]), { ...sweet, cap: 100, anim: 'pop', side: THREE.DoubleSide, ink: 0 });
     yield;
 
     // trees, and things the size of a house
@@ -1713,11 +1679,15 @@ export default {
     yield;
     b.toon('cakeStand', merge(coarse(0.5, () => cakeStandParts())), { ...sweet, cap: 40, anim: 'pop' });
     yield;
+    b.toon('kiosk', merge(coarse(0.6, () => kioskParts())), { ...sweet, cap: 30, anim: 'pop' });
+    yield;
+    b.toon('picnic', merge(coarse(0.5, () => picnicParts())), { ...sweet, cap: 30, anim: 'pop' });
+    yield;
+    b.toon('lollipopFlowers', merge(coarse(0.5, () => lollipopFlowersParts(5))), { ...sweet, cap: 140, anim: 'pop', wobble: [0.02, 0, 1.4, 0] });
+    yield;
     b.toon('cookieGiant', merge(coarse(0.7, () => moved(cookieParts(1.6, 0.4, { seed: 31, chips: 26 }), { rx: Math.PI / 2 - 0.35, y: 1.45 }))), { ...sweet, cap: 50, anim: 'popEarly' });
     yield;
     b.toon('donutArch', merge(coarse(0.7, () => moved(donutParts(1.6, 0.75, { glaze: C.white, seed: 3 }), { rx: Math.PI / 2, y: 1.9 }))), { ...sweet, cap: 50, anim: 'popEarly' });
-    yield;
-    b.toon('macaronGiant', merge(coarse(0.7, () => macaronParts(1.3, { color: C.white, fill: C.cream }))), { ...sweet, cap: 50, anim: 'popEarly' });
     yield;
     b.toon('truffleRocks', merge(coarse(0.6, () => [...truffle(1.0, 0), ...moved(truffle(0.75, 2), { x: 1.5, z: 0.4 }), ...moved(truffle(0.6, 1), { x: -1.2, z: 0.7 })])), { ...sweet, cap: 50, anim: 'popEarly' });
     yield;
@@ -1744,10 +1714,6 @@ export default {
       b.toon('rockCandyGiant', merge(parts), { ...sweet, cap: 50, anim: 'popEarly' });
     }
     yield;
-    b.toon('cakeSlice', merge(coarse(0.7, () => cakeSliceParts(1))), { ...sweet, cap: 50, anim: 'popEarly' });
-    yield;
-    b.toon('coneGiant', coarse(0.6, () => coneWallGeo()).scale(1.5, 1.5, 1.5), { ...sweet, cap: 50, anim: 'popEarly' });
-    yield;
     for (const [name, kind, seed] of [['gingerHouseA', 0, 3], ['gingerHouseB', 1, 7], ['gingerCottage', 2, 11]]) {
       b.toon(name, merge(coarse(0.7, () => gingerHouseParts(kind, seed))), { ...sweet, cap: 40, anim: 'lift' });
       yield;
@@ -1756,19 +1722,17 @@ export default {
     // the far country: frosting hills, cake mesas, towers, clouds
     b.toon('frostPatch', frostPatchGeo(3), { ...sweet, cap: 120, ink: 0 });
     yield;
-    b.toon('hillA', merge(coarse(0.8, () => frostHillParts(0, 3))), { ...sweet, cap: 70, anim: 'liftFar', ink: 0.04 });
+    b.toon('hillA', merge(coarse(0.8, () => frostHillParts(0, 3))), { ...sweet, cap: 150, anim: 'liftFar', ink: 0.04 });
     yield;
     b.toon('hillB', merge(coarse(0.6, () => frostHillParts(1, 5))), { ...sweet, cap: 50, anim: 'liftFar', ink: 0.04 });
     yield;
-    b.toon('hillC', merge(coarse(0.8, () => frostHillParts(2, 7))), { ...sweet, cap: 50, anim: 'liftFar', ink: 0.04 });
+    b.toon('hillC', merge(coarse(0.8, () => frostHillParts(2, 7))), { ...sweet, cap: 110, anim: 'liftFar', ink: 0.04 });
     yield;
     b.toon('cakeMesa', merge(yield* coarseSteps(0.45, cakeMesaParts(5))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
     yield;
     b.toon('cakeMesaB', merge(yield* coarseSteps(0.45, cakeMesaParts(10))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
     yield;
     b.toon('iceTower', merge(coarse(0.65, () => iceTowerParts(3))), { ...sweet, cap: 30, anim: 'lift' });
-    yield;
-    b.toon('softServeTower', merge(coarse(0.6, () => softServeTowerParts(4))), { ...sweet, cap: 30, anim: 'lift' });
     yield;
     for (let i = 0; i < CLOUDS; i++) {
       b.toon(`cloud${i}`, merge(cloudParts(7 + i * 11)), { ...sweet, cap: 24, ink: 0.05, fly: [0, 0, 3.5 + i, 0.035 + i * 0.01] });
@@ -1902,15 +1866,15 @@ export default {
           ctx.put(k, x, 0, dz, { s: rng.float(1.6, 3.2), sy: rng.float(1.2, 2.2), ry: rng.float(0, 6.28), c: rng.pick(PASTEL_TINTS) });
         }
       }
-      if (rng.chance(0.42)) {
-        const x = s * rng.float(28, 62);
+      if (rng.chance(0.3)) {
+        const x = s * rng.float(30, 62);
         const dz = rng.float(0, L);
-        const name = rng.weighted([['iceTower', 1.4], ['softServeTower', 0.9], ['cakeMesa', 1], ['cakeMesaB', 1], ['gingerHouseA', 0.6], ['gingerHouseB', 0.5]]);
+        const name = rng.weighted([['iceTower', 0.8], ['cakeMesa', 1], ['cakeMesaB', 1], ['gingerHouseA', 0.6], ['gingerHouseB', 0.5]]);
         const r = name.startsWith('cake') ? 11 : name.startsWith('ginger') ? 5 : 4;
         if (free(x, dz, r) && roomFor(x, dz, r)) {
           claim(x, dz, r);
           const big = name.startsWith('cake') ? rng.float(0.8, 1.2) : rng.float(0.9, 1.25);
-          ctx.put(name, x, 0, dz, { s: big, ry: name.startsWith('ginger') ? -s * 1.1 + rng.float(-0.3, 0.3) : rng.float(0, 6.28), c: name.startsWith('ginger') ? [rng.float(0.92, 1.08), rng.float(0.92, 1.04), 1] : rng.pick(PASTEL_TINTS) });
+          ctx.put(name, x, 0, dz, { s: big, ry: name.startsWith('ginger') || name === 'iceTower' ? -s * 1.1 + rng.float(-0.3, 0.3) : rng.float(0, 6.28), c: name.startsWith('ginger') ? [rng.float(0.92, 1.08), rng.float(0.92, 1.04), 1] : rng.pick(PASTEL_TINTS) });
         }
       }
     }
@@ -1936,81 +1900,81 @@ export default {
       }
     }
 
-    // What grows along each side changes as you go: a gingerbread village,
-    // a lollipop orchard, a patisserie, a chocolate quarry, a gummy meadow,
-    // an ice-cream parlour, every few chunks a new one (by a hash of where
-    // it is, so both sides change in their own time)
+    // Each side of the road is a landscape of its own for a while (by a
+    // hash of where it is, so the two sides change in their own time): an
+    // open frosting meadow, a gingerbread village with its gardens, a
+    // lollipop orchard planted in rows, a chocolate quarry, a gummy wood, an
+    // ice-cream district. Nothing is strewn about: sweets grow in patches
+    // and clumps, with open frosting between them, and the verge right by
+    // the road is kept mostly clear, so there's room to see it all.
     for (const s of [-1, 1]) {
       const zone = Math.floor((ctx.d0 - seg.start) / (L * 3) + (s > 0 ? 0.5 : 0));
-      let h = Math.sin(zone * 12.9898 + seg.start * 0.0131 + s * 4.1 + v * 1.7) * 43758.5453;
-      h -= Math.floor(h);
-      const theme = THEMES[Math.floor(h * THEMES.length)];
-      const T = THEME[theme];
-      // sour-straw grass and gummy plants all along the verge
-      for (let i = 0; i < 7; i++) {
-        const x = s * rng.float(5.0, 11);
+      const zh = (k) => {
+        const h = Math.sin(zone * 12.9898 + seg.start * 0.0131 + s * 4.1 + v * 1.7 + k * 7.31) * 43758.5453;
+        return h - Math.floor(h);
+      };
+      let pick = zh(0) * LAND_WEIGHT;
+      let land = LANDS[0];
+      for (const k of LANDS) {
+        pick -= LAND[k].weight;
+        if (pick <= 0) {
+          land = k;
+          break;
+        }
+      }
+      const T = LAND[land];
+      // how busy this stretch is (some of it left almost bare)
+      const busy = T.busy * (0.4 + 0.6 * zh(1));
+      const tint = (name) => (TINT[name] ? rng.pick(TINT[name]) : undefined);
+      const put = (name, x, dz, o = {}) => ctx.put(name, x, 0, dz, { s: (SIZE[name] || 1) * rng.float(0.85, 1.2), ry: rng.float(0, 6.28), c: tint(name), ...o });
+
+      // the land rolls: low knolls of frosting, set back from the road, the
+      // open ground between things never just flat
+      for (let k = 0; k < 2; k++) {
+        if (!rng.chance(0.6)) continue;
+        const sc = rng.float(0.35, 0.75);
+        const r = 10 * sc;
+        const x = s * (rng.float(11, 34) + r);
         const dz = rng.float(0, L);
-        if (free(x, dz, 0.4)) ctx.put('candyGrass', x, 0, dz, { s: rng.float(0.8, 1.4), ry: rng.float(0, 6.28) });
+        if (free(x, dz, r * 0.9) && roomFor(x, dz, r * 0.7)) {
+          claim(x, dz, r * 0.7);
+          ctx.put(rng.chance(0.7) ? 'hillA' : 'hillC', x, 0, dz, { s: sc, sy: rng.float(0.5, 0.8), ry: rng.float(0, 6.28), c: rng.pick(PASTEL_TINTS) });
+        }
       }
-      // the verge's sweets
-      const n = rng.int(6, 8);
-      for (let i = 0; i < n; i++) {
-        const name = rng.weighted(T.near);
-        const x = s * rng.float(5.3, 10.5);
-        const dz = rng.float(0, L);
-        if (!free(x, dz, 0.8)) continue;
-        const tint = TINT[name];
-        ctx.put(name, x, 0, dz, { s: rng.float(0.85, 1.35) * (SIZE[name] || 1), ry: rng.float(0, 6.28), c: tint ? rng.pick(tint) : undefined });
+      // tufts of sour-straw grass, in a clump or two
+      for (let k = 0; k < rng.int(1, 3); k++) {
+        const cx = s * rng.float(5.4, 16), cz = rng.float(0, L);
+        for (let i = 0; i < rng.int(3, 5); i++) {
+          const x = cx + rng.float(-0.9, 0.9), dz = cz + rng.float(-0.9, 0.9);
+          if (Math.abs(x) > 5 && free(x, dz, 0.4)) put('candyGrass', x, dz, { s: rng.float(0.8, 1.4) });
+        }
       }
-      // now and then a fence of candy canes along the verge (in a village or
-      // an orchard), or an avenue of lollipop trees
-      if ((theme === 'village' || theme === 'orchard') && rng.chance(0.3) && free(s * 5.6, 8, 3.5)) {
-        ctx.put('caneFence', s * 5.6, 0, rng.float(10, 16), { c: rng.pick(STRIPES) });
-      }
-      if (rng.chance(0.08)) {
-        const tint = rng.pick(TINT.lollipopTree);
-        for (let k = 0; k < 3; k++) {
-          const dz = 2 + k * 5.5;
-          if (free(s * 8.6, dz, 2) && roomFor(s * 8.6, dz, 1.6)) {
-            claim(s * 8.6, dz, 1.6);
-            ctx.put('lollipopTree', s * 8.6, 0, dz, { s: 0.85, ry: rng.float(0, 6.28), c: tint });
+      // patches of what grows here, spaced out, none hard by the road
+      const patches = Math.floor(rng.float(1.2, 3.6) * busy);
+      for (let k = 0; k < patches; k++) {
+        const patch = rng.weighted(T.patches);
+        const cx = s * rng.float(6.8, 17), cz = rng.float(1, L - 1);
+        if (!free(cx, cz, 1.8) || !roomFor(cx, cz, 2.4)) continue;
+        claim(cx, cz, 2.4);
+        for (const [name, lo, hi] of PATCH_OF[patch]) {
+          for (let i = rng.int(lo, hi); i > 0; i--) {
+            const x = cx + rng.float(-1.4, 1.4), dz = cz + rng.float(-1.4, 1.4);
+            if (Math.abs(x) > 5.6 && free(x, dz, 0.6)) put(name, x, dz);
           }
         }
       }
-      // things the size of a tree, or a house
-      const m = rng.int(3, 4);
-      for (let i = 0; i < m; i++) {
-        const name = rng.weighted(T.mid);
-        const r = RADIUS[name] || 2;
-        const x = s * (rng.float(9.5, 24) + r * 0.5);
+      // the land's own big things
+      T.lay({ ctx, rng, s, busy, free, roomFor, claim, put, tint });
+      // and behind, more of them, further off
+      if (rng.chance(0.95 * busy) && T.back.length) {
+        const name = rng.weighted(T.back);
+        const r = (RADIUS[name] || 2) * 1.6;
+        const x = s * rng.float(28, 46);
         const dz = rng.float(0, L);
-        if (!free(x, dz, r) || !roomFor(x, dz, r)) continue;
-        claim(x, dz, r);
-        const tint = TINT[name];
-        const faces = name.startsWith('ginger') || name === 'cakeSlice' || name === 'coneGiant' || name === 'gumdropArch';
-        const sc = rng.float(0.85, 1.2) * (SIZE[name] || 1);
-        ctx.put(name, x, 0, dz, {
-          s: sc,
-          ry: faces ? -s * 1.1 + rng.float(-0.35, 0.35) : rng.float(0, 6.28),
-          c: name.startsWith('ginger') ? [rng.float(0.9, 1.08), rng.float(0.9, 1.04), rng.float(0.92, 1.0)] : tint ? rng.pick(tint) : undefined,
-        });
-        ctx.put('shadow', x, 0.03, dz, { sx: r * 2.4 * sc, sz: r * 2.4 * sc });
-      }
-      // and further back, more of the same, bigger
-      for (let i = 0; i < 2; i++) {
-        const name = rng.weighted(T.mid);
-        const r = (RADIUS[name] || 2) * 1.5;
-        const x = s * rng.float(24, 44);
-        const dz = rng.float(0, L);
-        if (!free(x, dz, r) || !roomFor(x, dz, r)) continue;
-        claim(x, dz, r);
-        const tint = TINT[name];
-        const faces = name.startsWith('ginger') || name === 'cakeSlice' || name === 'coneGiant';
-        ctx.put(name, x, 0, dz, {
-          s: rng.float(1.2, 1.7) * (SIZE[name] || 1),
-          ry: faces ? -s * 1.2 + rng.float(-0.4, 0.4) : rng.float(0, 6.28),
-          c: name.startsWith('ginger') ? [rng.float(0.9, 1.08), rng.float(0.9, 1.04), rng.float(0.92, 1.0)] : tint ? rng.pick(tint) : undefined,
-        });
+        if (free(x, dz, r) && roomFor(x, dz, r)) {
+          claim(x, dz, r);
+          put(name, x, dz, { s: rng.float(1.2, 1.6) * (SIZE[name] || 1), ry: FACES.has(name) ? -s * 1.2 + rng.float(-0.4, 0.4) : rng.float(0, 6.28), c: name.startsWith('ginger') ? gingerTint(rng) : tint(name) });
+        }
       }
       // night: sugar sparks drifting over the verge
       if (v === 2) {
@@ -2032,70 +1996,179 @@ export default {
   },
 };
 
-// The mixes along the verges, theme by theme (near: the verge's sweets; mid:
-// what stands behind them), how big each is put out, how far it reaches
-// (for keeping clear of the river and of each other) and what it's tinted.
+// How big each thing is put out, how far it reaches (for keeping clear of
+// the river and of each other) and what it's tinted.
 const PATCH = ['#bff2dc', '#d9c8ff', '#fff0b0', '#c8e8ff', '#ffd8c0', '#ffffff'];
 const PIPING = ['#ffffff', '#ffc4dc', '#bff2dc', '#d9c8ff', '#fff0b0'];
-const THEMES = ['village', 'orchard', 'patisserie', 'chocolate', 'gummy', 'parlour'];
-const THEME = {
+// Something big put out, set back from the road and kept clear of the river
+// and of everything else big (faces: turned to face the road).
+const FACES = new Set(['gingerHouseA', 'gingerHouseB', 'gingerCottage', 'gumdropArch', 'kiosk', 'iceTower', 'picnic']);
+const gingerTint = (rng) => [rng.float(0.9, 1.08), rng.float(0.9, 1.04), rng.float(0.92, 1.0)];
+function placeBig(o, name, xr, { sc = 1, dz } = {}) {
+  const { ctx, rng, s, free, roomFor, claim, put, tint } = o;
+  const r = (RADIUS[name] || 2) * sc;
+  const x = s * (rng.float(xr[0], xr[1]) + r * 0.5);
+  const z = dz ?? rng.float(0, ctx.L);
+  if (!free(x, z, r) || !roomFor(x, z, r * 1.25)) return null;
+  claim(x, z, r * 1.25);
+  const ry = FACES.has(name) ? -s * 1.1 + rng.float(-0.3, 0.3) : rng.float(0, 6.28);
+  put(name, x, z, { s: sc * (SIZE[name] || 1) * rng.float(0.9, 1.1), ry, c: name.startsWith('ginger') ? gingerTint(rng) : tint(name) });
+  ctx.put('shadow', x, 0.03, z, { sx: r * 2.2, sz: r * 2.2 });
+  return { x, z, ry, r };
+}
+// in front of something facing the road (its own front, m out and across)
+const before = (b, out, across) => [b.x + Math.sin(b.ry) * out + Math.cos(b.ry) * across, b.z - Math.cos(b.ry) * out + Math.sin(b.ry) * across];
+
+// The patches sweets grow in: [what, how many at least, at most].
+const PATCH_OF = {
+  flowers: [['lollipopFlowers', 1, 1], ['rosettes', 1, 2], ['candyGrass', 1, 2]],
+  frosting: [['rosettes', 2, 3]],
+  gumdrops: [['assortGumdrops', 1, 2], ['candyGrass', 0, 2]],
+  meringues: [['assortMeringues', 1, 2]],
+  crystals: [['rockCandy', 1, 3]],
+  gummies: [['gummyPlant', 2, 3], ['assortFruity', 0, 1]],
+  chocolate: [['assortChocolates', 1, 2]],
+  caramel: [['assortCaramels', 1, 1], ['assortChocolates', 0, 1]],
+};
+const LAND = {
+  meadow: {
+    weight: 1.4, busy: 0.75,
+    patches: [['flowers', 2], ['frosting', 1], ['gumdrops', 1.4], ['meringues', 0.8]],
+    back: [['cottonTree', 1], ['lollipopBall', 0.7], ['cottonTreeB', 0.7]],
+    lay(o) {
+      const { rng, s, free, put } = o;
+      if (rng.chance(0.55)) {
+        // a stand of trees, two or three together
+        const name = rng.pick(['cottonTree', 'cottonTreeB', 'lollipopTree', 'lollipopBall']);
+        const t = placeBig(o, name, [10, 22]);
+        if (t) {
+          for (let i = rng.int(1, 2); i > 0; i--) {
+            const x = t.x + s * rng.float(2.5, 4), dz = t.z + rng.float(-3, 3);
+            if (free(x, dz, 2)) put(name, x, dz, { s: rng.float(0.75, 1.0) });
+          }
+        }
+      }
+      // now and then a grove of giant candy canes, grown up together like
+      // bamboo
+      else if (rng.chance(0.25)) {
+        const g = placeBig(o, 'caneTall', [12, 20]);
+        if (g) {
+          const c = rng.pick(STRIPES);
+          for (let i = 0; i < 3; i++) {
+            const x = g.x + rng.float(-1.6, 1.6), dz = g.z + rng.float(-1.6, 1.6);
+            if (free(x, dz, 0.6)) put('caneTall', x, dz, { s: rng.float(0.7, 1.1), c });
+          }
+        }
+      }
+    },
+  },
   village: {
-    near: [['assortGumdrops', 2], ['rosettes', 2], ['cane', 1.2], ['lollipop', 1], ['assortButtons', 1], ['assortMints', 1]],
-    mid: [['gingerHouseA', 1.6], ['gingerHouseB', 1.4], ['gingerCottage', 1.6], ['lollipopTree', 0.8], ['caneTall', 0.8], ['gumdropArch', 0.6]],
+    weight: 1.2, busy: 0.9,
+    patches: [['flowers', 1], ['gumdrops', 1], ['frosting', 1]],
+    back: [['gingerHouseA', 1], ['gingerHouseB', 1], ['gingerCottage', 1]],
+    // a house with its garden: a fence of candy canes along the front, a
+    // gumdrop arch for a gate, flowers either side of the path
+    lay(o) {
+      const { rng, s, free, put } = o;
+      const h = placeBig(o, rng.pick(['gingerHouseA', 'gingerHouseB', 'gingerCottage']), [12, 17]);
+      if (!h) return;
+      const [gx, gz] = before(h, 5.2, 0);
+      if (rng.chance(0.5) && free(gx, gz, 1.6)) put(rng.chance(0.6) ? 'gumdropArch' : 'donutArch', gx, gz, { s: 0.7, ry: h.ry });
+      else if (Math.abs(gx) > 7.5 && free(gx, gz, 3)) put('caneFence', gx, gz + 3, { c: rng.pick(STRIPES), ry: 0 });
+      for (const side of [-1, 1]) {
+        const [fx, fz] = before(h, 3.4, side * 1.8);
+        if (Math.abs(fx) > 6 && free(fx, fz, 0.8)) put(rng.chance(0.5) ? 'rosettes' : 'lollipopFlowers', fx, fz);
+        const [bx, bz] = before(h, 1.2, side * 3.2);
+        if (Math.abs(bx) > 6 && free(bx, bz, 0.8)) put('assortGumdrops', bx, bz);
+      }
+    },
   },
   orchard: {
-    near: [['assortGumdrops', 2], ['assortMints', 1.5], ['lollipop', 1.5], ['gummyPlant', 1.6], ['rockCandy', 0.6], ['rosettes', 0.8]],
-    mid: [['lollipopTree', 2], ['lollipopBall', 1.5], ['cottonTree', 1.6], ['cottonTreeB', 1], ['caneTall', 1.2]],
+    weight: 1.0, busy: 0.7,
+    patches: [['flowers', 1], ['gumdrops', 1]],
+    back: [['lollipopTree', 1], ['cottonTree', 1]],
+    // trees planted in rows, row after row running on down the road
+    lay(o) {
+      const { ctx, rng, s, free, roomFor, claim, put } = o;
+      const rows = [[11.5, 'lollipopTree'], [17, 'cottonTree'], [22.5, 'lollipopBall']];
+      rows.forEach(([rx, name], i) => {
+        const step = 6.4;
+        const off = i * 2.1;
+        const tintKey = Math.floor((ctx.d0 + off) / 96) + i * 3 + (s > 0 ? 1 : 0);
+        const c = TINT[name][tintKey % TINT[name].length];
+        for (let d = Math.ceil((ctx.d0 - off) / step) * step + off; d < ctx.d0 + ctx.L; d += step) {
+          const x = s * rx, dz = d - ctx.d0;
+          if (!free(x, dz, 2) || !roomFor(x, dz, 1.4)) continue;
+          claim(x, dz, 1.4);
+          put(name, x, dz, { s: 0.9, c });
+        }
+      });
+    },
   },
-  patisserie: {
-    near: [['assortPatisserie', 2], ['cupcake', 1.6], ['cupcakeB', 1.2], ['donut', 1.5], ['assortBakery', 1.2], ['rosettes', 0.8], ['cakeStand', 0.8]],
-    mid: [['donutArch', 1.5], ['macaronGiant', 1.5], ['cakeSlice', 1.5], ['cottonTree', 0.7], ['lollipopTree', 0.5]],
-  },
-  chocolate: {
-    near: [['assortChocolates', 2.2], ['assortCaramels', 1.6], ['assortBakery', 1.2], ['donut', 0.6], ['assortMints', 0.5]],
-    mid: [['chocoBlocks', 2], ['truffleRocks', 2], ['cookieGiant', 1.5], ['caneTall', 0.6], ['cottonTreeB', 0.5]],
+  quarry: {
+    weight: 0.8, busy: 0.8,
+    patches: [['chocolate', 1.5], ['caramel', 1]],
+    back: [['chocoBlocks', 1], ['truffleRocks', 1]],
+    // outcrops of chocolate, boulders of truffle, a giant cookie half sunk
+    lay(o) {
+      const n = o.rng.int(1, 2);
+      for (let i = 0; i < n; i++) placeBig(o, o.rng.weighted([['chocoBlocks', 1.2], ['truffleRocks', 1], ['cookieGiant', 0.6]]), [11, 24]);
+    },
   },
   gummy: {
-    near: [['assortFruity', 2], ['gummyPlant', 2], ['rockCandy', 1.2], ['ribbon', 1], ['assortGumdrops', 1]],
-    mid: [['gummyBear', 2.5], ['rockCandyGiant', 1.5], ['lollipopBall', 1], ['cottonTree', 0.8], ['gumdropArch', 0.7]],
+    weight: 0.9, busy: 0.85,
+    patches: [['gummies', 2], ['crystals', 1.2]],
+    back: [['rockCandyGiant', 1], ['cottonTree', 0.6]],
+    // gummy bears out grazing, a mother and her cub; crystals of rock candy
+    lay(o) {
+      const { rng, s, free, put } = o;
+      const b = placeBig(o, 'gummyBear', [10, 20]);
+      if (b && rng.chance(0.7)) {
+        const x = b.x + s * rng.float(1.6, 2.4), dz = b.z + rng.float(-1.5, 1.5);
+        if (free(x, dz, 1)) put('gummyBear', x, dz, { s: rng.float(0.55, 0.7), c: tint0(rng) });
+      }
+      if (rng.chance(0.5)) placeBig(o, 'rockCandyGiant', [14, 24]);
+    },
   },
   parlour: {
-    near: [['assortParlour', 2.2], ['softServe', 1.5], ['cupcake', 0.8], ['assortBakery', 1], ['cane', 0.6]],
-    mid: [['coneGiant', 2], ['lollipopTree', 0.8], ['cottonTree', 1], ['macaronGiant', 0.6]],
+    weight: 0.8, busy: 0.8,
+    patches: [['flowers', 1], ['frosting', 1], ['meringues', 1]],
+    back: [['iceTower', 1]],
+    // the ice-cream district: a parlour's stand by the road, a picnic
+    // spread out on the frosting, an ice-cream tower behind
+    lay(o) {
+      const { rng } = o;
+      if (rng.chance(0.6)) placeBig(o, 'kiosk', [8.5, 11]);
+      else if (rng.chance(0.6)) placeBig(o, rng.chance(0.6) ? 'picnic' : 'cakeStand', [8.5, 12]);
+      if (rng.chance(0.4)) placeBig(o, 'iceTower', [17, 24], { sc: 0.8 });
+    },
   },
 };
+const tint0 = (rng) => rng.pick(GUMMY_TINTS);
+const LANDS = Object.keys(LAND);
+const LAND_WEIGHT = LANDS.reduce((a, k) => a + LAND[k].weight, 0);
 const SIZE = {
   gummyBear: 1.25, rockCandyGiant: 1.2,
-  assortGumdrops: 1.7, assortMints: 1.6, assortPatisserie: 1.6, assortChocolates: 1.7, assortCaramels: 1.6, assortFruity: 1.7,
-  assortBakery: 1.6, assortParlour: 1.7, assortButtons: 1.5, cupcake: 1.6, cupcakeB: 1.6, donut: 1.8, softServe: 2.0,
-  lollipop: 1.5, cane: 1.4, rockCandy: 1.5, gummyPlant: 1.6, rosettes: 1.6, ribbon: 1.8,
+  assortGumdrops: 1.7, assortMeringues: 1.6, assortChocolates: 1.7, assortCaramels: 1.6, assortFruity: 1.7,
+  rockCandy: 1.5, gummyPlant: 1.6, rosettes: 1.6, lollipopFlowers: 1.5,
 };
 const RADIUS = {
   gingerHouseA: 4.6, gingerHouseB: 4.6, gingerCottage: 3.4, lollipopTree: 2.2, lollipopBall: 1.8, caneTall: 1.6,
-  cottonTree: 2.6, cottonTreeB: 2.6, gummyBear: 1.4, cookieGiant: 2.0, donutArch: 2.6, macaronGiant: 1.8,
-  truffleRocks: 2.6, chocoBlocks: 2.8, rockCandyGiant: 1.8, cakeSlice: 3.0, coneGiant: 2.0, gumdropArch: 2.0,
+  cottonTree: 2.6, cottonTreeB: 2.6, gummyBear: 1.4, cookieGiant: 2.0, donutArch: 2.6,
+  truffleRocks: 2.6, chocoBlocks: 2.8, rockCandyGiant: 1.8, gumdropArch: 2.0, kiosk: 2.2, picnic: 2.2, cakeStand: 1.2, iceTower: 3.2,
 };
 const TINT = {
-  lollipop: ['#ffffff', '#ffffff', '#ff4d8d', '#4fb6ff', '#a66cff', '#ffa62e', '#4fd67a'],
   lollipopTree: ['#ffffff', '#ffffff', '#ff7eb6', '#7cc6ff', '#b18cff', '#ffc24d'],
   lollipopBall: ['#ff4d8d', '#a66cff', '#4fb6ff', '#ffa62e', '#ff6a3d', '#4fd67a'],
-  cane: STRIPES,
   caneTall: STRIPES,
+  caneFence: STRIPES,
   rockCandy: ['#ff8cc0', '#8fd8ff', '#c4a4ff', '#ffe27a', '#9ff0c0'],
   rockCandyGiant: ['#ff8cc0', '#8fd8ff', '#c4a4ff', '#ffe27a'],
   gummyPlant: ['#5fd64a', '#8fe03a', '#3fc47a', '#ffd21f', '#ff8a1f', '#4fd6c0'],
   gummyBear: GUMMY_TINTS,
   rosettes: PASTEL_TINTS,
-  cupcake: PASTEL_TINTS,
-  cupcakeB: ['#ff8cc0', '#ffffff', '#c9b0ff', '#ffe27a', '#9ff0d0'],
-  donut: ['#ff8cc0', '#ffffff', '#8a4a28', '#c9b0ff', '#ffe27a', '#9ff0d0'],
   donutArch: ['#ff8cc0', '#ffffff', '#8a4a28', '#c9b0ff', '#9ff0d0'],
-  softServe: ['#ffffff', '#ffb3d1', '#a8f0d0', '#8a5230', '#ffe79a'],
-  ribbon: ['#ff4d8d', '#4fb6ff', '#4fd67a', '#a66cff', '#ffa62e'],
   cottonTree: ['#ffb3d1', '#acdcff', '#cdb6ff', '#ffd2e4'],
   cottonTreeB: ['#a8f0d0', '#ffe79a', '#ffb3d1', '#acdcff'],
-  macaronGiant: PASTEL_TINTS,
-  cakeSlice: PASTEL_TINTS,
-  coneGiant: ['#ffb3d1', '#a8f0d0', '#fff0c8', '#a8693a', '#cdb6ff'],
-  caneFence: STRIPES,
+  iceTower: PASTEL_TINTS,
 };

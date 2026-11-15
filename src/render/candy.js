@@ -590,8 +590,9 @@ void candyLight(inout vec3 col, vec3 base, vec3 n, vec3 V, vec3 shade, float lit
 
 // --- the road --------------------------------------------------------------------
 // Ground pattern 17: Candy World's road. Big biscuits laid in staggered
-// courses down each lane, each docked with a grid of little holes, a row of
-// them down its middle, toasted darker round its edges and crumbed; strips
+// courses down each lane (now and then a stretch of wafer instead), each
+// docked with a grid of little holes, a row of them down its middle, toasted
+// darker round its edges and crumbed; strips
 // of wafer, their grid pressed in and a line of pink cream showing at each
 // side, run down the lane lines; and round butter cookies - chocolate-chip,
 // jam-centred, or a ring pressed in - scallop the edges of the road. (p.y
@@ -646,15 +647,6 @@ export const BISCUIT_GROUND = /* glsl */ `
         float grid = 1.0 - smoothstep(0.08, 0.08 + ga * 1.2, ge);
         c = mix(c, uGroundA * vec3(1.06, 1.04, 0.98), 0.5);
         c *= 1.0 - grid * 0.22 * (1.0 - smoothstep(0.3, 0.7, ga));
-      }
-      // and here and there a biscuit drizzled with icing (light on the
-      // gold, so it never reads as a hole in the road)
-      float iced = step(hash12(vec2(li * 2.0 + bi, mod(row, 512.0)) + 51.0), 0.08) * (1.0 - wsec);
-      if (iced > 0.0) {
-        float zz = fy * bl * 9.0 + abs(fract(fx * bw * 2.2) - 0.5) * 2.4;
-        float za = fwidth(zz) * 1.2;
-        float line = (1.0 - smoothstep(0.08 - za, 0.08 + za, abs(fract(zz) - 0.5))) * step(0.12, e);
-        c = mix(c, mod(row, 2.0) > 0.5 ? vec3(1.0, 0.97, 0.93) : vec3(1.0, 0.78, 0.86), line * 0.85 * fade);
       }
       c *= 1.0 + (n2 - 0.5) * 0.14;
       // crumbs
