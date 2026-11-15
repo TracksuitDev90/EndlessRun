@@ -620,12 +620,14 @@ export const BISCUIT_GROUND = /* glsl */ `
       float row = floor(by);
       float fy = fract(by);
       float h = hash12(vec2(li * 2.0 + bi, mod(row, 512.0)) + 17.0);
+      // now and then a stretch of the road is laid in wafer instead
+      float wsec = step(hash12(vec2(floor(p.y / 64.0), 3.0)), 0.22);
       c = mix(uGroundA, uGroundB, h * 0.45 + n1 * 0.3);
       // toasted toward its edges
       float ex = min(fx, 1.0 - fx) * bw;
       float ey = min(fy, 1.0 - fy) * bl;
       float e = min(ex, ey);
-      c = mix(c, uGroundB * 0.92, (1.0 - smoothstep(0.0, 0.13, e)) * 0.55);
+      c = mix(c, uGroundB * 0.92, (1.0 - smoothstep(0.0, 0.13, e)) * 0.55 * (1.0 - wsec * 0.6));
       // docked: a grid of little holes, and a row of them down its middle
       vec2 hp = vec2(fx * bw, fy * bl);
       vec2 hs = vec2(0.17, 0.16);
@@ -634,7 +636,26 @@ export const BISCUIT_GROUND = /* glsl */ `
       float inner = step(0.0, hq.x) * step(hq.x, 5.0) * step(0.0, hq.y) * step(hq.y, 4.0);
       float hole = (1.0 - smoothstep(0.012, 0.02, length(hf))) * inner;
       float mid = (1.0 - smoothstep(0.008, 0.014, abs(fx * bw - bw * 0.5))) * step(0.5, fract(fy * bl / 0.05));
-      c = mix(c, uGroundC * 0.9, max(hole * 0.8, mid * 0.5) * fade);
+      c = mix(c, uGroundC * 0.9, max(hole * 0.8, mid * 0.5) * fade * (1.0 - wsec));
+      if (wsec > 0.0) {
+        // wafer: paler, pressed all over in its little grid
+        vec2 g = p / 0.064;
+        vec2 gf = fract(g);
+        float ge = min(min(gf.x, 1.0 - gf.x), min(gf.y, 1.0 - gf.y));
+        float ga = fwidth(g.y) + fwidth(g.x);
+        float grid = 1.0 - smoothstep(0.08, 0.08 + ga * 1.2, ge);
+        c = mix(c, uGroundA * vec3(1.06, 1.04, 0.98), 0.5);
+        c *= 1.0 - grid * 0.22 * (1.0 - smoothstep(0.3, 0.7, ga));
+      }
+      // and here and there a biscuit half dipped in chocolate
+      float dip = step(hash12(vec2(li * 2.0 + bi, mod(row, 512.0)) + 51.0), 0.06) * (1.0 - wsec);
+      if (dip > 0.0) {
+        float line = 0.55 + 0.03 * sin(fx * 23.0 + row);
+        float on = smoothstep(line - 0.01, line + 0.01, fy);
+        vec3 ch = vec3(0.34, 0.16, 0.08) * (0.9 + 0.2 * n2);
+        ch = mix(ch, vec3(0.62, 0.38, 0.24), (1.0 - smoothstep(0.0, 0.05, fy - line)) * 0.5);
+        c = mix(c, ch, on);
+      }
       c *= 1.0 + (n2 - 0.5) * 0.14;
       // crumbs
       float cr = hash12(floor(p * 22.0) + 3.0);

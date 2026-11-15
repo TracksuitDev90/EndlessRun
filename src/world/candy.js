@@ -687,6 +687,72 @@ function rosetteParts(seed) {
   return parts;
 }
 
+// --- set pieces ----------------------------------------------------------------------
+// a fence of candy canes along the verge, licorice rope swagged between them
+// (built running along z from 0 back to -L; the canes tinted)
+function caneFenceParts(L = 6) {
+  const parts = [];
+  const n = Math.round(L / 1.2);
+  for (let i = 0; i <= n; i++) {
+    const z = -(i / n) * L;
+    parts.push(...moved(caneParts(0.95, 0.05, C.white), { z, ry: i % 2 ? Math.PI / 2 : -Math.PI / 2 }));
+    if (i < n) {
+      const z1 = -((i + 1) / n) * L;
+      const pts = [];
+      for (let k = 0; k <= 6; k++) {
+        const t = k / 6;
+        pts.push([0, 0.78 - 0.22 * Math.sin(t * Math.PI), z + (z1 - z) * t]);
+      }
+      parts.push(licorice(pts, 0.028, '#d8263a', { outline: 0.4 }));
+    }
+  }
+  return parts;
+}
+
+// an arch of gumdrops, like a garden arch, beside the road (facing +z)
+function gumdropArchParts(seed) {
+  const parts = [];
+  const R = 1.4;
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 5; i++) {
+      const r = 0.34 - i * 0.025;
+      parts.push(gumdrop(r, r * 0.9, BRIGHT[(i * 2 + (s > 0 ? 1 : 0) + seed) % BRIGHT.length], { x: s * R, y: i * r * 0.78 }));
+    }
+  }
+  for (let i = 0; i <= 10; i++) {
+    const a = (i / 10) * Math.PI;
+    parts.push(gumdrop(0.24, 0.26, BRIGHT[(i + seed) % BRIGHT.length], { x: Math.cos(a) * R, y: 1.45 + Math.sin(a) * R, rz: a - Math.PI / 2, ry: 0 }));
+  }
+  return parts;
+}
+
+// a tiered cake stand set out by the road: cupcakes on the bottom plate,
+// macarons on the next, a little iced cake with a cherry on top
+function cakeStandParts() {
+  const parts = [];
+  const plate = (r, y) => {
+    parts.push(mat(P.cyl(r, r * 0.92, 0.06, 22), C.white, K.HARD, { y }));
+    parts.push(mat(P.torus(r, 0.03, 4, 22), C.gold, K.HARD, { y: y + 0.03, rx: Math.PI / 2, outline: 0 }));
+  };
+  parts.push(mat(P.cyl(0.05, 0.08, 2.1, 8), C.gold, K.HARD, { y: 1.05 }));
+  parts.push(mat(P.cyl(0.4, 0.5, 0.1, 16), C.white, K.HARD, { y: 0.05 }));
+  plate(0.95, 0.55);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    parts.push(...moved(cupcakeParts(0.42, { caseColor: PASTELS[i % 6], frost: C.white, glazed: i % 2 === 1 }), { x: Math.cos(a) * 0.62, y: 0.58, z: Math.sin(a) * 0.62 }));
+  }
+  plate(0.7, 1.3);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    parts.push(...moved(macaronParts(0.13, { color: PASTELS[(i + 2) % 6], fill: C.white }), { x: Math.cos(a) * 0.45, y: 1.33, z: Math.sin(a) * 0.45 }));
+  }
+  plate(0.45, 2.0);
+  parts.push(mat(P.cyl(0.3, 0.3, 0.32, 18), C.pink, K.CREAM, { y: 2.19 }));
+  parts.push(mat(P.cyl(0.31, 0.31, 0.06, 18), C.white, K.CREAM, { y: 2.37 }));
+  parts.push(...cherry(0.08, { y: 2.38 }));
+  return parts;
+}
+
 // --- buildings ----------------------------------------------------------------------
 // A gingerbread house, iced: walls of spiced gingerbread, a roof of frosting
 // (or chocolate tiles, or wafer), icing piped along every edge and dripping
@@ -1639,7 +1705,13 @@ export default {
     yield;
     b.toon('cottonTreeB', merge(coarse(0.7, () => cottonTreeParts(23, { trunk: '#2a1a20' }))), { ...sweet, cap: 80, anim: 'popEarly', wobble: [0.004, 0, 0.7, 0] });
     yield;
-    b.toon('gummyBear', merge(coarse(0.7, () => gummyBearParts())), { ...sweet, cap: 80, anim: 'pop' });
+    b.toon('gummyBear', merge(coarse(0.7, () => gummyBearParts())), { ...sweet, cap: 80, anim: 'pop', wobble: [0, 0.05, 2.2, 0] });
+    yield;
+    b.toon('caneFence', merge(coarse(0.55, () => caneFenceParts(6))), { ...sweet, cap: 60, anim: 'pop' });
+    yield;
+    b.toon('gumdropArch', merge(coarse(0.6, () => gumdropArchParts(2))), { ...sweet, cap: 40, anim: 'popEarly' });
+    yield;
+    b.toon('cakeStand', merge(coarse(0.5, () => cakeStandParts())), { ...sweet, cap: 40, anim: 'pop' });
     yield;
     b.toon('cookieGiant', merge(coarse(0.7, () => moved(cookieParts(1.6, 0.4, { seed: 31, chips: 26 }), { rx: Math.PI / 2 - 0.35, y: 1.45 }))), { ...sweet, cap: 50, anim: 'popEarly' });
     yield;
@@ -1890,6 +1962,21 @@ export default {
         const tint = TINT[name];
         ctx.put(name, x, 0, dz, { s: rng.float(0.85, 1.35) * (SIZE[name] || 1), ry: rng.float(0, 6.28), c: tint ? rng.pick(tint) : undefined });
       }
+      // now and then a fence of candy canes along the verge (in a village or
+      // an orchard), or an avenue of lollipop trees
+      if ((theme === 'village' || theme === 'orchard') && rng.chance(0.3) && free(s * 5.6, 8, 3.5)) {
+        ctx.put('caneFence', s * 5.6, 0, rng.float(10, 16), { c: rng.pick(STRIPES) });
+      }
+      if (rng.chance(0.08)) {
+        const tint = rng.pick(TINT.lollipopTree);
+        for (let k = 0; k < 3; k++) {
+          const dz = 2 + k * 5.5;
+          if (free(s * 8.6, dz, 2) && roomFor(s * 8.6, dz, 1.6)) {
+            claim(s * 8.6, dz, 1.6);
+            ctx.put('lollipopTree', s * 8.6, 0, dz, { s: 0.85, ry: rng.float(0, 6.28), c: tint });
+          }
+        }
+      }
       // things the size of a tree, or a house
       const m = rng.int(3, 4);
       for (let i = 0; i < m; i++) {
@@ -1900,7 +1987,7 @@ export default {
         if (!free(x, dz, r) || !roomFor(x, dz, r)) continue;
         claim(x, dz, r);
         const tint = TINT[name];
-        const faces = name.startsWith('ginger') || name === 'cakeSlice' || name === 'coneGiant';
+        const faces = name.startsWith('ginger') || name === 'cakeSlice' || name === 'coneGiant' || name === 'gumdropArch';
         const sc = rng.float(0.85, 1.2) * (SIZE[name] || 1);
         ctx.put(name, x, 0, dz, {
           s: sc,
@@ -1954,14 +2041,14 @@ const THEMES = ['village', 'orchard', 'patisserie', 'chocolate', 'gummy', 'parlo
 const THEME = {
   village: {
     near: [['assortGumdrops', 2], ['rosettes', 2], ['cane', 1.2], ['lollipop', 1], ['assortButtons', 1], ['assortMints', 1]],
-    mid: [['gingerHouseA', 1.6], ['gingerHouseB', 1.4], ['gingerCottage', 1.6], ['lollipopTree', 0.8], ['caneTall', 0.8]],
+    mid: [['gingerHouseA', 1.6], ['gingerHouseB', 1.4], ['gingerCottage', 1.6], ['lollipopTree', 0.8], ['caneTall', 0.8], ['gumdropArch', 0.6]],
   },
   orchard: {
     near: [['assortGumdrops', 2], ['assortMints', 1.5], ['lollipop', 1.5], ['gummyPlant', 1.6], ['rockCandy', 0.6], ['rosettes', 0.8]],
     mid: [['lollipopTree', 2], ['lollipopBall', 1.5], ['cottonTree', 1.6], ['cottonTreeB', 1], ['caneTall', 1.2]],
   },
   patisserie: {
-    near: [['assortPatisserie', 2], ['cupcake', 1.6], ['cupcakeB', 1.2], ['donut', 1.5], ['assortBakery', 1.2], ['rosettes', 0.8]],
+    near: [['assortPatisserie', 2], ['cupcake', 1.6], ['cupcakeB', 1.2], ['donut', 1.5], ['assortBakery', 1.2], ['rosettes', 0.8], ['cakeStand', 0.8]],
     mid: [['donutArch', 1.5], ['macaronGiant', 1.5], ['cakeSlice', 1.5], ['cottonTree', 0.7], ['lollipopTree', 0.5]],
   },
   chocolate: {
@@ -1970,7 +2057,7 @@ const THEME = {
   },
   gummy: {
     near: [['assortFruity', 2], ['gummyPlant', 2], ['rockCandy', 1.2], ['ribbon', 1], ['assortGumdrops', 1]],
-    mid: [['gummyBear', 2.5], ['rockCandyGiant', 1.5], ['lollipopBall', 1], ['cottonTree', 0.8]],
+    mid: [['gummyBear', 2.5], ['rockCandyGiant', 1.5], ['lollipopBall', 1], ['cottonTree', 0.8], ['gumdropArch', 0.7]],
   },
   parlour: {
     near: [['assortParlour', 2.2], ['softServe', 1.5], ['cupcake', 0.8], ['assortBakery', 1], ['cane', 0.6]],
@@ -1986,7 +2073,7 @@ const SIZE = {
 const RADIUS = {
   gingerHouseA: 4.6, gingerHouseB: 4.6, gingerCottage: 3.4, lollipopTree: 2.2, lollipopBall: 1.8, caneTall: 1.6,
   cottonTree: 2.6, cottonTreeB: 2.6, gummyBear: 1.4, cookieGiant: 2.0, donutArch: 2.6, macaronGiant: 1.8,
-  truffleRocks: 2.6, chocoBlocks: 2.8, rockCandyGiant: 1.8, cakeSlice: 3.0, coneGiant: 2.0,
+  truffleRocks: 2.6, chocoBlocks: 2.8, rockCandyGiant: 1.8, cakeSlice: 3.0, coneGiant: 2.0, gumdropArch: 2.0,
 };
 const TINT = {
   lollipop: ['#ffffff', '#ffffff', '#ff4d8d', '#4fb6ff', '#a66cff', '#ffa62e', '#4fd67a'],
@@ -2010,4 +2097,5 @@ const TINT = {
   macaronGiant: PASTEL_TINTS,
   cakeSlice: PASTEL_TINTS,
   coneGiant: ['#ffb3d1', '#a8f0d0', '#fff0c8', '#a8693a', '#cdb6ff'],
+  caneFence: STRIPES,
 };
