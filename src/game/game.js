@@ -1456,6 +1456,8 @@ export class Game {
     this.player.submerged = !!this.current?.def.env.bubbles;
     // (this world's stones: the elder's sparks come in their colours)
     this.player.gemSpec = this.current.def.gem;
+    // (which world it is: the fisherman's catches run to its own fish)
+    this.player.worldId = this.current.def.id;
     // low gravity from the moment the runner is through the doorway into it
     // until they're through the one out (see Player)
     this.player.lowG = st !== 'title' && !!this.course.segAt(this.dist).world.def.lowGravity;
