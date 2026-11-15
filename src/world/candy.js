@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, moved, rgb, gateFrameParts, gateTop, leafParts } from './shapes.js';
-import { crystal, stone, crystalPoint, hexPrism, nugget, barrel, tabular, lumps, octahedron } from './gems.js';
+import { crystal, stone, nugget, cleave } from './gems.js';
 import { groundStrip, lod } from '../render/geo.js';
 import { CONFIG } from '../config.js';
 import { clearOfRiver } from './river.js';
@@ -1213,25 +1213,78 @@ function chocoBarLowGeo(milk) {
   return merge(parts).translate(0, 0, -0.44);
 }
 
-// L · a heap of sweets, poured out on a mound of sugar
-function sweetPileGeo(seed) {
+// L · a candy-striped bag of pick-and-mix tipped over in the lane, its
+// sweets poured out of it in a heap of colour - big bright sweets, a
+// lollipop lying on top - so it reads from far off as something to jump,
+// never as the little heaps along the verges (the bag's stripes tinted).
+// A heap of sweets, centred, about 0.9 m across and up to 0.6 m high.
+function sweetHeapParts(seed, w = 0.9) {
   const rnd = seeded(seed);
-  const parts = [mat(P.sphere(1, 18, 9), C.white, K.SUGAR, { y: -0.22, sx: 0.98, sy: 0.72, sz: 0.6 })];
-  const surf = (x, z) => -0.22 + 0.72 * Math.sqrt(Math.max(0, 1 - (x / 0.98) ** 2 - (z / 0.6) ** 2));
-  for (let i = 0; i < 26; i++) {
+  const parts = [mat(P.sphere(1, 16, 8), '#ffe0ee', K.SUGAR, { y: -0.2, sx: w, sy: 0.62, sz: 0.55 })];
+  const surf = (x, z) => -0.2 + 0.62 * Math.sqrt(Math.max(0, 1 - (x / w) ** 2 - (z / 0.55) ** 2));
+  for (let i = 0; i < 22; i++) {
     const a = rnd() * Math.PI * 2;
-    const rr = Math.sqrt(rnd()) * 0.85;
-    const x = Math.cos(a) * rr * 0.98, z = Math.sin(a) * rr * 0.6;
-    const y = surf(x, z) - 0.02;
-    const k = i % 6;
+    const rr = Math.sqrt(rnd()) * 0.86;
+    const x = Math.cos(a) * rr * w, z = Math.sin(a) * rr * 0.55;
+    const y = surf(x, z) - 0.03;
+    const k = i % 5;
+    const col = BRIGHT[(i * 3 + seed) % BRIGHT.length];
     if (k === 0 || k === 3) {
-      const r = 0.1 + rnd() * 0.06;
-      parts.push(gumdrop(r, r * 1.2, BRIGHT[i % BRIGHT.length], { x, y, z, rz: x * 0.4, rx: -z * 0.4 }));
-    } else if (k === 1) parts.push(...moved(wrapped(0.08, BRIGHT[(i + 3) % BRIGHT.length]), { x, y: y + 0.07, z, ry: rnd() * 6 }));
-    else if (k === 2) parts.push(...moved(peppermint(0.12, 0.05, i % 4 ? C.red : '#2fb86a'), { x, y: y + 0.04, z, rx: -z * 0.6, rz: x * 0.5 }));
-    else parts.push(bean(0.08, 0.045, BRIGHT[(i * 5) % BRIGHT.length], { x, y: y + 0.04, z, ry: rnd() * 6 }));
+      const r = 0.13 + rnd() * 0.05;
+      parts.push(gumdrop(r, r * 1.15, col, { x, y: y - 0.03, z, rz: -x * 0.5, rx: z * 0.6 }));
+    } else if (k === 1) parts.push(...moved(wrapped(0.1, col), { x, y: y + 0.06, z, ry: rnd() * 6 }));
+    else if (k === 2) parts.push(...moved(peppermint(0.15, 0.06, i % 4 ? C.red : '#2fb86a'), { x, y: y + 0.03, z, rx: z * 0.7, rz: -x * 0.6 }));
+    else parts.push(bean(0.1, 0.055, col, { x, y: y + 0.03, z, ry: rnd() * 6 }));
   }
+  // a lollipop lying across the top
+  parts.push(...moved(lollipopParts(0.19, 0.07, '#ff4d8d', 0.4), { y: 0.5, x: -0.05, z: 0.05, rx: -1.25, ry: 0.5 + rnd() }));
+  return parts;
+}
+// The bag: paper in broad stripes, open at its mouth (toward -x), lying on
+// its side, its bottom crumpled shut.
+function sweetBagParts() {
+  const L = 0.62;
+  const g = P.cyl(0.29, 0.25, L, 18, 3, true);
+  const uv = g.attributes.uv.array;
+  for (let k = 0; k < uv.length; k += 2) {
+    uv[k] *= 3;
+    uv[k + 1] = 0;
+  }
+  const pos = g.attributes.position;
+  for (let k = 0; k < pos.count; k++) {
+    // (crumpled a little)
+    const a = Math.atan2(pos.getZ(k), pos.getX(k));
+    const c = 1 + 0.05 * Math.sin(a * 5 + pos.getY(k) * 9);
+    pos.setX(k, pos.getX(k) * c);
+    pos.setZ(k, pos.getZ(k) * c);
+  }
+  g.computeVertexNormals();
+  return [
+    mat(g, C.white, K.STRIPE, { rz: Math.PI / 2, y: 0.28, tint: 1 }),
+    mat(P.sphere(0.25, 14, 8), C.white, K.STRIPE, { x: L / 2 + 0.02, y: 0.27, sx: 0.4, rz: Math.PI / 2, tint: 1 }),
+    // a twist of paper where it was screwed shut
+    mat(P.cone(0.1, 0.16, 8), C.white, K.STRIPE, { x: L / 2 + 0.16, y: 0.27, rz: -Math.PI / 2, tint: 1, outline: 0.4 }),
+  ];
+}
+function sweetPileGeo(seed) {
+  const parts = moved(sweetHeapParts(seed, 0.72), { x: -0.32 });
+  parts.push(...moved(sweetBagParts(), { x: 0.42, ry: 0.12 }));
+  // a few sweets spilt in the mouth of the bag
+  for (let i = 0; i < 3; i++) parts.push(gumdrop(0.11, 0.13, BRIGHT[(i * 2 + seed) % BRIGHT.length], { x: 0.18 + i * 0.1, y: 0.04, z: (i - 1) * 0.12 }));
   return merge(parts).translate(0, 0, -0.62);
+}
+
+// L · three gumdrops as big as footstools, coated in glittering sugar (the
+// big one tinted)
+function gumdropTrioGeo() {
+  const parts = [
+    gumdrop(0.42, 0.6, C.white, { tint: 1 }),
+    gumdrop(0.3, 0.44, '#4fd67a', { x: -0.62, z: 0.12, rz: 0.08 }),
+    gumdrop(0.3, 0.44, '#ffe14d', { x: 0.62, z: -0.08, rz: -0.08 }),
+    gumdrop(0.13, 0.16, '#ff4d8d', { x: -0.25, z: 0.36 }),
+    gumdrop(0.12, 0.15, '#4fb6ff', { x: 0.3, z: 0.34 }),
+  ];
+  return merge(parts).translate(0, 0, -0.45);
 }
 
 // L · a stack of cookies: chocolate chip, a sandwich cookie, a jam ring
@@ -1282,6 +1335,17 @@ function sandwichWallGeo() {
 
 // W · a gummy bear as big as a person (tinted)
 const gummyBearWallGeo = () => merge(gummyBearParts()).scale(1.5, 1.5, 1.5).translate(0, 0, -0.62);
+
+// W · a gumdrop the size of a haystack, its sugar glittering, two little
+// ones at its foot (the big one tinted)
+function gumdropGiantGeo() {
+  const parts = [
+    gumdrop(0.96, 1.55, C.white, { tint: 1 }),
+    gumdrop(0.22, 0.28, '#ffe14d', { x: 0.82, z: 0.62 }),
+    gumdrop(0.17, 0.22, '#4fb6ff', { x: -0.86, z: 0.55 }),
+  ];
+  return merge(parts).translate(0, 0, -0.98);
+}
 
 // W · a giant ice-cream cone standing in a parlour's display stand - a
 // striped pedestal with a wafer ring holding the cone upright - two scoops
@@ -1355,15 +1419,28 @@ function chocoBarWideGeo() {
   return merge(parts).translate(0, 0, -0.5);
 }
 
-// LW · a long heap of sweets right across the road (a generator - a breath
-// between its heaps, it's a lot of sweets: the build takes it with yield*)
+// LW · a long heap of sweets right across the road, a bag tipped over at
+// either end of it (a generator - a breath between its heaps, it's a lot
+// of sweets: the build takes it with yield*)
 function* sweetsWideGeo() {
   const parts = [];
   for (let i = 0; i < 5; i++) {
-    parts.push(sweetPileGeo(31 + i * 7).translate(-4.2 + i * 2.1, 0, 0.62));
+    parts.push(...moved(sweetHeapParts(31 + i * 7, 0.8), { x: -2.6 + i * 1.3, ry: (i % 2) * 0.3 }));
     yield;
   }
+  parts.push(...moved(sweetBagParts(), { x: 3.95 }));
+  parts.push(...moved(sweetBagParts(), { x: -3.95, ry: Math.PI }));
   return merge(parts).translate(0, 0, -0.62);
+}
+
+// LW · a row of big gumdrops right across the road, every colour there is
+function gumdropRowGeo() {
+  const parts = [];
+  for (let i = 0; i < 7; i++) {
+    const big = i % 2 ? 0.92 : 1;
+    parts.push(gumdrop(0.42 * big, 0.6 * big, BRIGHT[(i * 3) % BRIGHT.length], { x: -3.9 + i * 1.3, z: (i % 2) * 0.08 }));
+  }
+  return merge(parts).translate(0, 0, -0.45);
 }
 
 // HW · a long wafer beam right across the road, hung on two giant candy
@@ -1386,51 +1463,131 @@ function waferBridgeGeo() {
 }
 
 // --- the gem ---------------------------------------------------------------------------
-// Watermelon tourmaline above all: pink at the heart and green at the rind,
-// the candiest stone there is; then rubellite in deep pink points,
-// rhodochrosite banded like a boiled sweet, and lilac kunzite. A slice of
-// watermelon tourmaline for the prize spots.
+// Hard candy: the jewels of a country made of sweets. Above all the
+// Jolly Rancher - a bar of boiled sugar clear as glass, cut off the slab
+// with its ends a little rough - laid out in runs that go through the
+// rainbow, cherry to grape, a flavour a gem; then fruit drops dusted in
+// sugar, sour balls swirled in layers, a boiled sweet in its twist of
+// cellophane, a ring of hard candy. A Jolly Rancher still in its wrapper
+// for the prize spots.
+//
+// A bar of hard candy cut off the slab: a block, its long edges and ends
+// bevelled where the knife went through, a corner or two broken.
+function candyBar({ w = 0.125, len = 0.25, t = 0.08, seed = 1 } = {}) {
+  const e = 0.03;
+  const q = Math.SQRT1_2;
+  const k = 1 / Math.sqrt(3);
+  const planes = [];
+  for (const a of [-1, 1]) {
+    for (const b of [-1, 1]) {
+      planes.push([a * q, 0, b * q, (w + t) * q - e]);
+      planes.push([0, a * q, b * q, (len + t) * q - e]);
+      planes.push([a * q, b * q, 0, (w + len) * q - e]);
+      for (const c of [-1, 1]) planes.push([a * k, b * k, c * k, (w + len + t) * k - e * 1.6]);
+    }
+  }
+  // (one end cut on the slant)
+  planes.push([0.28, 1, 0, len * 0.97]);
+  return cleave(planes, { box: [w, len, t], jitter: 0.04, chips: 2, deep: [0.03, 0.08], seed });
+}
+// Flat-faceted: smooth shapes cut into facets that each catch the light.
+function faceted(g) {
+  const f = g.index ? g.toNonIndexed() : g;
+  f.deleteAttribute('normal');
+  f.computeVertexNormals();
+  return f;
+}
+// A twist of cellophane: a crinkled cone pinched to the sweet, along +x.
+function twist(len, r) {
+  const g = new THREE.CylinderGeometry(r, r * 0.22, len, 12, 2, true);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const a = Math.atan2(pos.getZ(i), pos.getX(i));
+    const k = 1 + 0.22 * Math.sin(a * 6) * (0.5 + pos.getY(i) / len);
+    pos.setX(i, pos.getX(i) * k);
+    pos.setZ(i, pos.getZ(i) * k);
+  }
+  g.translate(0, len / 2, 0);
+  g.rotateZ(-Math.PI / 2);
+  return faceted(g);
+}
+const WRAPPER = '#f6f2ff';
+// the colours of a handful of Jolly Ranchers (cherry, fire, lemon, green
+// apple, blue raspberry, grape), gone through in order along a run
+const RANCHERS = ['#e8121e', '#ff5a14', '#f6d812', '#4cc41c', '#1c7ae8', '#a0189a'];
 const GEM = {
-  name: 'watermelon tourmaline',
-  color: '#ff3f9a',
+  name: 'hard candy',
+  color: '#ff2a48',
   stones: [
     {
-      name: 'watermelon tourmaline',
-      weight: 3,
-      tints: ['#ff3f9a', '#ff55a8', '#f03a8c'],
-      parts: () => [crystal(hexPrism({ r: 0.11, top: 0.3, foot: 0.26, seed: 4 }), { rz: 0.2 })],
-      texture: { bands: 0.6, rings: 'nested', bandFreq: 4, wander: 1, second: '#57d98a', mottle: 0.2, rough: 0.25 },
+      name: 'Jolly Rancher',
+      weight: 3.4,
+      tints: RANCHERS,
+      order: 'cycle',
+      parts: () => [crystal(candyBar({ seed: 4 }), { rz: 0.35, rx: 0.15 })],
+      // (streaked faintly along its length where the sugar was pulled)
+      texture: { bands: 0.18, bandFreq: 34, wander: 3, second: '#ffffff', mottle: 0.12, rough: 0.08, glints: 1.3 },
     },
     {
-      name: 'rubellite',
+      name: 'fruit drop',
       weight: 1.3,
-      tints: ['#ff2f7a', '#e82a6c', '#ff4a8a'],
-      parts: () => [crystal(crystalPoint({ r: 0.09, len: 0.34, tip: 0.13, seed: 7 }), { rz: -0.3 })],
-      texture: { bands: 0.25, bandFreq: 8, second: '#ffc0dc', mottle: 0.35, rough: 0.3, speckle: 0.06 },
+      tints: ['#ffd21a', '#ff8a12', '#5ad62a', '#ff2a52'],
+      pure: true,
+      parts: () => [crystal(nugget({ r: [0.2, 0.2, 0.11], faces: 34, spread: 0.03, chips: 0, seed: 12 }), { rx: 0.2 })],
+      // (dusted in sugar)
+      texture: { speckle: 0.4, second: '#ffffff', opaque: 0.25, rough: 0.3, mottle: 0.15 },
     },
     {
-      name: 'rhodochrosite',
-      weight: 1.2,
-      tints: ['#ff6f9f', '#ff86b0', '#f0608f'],
-      parts: () => [crystal(nugget({ r: [0.26, 0.16, 0.15], faces: 36, spread: 0.04, chips: 1, seed: 33 }), { rz: 0.4 })],
-      texture: { opaque: 0.6, bands: 0.8, bandFreq: 22, wander: 10, second: '#fff0f4', mottle: 0.2, rough: 0.15, glints: 0.5 },
-    },
-    {
-      name: 'kunzite',
+      name: 'sour ball',
       weight: 1,
-      tints: ['#e09cff', '#eeb0ff', '#d68cf5'],
-      parts: () => [crystal(barrel({ r: 0.13, h: 0.3, seed: 21 }), { rz: 0.5, rx: 0.2 })],
-      texture: { bands: 0.3, bandFreq: 12, second: '#ffffff', mottle: 0.3, rough: 0.2, speckle: 0.05 },
+      tints: ['#ff4f8a', '#7be03a', '#2fa8ff', '#ffb11a'],
+      pure: true,
+      parts: () => [crystal(nugget({ r: [0.19, 0.19, 0.19], faces: 40, spread: 0.025, chips: 0, seed: 27 }))],
+      // (boiled up in layers round its heart)
+      texture: { bands: 0.35, rings: 'round', bandFreq: 40, wander: 2, second: '#ffffff', rough: 0.1 },
+    },
+    {
+      name: 'boiled sweet in its wrapper',
+      weight: 1.1,
+      tints: ['#e8121e', '#a0189a', '#1c7ae8', '#ff8a12'],
+      pure: true,
+      parts: () => [
+        crystal(nugget({ r: [0.18, 0.14, 0.13], faces: 30, spread: 0.03, chips: 0, seed: 41 })),
+        stone(twist(0.15, 0.12), WRAPPER, { x: 0.15 }),
+        stone(twist(0.15, 0.12), WRAPPER, { x: -0.15, ry: Math.PI }),
+      ],
+      texture: { mottle: 0.2, second: '#ffffff', rough: 0.1 },
+    },
+    {
+      name: 'candy ring',
+      weight: 0.9,
+      tints: ['#ff3f9a', '#ffd21a', '#4cc41c', '#ff5a14', '#2fa8ff'],
+      pure: true,
+      parts: () => [crystal(faceted(P.torus(0.15, 0.07, 7, 14)), { rz: 0.3 })],
+      texture: { mottle: 0.15, second: '#ffffff', rough: 0.12, glints: 1.2 },
     },
   ],
   crown: {
-    name: 'watermelon tourmaline slice',
-    tints: ['#ff3f9a', '#ff55a8'],
-    parts: () => [crystal(tabular({ r: 0.3, t: 0.11, bevel: 0.9, seed: 5 }), { rx: Math.PI / 2 - 0.25 })],
-    texture: { bands: 0.85, rings: 'nested', bandFreq: 3, wander: 0.6, second: '#3fd47a', mottle: 0.15, rough: 0.15 },
+    name: 'Jolly Rancher in its wrapper',
+    tints: ['#e8121e', '#4cc41c', '#1c7ae8', '#a0189a'],
+    parts: () => {
+      const bar = candyBar({ w: 0.15, len: 0.28, t: 0.095, seed: 9 });
+      // the wrapper's ends, crimped flat past the candy
+      const seal = (y) => {
+        const g = new THREE.BoxGeometry(0.34, 0.1, 0.03, 8, 1, 1);
+        const pos = g.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          if (Math.abs(pos.getY(i)) > 0.04) pos.setY(i, pos.getY(i) + Math.sign(y) * 0.022 * (Math.round(pos.getX(i) / 0.0425) % 2 ? 1 : 0));
+        }
+        return stone(faceted(g), WRAPPER, { y });
+      };
+      return [crystal(bar), seal(0.33), seal(-0.33)].map((p) => p.rotateZ(0.35));
+    },
+    texture: { bands: 0.18, bandFreq: 34, wander: 3, second: '#ffffff', mottle: 0.12, rough: 0.08, glints: 1.4 },
   },
   motion: [1.0, 1.8, 0.1, 0.18],
-  look: [0.78, 1, 0.3, 0.45],
+  // (little spread of hue across the facets: a candy is one flavour)
+  look: [0.8, 1.1, 0.1, 0.35],
   glow: 0.45,
   pool: 0.5,
 };
@@ -1621,7 +1778,14 @@ export default {
     },
   ],
 
-  *build(b) {
+  *build(b0) {
+    // (every prop's reach from where it's put, noted as it's built, so the
+    // scenery can be kept off the road: see offRoad)
+    const b = Object.create(b0);
+    b.toon = (name, geo, o) => {
+      REACH[name] = reachOf(geo);
+      return b0.toon(name, geo, o);
+    };
     const sweet = { candy: true };
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 17);
     yield;
@@ -1752,17 +1916,21 @@ export default {
     yield;
     b.toon('chocoBarB', chocoBarLowGeo(true), { ...sweet, cap: 12, anim: 'popEarly' });
     yield;
-    b.toon('sweetPile', sweetPileGeo(5), { ...sweet, cap: 12, anim: 'popEarly' });
+    b.toon('sweetPile', sweetPileGeo(5), { ...sweet, cap: 12, anim: 'popEarly', side: THREE.DoubleSide });
     yield;
     b.toon('cookieStack', cookieStackGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
     yield;
     b.toon('caramelHeap', caramelHeapGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
+    yield;
+    b.toon('gumdropTrio', gumdropTrioGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
     yield;
     b.toon('cookieWall', cookieWallGeo(9), { ...sweet, cap: 16, anim: 'popEarly' });
     yield;
     b.toon('sandwichWall', sandwichWallGeo(), { ...sweet, cap: 16, anim: 'popEarly' });
     yield;
     b.toon('gummyBearWall', gummyBearWallGeo(), { ...sweet, cap: 16, anim: 'popEarly' });
+    yield;
+    b.toon('gumdropGiant', gumdropGiantGeo(), { ...sweet, cap: 16, anim: 'popEarly' });
     yield;
     b.toon('coneWall', coneWallGeo(), { ...sweet, cap: 16, anim: 'popEarly' });
     yield;
@@ -1774,7 +1942,9 @@ export default {
     }
     b.toon('chocoBarWide', chocoBarWideGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
     yield;
-    b.toon('sweetsWide', yield* sweetsWideGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
+    b.toon('sweetsWide', yield* sweetsWideGeo(), { ...sweet, cap: 6, anim: 'popEarly', side: THREE.DoubleSide });
+    yield;
+    b.toon('gumdropRow', gumdropRowGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
     yield;
     b.toon('waferBridge', waferBridgeGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
     yield;
@@ -1795,7 +1965,8 @@ export default {
     L: [
       { name: 'chocoBarA', len: 0.9, top: 0.6, tints: ['#ff3550', '#3f8cff', '#ffb02e', '#8a3cff', '#2fb86a'] },
       { name: 'chocoBarB', len: 0.9, top: 0.6, tints: ['#ff6fb0', '#ffd23a', '#4fc8ff'] },
-      { name: 'sweetPile', len: 1.24, top: 0.62 },
+      { name: 'sweetPile', len: 1.24, top: 0.62, tints: ['#ff2d4a', '#4f9cff', '#a660ff', '#3fc46a', '#ff6fb0', '#ffa62e'] },
+      { name: 'gumdropTrio', len: 0.9, top: 0.62, tints: ['#ff3b4e', '#ff8a1f', '#a66cff', '#ff5fae', '#4fb6ff'] },
       { name: 'cookieStack', len: 1.7, top: 0.68, flip: true },
       { name: 'caramelHeap', len: 0.9, top: 0.72 },
     ],
@@ -1808,17 +1979,25 @@ export default {
       { name: 'cookieWall', len: 1.0 },
       { name: 'sandwichWall', len: 1.32 },
       { name: 'gummyBearWall', len: 1.24, tints: GUMMY_TINTS },
+      { name: 'gumdropGiant', len: 1.96, tints: ['#ff3b4e', '#ff8a1f', '#ffd21f', '#4fd64a', '#4fb6ff', '#b061ff', '#ff5fae'] },
       { name: 'coneWall', len: 1.7, tints: ['#ffb3d1', '#a8f0d0', '#fff0c8', '#a8693a', '#cdb6ff'] },
       { name: 'lollipopWall', len: 0.84, tints: ['#ffffff', '#ffffff', '#ff4d8d', '#4fb6ff', '#a66cff', '#ffa62e'] },
     ],
     LW: [
       { name: 'chocoBarWide', len: 1.0, top: 0.62, tints: ['#8a3cff', '#ff3550', '#2fb86a'] },
-      { name: 'sweetsWide', len: 1.24, top: 0.62 },
+      { name: 'sweetsWide', len: 1.24, top: 0.62, tints: ['#ff2d4a', '#4f9cff', '#a660ff', '#3fc46a'] },
+      { name: 'gumdropRow', len: 0.9, top: 0.62 },
     ],
     HW: { name: 'waferBridge', len: 0.6 },
   },
 
-  chunk(ctx) {
+  chunk(ctx0) {
+    // (everything put out beside the road is kept off it: see offRoad)
+    const ctx = Object.create(ctx0);
+    ctx.put = (name, x, y, dz, o) => {
+      const at = offRoad(name, x, y, o, (xx, r) => clearOfRiver(ctx0.river(), xx, ctx0.d0 + dz, r));
+      return at === null ? null : ctx0.put(name, at, y, dz, o);
+    };
     const { rng } = ctx;
     const v = ctx.visit;
     const L = ctx.L;
@@ -2012,7 +2191,7 @@ function placeBig(o, name, xr, { sc = 1, dz } = {}) {
   if (!free(x, z, r) || !roomFor(x, z, r * 1.25)) return null;
   claim(x, z, r * 1.25);
   const ry = FACES.has(name) ? -s * 1.1 + rng.float(-0.3, 0.3) : rng.float(0, 6.28);
-  put(name, x, z, { s: sc * (SIZE[name] || 1) * rng.float(0.9, 1.1), ry, c: name.startsWith('ginger') ? gingerTint(rng) : tint(name) });
+  if (!put(name, x, z, { s: sc * (SIZE[name] || 1) * rng.float(0.9, 1.1), ry, c: name.startsWith('ginger') ? gingerTint(rng) : tint(name) })) return null;
   ctx.put('shadow', x, 0.03, z, { sx: r * 2.2, sz: r * 2.2 });
   return { x, z, ry, r };
 }
@@ -2172,3 +2351,36 @@ const TINT = {
   cottonTreeB: ['#a8f0d0', '#ffe79a', '#ffb3d1', '#acdcff'],
   iceTower: PASTEL_TINTS,
 };
+
+// --- keeping the scenery off the road ----------------------------------------------------
+// How far each prop reaches out from where it's put, at scale 1, whichever
+// way it's turned (noted as the world is built).
+const REACH = {};
+function reachOf(geo) {
+  const p = geo.attributes.position.array;
+  let r = 0;
+  for (let i = 0; i < p.length; i += 3) r = Math.max(r, p[i] * p[i] + p[i + 2] * p[i + 2]);
+  return Math.sqrt(r);
+}
+// The road and its piped edge, and a little room besides: nothing beside
+// the road may reach in past this (m from the middle).
+const ROAD_CLEAR = CONFIG.trackHalfWidth + 0.6;
+// What belongs on or at the road (its own ground, its piping, the river
+// where it crosses), and what's put out by the obstacles, not the scenery.
+const ON_ROAD = new Set(['ground', 'floor', 'piping', 'river', 'riverBank', 'riverBankB', 'riverEdge', 'shadow']);
+// The land's big swells, pushed back off the road rather than left out.
+const PUSH_BACK = new Set(['hillA', 'hillB', 'hillC']);
+// Where a prop can stand (its x, pushed back if it's a hill), or null if it
+// would come onto the road: anything on the ground whose reach - however
+// it's scaled and turned - crosses ROAD_CLEAR. (Clouds, and the dream's
+// sweets floating high, sail over.)
+function offRoad(name, x, y, o, clear) {
+  const reach = REACH[name];
+  if (!reach || ON_ROAD.has(name) || y > 3.5) return x;
+  const s = o?.s ?? 1;
+  const r = reach * Math.max(o?.sx ?? s, o?.sz ?? s);
+  if (Math.abs(x) - r >= ROAD_CLEAR) return x;
+  if (!PUSH_BACK.has(name)) return null;
+  const at = Math.sign(x || 1) * (ROAD_CLEAR + r);
+  return clear(at, r * 0.8) ? at : null;
+}

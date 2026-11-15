@@ -495,8 +495,11 @@ export class GemField {
     }
     const stone = crown ? spec.crown : spec.stones[kind];
     const tints = stone.rgb || (stone.rgb = stone.tints.map((t) => rgb(t)));
-    const a = r.pick(tints);
-    const b = r.pick(tints);
+    // (a stone in order goes through its colours along the run, one a gem -
+    // Candy World's Jolly Ranchers, cherry to grape; a pure one is always
+    // just one of them, never a blend)
+    const a = stone.order === 'cycle' ? tints[index % tints.length] : r.pick(tints);
+    const b = stone.order || stone.pure ? a : r.pick(tints);
     const t = r.float(0, 1);
     const k = r.float(0.93, 1.05);
     const tint = [lerp(a[0], b[0], t) * k, lerp(a[1], b[1], t) * k, lerp(a[2], b[2], t) * k];
@@ -549,7 +552,7 @@ export class GemField {
     const kind = crown ? spec.stones.length : run.lead.get(world);
     const stone = crown ? spec.crown : spec.stones[kind];
     const tints = stone.rgb || (stone.rgb = stone.tints.map((t) => rgb(t)));
-    const a = rng.pick(tints);
+    const a = stone.order === 'cycle' ? tints[index % tints.length] : rng.pick(tints);
     const tint = [a[0], a[1], a[2]];
     const light = spec.light ? (spec.lightRgb || (spec.lightRgb = rgb(spec.light))) : tint;
     const g = { d, x, y, world, run, index, kind, crown, tint, light, taken: 0, items: null, bonus: true, big };

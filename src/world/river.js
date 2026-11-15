@@ -7,7 +7,7 @@ import { CONFIG } from '../config.js';
 // streaming in, or the obstacle director looking ahead), from the run's seed
 // and where the world starts, so both always agree on where it runs.
 //
-// The plan: a few crossings, spaced out along the world; between them the
+// The plan: four crossings, spaced out along the world; between them the
 // river runs alongside the road for a while - close beside it, or winding
 // off into the hills and back - and turns in across the road at a slant, its
 // banks bowed and wandering, to carry on up the other side. Sometimes it
@@ -123,20 +123,21 @@ function waypoints(seg, rng, crossings) {
       W.push([side * 21, c + 34]);
     } else {
       wander(c - 52, true);
-      W.push([side * 21.5, c - 48]);
-      W.push([side * 21, c - 28]);
+      W.push([side * 26.5, c - 48]);
+      W.push([side * 26, c - 34]);
     }
     // across, from this side to the other, at a slant (phi), a little bowed
     // (a long straight run in and out, so the river has finished turning
-    // before it reaches the road)
+    // before it reaches the road - long enough for four crossings close
+    // together, the river swinging back across between them)
     const dx = -side * Math.cos(phi), dd = Math.sin(phi);
-    for (const t of [-14, -9, -4.5, 0, 4.5, 9, 14]) {
-      const b = bow * (1 - (t / 14) ** 2);
+    for (const t of [-22, -15, -7.5, 0, 7.5, 15, 22]) {
+      const b = bow * (1 - (t / 22) ** 2);
       W.push([dx * t - dd * b, c + dd * t + dx * b]);
     }
     side = -side;
-    W.push([side * 21, c + 28]);
-    W.push([side * 21.5, c + 48]);
+    W.push([side * 26, c + 34]);
+    W.push([side * 26.5, c + 48]);
     at = c + 48;
     plan.push({ c, phi });
   }
@@ -227,17 +228,19 @@ function onRoad(P) {
   return false;
 }
 
-// (crossings: 2 as many as fit, 1 just the one, 0 none)
-function attempt(seg, rng, crossings0) {
+// (n: how many crossings; spread evenly along the world, give or take)
+function attempt(seg, rng, n) {
   const D0 = seg.start, D1 = seg.end;
   const cs = [];
-  if (crossings0 === 2) {
-    let c = D0 + rng.float(140, 185);
-    while (c < D1 - 160) {
-      cs.push(c);
-      c += rng.float(175, 260);
+  if (n > 0) {
+    const a = D0 + 128, b = D1 - 140;
+    const step = n > 1 ? (b - a) / (n - 1) : 0;
+    if (n > 1 && step < 98) return null;
+    for (let k = 0; k < n; k++) {
+      const jig = n > 1 ? rng.float(-0.12, 0.12) * (step - 98) : 0;
+      cs.push(n > 1 ? a + k * step + jig : D0 + rng.float(0.35, 0.65) * (D1 - D0));
     }
-  } else if (crossings0 === 1) cs.push(D0 + rng.float(0.35, 0.65) * (D1 - D0));
+  }
   const pieces = follow(catmull(waypoints(seg, rng, cs), 0.5));
   // every run of pieces on the road must be one crossing, right across it
   const crossings = [];
@@ -288,8 +291,10 @@ function attempt(seg, rng, crossings0) {
 // is handed the plan at the end.
 export function* planRiverSteps(seg, seed, done) {
   let plan = null;
-  for (let n = 0; n < 12 && !plan; n++) {
-    plan = attempt(seg, new RNG(hashSeed(seed, seg.start, n, 0x7c)), n < 7 ? 2 : n < 11 ? 1 : 0);
+  // (four crossings - four jumps over the chocolate - if it can be done;
+  // failing that three, then two, then one)
+  for (let n = 0; n < 22 && !plan; n++) {
+    plan = attempt(seg, new RNG(hashSeed(seed, seg.start, n, 0x7c)), n < 12 ? 4 : n < 16 ? 3 : n < 19 ? 2 : n < 21 ? 1 : 0);
     yield;
   }
   if (!plan) plan = { pieces: [], crossings: [] };
