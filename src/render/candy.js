@@ -647,14 +647,14 @@ export const BISCUIT_GROUND = /* glsl */ `
         c = mix(c, uGroundA * vec3(1.06, 1.04, 0.98), 0.5);
         c *= 1.0 - grid * 0.22 * (1.0 - smoothstep(0.3, 0.7, ga));
       }
-      // and here and there a biscuit half dipped in chocolate
-      float dip = step(hash12(vec2(li * 2.0 + bi, mod(row, 512.0)) + 51.0), 0.06) * (1.0 - wsec);
-      if (dip > 0.0) {
-        float line = 0.55 + 0.03 * sin(fx * 23.0 + row);
-        float on = smoothstep(line - 0.01, line + 0.01, fy);
-        vec3 ch = vec3(0.34, 0.16, 0.08) * (0.9 + 0.2 * n2);
-        ch = mix(ch, vec3(0.62, 0.38, 0.24), (1.0 - smoothstep(0.0, 0.05, fy - line)) * 0.5);
-        c = mix(c, ch, on);
+      // and here and there a biscuit drizzled with icing (light on the
+      // gold, so it never reads as a hole in the road)
+      float iced = step(hash12(vec2(li * 2.0 + bi, mod(row, 512.0)) + 51.0), 0.08) * (1.0 - wsec);
+      if (iced > 0.0) {
+        float zz = fy * bl * 9.0 + abs(fract(fx * bw * 2.2) - 0.5) * 2.4;
+        float za = fwidth(zz) * 1.2;
+        float line = (1.0 - smoothstep(0.08 - za, 0.08 + za, abs(fract(zz) - 0.5))) * step(0.12, e);
+        c = mix(c, mod(row, 2.0) > 0.5 ? vec3(1.0, 0.97, 0.93) : vec3(1.0, 0.78, 0.86), line * 0.85 * fade);
       }
       c *= 1.0 + (n2 - 0.5) * 0.14;
       // crumbs
