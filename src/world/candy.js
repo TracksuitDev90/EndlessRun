@@ -108,6 +108,16 @@ function coarse(k, fn) {
   }
 }
 
+// The same for a prop built a step at a time (a generator: each step runs
+// at that detail), its result handed back at the end (take it with yield*).
+function* coarseSteps(k, steps) {
+  for (;;) {
+    const r = coarse(k, () => steps.next());
+    if (r.done) return r.value;
+    yield;
+  }
+}
+
 // A tube along points (each [x, y, z]), radius r (or r(t)), uv round/along.
 function tube(points, r, { seg = 24, radial = 8, closed = false, ridges = 0, ridgeK = 0.18 } = {}) {
   seg = Math.max(6, Math.round(seg * TUBE));
@@ -845,8 +855,9 @@ function frostPatchGeo(seed) {
 
 // A layered cake standing up out of the land like a mesa: tiers of sponge
 // and cream and jam, frosting poured over each and running down its sides,
-// fruit and chocolate shards on top. Faces every way.
-function cakeMesaParts(seed) {
+// cherries on top. Faces every way. (A generator, a tier a step: the build
+// takes it with yield*.)
+function* cakeMesaParts(seed) {
   const rnd = seeded(seed);
   const parts = [];
   const sponge = [C.butter, '#c9875a', '#ffc2cf'][seed % 3];
@@ -872,6 +883,7 @@ function cakeMesaParts(seed) {
       parts.push(...moved(swirlParts(0.5, 0.5, frost, { tint: 0, turns: 1.6, seg: 18 }), { x: Math.cos(a) * r * 0.88, y: y + 0.2, z: Math.sin(a) * r * 0.88 }));
     }
     r *= 0.68;
+    yield;
   }
   for (let i = 0; i < 5; i++) {
     const a = rnd() * 6.28;
@@ -1296,12 +1308,13 @@ function chocoBarWideGeo() {
   return merge(parts).translate(0, 0, -0.5);
 }
 
-// LW · a long heap of sweets right across the road
-function sweetsWideGeo() {
+// LW · a long heap of sweets right across the road (a generator - a breath
+// between its heaps, it's a lot of sweets: the build takes it with yield*)
+function* sweetsWideGeo() {
   const parts = [];
   for (let i = 0; i < 5; i++) {
-    const g = sweetPileGeo(31 + i * 7).translate(-4.2 + i * 2.1, 0, 0.62);
-    parts.push(g);
+    parts.push(sweetPileGeo(31 + i * 7).translate(-4.2 + i * 2.1, 0, 0.62));
+    yield;
   }
   return merge(parts).translate(0, 0, -0.62);
 }
@@ -1382,19 +1395,23 @@ const GEM = {
 // nothing of the world beyond shows till you're through.
 const OPENING = { halfW: 4.4, rectH: 6.6, arch: true };
 const GATE_DEPTH = 2.4;
-function gateGeo() {
+// (a generator, a part of it a step - there's a lot of it - built with the
+// world, and kept for its door: see door)
+const GATE = {};
+function* gateSteps() {
   const W = OPENING.halfW, H = OPENING.rectH, T = 1.5;
-  const parts = [...gateFrameParts(OPENING, { thick: T, depth: GATE_DEPTH, color: C.ginger, mark: K.GINGER })];
+  const all = [];
+  let parts = [...gateFrameParts(OPENING, { thick: T, depth: GATE_DEPTH, color: C.ginger, mark: K.GINGER })];
   const zf = GATE_DEPTH / 2 + 0.06;
   for (const z of [zf, -zf]) {
     for (const R of [W + 0.08, W + T - 0.08]) {
-      for (let i = 0; i <= 22; i++) {
-        const a = (i / 22) * Math.PI;
-        parts.push(mat(P.sphere(0.15, 7, 5), C.white, K.CREAM, { x: Math.cos(a) * R, y: H + Math.sin(a) * R, z, outline: 0.4 }));
+      for (let i = 0; i <= 16; i++) {
+        const a = (i / 16) * Math.PI;
+        parts.push(mat(P.sphere(0.17, 6, 4), C.white, K.CREAM, { x: Math.cos(a) * R, y: H + Math.sin(a) * R, z, outline: 0.4 }));
       }
-      for (let i = 0; i < 14; i++) {
-        const y = (i / 14) * H;
-        for (const s of [-1, 1]) parts.push(mat(P.sphere(0.15, 7, 5), C.white, K.CREAM, { x: s * R, y, z, outline: 0.4 }));
+      for (let i = 0; i < 10; i++) {
+        const y = (i / 10) * H;
+        for (const s of [-1, 1]) parts.push(mat(P.sphere(0.17, 6, 4), C.white, K.CREAM, { x: s * R, y, z, outline: 0.4 }));
       }
     }
     for (let i = 0; i < 9; i++) {
@@ -1403,27 +1420,41 @@ function gateGeo() {
       parts.push(gumdrop(0.32, 0.4, BRIGHT[i % BRIGHT.length], { x: Math.cos(a) * R, y: H + Math.sin(a) * R, z, rx: (z > 0 ? 1 : -1) * Math.PI / 2 }));
     }
   }
+  // a lollipop crowning the arch
+  parts.push(...moved(lollipopParts(1.3, 0.3, C.white, 1.2, {}), { y: H + W + T + 2.2, z: 0.2 }));
+  all.push(merge(parts));
+  yield;
   for (const s of [-1, 1]) {
-    parts.push(...moved(caneParts(9.5, 0.42, '#ff2d4a'), { x: s * (W + T + 0.9), z: GATE_DEPTH / 2 + 0.5, ry: s > 0 ? Math.PI : 0 }));
-    // walls of layer cake either side
+    parts = [...moved(caneParts(9.5, 0.42, '#ff2d4a'), { x: s * (W + T + 0.9), z: GATE_DEPTH / 2 + 0.5, ry: s > 0 ? Math.PI : 0 })];
+    // walls of layer cake either side, frosting running down them
     const w = 64;
     const x = s * (W + T + 0.4 + w / 2);
     const layers = [[0, 2.6, C.butter, K.SPONGE], [2.6, 0.45, '#ff8fb8', K.CREAM], [3.05, 2.6, C.butter, K.SPONGE], [5.65, 0.45, C.cream, K.CREAM], [6.1, 2.4, '#c9875a', K.SPONGE], [8.5, 0.6, C.white, K.CREAM]];
     for (const [y, h, c, k] of layers) parts.push(mat(P.box(w, h, 3), c, k, { x, y: y + h / 2, z: -1.2 }));
-    for (let i = 0; i < 40; i++) {
-      const L = 0.4 + ((i * 7) % 5) * 0.22;
-      parts.push(mat(P.capsule(0.18, L, 2, 6), C.white, K.CREAM, { x: s * (W + T + 1.0 + i * 1.6), y: 8.5 - L * 0.4, z: 0.32, outline: 0.4 }));
-      if (i % 3 === 0) parts.push(...moved(swirlParts(0.42, 0.5, i % 2 ? C.pink : C.white, { tint: 0, turns: 1.8, seg: 18 }), { x: s * (W + T + 1.6 + i * 1.6), y: 9.05, z: -0.2 }));
-    }
-    for (let i = 0; i < 6; i++) {
-      const cx = s * (W + T + 4 + i * 6.5);
-      if (i % 2) parts.push(...moved(lollipopTreeParts(3.5, 1.4, {}), { x: cx, y: 9.1, z: -1.5 }));
-      else parts.push(...moved(cottonTreeParts(40 + i), { x: cx, y: 9.1, z: -1.6 }));
-    }
+    coarse(0.6, () => {
+      for (let i = 0; i < 28; i++) {
+        const L = 0.4 + ((i * 7) % 5) * 0.22;
+        parts.push(mat(P.capsule(0.2, L, 2, 6), C.white, K.CREAM, { x: s * (W + T + 1.0 + i * 2.2), y: 8.5 - L * 0.4, z: 0.32, outline: 0.4 }));
+        if (i % 4 === 0) parts.push(...moved(swirlParts(0.42, 0.5, i % 8 ? C.pink : C.white, { tint: 0, turns: 1.8, seg: 18 }), { x: s * (W + T + 2.0 + i * 2.2), y: 9.05, z: -0.2 }));
+      }
+    });
+    all.push(merge(parts));
+    yield;
+    // lollipops and cotton candy peeping over them
+    parts = [];
+    coarse(0.6, () => {
+      for (let i = 0; i < 4; i++) {
+        const cx = s * (W + T + 4 + i * 8.5);
+        if (i % 2) parts.push(...moved(lollipopTreeParts(3.5, 1.4, {}), { x: cx, y: 9.1, z: -1.5 }));
+        else parts.push(...moved(cottonTreeParts(40 + i), { x: cx, y: 9.1, z: -1.6 }));
+      }
+    });
+    all.push(merge(parts));
+    yield;
   }
-  // a lollipop crowning the arch
-  parts.push(...moved(lollipopParts(1.3, 0.3, C.white, 1.2, {}), { y: H + W + T + 2.2, z: 0.2 }));
-  return merge(parts);
+  GATE.frame = merge(all);
+  yield;
+  GATE.leaf = merge(leafParts(OPENING, { color: '#ffffff', deco: candyLeaf }));
 }
 
 // The door into Candy World: each leaf a slab of chocolate bar in its
@@ -1659,9 +1690,9 @@ export default {
     yield;
     b.toon('hillC', merge(coarse(0.8, () => frostHillParts(2, 7))), { ...sweet, cap: 50, anim: 'liftFar', ink: 0.04 });
     yield;
-    b.toon('cakeMesa', merge(coarse(0.45, () => cakeMesaParts(5))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
+    b.toon('cakeMesa', merge(yield* coarseSteps(0.45, cakeMesaParts(5))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
     yield;
-    b.toon('cakeMesaB', merge(coarse(0.45, () => cakeMesaParts(10))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
+    b.toon('cakeMesaB', merge(yield* coarseSteps(0.45, cakeMesaParts(10))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
     yield;
     b.toon('iceTower', merge(coarse(0.65, () => iceTowerParts(3))), { ...sweet, cap: 30, anim: 'lift' });
     yield;
@@ -1707,17 +1738,21 @@ export default {
     }
     b.toon('chocoBarWide', chocoBarWideGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
     yield;
-    b.toon('sweetsWide', sweetsWideGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
+    b.toon('sweetsWide', yield* sweetsWideGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
     yield;
     b.toon('waferBridge', waferBridgeGeo(), { ...sweet, cap: 6, anim: 'popEarly' });
     yield;
+    // (and the doorway into the world, for its door)
+    if (!GATE.leaf) yield* gateSteps();
   },
 
   // The door INTO this world, in its own style (built into the shared
   // doors, see world.js: it stands in the world before it).
+  // (built with the world, a step at a time: see gateSteps)
   door(b) {
-    b.toon('gateFrame', gateGeo(), { cap: 2, stencil: false, candy: true, ink: 0.05 });
-    b.toon('gateLeaf', merge(leafParts(OPENING, { color: '#ffffff', deco: candyLeaf })), { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05, candy: true });
+    if (!GATE.leaf) for (const _ of gateSteps());
+    b.toon('gateFrame', GATE.frame, { cap: 2, stencil: false, candy: true, ink: 0.05 });
+    b.toon('gateLeaf', GATE.leaf, { cap: 4, stencil: false, anim: [3, 44, 96, 1.95], order: -20, ink: 0.05, candy: true });
   },
 
   obstacles: {

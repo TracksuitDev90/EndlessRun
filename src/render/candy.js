@@ -77,7 +77,7 @@ float chocoH(vec2 q) {
   float n1 = texture2D(uNoise, q * vec2(0.055, 0.14)).g;
   float n2 = texture2D(uNoise, q * vec2(0.17, 0.33) + 0.37).g;
   float r = sin(q.x * 2.6 + n1 * 8.0 + q.y * 0.45);
-  return n1 * 0.62 + n2 * 0.38 + r * (0.1 + 0.06 * n2);
+  return n1 * 0.62 + n2 * 0.38 + r * (0.12 + 0.08 * n2);
 }
 float chocoHash(float x) {
   return fract(sin(x * 91.3458) * 47453.5453);
@@ -106,8 +106,8 @@ vec3 chocolateRiver(vec3 V, float dist) {
   float hu = mix(chocoH(q + o1 + vec2(e, 0.0)), chocoH(q + o2 + vec2(e, 0.0)), k2);
   float hw = mix(chocoH(q + o1 + vec2(0.0, e)), chocoH(q + o2 + vec2(0.0, e)), k2);
   // marbling: streaks of milk chocolate drawn out long by the current
-  float m1 = texture2D(uNoise, (q + o1) * vec2(0.045, 0.42) + 0.61).g;
-  float m2 = texture2D(uNoise, (q + o2) * vec2(0.045, 0.42) + 0.61).g;
+  float m1 = texture2D(uNoise, (q + o1) * vec2(0.07, 0.34) + 0.61).g;
+  float m2 = texture2D(uNoise, (q + o2) * vec2(0.07, 0.34) + 0.61).g;
   float mb = mix(m1, m2, k2);
   float fw = fwidth(mb) + 0.004;
   float streak = 1.0 - smoothstep(0.012, 0.012 + fw * 1.5, abs(mb - 0.56));
@@ -186,6 +186,10 @@ vec3 chocolateRiver(vec3 V, float dist) {
   vec3 rf = reflect(V, N);
   float rl = max(dot(rf, uLightDir), 0.0);
   float spec = pow(rl, 80.0) * 1.6 + pow(rl, 22.0) * 0.45 + pow(rl, 6.0) * 0.12;
+  // (and the soft light of the open sky over it: the swells that turn up
+  // toward you catch a glossy sheen whatever the sun is doing)
+  float sheen = pow(max(dot(N, normalize(-V + vec3(0.0, 1.4, 0.0))), 0.0), 36.0);
+  spec += sheen * 0.55;
   float fres = pow(1.0 - abs(dot(N, V)), 3.0);
   vec3 sky = skyColor(rf);
   col = mix(col, sky * vec3(1.0, 0.86, 0.74) * 0.75, 0.08 + 0.32 * fres);
