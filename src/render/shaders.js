@@ -4960,6 +4960,10 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
 #define R_CYAN 28
 #define R_BELLY 29
 #define R_GLOW 31
+// how the catch on his line is marked (see CATCHES in game/fisher.js): x the
+// share of its scale cells that carry a spot, y how many bars cross it, z a
+// stripe's width down its flank, w how much its markings glow
+uniform vec4 uFish;
 float rdHash(vec3 p) {
   p = fract(p * 0.1031);
   p += dot(p, p.zyx + 31.32);
@@ -5303,12 +5307,20 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     vec3 si = floor(sp);
     float sh = rdHash(si + 5.0);
     vec3 so = sp - si - 0.5 - (vec3(rdHash(si + 1.0), rdHash(si + 2.0), rdHash(si + 3.0)) - 0.5) * 0.5;
-    float spot = fill(length(so) - (0.18 + 0.14 * sh)) * step(0.45, sh) * (1.0 - belly) * smoothstep(-0.04, -0.1, q.y) * step(part, 0.5);
-    float halo = (1.0 - smoothstep(0.2, 0.55, length(so))) * step(0.45, sh) * (1.0 - belly) * step(part, 0.5) * smoothstep(-0.04, -0.1, q.y);
-    c = mix(c, mix(c, uPal[R_GLOW], 0.45), halo * 0.5);
-    c = mix(c, uPal[R_GLOW] * 1.1 + 0.05, spot);
-    unlit = max(unlit, spot);
-    gKeep = max(gKeep, spot);
+    float spotOn = step(1.0 - uFish.x, sh) * step(0.001, uFish.x);
+    float spot = fill(length(so) - (0.18 + 0.14 * sh)) * spotOn * (1.0 - belly) * smoothstep(-0.04, -0.1, q.y) * step(part, 0.5);
+    float halo = (1.0 - smoothstep(0.2, 0.55, length(so))) * spotOn * (1.0 - belly) * step(part, 0.5) * smoothstep(-0.04, -0.1, q.y);
+    // bars across its back, and a stripe down each flank, behind its head
+    float body = step(part, 0.5) * smoothstep(-0.07, -0.13, q.y);
+    float bar = uFish.y > 0.0 ? (1.0 - smoothstep(0.17, 0.25, abs(fract(q.y * uFish.y * 3.3 + 0.35) - 0.5))) * (1.0 - 0.7 * belly) * body * smoothstep(-0.38, -0.33, q.y) : 0.0;
+    float stripe = uFish.z > 0.0 ? (1.0 - smoothstep(uFish.z * 0.55, uFish.z, abs(q.x - 0.012))) * body : 0.0;
+    float mark = max(bar, stripe);
+    vec3 markCol = mix(uPal[R_GLOW], uPal[R_GLOW] * 1.1 + 0.05, uFish.w);
+    c = mix(c, mix(c, uPal[R_GLOW], 0.45), halo * 0.5 * uFish.w);
+    c = mix(c, markCol, mark * 0.88);
+    c = mix(c, markCol, spot);
+    unlit = max(unlit, max(spot, mark * 0.8) * uFish.w);
+    gKeep = max(gKeep, max(spot, mark * 0.8) * uFish.w);
     if (part > 0.5 && part < 1.5) c = mix(uPal[R_BELLY] * 1.05, vec3(0.95, 0.7, 0.85), 0.35);
     if (part > 1.5 && part < 2.5) {
       c = vec3(0.97, 0.95, 0.88);
@@ -7563,6 +7575,8 @@ uniform vec4 uKindB[GEM_KINDS]; // x opaque, y rough, z texture scale (per meter
 uniform vec4 uKindC[GEM_KINDS]; // rgb second colour, w how the bands lie: 0 layers along it, 1 round its heart, 2 nested like its faces (octahedral zoning)
 uniform vec4 uKindD[GEM_KINDS]; // rgb vein colour, w how much veins take it (0: pale cracks)
 uniform vec4 uKindE[GEM_KINDS]; // x glints, y how much the bands wander, z metallic, w nacre (a pearl: its lustre and orient; second is the orient's overtone)
+uniform vec4 uKindF[GEM_KINDS]; // rgb the flash's colour, w how strong (labradorescence: a sheet of colour lit up inside it at just the right angle)
+uniform vec4 uKindG[GEM_KINDS]; // x colour change (alexandrite: facets turned one way show the second colour, sliding over it as it turns)
 uniform float uGemPolish;
 varying vec3 vLocalN;
 varying vec3 vLocal;
@@ -7667,6 +7681,23 @@ void main() {
       col = mix(col, two, smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(b)) * A.w);
     }
     col = hueRot(col, (seed - 0.5) * uGemK.z);
+    if (uKindG[k].x > 0.0) {
+      // colour change: whichever facets are turned one way to the eye go
+      // over to the second colour, the line between sliding as it turns
+      float sh = 0.5 + 0.5 * sin(dot(R, vec3(2.3, 1.7, -1.9)) * 1.6 + seed * 2.5 + (m - 0.5) * 2.0);
+      col = mix(col, two * (0.75 + 0.6 * t), smoothstep(0.42, 0.85, sh) * uKindG[k].x);
+    }
+    vec4 KF = uKindF[k];
+    if (KF.w > 0.0) {
+      // labradorescence: from deep inside, in patches, a sheet of
+      // blue-green (running to gold and violet at its edges) flaring up
+      // only where it faces the light just so
+      float at = max(dot(R, L), 0.0) * 0.7 + max(dot(R, L2), 0.0) * 0.7;
+      float sheet = smoothstep(0.3, 0.72, fbm(q * 0.45 + 2.0));
+      vec3 film = 0.5 + 0.5 * cos(6.2831 * (0.6 * fbm(q * 0.8 + 5.1) + 0.3 * R.y) + vec3(0.0, 2.1, 4.2));
+      float fk = clamp(pow(at, 1.6) * (0.35 + 0.65 * sheet) * KF.w, 0.0, 0.92);
+      col = mix(col, mix(KF.rgb, film, 0.25) * 1.15, fk);
+    }
     float face = abs(dot(n, V));
     col += base * pow(face, 4.0) * uGemK.w * (1.0 - B.x);
     vec3 shade = mix(mix(uShadowTint, vec3(1.0), 0.45), vec3(1.0), lit);
@@ -8704,6 +8735,8 @@ export function makeGemMaterial(env, o = {}) {
     uKindC: v4((k) => [...rgbOf(k.second ?? '#ffffff'), k.rings === 'nested' ? 2 : k.rings ? 1 : 0]),
     uKindD: v4((k) => [...rgbOf(k.veinColor ?? '#ffffff'), k.veinColor ? 1 : 0]),
     uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, k.nacre ?? 0]),
+    uKindF: v4((k) => [...rgbOf(k.flashColor ?? '#40d8c8'), k.flash ?? 0]),
+    uKindG: v4((k) => [k.shift ?? 0, 0, 0, 0]),
     uGemPolish: { value: o.polish ?? 0 },
     uClear: { value: 1 },
   });

@@ -702,9 +702,12 @@ broken snags and a ledge of ice on two piers to slide under, a low arch of ice
 across the whole route; and ice pillars, great snowy boulders of slate and
 abandoned supply sleds to go around.
 
-**Its gems** are fire in the ice, the one warm colour in the pass: fire opal,
-sunstone glittering with copper, spessartine garnet, wulfenite tablets and
-honey calcite; the crown is a great fire opal in a ring of ice crystals.
+**Its gems** are stones that change as you look at them: alexandrite, deep
+plum turning over to teal as it spins, with a restrained pink-violet glow (a
+twinned crystal and a cut stone), and labradorite, dark slate flashing
+blue-green from deep inside, its faces throwing strong glints (a cleaved slab
+and a polished pebble); the crown is a great alexandrite in a ring of
+labradorite shards.
 
 ![The Frostbound Pass: the same stretch on the first four visits, the snow settling deeper each time; the low arch to slide under, the fissure to jump, the ridge of ice shards; and deep in the dream, far drifts lifting apart over the ice field](docs/frost.jpg)
 
@@ -963,7 +966,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Sky Road | **Turquoise** | the stones of the pharaohs, sky blue against the gold and lapis | turquoise, sky blue in its web of dark matrix · lapis lazuli, the deep blue of the night of Nut flecked with gold · carnelian, the red of the sun · a long leaning double-terminated aquamarine shard | a scarab carved in turquoise, legs of gold, pushing the red disc of the sun up before it |
 | Hell | **Onyx** black | dark stones on pale ash; the onyx's white bands and every stone's pale facet edges and glints make them read once the colour has gone, and they give off a pale smoky light of their own so their halos still show | onyx, a water-worn pebble banded black and white · obsidian, a glassy conchoidal shard · hematite, steel-bright kidney ore · black tourmaline, a long striated prism · smoky quartz, a point · mahogany obsidian, black clouded with rust | three obsidian blades fanned from a lump of basalt |
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
-| Frostbound Pass | **Fire opal** orange | the one warm colour in the pass: fire in the ice, carrying from one end of a white-and-blue canyon to the other | fire opal, a rough orange lump lit from inside and flecked with gold · sunstone, a plate glittering with copper flecks · spessartine, a garnet's ball of rhombs in mandarin · wulfenite, thin square tablets grown through each other · honey calcite, a cleaved rhomb | a great fire opal in a ring of ice crystals |
+| Frostbound Pass | **Alexandrite** plum and **labradorite** slate | stones that change as you look at them: plum shifting to teal under a restrained pink-violet glow, and dark slate flashing blue-green, against the white-and-blue canyon | alexandrite, a stubby twinned six-sided crystal · cut alexandrite, a step-cut stone · labradorite, a cleaved slab flashing blue-green · a polished labradorite pebble, flashing blue | a great cut alexandrite in a ring of labradorite shards |
 | Red Drift | **Moldavite** green | the only green under all that red, and every stone of it fell from the sky | moldavite, wrinkled bottle-green glass flung up by a meteorite strike · peridot, an eight-sided bipyramid · pallasite, meteorite iron studded with olivine · tektite, green glass beads grown together | a fallen star: five points of moldavite |
 | Kelp Deep | **Pearls**, iridescent, in every shade | lustrous and soft against all that teal and green, and the one gem the sea makes itself; the counter wears a pearl here | Akoya, white with a rosé glow · golden South Sea · pink freshwater, a button pearl with a blue-lavender sheen · Tahitian, peacock black shot with green and blue · a silver-grey drop · a cream baroque · a circled champagne pearl (see [Pearls](#pearls)) | a great pearl in an open scallop shell |
 

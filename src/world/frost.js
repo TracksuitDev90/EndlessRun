@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, rgb, gateFrameParts, gateTop, leafParts } from './shapes.js';
-import { crystal, stone, nugget, tabular, dodecahedron, cube, crystalPoint, FACE } from './gems.js';
+import { crystal, stone, nugget, tabular, hexPrism, octahedron, stepCut, crystalPoint, FACE } from './gems.js';
 import { CONFIG } from '../config.js';
 
 // X · The Frostbound Pass — a route of packed snow and bare blue ice through
@@ -1124,75 +1124,66 @@ function frostLeaf({ W, H, z, f }) {
 }
 
 // --- gems -------------------------------------------------------------------------
-// Fire in the ice: the one warm colour in the pass, and it carries from one
-// end of a white canyon to the other. Fire opal above all, rough, lit from
-// inside and flecked with gold; sunstone, its plates glittering with copper;
-// spessartine, a garnet's ball of rhombs in mandarin orange; wulfenite, thin
-// square tablets grown through each other; and honey calcite, a cleaved
-// rhomb. The crown: a great fire opal in a ring of ice crystals.
-const OPAL = { mottle: 0.6, second: '#ffe36a', speckle: 0.3, rough: 0.12, glints: 1.5, scale: 8 };
-function emberInIce() {
-  const out = [crystal(nugget({ r: [0.25, 0.2, 0.22], faces: 20, spread: 0.1, chips: 2, seed: 23 }), { y: 0.04 })];
+// Stones that change as you look at them, under the ice: alexandrite, deep
+// plum, its facets turning over to teal as it spins, with a restrained
+// pink-violet glow about it - as a twinned crystal (a stubby six-sided
+// trilling) and as a cut stone; and labradorite, dark slate, flashing
+// blue-green from deep inside when it catches the light just so, with
+// strong glints off its faces - as a cleaved slab and a polished pebble.
+// The crown: a great cut alexandrite in a ring of labradorite shards.
+const ALEX = { shift: 0.62, second: '#2fb3a4', glints: 1.7, rough: 0.05 };
+const LAB = { flash: 1.3, flashColor: '#22c9b4', second: '#4a5862', mottle: 0.2, opaque: 0.7, glints: 1.4, scale: 5 };
+function alexInLabradorite() {
+  const out = [crystal(octahedron({ r: 0.26, blunt: 0.84, seed: 21 }), { y: 0.04, rx: 0.3 })];
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU;
-    out.push(stone(crystalPoint({ r: 0.05, len: 0.26 + 0.07 * (i % 2), tip: 0.1, sides: 6, seed: 31 + i }), '#d8f6ff', { x: Math.cos(a) * 0.27, y: -0.27, z: Math.sin(a) * 0.27, rz: -Math.cos(a) * 0.5, rx: Math.sin(a) * 0.5 }));
+    out.push(stone(crystalPoint({ r: 0.05, len: 0.26 + 0.07 * (i % 2), tip: 0.1, sides: 5, seed: 31 + i }), i % 2 ? '#3c4a56' : '#2f5f66', { x: Math.cos(a) * 0.27, y: -0.27, z: Math.sin(a) * 0.27, rz: -Math.cos(a) * 0.5, rx: Math.sin(a) * 0.5 }));
   }
   return out;
 }
 const GEM = {
-  name: 'fire opal',
-  color: '#ff7a1f',
+  name: 'alexandrite',
+  color: '#c48ad8',
   stones: [
     {
-      name: 'fire opal',
+      name: 'alexandrite',
       weight: 3,
-      tints: ['#ff6a14', '#ff8424', '#f25a10'],
-      parts: () => [crystal(nugget({ r: [0.23, 0.17, 0.2], faces: 22, spread: 0.1, chips: 2, seed: 11 }), { rz: 0.25 })],
-      texture: OPAL,
+      tints: ['#5c2062', '#6a276c', '#4f1a57'],
+      parts: () => [crystal(hexPrism({ r: 0.16, top: 0.17, foot: 0.15, seed: 8 }), { rz: 0.3, rx: 0.2 })],
+      texture: ALEX,
     },
     {
-      // aventurescent: flecks of copper glittering inside it
-      name: 'sunstone',
+      name: 'cut alexandrite',
       weight: 1.5,
-      tints: ['#ff9a4a', '#f58a3c', '#ffab5e'],
-      parts: () => [crystal(tabular({ r: 0.21, t: 0.1, seed: 5 }), { rx: FACE, rz: 0.3 })],
-      texture: { speckle: 0.65, second: '#ffe0b0', opaque: 0.3, glints: 1.7, scale: 11 },
+      tints: ['#62235f', '#552062', '#6e2a66'],
+      parts: () => [crystal(stepCut({ w: 0.17, h: 0.22, chamfer: 0.06 }), { rx: FACE })],
+      texture: { ...ALEX, shift: 0.7, glints: 2 },
     },
     {
-      name: 'spessartine',
-      weight: 1.4,
-      tints: ['#f4621a', '#e8500e', '#ff7426'],
-      parts: () => [crystal(dodecahedron({ r: 0.19, seed: 7 }))],
-      texture: { rough: 0.08, glints: 1.5 },
+      name: 'labradorite',
+      weight: 2,
+      tints: ['#2c3640', '#27313a', '#323d47'],
+      parts: () => [crystal(tabular({ r: 0.22, t: 0.09, seed: 4 }), { rx: FACE, rz: 0.35 })],
+      texture: LAB,
     },
     {
-      name: 'wulfenite',
-      weight: 1,
-      tints: ['#ff8a1c', '#f77c10', '#ff9a30'],
-      parts: () => [
-        crystal(cube({ s: 0.17, seed: 3 }), { sz: 0.2, rz: 0.5, rx: 0.2 }),
-        crystal(cube({ s: 0.13, seed: 9 }), { sx: 0.22, x: 0.05, y: 0.03, rz: -0.3, ry: 0.4 }),
-      ],
-      texture: { rough: 0.06, glints: 1.6, bands: 0.2, bandFreq: 30, second: '#ffd27a' },
-    },
-    {
-      name: 'honey calcite',
-      weight: 1,
-      tints: ['#ffb45a', '#f7a548', '#ffc070'],
-      parts: () => [crystal(cube({ s: 0.15, jitter: 0.12, chips: 2, seed: 14 }), { sx: 1.2, rz: 0.55, rx: 0.4 })],
-      texture: { mottle: 0.35, bands: 0.25, bandFreq: 18, opaque: 0.35, second: '#ffe6bc', glints: 1.1 },
+      name: 'labradorite pebble',
+      weight: 1.2,
+      tints: ['#2d3842', '#262f38'],
+      parts: () => [crystal(nugget({ r: [0.21, 0.15, 0.18], faces: 18, spread: 0.08, chips: 1, seed: 17 }), { rz: 0.4 })],
+      texture: { ...LAB, flashColor: '#3f9cff', mottle: 0.15 },
     },
   ],
   crown: {
-    name: 'fire opal in a ring of ice',
-    tints: ['#ff6a14', '#ff8424'],
-    parts: () => emberInIce(),
-    texture: OPAL,
+    name: 'alexandrite in a ring of labradorite',
+    tints: ['#5c2062', '#6a276c'],
+    parts: () => alexInLabradorite(),
+    texture: { ...ALEX, shift: 0.7, glints: 2 },
   },
   motion: [0.9, 1.3, 0.09, 0.14],
-  look: [0.86, 1.3, 0.35, 0.45],
-  glow: 0.7,
-  pool: 0.3,
+  look: [0.86, 1.3, 0.3, 0.35],
+  glow: 0.5,
+  pool: 0.25,
 };
 
 const FIR_TINTS = [[1, 1, 1], [0.9, 1.02, 1.06], [1.06, 1.04, 0.92]];
