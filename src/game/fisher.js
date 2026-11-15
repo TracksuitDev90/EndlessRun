@@ -196,6 +196,7 @@ const TRICKS = ['puddle', 'stride', 'puddle', 'star', 'stride', 'puddle'];
 //     pink veils;
 //   - the Deepwood: a mossback trout, slender and olive, peppered dark,
 //     a rosy flush down its belly;
+//   - Candy World: a gummy fish, cherry-red and see-through;
 //   - the Night Rooftops: a neon tetra, inky navy, an electric blue stripe
 //     glowing down each flank over a red belly;
 //   - the Hall of Doors: an inkblot carp, parchment-cream blotted with ink,
@@ -216,6 +217,7 @@ const CATCHES = [
   { name: 'lantern', body: '#1e2650', fin: '#35458a', belly: '#6170b0', glow: '#ffe45c', size: [1.22, 0.9, 1.18], tail: 0.9, fins: 0.9, pat: [0.55, 0, 0, 1] },
   { name: 'perch', world: 'village', body: '#7a8f3a', fin: '#f0702c', belly: '#f5e4a2', glow: '#2e3a17', size: [1.08, 0.98, 0.96], tail: 1.05, fins: 1.1, pat: [0, 2.2, 0, 0] },
   { name: 'betta', world: 'conservatory', body: '#c42a7c', fin: '#ff78c4', belly: '#ffc6e6', glow: '#7cf0c0', size: [0.95, 0.92, 0.9], tail: 1.8, fins: 1.7, pat: [0.2, 0, 0, 1] },
+  { name: 'gummy', world: 'candy', body: '#ff3a52', fin: '#ff7a8c', belly: '#ffb0bc', glow: '#fff0f4', size: [1.0, 1.08, 0.92], tail: 1.15, fins: 1.1, pat: [0.5, 0, 0, 1] },
   { name: 'trout', world: 'forest', body: '#5c7240', fin: '#93a06c', belly: '#f2b8a8', glow: '#1f2614', size: [0.82, 1.22, 0.8], tail: 1.0, fins: 0.9, pat: [0.8, 0, 0.022, 0] },
   { name: 'tetra', world: 'rooftops', body: '#1b2142', fin: '#5368b8', belly: '#e8374a', glow: '#3ce8ff', size: [0.9, 1.05, 0.85], tail: 1.0, fins: 0.95, pat: [0, 0, 0.026, 1] },
   { name: 'inkblot', world: 'corridor', body: '#ead9b0', fin: '#6e4a2a', belly: '#fff4d8', glow: '#22180f', size: [1.1, 1.0, 1.0], tail: 1.2, fins: 1.15, pat: [0.38, 0, 0, 0] },

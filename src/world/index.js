@@ -1,7 +1,9 @@
 // The worlds always nest inward in this order, and every lap comes back
 // round the same way, grouped so each leads into the next:
 //   green and growing - the Cypress Lane (the breather, every lap starts on
-//     it), the Glasshouse, the Deepwood: day into ever deeper shade;
+//     it), the Glasshouse, the Deepwood: day into ever deeper shade; and out
+//     of the shade into the sugar-bright clearing of Candy World, where the
+//     chocolate river runs;
 //   after dark, by lamplight - the Night Rooftops, then down into the
 //     endless library of the Hall of Doors;
 //   the sun and its eclipse - the Sky Road of the sun, then Hell, where the
@@ -20,6 +22,7 @@ export const WORLD_ORDER = [
   { id: 'village', load: () => import('./village.js') },
   { id: 'conservatory', load: () => import('./conservatory.js') },
   { id: 'forest', load: () => import('./forest.js') },
+  { id: 'candy', load: () => import('./candy.js') },
   { id: 'rooftops', load: () => import('./rooftops.js') },
   { id: 'corridor', load: () => import('./corridor.js') },
   { id: 'causeway', load: () => import('./causeway.js') },
