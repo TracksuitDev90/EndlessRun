@@ -1,5 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { BEND_VS_HEAD, BEND_VS_MAIN, CHOCO_FS, CANDY_FS, BISCUIT_GROUND } from './candy.js';
+import { COAST_VS_HEAD, COAST_VS_LOCAL, COAST_VS_WORLD, UNBEND_VS, COAST_FS_HEAD, COAST_FS_CODES, COAST_FS_BASE, COAST_FS_LIGHT, COAST_GROUND } from './coast.js';
 
 // We author every color in sRGB and want it on screen untouched — the look is
 // flat illustration, not physically based lighting.
@@ -422,7 +423,7 @@ float snowHeight(vec2 p) {
 #endif
 `;
 
-const VS_OBJECT = COMMON + SANDS_VS + FROST_VS + /* glsl */ `
+const VS_OBJECT = COMMON + SANDS_VS + FROST_VS + COAST_VS_HEAD + /* glsl */ `
 uniform vec4 uAnim;
 uniform vec4 uWobble;
 uniform vec4 uFly; // x flap amplitude (rad), y flap speed, z drift radius, w drift speed
@@ -475,7 +476,7 @@ attribute vec4 aInst;
 // clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
 uniform float uWonk;
 #endif
-#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID) || defined(SWIM) || defined(WATCH)
+#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID) || defined(SWIM) || defined(WATCH) || defined(SURGE) || defined(WASH) || defined(BREAKER)
 attribute float role;
 #endif
 #if defined(SCHOOL) || defined(LID)
@@ -565,7 +566,7 @@ uniform vec3 uGemAt;
 // the sand above, 2 the sand below, 3 the stream (built 0..1 along y).
 uniform vec4 uSand;
 #endif
-#ifdef SPLASH
+#if defined(SPLASH) || defined(SURGE) || defined(WASH) || defined(BREAKER)
 // Lava splashing: every droplet leaps from where it lies (spA.xyz) at its
 // own launch velocity (spB.xyz), arcs up and falls back in, over and over
 // (every spB.w seconds, its phase spA.w), stretched along its flight
@@ -1082,11 +1083,13 @@ void main() {
       }
     }
   #endif
+` + COAST_VS_LOCAL + /* glsl */ `
   vec3 wp = (M * vec4(lp, 1.0)).xyz;
   vec3 wn = normalize(mat3(M) * ln);
   #ifdef OUTLINE
     vec3 wo = mat3(M) * lo;
   #endif
+` + COAST_VS_WORLD + /* glsl */ `
   if (uFly.z != 0.0) {
     float ft = uTime * uFly.w + phase * 5.0;
     vec3 off = vec3(sin(ft), 0.45 * sin(ft * 1.7 + 1.0), cos(ft * 0.8)) * uFly.z;
@@ -1146,6 +1149,7 @@ void main() {
     wp.xz = pivot.xz + (wp.xz - pivot.xz) * (1.0 - b * 0.12);
   }
 
+` + UNBEND_VS + /* glsl */ `
   vPos = wp;
   #ifdef OUTLINE
     float w = length(onrm);
@@ -1807,6 +1811,7 @@ float hash12(vec2 p) {
 float hashS(vec2 p) {
   return hash12(p);
 }
+` + COAST_FS_HEAD + /* glsl */ `
 #ifdef WATCH
 varying vec3 vRest;
 varying vec3 vRestN;
@@ -2618,7 +2623,7 @@ vec3 groundColor(vec2 p, float dist) {
     // a little warmth and a little cold, painted in patches
     c *= 0.9 + 0.2 * n1;
     return mix(c, mix(uGroundA, uGroundB, 0.5) * 0.85, far * 0.6);
-` + BISCUIT_GROUND + /* glsl */ `
+` + BISCUIT_GROUND + COAST_GROUND + /* glsl */ `
   #else
     // causeway road with dashed lane lines
     float n = hash12(floor(p * vec2(1.0, 0.5)));
@@ -2688,6 +2693,7 @@ void main() {
     float isCrev = step(0.85, vFx.x);
     markK *= 1.0 - isCrev;
   #endif
+` + COAST_FS_CODES + /* glsl */ `
   #ifdef CRUST
     // (something that turns to watch you wears its crust: see WATCH)
     #ifdef WATCH
@@ -2799,6 +2805,7 @@ void main() {
     }
   #endif
 
+` + COAST_FS_BASE + /* glsl */ `
   vec3 V = v / dist;
   float ndl = dot(n, uLightDir);
   float wl = (ndl + uLightK.y) / (1.0 + uLightK.y);
@@ -3028,6 +3035,7 @@ void main() {
     col = mix(col, hl, rip * 0.5 + glint * 0.5);
   #endif
 
+` + COAST_FS_LIGHT + /* glsl */ `
   #ifdef SANDFALL
     // a curtain of sand pouring down (the Gallery of Hours' cornices, gears
     // and ledges): streaks of paler and darker grain sliding down it, a
@@ -8649,6 +8657,26 @@ export function makeToonMaterial(env, o = {}) {
     defines.CREVASSE = '';
     uniforms.uCrev = { value: new THREE.Vector4(o.crevasse[0], o.crevasse[1] ?? 5, o.crevasse[2] ?? 0.18, 0) };
   }
+  // the Blue Hour (see render/coast.js): coast - the lighthouse's beam and
+  // the coast's surfaces by mark flag (cut: a tidal cut's [length, depth]);
+  // wind: [bend, flutter, stiff foot (or, hung, the height it hangs from), 1:
+  // it hangs]; sea; surge; wash; breaker: [cycle (s),
+  // how high it rears, 1: its progress is p1]. (All of them are coast.)
+  if (o.coast || o.wind || o.sea || o.surge || o.wash || o.breaker) {
+    defines.COAST = '';
+    uniforms.uCut = { value: new THREE.Vector4(...(o.cut || [1, 1, 0, 0])) };
+  }
+  if (o.wind) {
+    defines.WIND = '';
+    uniforms.uWindK = { value: new THREE.Vector4(o.wind[0], o.wind[1] ?? 0, o.wind[2] ?? 0, o.wind[3] ?? 0) };
+  }
+  if (o.sea) defines.SEA = '';
+  if (o.surge) defines.SURGE = '';
+  if (o.wash) defines.WASH = '';
+  if (o.breaker) {
+    defines.BREAKER = '';
+    uniforms.uBreak = { value: new THREE.Vector4(o.breaker[0], o.breaker[1], o.breaker[2] ?? 0, 0) };
+  }
   if (o.thread) {
     defines.THREAD = '';
     uniforms.uThread = { value: new THREE.Vector4(o.thread[0], o.thread[1], 0, 0) };
@@ -8667,7 +8695,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'WATCH', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW', 'BEND']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'WATCH', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW', 'BEND', 'COAST', 'WIND', 'SEA', 'SURGE', 'WASH', 'BREAKER']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
@@ -8843,8 +8871,11 @@ export function makeBeamMaterial(env, o = {}) {
     uWobble: { value: new THREE.Vector4(...(o.wobble || [0, 0, 1, 0])) },
     uFly: { value: new THREE.Vector4() },
   });
+  // (o.unbend: a long beam laid out as it will look after the world's bend,
+  // so it stays straight - a lighthouse's, reaching over the road)
   return new THREE.ShaderMaterial({
     uniforms,
+    defines: o.unbend ? { UNBEND: '' } : {},
     vertexShader: VS_OBJECT,
     fragmentShader: FS_BEAM,
     vertexColors: true,

@@ -190,11 +190,16 @@ export class World {
   markObstacles() {
     const o = this.def.obstacles || {};
     const names = new Set();
-    for (const spec of [...(o.L || []), ...(o.H || []), ...(o.W || []), o.LW, o.HW, o.SW].flat()) {
+    // (a world that lays its obstacles a stretch at a time lists them all
+    // here as well; and something laid across two lanes - o.twin - or built
+    // the other way round for the left-hand lane - spec.left - is one too)
+    const twins = o.twin ? Object.values(o.twin) : [];
+    for (const spec of [...(o.L || []), ...(o.H || []), ...(o.W || []), o.LW, o.HW, o.SW, ...twins].flat()) {
       if (!spec) continue;
       names.add(spec.name);
       if (spec.frame) names.add(spec.frame);
-      for (const n of spec.with || []) names.add(n);
+      if (spec.left) names.add(spec.left);
+      for (const n of [...(spec.with || []), ...(spec.withLeft || [])]) names.add(n);
     }
     // (and what a climb is built of: see ObstacleField.placeClimb)
     for (const name of this.def.climb?.names || []) names.add(name);

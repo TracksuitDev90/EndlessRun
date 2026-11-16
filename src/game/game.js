@@ -1293,6 +1293,20 @@ export class Game {
     // but only to two and a half times its usual: see particles2's room)
   }
 
+  // --- worlds that keep time with the runner ------------------------------------
+  // A world with def.frame(world, game, seg, dt) is handed every frame what
+  // it needs to move with the run (the Blue Hour: its lighthouse kept far
+  // off on its headland, the beam that sweeps from it, the waves that break
+  // over the causeway as the runner comes up to them). seg: its stretch of
+  // the course - the one being run through, or, seen through a doorway, the
+  // one beyond it (null if neither).
+  worldFrames(dt) {
+    const seg = this.course.segAt(this.dist);
+    const here = seg.world === this.current ? seg : this.course.prevOf(seg);
+    if (this.current.def.frame) this.current.def.frame(this.current, this, here && here.world === this.current ? here : null, dt);
+    if (this.next && this.next !== this.current && this.next.def?.frame && this.door) this.next.def.frame(this.next, this, this.door.seg, dt);
+  }
+
   // --- doorways ---------------------------------------------------------------
   camDist() {
     return this.origin - this.cam.camera.position.z;
@@ -1552,6 +1566,7 @@ export class Game {
     this.updateDoor();
     this.updateWonk();
     this.updateSnow();
+    this.worldFrames(dt);
     shared.uCamPos.value.copy(this.cam.camera.position);
 
     const sway = CONFIG.swayAmount * Math.sin((this.time * Math.PI * 2) / CONFIG.swayPeriod);

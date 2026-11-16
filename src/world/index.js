@@ -10,9 +10,10 @@
 //     sun has gone out;
 //   out past the world - the Gallery of Hours (heavenly, its sands running
 //     out), the sea lapping in through its doorway to the Kelp Deep; up out
-//     of the sea onto the ice of the Frostbound Pass, where the snow lies a
-//     little deeper every time you come back to it; and over the pass, the
-//     stars of the Red Drift.
+//     of the sea onto the windswept coast of the Blue Hour, its lighthouse
+//     turning; from the coast up onto the ice of the Frostbound Pass, where
+//     the snow lies a little deeper every time you come back to it; and over
+//     the pass, the stars of the Red Drift.
 //
 // Each world's module is only fetched when it's wanted (see World.load): the
 // first world's before the title screen, the rest behind it, in this order,
@@ -29,6 +30,7 @@ export const WORLD_ORDER = [
   { id: 'hell', load: () => import('./hell.js') },
   { id: 'time', load: () => import('./time.js') },
   { id: 'ocean', load: () => import('./ocean.js') },
+  { id: 'coast', load: () => import('./coast.js') },
   { id: 'frost', load: () => import('./frost.js') },
   { id: 'space', load: () => import('./space.js') },
 ];

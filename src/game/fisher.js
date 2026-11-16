@@ -206,6 +206,8 @@ const TRICKS = ['puddle', 'stride', 'puddle', 'star', 'stride', 'puddle'];
 //   - the Gallery of Hours: an hourglass angelfish, tall and ivory, banded
 //     in sand-gold, long trailing fins;
 //   - the Kelp Deep: a clownfish, tangerine with three white bars;
+//   - the Blue Hour: a mackerel, sea-green and slender, dark bars across
+//     its back over a silver belly, a little lamp-glow to its markings;
 //   - the Frostbound Pass: an alexandrite char, deep plum, teal fins, a
 //     pink-violet belly, teal lights;
 //   - the Red Drift: a comet ray, rust-red, starlight speckled over it.
@@ -225,6 +227,7 @@ const CATCHES = [
   { name: 'gar', world: 'hell', body: '#2a1716', fin: '#5c1c12', belly: '#6e2a1a', glow: '#ff5a14', size: [0.68, 1.45, 0.68], tail: 1.0, fins: 0.75, pat: [0.75, 0, 0.016, 1] },
   { name: 'angel', world: 'time', body: '#f5ecd6', fin: '#e9c46a', belly: '#fffaf0', glow: '#c99633', size: [1.5, 0.84, 0.72], tail: 1.35, fins: 1.6, pat: [0, 1.6, 0, 0.25] },
   { name: 'clown', world: 'ocean', body: '#ff7414', fin: '#ff9640', belly: '#ffae6a', glow: '#ffffff', size: [1.1, 0.88, 1.0], tail: 0.95, fins: 1.15, pat: [0, 1.25, 0, 0.35] },
+  { name: 'mackerel', world: 'coast', body: '#2f6a78', fin: '#4d6f7a', belly: '#e4ebee', glow: '#ffb347', size: [0.8, 1.2, 0.82], tail: 1.05, fins: 0.9, pat: [0, 2.6, 0, 0.25] },
   { name: 'char', world: 'frost', body: '#4b2152', fin: '#2ea597', belly: '#e58cba', glow: '#7ff2e2', size: [0.92, 1.12, 0.9], tail: 1.05, fins: 1.0, pat: [0.5, 0, 0, 1] },
   { name: 'comet', world: 'space', body: '#9a2e22', fin: '#d85a3a', belly: '#f2a684', glow: '#fff0c8', size: [1.05, 1.0, 1.1], tail: 1.3, fins: 1.4, pat: [0.3, 0, 0, 1] },
 ];
