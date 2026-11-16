@@ -419,10 +419,11 @@ someone inside; and dead trees claw up at the smoke.
 
 And then there are the burning. Nine times through every stretch of Hell,
 spread from just inside the door to just short of the door out, someone is on
-fire at the very edge of the road — now on one side, now the other: a gaunt,
-hairless, sexless figure charred black, fire showing through the cracks in its
-skin, two embers where its eyes were, flames streaming up off its back and
-shoulders. Some stand with their arms hanging, too long for their bodies; one
+fire at the very edge of the road — now on one side, now the other: a
+hairless, sexless figure of ordinary human build (seven and a half heads tall,
+the fingertips at mid-thigh), charred black, fire showing through the cracks
+in its skin, two embers where its eyes were, wrapped in flame so that it
+stands dark against its own fire. Some stand with their arms hanging; one
 holds a hand out toward the road; some sit in the ash with their arms wrapped
 round their knees. Far off each has its head hung forward. As you come, it
 lifts its head and turns it to look at you, the body turning slowly after —
@@ -430,15 +431,24 @@ the seated ones only twist their necks round, further than a neck should go —
 and it goes on watching you as you run past. Their fire keeps its colour
 through the drain, and they stand nearer the road every time you come back.
 
-It's all in the vertex shader (toon option `watch`): the figure is built
-facing forward, its head's vertices marked (`role`), and the turn is worked
-out from where the camera is — how far off decides how far the head has
-lifted and how much of the turn the head and the body have each made — so
+The turn is all in the vertex shader (toon option `watch`): the figure is
+built facing forward, its head's vertices marked (`role`), and the turn is
+worked out from where the camera is — how far off decides how far the head
+has lifted and how much of the turn the head and the body have each made — so
 they cost nothing on the CPU and one draw call a pose. Their charred crust is
 laid from where each vertex stood before it turned, so it turns with them
-rather than swimming across them. The flames are the Deepwood campfires'
-(`flame`), given further to lick and a wave that runs up each long tongue
-(`flame: [how far, the wave]`).
+rather than swimming across them. Their bodies are lofted through rings (a
+trunk with hips, waist, chest and sloping shoulders; a skull with a jaw, ears
+and the bridge of a nose), their limbs tapered through knee, calf, elbow and
+wrist to hands with fingers.
+
+The fire is drawn, not modelled (`b.fire`, `makeFireMaterial`): sheets that
+stand up round each figure and face the camera, the tallest a little behind
+it and low ones licking up in front of its legs, each drawn as flame in the
+fragment shader — turbulence rising through it at three scales, broad and
+yellow-hot low down, wavering more the higher it climbs and torn there into
+tongues that thin through orange to deep red and are gone; its core hides
+what's behind it and its edges only add their light.
 
 ### Time coming unstuck
 
