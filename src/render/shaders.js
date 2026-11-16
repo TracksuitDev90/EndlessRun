@@ -455,11 +455,6 @@ uniform vec4 uWatch2;
 varying vec3 vRest;
 varying vec3 vRestN;
 #endif
-#ifdef FLAME
-// x how far the tongues lick about (1: a campfire's), y a wave running up a
-// long tongue (m at its tip)
-uniform vec2 uFlame;
-#endif
 #ifdef TUMBLE
 // Tumbling about its own middle (an asteroid): x turns a second about the
 // local x axis, y about the local z axis, both through (0, z, 0); each
@@ -983,16 +978,13 @@ void main() {
   #endif
   #ifdef FLAME
     // a fire's tongues (its fully self-lit parts) lick and flicker, each on
-    // its own beat (uv.x), more and more toward its tip (uv.y); a long one
-    // snakes, a wave running up it
+    // its own beat (uv.x), more and more toward its tip (uv.y)
     if (fx.y > 0.95) {
       float k = clamp(uv.y, 0.0, 1.0);
       float t = uTime * (6.5 + uv.x * 3.5) + uv.x * 17.0 + phase * 5.0;
-      lp.x += (sin(t) * 0.07 + sin(t * 2.7 + 1.3) * 0.03) * k * k * uFlame.x;
-      lp.z += sin(t * 1.3 + 2.0) * 0.045 * k * k * uFlame.x;
-      lp.y += (sin(t * 1.9 + 0.7) * 0.5 + 0.5) * 0.14 * k * uFlame.x;
-      lp.x += sin(t * 0.55 - k * 5.0) * uFlame.y * k;
-      lp.z += cos(t * 0.43 - k * 4.0) * uFlame.y * 0.6 * k;
+      lp.x += (sin(t) * 0.07 + sin(t * 2.7 + 1.3) * 0.03) * k * k;
+      lp.z += sin(t * 1.3 + 2.0) * 0.045 * k * k;
+      lp.y += (sin(t * 1.9 + 0.7) * 0.5 + 0.5) * 0.14 * k;
     }
   #endif
   #ifdef WATCH
@@ -8464,11 +8456,7 @@ export function makeToonMaterial(env, o = {}) {
   if (o.splash) defines.SPLASH = '';
   if (o.wonky) defines.WONKY = '';
   if (o.sandfall) defines.SANDFALL = '';
-  if (o.flame) {
-    // (true: a campfire's; [how far the tongues lick, the wave up a long one])
-    defines.FLAME = '';
-    uniforms.uFlame = { value: new THREE.Vector2(...(o.flame === true ? [1, 0] : o.flame)) };
-  }
+  if (o.flame) defines.FLAME = '';
   if (o.watch) {
     // { neck: [y, z], body, far, near, bow, head } (see WATCH)
     const w = o.watch;
@@ -8658,6 +8646,85 @@ export function makeGlassMaterial(env, o = {}) {
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
+  });
+}
+
+// A fire (Hell's burning figures): a sheet that stands upright on its spot
+// and turns to face the camera, as wide and as tall as its instance's scale,
+// drawn as flame - turbulence rising through it at three scales, the fire
+// broad and white-hot low down, wavering more the higher it climbs and torn
+// there into tongues that thin from yellow through orange to deep red and
+// are gone. p0 its own beat, p1 how far it stands back from the camera
+// behind its spot (m; negative: in front), so a body can stand dark against
+// its own fire. It lights itself, so it keeps its colour through a drain.
+const VS_FIRE = COMMON + /* glsl */ `
+uniform vec4 uAnim;
+uniform vec4 uFog;
+attribute vec4 aInst;
+varying vec2 vUv;
+varying float vFade;
+varying float vPhase;
+void main() {
+  mat4 M = modelMatrix * instanceMatrix;
+  vec3 pivot = M[3].xyz;
+  vec2 away = pivot.xz - uCamPos.xz;
+  away /= max(length(away), 0.001);
+  pivot.xz += away * aInst.y;
+  vec3 right = normalize(vec3(away.y, 0.0, -away.x));
+  float w = length(M[0].xyz);
+  float h = length(M[1].xyz);
+  float v = position.y;
+  // the whole sheet leans and sways a little, more toward its top
+  float sway = (sin(uTime * 1.7 + aInst.x * 5.0) * 0.06 + sin(uTime * 3.1 + aInst.x * 9.0) * 0.03) * v * v;
+  vec3 wp = pivot + right * (position.x + sway) * w + vec3(0.0, v * h, 0.0);
+  wp = bendPos(wp);
+  float dist = length(wp - uCamPos);
+  vFade = 1.0 - 0.6 * smoothstep(uFog.x, uFog.y, dist);
+  vUv = uv;
+  vPhase = aInst.x;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_FIRE = /* glsl */ `
+uniform sampler2D uNoise;
+uniform float uTime;
+uniform float uGlowGain;
+varying vec2 vUv;
+varying float vFade;
+varying float vPhase;
+void main() {
+  float v = vUv.y;
+  float u = (vUv.x - 0.5) * 2.0;
+  float t = uTime * 1.25 + vPhase * 3.0;
+  float ph = fract(vPhase * 0.618);
+  float n1 = texture2D(uNoise, vec2(vUv.x * 0.21 + ph, v * 0.3 - t * 0.3)).g;
+  float n2 = texture2D(uNoise, vec2(vUv.x * 0.5 - ph * 0.7, v * 0.72 - t * 0.58)).g;
+  float n3 = texture2D(uNoise, vec2(vUv.x * 1.25 + ph * 0.3, v * 1.7 - t * 1.0)).g;
+  float x = u + ((n1 - 0.5) * 1.5 + (n2 - 0.5) * 0.7) * (0.15 + v);
+  float w = (0.35 + 0.65 * smoothstep(0.0, 0.16, v)) * pow(max(1.0 - v, 0.0), 0.7) * 0.78;
+  float body = 1.0 - smoothstep(0.0, 1.0, abs(x) / max(w, 0.001));
+  float tear = n2 * 0.55 + n3 * 0.45;
+  float heat = body * (1.2 - v * 0.6) - (0.16 + v * 1.5) * (1.0 - tear);
+  heat = clamp(heat * 1.45, 0.0, 1.3) * smoothstep(0.0, 0.05, v);
+  vec3 c = mix(vec3(0.62, 0.04, 0.0), vec3(1.0, 0.3, 0.02), smoothstep(0.06, 0.38, heat));
+  c = mix(c, vec3(1.0, 0.62, 0.1), smoothstep(0.42, 0.85, heat));
+  c = mix(c, vec3(1.0, 0.9, 0.55), smoothstep(0.95, 1.3, heat));
+  float a = smoothstep(0.015, 0.3, heat) * vFade;
+  // (premultiplied: its core hides what's behind it, its edges only add)
+  gl_FragColor = vec4(c * a * uGlowGain * 0.9, a * 0.55 * smoothstep(0.2, 0.7, heat));
+}
+`;
+export function makeFireMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, { uAnim: { value: animVector('none') } }),
+    vertexShader: VS_FIRE,
+    fragmentShader: FS_FIRE,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
   });
 }
 

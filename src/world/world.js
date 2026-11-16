@@ -7,6 +7,7 @@ import {
   makeInkMaterial,
   makeGlassMaterial,
   makeGlowMaterial,
+  makeFireMaterial,
   makeShadowMaterial,
   makeBeamMaterial,
   makePoolMaterial,
@@ -342,6 +343,16 @@ class WorldBuilder {
     return this.world.addBatch(name, b);
   }
 
+  // Fire: sheets of flame that stand up and face the camera (see VS_FIRE).
+  // Put one with sx its width, sy its height, p0 its beat and p1 how far it
+  // stands back behind its spot.
+  fire(name, o = {}) {
+    const g = part(P.plane(1, 1, 1, 6), '#ffffff', { y: 0.5, outline: 0 });
+    const b = new Batch(name, g, makeFireMaterial(this.u), null, o.cap ?? 32);
+    b.renderOrder = o.order ?? 7;
+    return this.world.addBatch(name, b);
+  }
+
   // Ground shadow decal (multiply). o.hard: crisp rectangle instead of a blob.
   // o.plane: { w, d, x, y, z } bakes its size and offset into the decal (for
   // one put alongside an obstacle with `with`); o.cross: it glides with
@@ -407,7 +418,7 @@ class WorldBuilder {
   // The same builder, every batch's name prefixed (the doorways: every
   // world's door built into the one shared set, see Game).
   prefixed(prefix) {
-    const named = new Set(['toon', 'ground', 'glass', 'glow', 'shadow', 'beam', 'pool']);
+    const named = new Set(['toon', 'ground', 'glass', 'glow', 'fire', 'shadow', 'beam', 'pool']);
     return new Proxy(this, {
       get(t, k) {
         const v = t[k];

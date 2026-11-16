@@ -337,191 +337,180 @@ function gibbetCageGeo() {
 }
 
 // --- the burning ------------------------------------------------------------------
-// People on fire beside the road: gaunt, hairless, sexless figures charred
+// People on fire beside the road: hairless, sexless figures of ordinary human
+// build - seven and a half heads tall, the fingertips at mid-thigh - charred
 // black, the fire showing through the cracks in their skin, two embers where
-// their eyes were, flames streaming up off their backs and shoulders. Some
-// stand, their arms hanging - one holds a hand out toward the road - and some
-// sit in the ash with their arms round their knees. Each is built facing +z
-// with its head hung forward; as you come it lifts its head and turns to
-// watch you, and goes on watching as you pass (toon option `watch`: the head
-// is role 1, and so is whatever burns on it).
+// their eyes were, and wrapped in flame (sheets of fire stood round them: see
+// burningFire). Some stand, their arms hanging - one holds a hand out toward
+// the road - and some sit in the ash with their arms round their knees. Each
+// is built facing +z with its head hung forward; as you come it lifts its
+// head and turns to watch you, and goes on watching as you pass (toon option
+// `watch`: the head is role 1).
 const SKIN = ['#0c0807', '#3a2a24'];
 const _up = new THREE.Vector3(0, 1, 0);
 function asRole(g, k) {
   g.setAttribute('role', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(k), 1));
   return g;
 }
-// a length of limb from a to b (its radius at each), a joint at b
-function limb(parts, a, b, ra, rb, top, joint = true) {
-  const A = new THREE.Vector3(...a);
-  const B = new THREE.Vector3(...b);
-  const d = B.clone().sub(A);
-  const len = d.length();
-  const g = P.cyl(rb, ra, len, 7, 2);
-  g.applyMatrix4(new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(_up, d.normalize()), new THREE.Vector3(1, 1, 1)));
-  parts.push(part(g, null, { grad: [...SKIN, 0, top], mark: CHAR }));
-  if (joint) parts.push(part(P.sphere(rb * 1.08, 7, 5), null, { x: b[0], y: b[1], z: b[2], grad: [...SKIN, 0, top], mark: CHAR }));
+// A body part lofted through rings up its height: each [y, half width, half
+// depth, z of its middle], an ellipse (a little squared off: sq).
+function loft(rings, n = 14, sq = 2.3) {
+  const pos = [];
+  const idx = [];
+  for (const [y, w, d, z = 0] of rings) {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const k = Math.pow(Math.pow(Math.abs(c), sq) + Math.pow(Math.abs(s), sq), -1 / sq);
+      pos.push(c * k * w, y, z + s * k * d);
+    }
+  }
+  for (let r = 0; r < rings.length - 1; r++) {
+    for (let i = 0; i < n; i++) {
+      const a = r * n + i;
+      const b = r * n + ((i + 1) % n);
+      idx.push(a, a + n, b, b, a + n, b + n);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
 }
-// a hand: a narrow palm and long thin fingers, hanging (or held out) along dir
-function hand(parts, at, dir, top, spread = 0.12) {
+const skin = (g, top, o = {}) => part(g, null, { grad: [...SKIN, 0, top], mark: CHAR, ...o });
+// A limb through points [x, y, z, radius], rounded at each joint.
+function limb(parts, pts, top) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const A = new THREE.Vector3(...pts[i]);
+    const B = new THREE.Vector3(...pts[i + 1]);
+    const d = B.clone().sub(A);
+    const len = d.length();
+    const g = P.cyl(pts[i + 1][3], pts[i][3], len, 9, 1);
+    g.applyMatrix4(new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(_up, d.normalize()), new THREE.Vector3(1, 1, 1)));
+    parts.push(skin(g, top));
+    parts.push(skin(P.sphere(pts[i + 1][3] * 1.02, 9, 6), top, { x: B.x, y: B.y, z: B.z }));
+  }
+}
+// a leg from hip to ankle by way of the knee: the thigh's taper, the calf's swell
+function leg(parts, hip, knee, ankle, top) {
+  const at = (a, b, t, r) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, r];
+  limb(parts, [[...hip, 0.088], at(hip, knee, 0.5, 0.075), [...knee, 0.054], at(knee, ankle, 0.3, 0.056), at(knee, ankle, 0.72, 0.04), [...ankle, 0.034]], top);
+}
+function arm(parts, sh, elbow, wrist, top) {
+  const at = (a, b, t, r) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, r];
+  parts.push(skin(P.sphere(0.058, 9, 7), top, { x: sh[0], y: sh[1], z: sh[2] }));
+  limb(parts, [[...sh, 0.05], at(sh, elbow, 0.45, 0.046), [...elbow, 0.037], at(elbow, wrist, 0.3, 0.04), [...wrist, 0.027]], top);
+}
+// a foot under an ankle, toes toward +z
+function foot(parts, ankle, top) {
+  parts.push(skin(loft([[0, 0.036, 0.1, 0.06], [0.03, 0.04, 0.115, 0.055], [0.06, 0.032, 0.06, 0.01], [0.085, 0.02, 0.03, 0]], 10), top, { x: ankle[0], z: ankle[2] }));
+}
+// a hand: a palm, four fingers and a thumb, lying along dir (thumb to side)
+function hand(parts, at, dir, thumb, top, curl = 0) {
   const D = new THREE.Vector3(...dir).normalize();
-  const tip = (k) => [at[0] + D.x * k, at[1] + D.y * k, at[2] + D.z * k];
-  limb(parts, at, tip(0.075), 0.03, 0.034, top, false);
-  const side = new THREE.Vector3().crossVectors(D, Math.abs(D.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : _up).normalize();
-  for (let i = -1; i <= 1; i++) {
-    const a = tip(0.07);
-    const b = tip(0.2 - Math.abs(i) * 0.02);
-    for (let k = 0; k < 3; k++) {
-      a[k] += side.getComponent(k) * i * 0.016;
-      b[k] += side.getComponent(k) * i * spread * 0.35;
-    }
-    limb(parts, a, b, 0.012, 0.006, top, false);
+  const S = new THREE.Vector3(...thumb);
+  S.addScaledVector(D, -S.dot(D)).normalize();
+  const N = new THREE.Vector3().crossVectors(D, S);
+  const pt = (f, s, n, r) => [at[0] + D.x * f + S.x * s + N.x * n, at[1] + D.y * f + S.y * s + N.y * n, at[2] + D.z * f + S.z * s + N.z * n, r];
+  limb(parts, [pt(0, 0, 0, 0.027), pt(0.045, 0, 0, 0.034), pt(0.09, 0, 0, 0.03)], top);
+  for (let i = 0; i < 4; i++) {
+    const s = (i - 1.5) * 0.017;
+    const len = 0.075 - Math.abs(i - 1.4) * 0.009;
+    limb(parts, [pt(0.088, s, 0, 0.0095), pt(0.088 + len * 0.55, s * 1.15, curl * 0.012, 0.0085), pt(0.088 + len, s * 1.2, curl * 0.04, 0.007)], top);
   }
+  limb(parts, [pt(0.03, 0.028, 0, 0.012), pt(0.065, 0.05, curl * 0.01, 0.01), pt(0.095, 0.055, curl * 0.02, 0.008)], top);
 }
-// the head, on its neck at [0, y, z]: a smooth skull, hollow sockets, an
-// ember in each
+// The trunk from the crotch (y = 0) to the root of the neck: hips, a waist
+// no narrower than it need be, a flat chest, shoulders sloping to the neck.
+const TRUNK = [[0, 0.03, 0.04, 0], [0.035, 0.11, 0.08, 0], [0.09, 0.16, 0.1, -0.005], [0.15, 0.163, 0.104, -0.005], [0.24, 0.142, 0.09, 0], [0.33, 0.143, 0.095, 0.004], [0.43, 0.158, 0.107, 0.008], [0.52, 0.172, 0.11, 0.008], [0.585, 0.186, 0.098, 0.002], [0.625, 0.15, 0.082, -0.002], [0.655, 0.075, 0.062, 0], [0.68, 0.05, 0.052, 0.004]];
+// The head, its chin just under the top of the neck at [0, y, z]: a skull
+// with a jaw, ears, the bridge of a nose, hollow sockets with an ember in
+// each, a dark gape of a mouth.
 function headParts(parts, y, z, top, tilt = 0) {
+  const y0 = y - 0.012;
+  const z0 = z + 0.012;
   const out = [];
-  out.push(part(P.sphere(0.112, 12, 10), null, { y: y + 0.125, z: z + 0.012, sx: 0.9, sy: 1.2, sz: 1.02, rz: tilt, grad: [...SKIN, 0, top], mark: CHAR }));
-  // the jaw, narrow and long
-  out.push(part(P.sphere(0.075, 9, 7), null, { y: y + 0.05, z: z + 0.04, sx: 0.85, sy: 1.1, sz: 0.95, rz: tilt, grad: [...SKIN, 0, top], mark: CHAR }));
+  const skull = [[0, 0.018, 0.02, 0.05], [0.014, 0.04, 0.044, 0.036], [0.05, 0.058, 0.074, 0.016], [0.095, 0.068, 0.09, 0.005], [0.14, 0.075, 0.098, 0], [0.185, 0.073, 0.096, -0.002], [0.215, 0.056, 0.076, -0.004], [0.232, 0.03, 0.042, -0.004], [0.238, 0.004, 0.006, -0.004]];
+  out.push(skin(loft(skull, 16, 2.1), top, { y: y0, z: z0 }));
+  out.push(skin(P.sphere(0.02, 7, 5), top, { y: y0 + 0.088, z: z0 + 0.093, sx: 0.7, sy: 1.5, sz: 0.9 }));
   for (const sd of [-1, 1]) {
-    const ex = sd * 0.04 - tilt * 0.12;
-    out.push(part(P.sphere(0.036, 8, 6), '#020101', { x: ex, y: y + 0.13, z: z + 0.094, sz: 0.5, outline: 0 }));
-    // (not quite fully self-lit, so the flames' flicker leaves the eyes be)
-    out.push(part(P.sphere(0.021, 7, 5), '#ffd070', { x: ex, y: y + 0.128, z: z + 0.108, emit: 0.94, outline: 0 }));
+    out.push(skin(P.sphere(0.03, 8, 6), top, { x: sd * 0.076, y: y0 + 0.115, z: z0 - 0.008, sx: 0.3, sz: 0.62 }));
+    out.push(part(P.sphere(0.024, 8, 6), '#020101', { x: sd * 0.033, y: y0 + 0.125, z: z0 + 0.079, sx: 1.15, sz: 0.5, outline: 0 }));
+    // (not quite fully self-lit: only what burns outright is 1)
+    out.push(part(P.sphere(0.014, 7, 5), '#ffd070', { x: sd * 0.033, y: y0 + 0.124, z: z0 + 0.084, emit: 0.94, outline: 0 }));
   }
-  // a dark gape of a mouth
-  out.push(part(P.sphere(0.024, 7, 5), '#020101', { x: -tilt * 0.06, y: y + 0.04, z: z + 0.105, sy: 1.5, sz: 0.4, outline: 0 }));
-  for (const g of out) parts.push(asRole(g, 1));
-}
-// A tongue of fire rising from `at`, leaning (rx back, rz aside), its tip
-// deep red (or white-hot yellow, a core). uv: x its own beat, y how far up
-// it (the lathe's own v).
-function fireTongue(parts, at, h, r, { rx = 0, rz = 0, seed = 0, hot = false, role = 0 } = {}) {
-  const prof = [[0, 0], [r * 0.7, h * 0.07], [r, h * 0.2], [r * 0.9, h * 0.36], [r * 0.62, h * 0.55], [r * 0.34, h * 0.74], [r * 0.14, h * 0.9], [0, h]];
-  const g = part(P.lathe(prof, 7), null, {
-    x: at[0], y: at[1], z: at[2], rx, rz,
-    grad: hot ? ['#fff6c0', '#ffa828', at[1], at[1] + h * 0.8] : ['#ffa024', '#f03c0c', at[1] + h * 0.1, at[1] + h * 0.9],
-    emit: 1, outline: 0,
-  });
-  const uv = g.attributes.uv.array;
-  for (let i = 0; i < uv.length; i += 2) uv[i] = seed;
-  parts.push(asRole(g, role));
-}
-// a lick of flame come loose above a tongue
-function fireLick(parts, at, r, seed, role = 0) {
-  const g = part(P.lathe([[0, 0], [r, r * 0.9], [r * 0.55, r * 2.2], [0, r * 3.6]], 6), '#ff7a1a', { x: at[0], y: at[1], z: at[2], emit: 1, outline: 0 });
-  const uv = g.attributes.uv.array;
-  for (let i = 0; i < uv.length; i += 2) {
-    uv[i] = seed;
-    uv[i + 1] = 0.75 + uv[i + 1] * 0.25;
-  }
-  parts.push(asRole(g, role));
-}
-// the fire on a figure: [x, y, z, height, radius, lean back, lean aside, hot,
-// on the head], and a lick loose above each of the big ones
-function fire(parts, list, seed) {
-  const rnd = seeded(seed);
-  for (const [x, y, z, h, r, rx = 0, rz = 0, hot = 0, role = 0] of list) {
-    const beat = rnd();
-    fireTongue(parts, [x, y, z], h, r, { rx: -rx, rz, seed: beat, hot: !!hot, role });
-    if (h > 0.7 && !hot) {
-      const k = 1.08 + rnd() * 0.12;
-      fireLick(parts, [x - Math.sin(rz) * h * k + (rnd() - 0.5) * 0.1, y + Math.cos(rx) * Math.cos(rz) * h * k, z - Math.sin(rx) * h * k], r * 0.3, beat + 0.07, role);
-    }
+  out.push(part(P.sphere(0.022, 7, 5), '#020101', { y: y0 + 0.044, z: z0 + 0.079, sx: 1.1, sy: 1.25, sz: 0.4, outline: 0 }));
+  for (const g of out) {
+    // (tilted to one side on its neck)
+    if (tilt) g.translate(0, -y, -z).rotateZ(tilt).translate(0, y, z);
+    parts.push(asRole(g, 1));
   }
 }
 
-const STAND_NECK = [1.56, 0];
+const STAND_NECK = [1.555, 0.005];
 // Standing: reach - one hand held out toward whoever it's looking at.
-function burningStandGeo(reach, seed) {
-  const H = 1.86;
+function burningStandGeo(reach) {
+  const H = 1.8;
   const parts = [];
   for (const s of [-1, 1]) {
-    // legs, a little apart, and long narrow feet
-    limb(parts, [s * 0.09, 0.93, 0], [s * 0.105, 0.5, 0.025], 0.074, 0.052, H);
-    limb(parts, [s * 0.105, 0.5, 0.025], [s * 0.11, 0.07, -0.01], 0.05, 0.034, H);
-    parts.push(part(P.sphere(0.05, 8, 6), null, { x: s * 0.115, y: 0.035, z: 0.06, sx: 0.85, sy: 0.6, sz: 2.3, grad: [...SKIN, 0, H], mark: CHAR }));
-    // arms too long for the body, the shoulders rolled forward
-    const sh = [s * 0.195, 1.43, 0.015];
-    parts.push(part(P.sphere(0.06, 8, 6), null, { x: sh[0], y: sh[1], z: sh[2], grad: [...SKIN, 0, H], mark: CHAR }));
+    const ankle = [s * 0.095, 0.08, -0.015];
+    leg(parts, [s * 0.088, 0.9, 0], [s * 0.092, 0.49, 0.02], ankle, H);
+    foot(parts, ankle, H);
+    const sh = [s * 0.2, 1.42, 0.005];
     if (reach && s > 0) {
-      limb(parts, sh, [0.25, 1.24, 0.2], 0.045, 0.036, H);
-      limb(parts, [0.25, 1.24, 0.2], [0.2, 1.3, 0.5], 0.034, 0.026, H);
-      hand(parts, [0.2, 1.3, 0.5], [-0.1, 0.05, 1], H, 0.3);
+      arm(parts, sh, [0.25, 1.2, 0.2], [0.21, 1.27, 0.44], H);
+      hand(parts, [0.21, 1.27, 0.44], [-0.1, 0.1, 1], [-1, 0.2, 0], H, -1);
     } else {
-      limb(parts, sh, [s * 0.235, 1.1, -0.01], 0.045, 0.036, H);
-      limb(parts, [s * 0.235, 1.1, -0.01], [s * 0.225, 0.8, 0.05], 0.034, 0.026, H);
-      hand(parts, [s * 0.225, 0.8, 0.05], [0, -1, 0.12], H);
+      const wrist = [s * 0.245, 0.87, 0.04];
+      arm(parts, sh, [s * 0.245, 1.12, -0.02], wrist, H);
+      hand(parts, wrist, [0, -1, 0.1], [0, 0, 1], H, s);
     }
   }
-  // the trunk: narrow, straight, a little hollow under the ribs
-  const trunk = [[0, 0.86], [0.1, 0.875], [0.132, 0.94], [0.128, 1.04], [0.11, 1.16], [0.128, 1.3], [0.15, 1.41], [0.13, 1.475], [0.06, 1.51], [0, 1.52]];
-  parts.push(part(P.lathe(trunk, 10), null, { sz: 0.66, grad: [...SKIN, 0, H], mark: CHAR }));
-  limb(parts, [0, 1.48, 0], [0, 1.6, 0.012], 0.046, 0.04, H, false);
-  headParts(parts, STAND_NECK[0], STAND_NECK[1], H, reach ? -0.16 : 0.1);
-  // prettier-ignore
-  fire(parts, [
-    [0, 1.2, -0.1, 1.5, 0.22, 0.32, 0.04],
-    [-0.2, 1.36, -0.05, 1.05, 0.16, 0.22, 0.3],
-    [0.2, 1.36, -0.05, 0.9, 0.15, 0.3, -0.26],
-    [0.05, 0.9, -0.1, 0.95, 0.17, 0.5, -0.1],
-    [-0.09, 1.3, -0.14, 0.8, 0.11, 0.26, 0.1, 1],
-    [0.1, 1.36, -0.13, 0.6, 0.09, 0.36, -0.14, 1],
-    [0, 1.74, -0.06, 0.6, 0.1, 0.34, 0, 0, 1],
-    [0.02, 1.76, -0.09, 0.34, 0.06, 0.4, 0.1, 1, 1],
-    [-0.24, 0.92, -0.02, 0.5, 0.085, 0.2, 0.22],
-    ...(reach ? [[0.23, 1.28, 0.34, 0.42, 0.07, 0.25, -0.1], [0.22, 1.3, 0.42, 0.24, 0.045, 0.2, 0, 1]] : [[0.24, 0.95, -0.02, 0.44, 0.08, 0.24, -0.2]]),
-    [-0.12, 0.3, -0.06, 0.5, 0.09, 0.3, 0.12],
-    [0.13, 0.12, -0.08, 0.42, 0.1, 0.36, -0.1],
-    [-0.02, 0.0, -0.2, 0.3, 0.1, 0.2, 0],
-  ], seed);
+  parts.push(skin(loft(TRUNK), H, { y: 0.84 }));
+  limb(parts, [[0, 1.5, 0.002, 0.052], [0, 1.575, 0.012, 0.046]], H);
+  headParts(parts, STAND_NECK[0], STAND_NECK[1], H, reach ? -0.14 : 0.08);
   return merge(parts);
 }
 
-const SIT_NECK = [0.79, 0.02];
+const SIT_NECK = [0.775, 0.045];
 // Sitting in the ash, knees drawn up, arms wrapped round them, hunched.
-function burningSitGeo(seed) {
-  const H = 1.05;
+function burningSitGeo() {
+  const H = 1.02;
   const parts = [];
+  // the trunk, bent forward over the knees (and where a point on it ends up)
+  const lean = 0.35;
+  const base = [0.07, -0.22];
+  const on = (x, y, z = 0) => [x, base[0] + y * Math.cos(lean) - z * Math.sin(lean), base[1] + y * Math.sin(lean) + z * Math.cos(lean)];
+  parts.push(skin(loft(TRUNK), H, { y: base[0], z: base[1], rx: lean }));
   for (const s of [-1, 1]) {
-    const hip = [s * 0.1, 0.11, -0.19];
-    const knee = [s * 0.13, 0.53, 0.2];
-    limb(parts, hip, knee, 0.076, 0.054, H);
-    limb(parts, knee, [s * 0.12, 0.07, 0.41], 0.05, 0.034, H);
-    parts.push(part(P.sphere(0.05, 8, 6), null, { x: s * 0.125, y: 0.035, z: 0.49, sx: 0.85, sy: 0.6, sz: 2.3, grad: [...SKIN, 0, H], mark: CHAR }));
-    const sh = [s * 0.185, 0.67, -0.02];
-    parts.push(part(P.sphere(0.06, 8, 6), null, { x: sh[0], y: sh[1], z: sh[2], grad: [...SKIN, 0, H], mark: CHAR }));
-    // arms round the shins, the forearms crossed
-    const elbow = [s * 0.225, 0.46, 0.21];
-    const wrist = [-s * 0.05, 0.4 + s * 0.035, 0.36];
-    limb(parts, sh, elbow, 0.045, 0.036, H);
-    limb(parts, elbow, wrist, 0.034, 0.026, H);
-    hand(parts, wrist, [-s, -0.5, -0.1], H);
+    const ankle = [s * 0.1, 0.08, 0.3];
+    leg(parts, [s * 0.088, 0.13, -0.2], [s * 0.115, 0.45, 0.075], ankle, H);
+    foot(parts, ankle, H);
+    // arms round the shins, one wrist over the other
+    const wrist = [-s * 0.03, 0.35 + s * 0.03, 0.2 + s * 0.012];
+    arm(parts, on(s * 0.2, 0.58, 0.005), [s * 0.24, 0.36, 0.11], wrist, H);
+    hand(parts, wrist, [-s, -0.35, 0.05], [0, 1, 0], H, 1);
   }
-  parts.push(part(P.sphere(0.15, 9, 7), null, { y: 0.13, z: -0.2, sy: 0.75, grad: [...SKIN, 0, H], mark: CHAR }));
-  // the trunk, bent forward over the knees
-  const trunk = [[0, 0], [0.12, 0.02], [0.13, 0.12], [0.112, 0.27], [0.13, 0.42], [0.15, 0.53], [0.13, 0.6], [0.06, 0.635], [0, 0.645]];
-  parts.push(part(P.lathe(trunk, 10), null, { y: 0.09, z: -0.21, rx: 0.3, sz: 0.7, grad: [...SKIN, 0, H], mark: CHAR }));
-  limb(parts, [0, 0.7, -0.03], [0, 0.82, 0.03], 0.046, 0.04, H, false);
-  headParts(parts, SIT_NECK[0], SIT_NECK[1], H, 0.08);
-  // prettier-ignore
-  fire(parts, [
-    [0, 0.42, -0.26, 1.45, 0.23, 0.28, 0.06],
-    [-0.19, 0.6, -0.12, 1.0, 0.16, 0.2, 0.3],
-    [0.19, 0.6, -0.12, 0.85, 0.15, 0.3, -0.24],
-    [0.04, 0.12, -0.34, 0.9, 0.18, 0.55, -0.1],
-    [-0.08, 0.52, -0.24, 0.75, 0.11, 0.24, 0.1, 1],
-    [0.1, 0.56, -0.22, 0.55, 0.09, 0.34, -0.14, 1],
-    [0, 0.96, -0.04, 0.55, 0.1, 0.32, 0, 0, 1],
-    [0.02, 0.98, -0.07, 0.32, 0.06, 0.4, 0.1, 1, 1],
-    [-0.24, 0.4, 0.1, 0.42, 0.08, 0.2, 0.2],
-    [0.25, 0.42, 0.08, 0.36, 0.075, 0.25, -0.2],
-    [-0.2, 0.0, -0.3, 0.4, 0.11, 0.3, 0.2],
-    [0.14, 0.5, 0.2, 0.3, 0.06, 0.1, 0],
-  ], seed);
+  limb(parts, [[...on(0, 0.655, 0.002), 0.052], [0, 0.79, 0.05, 0.046]], H);
+  headParts(parts, SIT_NECK[0], SIT_NECK[1], H, 0.07);
   return merge(parts);
+}
+
+// The fire on one of them: sheets of flame stood round the figure (the fire
+// batch: each [x aside, y, width, height, how far behind the figure it
+// stands as you look at it]), the tallest behind so the body stands dark
+// against it, low ones licking up in front of the legs.
+// prettier-ignore
+const FIRE_STAND = [[0, 0.3, 1.5, 3.3, 0.34], [-0.22, 0.85, 0.85, 2.3, 0.24], [0.2, 0.7, 0.9, 1.9, 0.2], [0.03, 1.3, 0.6, 1.5, 0.14], [0.05, 0, 1.7, 0.9, 0.3], [-0.16, 0, 0.6, 0.85, -0.24], [0.2, 0.05, 0.45, 0.6, -0.26]];
+// prettier-ignore
+const FIRE_SIT = [[0, 0.05, 1.6, 2.8, 0.42], [-0.2, 0.4, 0.85, 1.9, 0.3], [0.22, 0.3, 0.85, 1.6, 0.27], [0.02, 0.72, 0.55, 1.3, 0.16], [0, 0, 1.9, 0.75, 0.4], [-0.3, 0, 0.5, 0.5, -0.5], [0.3, 0, 0.4, 0.4, -0.45]];
+function burningFire(ctx, sit, x, z, s, rng) {
+  for (const [dx, y, w, h, back] of sit ? FIRE_SIT : FIRE_STAND) {
+    ctx.put('fire', x + dx * s, y * s, z, { sx: w * s, sy: h * s, sz: 1, p0: rng.float(0, 40), p1: back * s });
+  }
 }
 
 // Where they are along a stretch of Hell: nine of them, spread from just
@@ -550,7 +539,7 @@ function burningIn(index, count, start, visit) {
     // turned toward the road, anywhere from facing you as you come to
     // facing well away down it
     const away = sit ? 0.35 + u[1] * 1.3 : 0.3 + u[1] * 2.1;
-    return { name, sit, side, x: side * off, z: 3 + u[2] * 10, ry: -side * away, s: sit ? 1.2 + u[3] * 0.25 : 1.12 + u[3] * 0.25 };
+    return { name, sit, side, x: side * off, z: 3 + u[2] * 10, ry: -side * away, s: sit ? 1.1 + u[3] * 0.15 : 1.05 + u[3] * 0.15 };
   }
   return null;
 }
@@ -895,12 +884,12 @@ export default {
     b.toon('cage', gibbetCageGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.12, 0.9, 0] });
     yield;
     // the burning: lit by nothing but themselves, standing clear of the smoke
-    const burn = (neck, o) => ({ cap: 6, ink: 0.022, crust: [1.25, 0.16, 1], flame: [2.3, 0.07], clear: 0.6, watch: { neck, far: 78, near: 26, ...o } });
-    b.toon('burningStand', burningStandGeo(false, 3), burn(STAND_NECK, { body: 0.8, bow: 0.6, head: 1.25 }));
+    const burn = (neck, o) => ({ cap: 6, ink: 0.022, crust: [1.25, 0.16, 1], clear: 0.6, watch: { neck, far: 78, near: 26, ...o } });
+    b.toon('burningStand', burningStandGeo(false), burn(STAND_NECK, { body: 0.8, bow: 0.6, head: 1.25 }));
     yield;
-    b.toon('burningReach', burningStandGeo(true, 8), burn(STAND_NECK, { body: 1, bow: 0.5, head: 1.1 }));
+    b.toon('burningReach', burningStandGeo(true), burn(STAND_NECK, { body: 1, bow: 0.5, head: 1.1 }));
     yield;
-    b.toon('burningSit', burningSitGeo(5), burn(SIT_NECK, { body: 0.12, bow: 0.85, head: 1.75 }));
+    b.toon('burningSit', burningSitGeo(), burn(SIT_NECK, { body: 0.12, bow: 0.85, head: 1.75 }));
     yield;
     b.toon('lavaPool', lavaPoolGeo(4), { cap: 16, lava: true, ink: 0, anim: 'pop' });
     yield;
@@ -915,6 +904,8 @@ export default {
     b.toon('riverSplash', splashGeo({ bursts: 2, n: 6, rx: 1.6, rz: 6, cz: -8, up: [4, 7], out: 1.6, size: [0.12, 0.26], seed: 11 }), { cap: 24, ink: 0, splash: true });
     yield;
     b.glow('glow', { cap: 100, anim: 'pop' });
+    yield;
+    b.fire('fire', { cap: 48 });
     yield;
     b.pool('pool', { cap: 60, anim: 'pop' });
     yield;
@@ -979,7 +970,8 @@ export default {
     if (burning) {
       const { name, sit, x, z, ry, s } = burning;
       ctx.put(name, x, 0, z, { ry, s });
-      ctx.put('glow', x, (sit ? 1.1 : 1.6) * s, z, { s: (sit ? 5.5 : 6.5) * s, c: [1, 0.4, 0.1] });
+      burningFire(ctx, sit, x, z, s, rng);
+      ctx.put('glow', x, (sit ? 1.1 : 1.6) * s, z, { s: (sit ? 5.5 : 6.5) * s, c: [0.8, 0.3, 0.07] });
       ctx.put('pool', x, 0.05, z, { sx: 7 * s, sz: 7 * s, c: [0.75, 0.75, 0.75] });
     }
     for (const s of [-1, 1]) {
