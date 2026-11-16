@@ -312,6 +312,14 @@ export class ObstacleField {
       this.nextD = here.start + after;
       return;
     }
+    // and keep a stretch of its road clear (def.holdAt(seg, d): where the
+    // stretch ends, if d is in it - the Blue Hour's, as you come out of the
+    // long grass onto the causeway)
+    const hold = here.world.def.holdAt?.(here, d) || 0;
+    if (hold > d) {
+      this.nextD = hold;
+      return;
+    }
     // A river (Candy World's): where it runs across the road it's laid as a
     // row of its own - the chocolate's span in each lane, a jump - and every
     // pattern before it is kept far enough short of it to land and take off
@@ -366,7 +374,9 @@ export class ObstacleField {
       }
       // (no room before a river's crossing: the rest of the pattern waits)
       if (d + 3.5 > limit) break;
-      const world = course.segAt(d).world;
+      const seg = course.segAt(d);
+      const world = seg.world;
+      if ((world.def.holdAt?.(seg, d) || 0) > d) break;
       const len = this.placeRow(world, d, row);
       d += len;
       last = row;
@@ -715,8 +725,56 @@ export class ObstacleField {
     return p.make(r);
   }
 
+  // The obstacles a world lays at d. A world whose road changes along its
+  // length (def.obstaclesAt(seg, d): the Blue Hour's grass headland, its
+  // causeway and its fishing landing) deals each stretch its own; every
+  // spec it can ever deal is still listed in def.obstacles (see
+  // World.markObstacles).
+  defsAt(world, d) {
+    const at = world.def.obstaclesAt;
+    if (!at) return world.def.obstacles;
+    const seg = this.game.course.segAt(d);
+    return at(seg.world === world ? seg : null, d) || world.def.obstacles;
+  }
+
+  // One of a kind's specs for a lane. A spec can be kept to some lanes
+  // (spec.lanes: an overtopping wave only ever floods an outer lane, a
+  // wreck's spar only reaches in from the verge) and weighted (spec.w); a
+  // list that does neither is dealt from exactly as it always was.
+  specFor(list, lane) {
+    const r = this.rng;
+    if (!list.some((s) => s.lanes || s.w)) return r.pick(list);
+    const ok = list.filter((s) => !s.lanes || s.lanes.includes(lane));
+    return r.weighted((ok.length ? ok : list).map((s) => [s, s.w ?? 1]));
+  }
+
+  // Something drawn once across two neighbouring lanes (defs.twin[kind]: a
+  // storm-thrown trunk over two lanes, a dinghy lying slantwise across
+  // them), standing for both their obstacles: a record in each lane, one
+  // thing to see. Returns the lanes it took.
+  placeTwin(world, defs, d, row, lanes, laid) {
+    const r = this.rng;
+    const took = [false, false, false];
+    if (!defs.twin) return took;
+    for (const [a, b] of [[0, 1], [1, 2]]) {
+      const k = row.lanes[a];
+      if (!k || k !== row.lanes[b] || took[a] || !defs.twin[k]?.length) continue;
+      if (!r.chance(defs.twinChance ?? 0.5)) continue;
+      const spec = r.pick(defs.twin[k]);
+      const x = (CONFIG.laneX[a] + CONFIG.laneX[b]) / 2;
+      const group = this.group(world, d, spec.len, row.hint, 2);
+      this.putSpec(world, group, spec, x, d, { c: spec.tints ? rgb(r.pick(spec.tints)) : null, p0: r.float(0, 6.28) });
+      if (!spec.flat) this.shadow(world, group, x, d, spec.len, 4.8, k === 'L' ? 0.9 : k === 'H' ? 2.2 : 3);
+      lanes[a] = this.record(group, a, d, spec.len, k, spec);
+      lanes[b] = this.record(group, b, d, spec.len, k, spec);
+      laid.end = Math.max(laid.end, d + spec.len);
+      took[a] = took[b] = true;
+    }
+    return took;
+  }
+
   placeRow(world, d, row) {
-    const defs = world.def.obstacles;
+    const defs = this.defsAt(world, d);
     const r = this.rng;
     const lanes = [null, null, null];
     const laid = { d, end: d, lanes, hint: row.hint || null };
@@ -732,9 +790,11 @@ export class ObstacleField {
       return spec.len;
     }
     let maxLen = 0;
+    const twinned = this.placeTwin(world, defs, d, row, lanes, laid);
+    for (const k of [0, 1, 2]) if (twinned[k]) maxLen = Math.max(maxLen, lanes[k].len);
     for (let lane = 0; lane < 3; lane++) {
       const kind = row.lanes[lane];
-      if (!kind) continue;
+      if (!kind || twinned[lane]) continue;
       const x = CONFIG.laneX[lane];
       if (kind === 'W' && defs.SW && lane !== 1 && r.chance(0.4)) {
         lanes[lane] = this.placeSwing(world, defs.SW, lane, d, row.hint);
@@ -743,9 +803,12 @@ export class ObstacleField {
         maxLen = Math.max(maxLen, defs.SW.len);
         continue;
       }
-      const spec = r.pick(defs[kind]);
+      const spec = this.specFor(defs[kind], lane);
       const group = this.group(world, d, spec.len, row.hint);
-      this.putSpec(world, group, spec, x, d, {
+      // (spec.left: in the left-hand lane, the same thing built the other
+      // way round - a wave breaking in off the sea on that side, a spar
+      // reaching in from the wreck on that verge)
+      this.putSpec(world, group, lane === 0 && spec.left ? { ...spec, name: spec.left, with: spec.withLeft || spec.with } : spec, x, d, {
         c: spec.tints ? rgb(r.pick(spec.tints)) : null,
         ry: spec.flip && r.chance(0.5) ? Math.PI : 0,
         p0: r.float(0, 6.28),

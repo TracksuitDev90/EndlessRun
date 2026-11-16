@@ -28,9 +28,13 @@ once you're deep enough they stop holding their shape: slowly at first, then
 roads corkscrew, forests melt, skies swirl like wet paint. Every doorway you
 come through is counted on a little orange door by your score, and makes the
 road, and every obstacle you clear, worth more — so the strangest stretches
-are the ones worth the most. Up out of the sea you come onto the ice of the
-Frostbound Pass, where the snow lies a little deeper every time you come
-back to it (see [The Frostbound Pass](#the-frostbound-pass-snow-that-stays));
+are the ones worth the most. Up out of the sea you come ashore on a lonely,
+windswept coast held for ever at blue hour, a lighthouse turning far off,
+where the sea comes right over the causeway you run along (see [Blue Hour:
+the sea comes over the causeway](#blue-hour-the-sea-comes-over-the-causeway));
+up from the coast onto the ice of the Frostbound Pass, where the snow lies a
+little deeper every time you come back to it (see [The Frostbound
+Pass](#the-frostbound-pass-snow-that-stays));
 and deepest of all, over the pass, the door
 opens onto the stars: you jump to light speed and drop out of it onto a
 little red world where gravity barely holds you down — every jump a burst
@@ -73,8 +77,9 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | VIII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, people on fire stand and sit at the edge of the road and turn to watch you pass (see [Hell's fire, and its ghosts](#hells-fire-and-its-ghosts)), and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
 | IX | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump, curtains of sand pouring in through the arches; and the whole gallery stands inside the works of one enormous clock — out past the colonnade on either side a single train of great wheels runs the length of the walk, a wheel behind one arch and a pinion behind the next, tooth in tooth, each pinion's arbor carrying a greater wheel behind it, every arbor on a brass pillar, the sand banked up through it all over the wheels' feet and poured off their rims as they turn, and beyond the works a sea of dunes rolling to the horizon (see [The sands of time](#the-sands-of-time)); open movements in the bays — a wheel driving its pinion, tooth in tooth, an anchor rocking over the scape wheel; your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, now and then one lane raised into a high walk over the rest, a stone stair up, a bridge across the road and sand pouring off it into the lanes below (see [High routes](#high-routes-two-ways-through)), pocket watches dangling out of the sky on their chains, and dials and hourglasses adrift high in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 | X | **The Kelp Deep** — under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
-| XI | **The Frostbound Pass** — a route of packed snow and bare blue ice through a glacier: towering cliffs of turquoise and cobalt ice either side, banded and cracked and capped with snow, frozen waterfalls down their faces, icicles, and now and then an enormous natural arch of ice right over the route; in places the canyon opens out — on one side, then both, then the other — onto a field of pack ice, plates of it up-ended along the pressure ridges, icebergs frozen into it, and jagged mountains far off; firs bowed under snow by the route, and here and there a small timber cabin, its windows lit amber. And the snow stays: it lies a little deeper by the end of every visit and a good deal deeper every time the run comes back round (see [The Frostbound Pass: snow that stays](#the-frostbound-pass-snow-that-stays)) | cold and clear: a low peach sun ahead, lavender shade, ice that holds the light, spindrift low over the snow; later, a snow sky, then the blue hour with the windows bright | the glacier canyon, the frozen lake under the mountain, the ice cave, the crack in the ice, the pack ice under the peaks, the snowy road between the firs |
-| XII | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, and alien life lit from within growing all along the road (see [Alien life](#alien-life-on-the-red-drift)) — stalks of light like models of molecules, bristling puffballs, lantern pods, gold fronds branching like antlers, parasol trees with broad glowing pads — among rock grown into shapes no rock should take: spires wound like screws, stones balanced on stones, rings of rock stood on their edges, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
+| XI | **Blue Hour** — a lonely, windswept coast held for ever at blue hour (see [Blue Hour](#blue-hour-the-sea-comes-over-the-causeway)): an enormous restless sea, swells rolling in on black rocks and bursting into spray, fields of long grass bending in broad waves with gusts running silver through them, and far off on a rocky headland a little right of the road, a lighthouse turning two slow beams over the water. The route runs through three stretches every time: a weathered coastal path through the long grass between low dry-stone walls, driftwood thrown up on it, the sea over the brow; out of grass grown tall and dense onto an exposed stone causeway, the sea on both sides — just as you come out onto it the beam swings round over the road and a great wave breaks beside you, its spray lit warm — where swells rear up and pour over into an outer lane, a low wash runs right across now and then, and tidal cuts break through it; and an old fishing landing of worn boards and setts by a quay, half abandoned — net-drying frames, a wreck's spar, torn sails between posts, lobster pots, stranded dinghies, boats moored off it with their lights lit — then the grass again. Fishing boats rock offshore, gulls wheel, rope ends, torn sailcloth and seed heads all stream the same way in the wind | blue hour, always: deep denim overhead and a pale slate glow where the sun's gone, slate and muted teal and charcoal, soft cool light off the whole sky bright enough to read by, white foam for contrast, and only a few warm lights — the lighthouse's amber lantern, the boats' lights, their reflections in the wet stone and the puddles; sea mist lying low on the water | a windswept coast at blue hour: the lighthouse on its headland, waves breaking on a causeway, long grass in the wind, a fishing landing |
+| XII | **The Frostbound Pass** — a route of packed snow and bare blue ice through a glacier: towering cliffs of turquoise and cobalt ice either side, banded and cracked and capped with snow, frozen waterfalls down their faces, icicles, and now and then an enormous natural arch of ice right over the route; in places the canyon opens out — on one side, then both, then the other — onto a field of pack ice, plates of it up-ended along the pressure ridges, icebergs frozen into it, and jagged mountains far off; firs bowed under snow by the route, and here and there a small timber cabin, its windows lit amber. And the snow stays: it lies a little deeper by the end of every visit and a good deal deeper every time the run comes back round (see [The Frostbound Pass: snow that stays](#the-frostbound-pass-snow-that-stays)) | cold and clear: a low peach sun ahead, lavender shade, ice that holds the light, spindrift low over the snow; later, a snow sky, then the blue hour with the windows bright | the glacier canyon, the frozen lake under the mountain, the ice cave, the crack in the ice, the pack ice under the peaks, the snowy road between the firs |
+| XIII | **The Red Drift** — the last world, out among the stars, where gravity barely holds you down: a little world of red dust — regolith half Mars and half moon, rust-red sand and grey-violet basalt flats pocked with craters, a paler trodden road down the middle — that curves away to a near horizon, red buttes standing on it, hoodoos, boulders and crater rims by the road, violet crystals glowing in the dust, and alien life lit from within growing all along the road (see [Alien life](#alien-life-on-the-red-drift)) — stalks of light like models of molecules, bristling puffballs, lantern pods, gold fronds branching like antlers, parasol trees with broad glowing pads — among rock grown into shapes no rock should take: spires wound like screws, stones balanced on stones, rings of rock stood on their edges, a natural arch of red rock now and then right over the road, little asteroids tumbling overhead; and above it all the whole universe: stars all the way round, a nebula in ribbons of pink, orange and blue, two spiral galaxies, and planets — a ringed giant, an ice giant blazing magenta at its rim, a blue marble low on the horizon, moons — ebbing in closer and drifting away again, while smaller moons sail by on either side. Asteroids, UFOs and rock pillars in the way. You come in at light speed (see [Low gravity: the Red Drift](#low-gravity-the-red-drift)) | no air to soften it: hard white sunlight over your right shoulder, a crisp terminator on everything, shade sunk in deep violet, a cold starlit rim, a thin red dust hanging over the plain | the hyperspace streaks, Neptune, the Earth from the moon and from Mars, the moon's surface, the cut-paper and painted universes |
 
 The worlds always nest inward in that order, and every lap comes back round
 the same way, so you always know what's through the next door. They run in
@@ -86,8 +91,9 @@ World, where the chocolate river runs; then after dark, by lamplight — the Nig
 off them into the endless library of the Hall of Doors; then the sun and its
 eclipse — the Sky Road of the sun, and Hell, where the sun has gone out; and
 last, out past the world — the heavenly Gallery of Hours, the sea lapping in
-through its doorway to the Kelp Deep, up out of the sea onto the ice of the
-Frostbound Pass, and over the pass, the stars of the Red Drift. Then back
+through its doorway to the Kelp Deep, up out of the sea onto the windswept
+coast of the Blue Hour, up from the coast onto the ice of the Frostbound
+Pass, and over the pass, the stars of the Red Drift. Then back
 round to the Cypress Lane.
 
 ### Candy World
@@ -300,6 +306,7 @@ colour, and each world dresses them its own way:
 | Hell | basalt, horned with obsidian, runes glowing round the arch, basalt columns either side | charred black plates, the red glowing like lava in the seams between them, banded with iron and spiked |
 | Gallery of Hours | ivory, ringed in brass, a great clock face over it whose hands have come unstuck | half a great clock face on each leaf, meeting in the middle, and a brass gear |
 | Kelp Deep | rock crusted with coral, a scallop shell over it, sea fans and anemones, cliffs either side | a ship's door: weathered planks, a brass porthole glowing sea-green, barnacles, a starfish, kelp streaming up it |
+| Blue Hour | weathered stone, a bleached driftwood lintel over it with a ship's lantern hung glowing from it, floats strung across, coiled rope, lobster pots and rocks at its feet | a planked door in faded denim blue: iron straps, a brass-rimmed porthole glowing amber across the two leaves |
 | Red Drift | red rock banded with strata, violet crystals bursting from its crown, moonlets turning round its top | an airlock hatch: riveted plates, a porthole full of stars with a little ringed planet in it, hazard stripes, a violet strip light |
 
 ![The ten doors, each in the world before it: into the Cypress Lane (standing on the Red Drift), the Deepwood, the Night Rooftops, the Hall of Doors and the Glasshouse; into the Sky Road, Hell, the Gallery of Hours (in Hell, its colour drained), the Kelp Deep and the Red Drift](docs/doors.jpg)
@@ -770,6 +777,69 @@ long low moan a few seconds before it reaches the road (an obstacle's `call`).
 
 ![The Kelp Deep: kelp, coral and light shafts over the sand; a whale gliding across the path; the splash coming in — the sheet sliding off with its bright lip, then drops streaking down the lens; and the twilight reef on the second visit, a jellyfish glowing](docs/ocean.jpg)
 
+### Blue Hour: the sea comes over the causeway
+
+The Blue Hour is a coast, and its sea is part of the road. Every time
+through, it runs in three stretches (`stretches()` in `world/coast.js`, a
+share of the world's length each, snapped to chunks):
+
+- **the grass headland** — an open path, worn into three paler tracks with
+  grass up the ridges between them and puddles in the hollows, through long
+  grass; low dry-stone walls across the fields, driftwood, an old post with
+  its rope's end streaming, and over the brow to the right, rocks down to
+  the sea with the swell breaking on them. Room to breathe, the lighthouse
+  always in view. Its last stretch runs between grass grown tall and dense;
+- **the causeway** — big wet slabs laid in three runs (their joints are the
+  lane lines), a coping of rough stone along each edge, a wall of dressed
+  blocks dropping to black rock and the sea on both sides, the swell
+  striking the rocks all along it, bursting into spray (thrown up and out to
+  sea, never in over the road) and draining back down through the cracks;
+- **the fishing landing** — grey boards and old setts by a quay, a derelict
+  hut, pots stacked, an upturned boat, nets drying, used sparingly; skiffs
+  moored off the quay; then the grass again, out to the doorway.
+
+Each stretch deals its own obstacles (`def.obstaclesAt`). **The waves keep
+time with the runner.** An overtopping wave (go around) is a swell that
+rolls in from well out beside an outer lane — and only ever an outer lane,
+so the middle is always a way through — rising as it comes; it rears up
+against the causeway's wall, its lip feathering spray (the warning: *this*
+lane), pitches over, pours down into the lane in a ragged curtain and leaves
+it heaped with churning foam until you're past, then drains. A wash (jump)
+is a smaller swell breaking over the edge and a low ridge of white water
+running right across the road, covering every lane before you get to it. The
+two can't be mistaken: a low white ridge across everything means jump; a
+tall dark wave curling over one lane means go round. Both are drawn by the
+vertex shader (`render/coast.js`) from their *progress*, which the world
+writes every frame (`def.frame`) from how long you'll take to reach them — 0
+three and a half seconds out, 1 the moment you arrive — and which never goes
+back: so a wave always gives the same warning however fast you're running,
+never un-breaks if you stumble, and what you hit is always the same plain
+obstacle in its lane, laid like any other.
+
+**The lighthouse** stands on its headland a fixed distance ahead and to the
+right — a landmark, never nearer, never further — stood on the line of the
+sea's own horizon (this is a curved world: the sea's horizon is only a
+hundred metres off), its amber lantern turning two beams back to back. The
+beams light whatever they sweep over (`beaconAt`): the sea glitters, the
+foam and the spray flare warm, the wet stone shines; the lantern lies in a
+broken streak down the wet causeway and in the puddles toward you. As you
+come up to the causeway the beam is brought round — never more than twice
+its pace, never less than a third — so that just as you come out of the
+long grass onto the stone it swings across the road and slows there a
+moment, while a great wave breaks alongside and its spray lights up warm;
+the road is kept clear of obstacles from the last of the long grass until
+you're well out onto the causeway (`def.holdAt`), so nothing hides the way.
+
+**The wind** blows in off the sea. Every blade of long grass bends to it by
+how hard it's blowing where the blade stands (`gustAt`): broad waves rolling
+across the fields, and on them patches of stronger gusts that press the
+grass flat and turn up the pale undersides of the blades — silver bands
+running through it; the fields beyond the grass pale in the same bands as
+the same gusts cross them. Rope ends, net edges, torn sailcloth, kelp and
+seed heads stream the same way (hung things are blown out sideways and lift
+as they go). Sea mist lies low on the water, never up over the road near you,
+and what you play against cuts through it.
+
 ### The Frostbound Pass: snow that stays
 
 It is always snowing in the pass, and the snow stays. The first time
@@ -1024,6 +1094,7 @@ rolls in slow waves:
 | Gallery of Hours | golden hour: the gallery turned to amber, long shadows; and the walk fallen away in places, decks to cross gap to gap (see [Climbs](#climbs-up-and-over)) | midnight: a star-sown sky, aurora, the clock faces glowing; two or three gaps a climb | the colours begin to drift; now and then the far side a step higher |
 | Frostbound Pass | a snow sky: the light soft and flat, thicker snow, rocks and fences half buried — and a few flakes hanging where they are | the blue hour, snowing hard: the cabins' windows bright, great drifts, flakes hanging still all through the air, far drifts coming apart | the hanging flakes rise through the falling snow, the drifts lift well clear |
 | Kelp Deep | the twilight reef: blue dusk, the light from above fading, jellyfish glowing everywhere, plankton lit up in the water | the deep at midnight: almost no light from above, the anemones, jellyfish and plankton glowing | the colours begin to drift |
+| Blue Hour | still blue hour — never day, never night — only a little deeper into it: more stars, thicker mist on the water, the warm lights brighter | deeper still, a breath of aurora over the sea | the colours begin to drift |
 | Red Drift | a comet shower: comets crossing the sky, the nebula burning hotter, UFOs zipping about far off | the violet night: the nebula gone to violet and teal, a paler sun, the dust pinker, astronauts adrift overhead | the colours begin to drift |
 
 ![The Hall of Doors on four visits](docs/laps.jpg)
@@ -1119,6 +1190,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
 | Frostbound Pass | **Alexandrite** plum and **labradorite** slate | stones that change as you look at them: plum shifting to teal under a restrained pink-violet glow, and dark slate flashing blue-green, against the white-and-blue canyon | alexandrite, a stubby twinned six-sided crystal · cut alexandrite, a step-cut stone · labradorite, a cleaved slab flashing blue-green · a polished labradorite pebble, flashing blue | a great cut alexandrite in a ring of labradorite shards |
 | Red Drift | **Moldavite** green | the only green under all that red, and every stone of it fell from the sky | moldavite, wrinkled bottle-green glass flung up by a meteorite strike · peridot, an eight-sided bipyramid · pallasite, meteorite iron studded with olivine · tektite, green glass beads grown together | a fallen star: five points of moldavite |
+| Blue Hour | **Amber** and sea glass | the one warm thing you can pick up off a blue shore, a small glow like the lantern's; with sea glass frosted by the waves | honey amber, a rough pebble · cherry amber, darker and redder · a clear golden drop · sea glass, a frosted aqua shard · cobalt sea glass | a drop of amber in a ring of sea glass |
 | Kelp Deep | **Pearls**, iridescent, in every shade | lustrous and soft against all that teal and green, and the one gem the sea makes itself; the counter wears a pearl here | Akoya, white with a rosé glow · golden South Sea · pink freshwater, a button pearl with a blue-lavender sheen · Tahitian, peacock black shot with green and blue · a silver-grey drop · a cream baroque · a circled champagne pearl (see [Pearls](#pearls)) | a great pearl in an open scallop shell |
 
 ### Pearls
@@ -1426,7 +1498,21 @@ reef across the whole path),
 an arch of rock crusted with coral, a fringe of it along its face (slide), a
 thicket of kelp, a tower of rock crowded with coral and a great violet sea
 fan (go around) — and the whale crossing the path (slide; see
-[Under the sea](#under-the-sea)).
+[Under the sea](#under-the-sea)). On the Blue Hour's coast it depends where
+you are (see [Blue Hour](#blue-hour-the-sea-comes-over-the-causeway)): on the
+grass, a collapsed run of dry-stone wall with grass growing through it, or a
+bleached storm-thrown trunk across one lane or two, kelp hung on its
+branches (jump), a storm-worn tree wedged between rocks, its roots reared up
+beside the road (slide), and black rock teeth (go around); on the causeway,
+tidal cuts — the sea rushing white through a breach, bright lips of wet stone
+at the takeoff and the landing (jump; you can't land in the sea), a low ridge
+of white water washing right across it (jump), a wreck lying on the rocks off
+the edge with its broken spar reaching out over the lane (slide), and the
+sea itself, rearing up and pouring into an outer lane (go around); at the
+landing, net-drying frames and torn sails stretched raked between posts, their
+loose edges always above the duck line (slide), and lobster pots stacked and
+tangled and dinghies thrown up slantwise on the rocks, bows reared, rain lying
+in them (go around).
 
 ### Washing and bark
 
@@ -3426,7 +3512,7 @@ src/core/                     input (swipes + keys), ambient audio, seeded RNG
 src/game/prep.js              the work done ahead of time, a step at a time between
                               frames: worlds built, compiled and put on the GPU, the
                               rest of the cast let in (see Loading)
-src/render/                   shaders, geometry kit, instanced batches, textures, particles, the figures' shadows
+src/render/                   shaders (the Blue Hour's sea, waves, wind and lighthouse in coast.js, Candy World's in candy.js), geometry kit, instanced batches, textures, particles, the figures' shadows
 src/world/                    world runtime + one file per world (art, lighting, lap
                               variations, layout, obstacles, gem, doorway); whimsy.js holds
                               the shared later-lap props and light volumes, gems.js the
@@ -3582,6 +3668,23 @@ it with `leafParts(opening, { deco })`, `deco` dressing each face of it) and
 any extras, all with `stencil: false`, in the shared doors; `gateExtras`
 entries can be `[name, x, y, dz]` to stand something on the gate (the
 Gallery's clock hands).
+On the coast (the Blue Hour, see [above](#blue-hour-the-sea-comes-over-the-causeway)):
+`def.obstaclesAt(seg, d)` deals a stretch of the world its own obstacles (still
+list every spec in `obstacles`), `def.holdAt(seg, d)` keeps a stretch of road
+clear (return where it ends), and `def.frame(world, game, seg, dt)` is called
+every frame with the world's stretch of the course (move things with the
+runner there). An obstacle spec can be kept to some lanes (`lanes: [0, 2]`),
+weighted (`w`), and built the other way round for the left-hand lane
+(`left`, `withLeft`); `obstacles.twin: { L, W }` lists things laid across two
+neighbouring lanes at once (`twinChance` how often). Toon options: `coast`
+(the lighthouse's light on it, and the coast's surfaces by `mark` flag —
+0.13 foam, 0.23 a wave's body, painted dark to light up it, 0.33 wet stone,
+0.43 a tidal cut's opening with `cut: [length, depth]`), `wind: [bend,
+flutter, foot, hang]`, `sea`, `surge`, `wash` and `breaker: [cycle, height,
+1 to follow p1]`; ground patterns 18–20 are the coastal path through the
+grass, the causeway's slabs and the landing's boards and setts. `b.beam(…,
+{ unbend: true })` lays a long beam out straight on screen, however the
+world bends.
 Under the sea: `env.sea: { surface, rays, caustics, scale }` puts the
 rippling underside of the surface overhead, shafts fanning down from it and
 caustics on everything facing up (scale per metre, a multiple of 1/256);
