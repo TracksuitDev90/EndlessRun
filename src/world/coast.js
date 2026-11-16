@@ -519,17 +519,29 @@ function bollardGeo() {
   ]);
 }
 
-// A crescent of white water, curling landward (-x) off a crest, extruded
-// along z (centred).
-function lipShape(depth) {
-  const s = new THREE.Shape();
-  s.moveTo(0.3, 0);
-  s.quadraticCurveTo(0.35, 1.3, -0.55, 1.6);
-  s.quadraticCurveTo(-1.35, 1.8, -1.8, 1.1);
-  s.quadraticCurveTo(-1.15, 1.35, -0.6, 1.1);
-  s.quadraticCurveTo(-0.2, 0.75, -0.3, 0);
-  s.closePath();
-  return P.extrude(s, depth, 10);
+// The lip of a wave: a sheet of white water curling landward (-x) off its
+// crest and over, thinning and tapering to nothing toward its ends, its
+// leading edge ragged; `depth` long along z (centred). (Two-sided: the
+// waves draw both faces.)
+function lipShape(depth, seed = 1) {
+  const rnd = seeded(seed);
+  const ph = [rnd() * 6, rnd() * 6, rnd() * 6];
+  const bez = (t, a, b, c, d) => (1 - t) ** 3 * a + 3 * (1 - t) ** 2 * t * b + 3 * (1 - t) * t * t * c + t ** 3 * d;
+  return surface(10, 16, (u, v) => {
+    const z = (v - 0.5) * depth;
+    const e = Math.min(v, 1 - v) * 2;
+    const taper = Math.pow(e, 0.55) * (0.82 + 0.18 * Math.sin(v * 11 + ph[0]));
+    // how far over it's thrown here: further in the middle
+    const reach = 0.55 + 0.45 * Math.pow(e, 0.4) + 0.12 * Math.sin(v * 7 + ph[1]);
+    const t = u * reach;
+    let x = bez(t, 0.3, 0.55, -0.9, -1.75);
+    let y = bez(t, 0, 1.45, 2.05, 1.0);
+    // a ragged leading edge
+    const rag = u > 0.75 ? (u - 0.75) * 4 * 0.25 * Math.sin(v * 37 + ph[2]) : 0;
+    x += rag * 0.6;
+    y -= Math.abs(rag) * 0.5;
+    return [x * taper, y * taper, z];
+  });
 }
 
 // --- a breaker: a swell striking the rocks ------------------------------------------
@@ -551,7 +563,7 @@ function breakerGeo({ len = 7, seed = 1, spray = 34, up = [6, 11], wide = 1 } = 
   parts.push(withRole(part(sw, null, { grad: ['#000000', '#ffffff', 0, 1], mark: WAVE, outline: 0 }), 0));
   // its lip (role 4): a crescent of white water along the crest
   for (const [dz, k] of [[0, 1], [len * 0.35, 0.75], [-len * 0.4, 0.8]]) {
-    const lip = lipShape(len * 0.7);
+    const lip = lipShape(len * 0.75, seed * 3 + Math.round(k * 10));
     lip.scale(k, k, 1).translate(0.2 * (1 - k), 0, dz);
     parts.push(withRole(part(lip, C.foam, { mark: FOAM, outline: 0 }), 4));
   }
@@ -599,7 +611,7 @@ function surgeGeo() {
   });
   parts.push(withRole(part(sw, null, { grad: ['#000000', '#ffffff', 0, 1], mark: WAVE, outline: 0 }), 0));
   // the lip: a crescent of white water along the crest, curling landward
-  const lip = lipShape(8.5);
+  const lip = lipShape(8.5, 5);
   lip.translate(0, 0, -1.3);
   parts.push(withRole(part(lip, C.foam, { mark: FOAM, outline: 0 }), 1));
   // the curtain: a ragged sheet of white water, bulging and torn along its
@@ -1350,9 +1362,7 @@ function frame(world, game, seg, dt) {
   const origin = game.origin;
   const v = Math.max(game.speed, 9);
 
-  // the lighthouse, its glow and its beams, kept far off on the headland
-  // (raised by as much as the world's bend will sink it, so it stands on the
-  // horizon)
+  // The lighthouse, its glow and its beams, kept far off on the headland.
   // (In this curved world the sea's own horizon is only a hundred metres
   // or so off: the lighthouse is stood with its foot on that line - the
   // highest the sea reaches in the camera's eye - raised by however much
@@ -1468,7 +1478,7 @@ export default {
     light: { dir: [-0.35, 0.65, -0.65], shadow: [0.5, 0.58, 0.72], hi: [0.98, 1.03, 1.12], soft: 0.3, wrap: 0.4, hiAmt: 0.3, lift: 1 },
     rim: [0.6, 0.74, 0.98, 0.3],
     // sea mist lying low over the water, never up over the road near you
-    mist: { color: '#7d93ad', amount: 0.3, top: -1.2, fade: 2.6, near: 45, far: 190 },
+    mist: { color: '#64798f', amount: 0.24, top: -1.2, fade: 2.6, near: 55, far: 220 },
     grade: { sat: 0.98, contrast: 1.04, vignette: 0.3, exposure: 1.1, tint: '#0e1a2e' },
     ink: '#111925',
     fog: [65, 320],
@@ -1588,7 +1598,7 @@ export default {
     b.toon('breakerB', breakerGeo({ seed: 8, len: 9, spray: 60, up: [7, 12] }), { cap: 30, ink: 0, side: THREE.DoubleSide, breaker: [9.5, 4.4] });
     yield;
     // (the great wave beside you as you come out onto the causeway)
-    b.toon('bigBreaker', breakerGeo({ seed: 21, len: 14, spray: 160, up: [9, 15], wide: 2.1 }), { cap: 4, ink: 0, side: THREE.DoubleSide, breaker: [8, 7.2, 1] });
+    b.toon('bigBreaker', breakerGeo({ seed: 21, len: 12, spray: 160, up: [9, 14], wide: 1.5 }), { cap: 4, ink: 0, side: THREE.DoubleSide, breaker: [8, 5.2, 1] });
     yield;
 
     // the headland's walls, driftwood, old posts
@@ -1851,7 +1861,7 @@ function causewayChunk(ctx, S, rng, z, p0) {
     }
   }
   // the great wave, alongside you as you come out of the grass
-  if (d0 === S.mouth + CONFIG.chunkLength) ctx.put('bigBreaker', 8.2, 0, BIG_AHEAD - CONFIG.chunkLength, { p0: 0, p1: 0, s: 1.45 });
+  if (d0 === S.mouth + CONFIG.chunkLength) ctx.put('bigBreaker', -7.6, 0, BIG_AHEAD - CONFIG.chunkLength, { p0: 0, p1: 0, s: 1.3 });
 }
 
 // --- the fishing landing ---------------------------------------------------------

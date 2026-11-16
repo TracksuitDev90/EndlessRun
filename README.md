@@ -840,6 +840,8 @@ seed heads stream the same way (hung things are blown out sideways and lift
 as they go). Sea mist lies low on the water, never up over the road near you,
 and what you play against cuts through it.
 
+![Blue Hour: the coastal path through the long grass, the lighthouse on its headland; coming out onto the causeway as the beam sweeps over and a great wave breaks alongside; an overtopping wave rearing up beside the right-hand lane, then pouring into it; a wash running right across the causeway; the old fishing landing, a net-drying frame to slide under](docs/bluehour.jpg)
+
 ### The Frostbound Pass: snow that stays
 
 It is always snowing in the pass, and the snow stays. The first time

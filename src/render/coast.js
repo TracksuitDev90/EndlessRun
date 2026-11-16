@@ -253,8 +253,8 @@ export const COAST_VS_LOCAL = /* glsl */ `
       float sc = smoothstep(0.24, 0.36, f) * (1.0 - smoothstep(0.45, 0.5, f));
       float a2 = 1.9 * smoothstep(0.33, 0.47, f);
       float c = cos(a2), s = sin(a2);
-      lp *= sc * min(E / 4.2, 1.15);
-      lp.z *= max(1.0, E / 4.2) / min(E / 4.2, 1.15);
+      lp *= sc * min(E / 4.2, 1.2);
+      lp.z *= 1.0 / min(E / 4.2, 1.2);
       lp.xy = vec2(lp.x * c - lp.y * s, lp.x * s + lp.y * c);
       ln.xy = vec2(ln.x * c - ln.y * s, ln.x * s + ln.y * c);
       lp += vec3(mix(11.0, 0.8, a) - 0.4, SEA_Y + E * 0.96, 0.0);
@@ -441,7 +441,7 @@ export const COAST_FS_LIGHT = /* glsl */ `
         vec3 deep = vec3(0.075, 0.13, 0.2);
         vec3 body = mix(deep, vec3(0.15, 0.26, 0.32), smoothstep(-0.7, 0.4, h));
         body = mix(body, vec3(0.24, 0.4, 0.44), smoothstep(0.35, 0.95, h));
-        float fr = 0.06 + 0.8 * pow(1.0 - max(dot(n, -V), 0.0), 4.0);
+        float fr = 0.05 + 0.5 * pow(1.0 - max(dot(n, -V), 0.0), 5.0);
         vec3 sky = skyColor(reflect(V, n));
         col = mix(body * mix(shade, vec3(1.0), 0.5), sky, fr);
         float t = uTime;
@@ -475,7 +475,7 @@ export const COAST_FS_LIGHT = /* glsl */ `
         if (isFoam > 0.0) {
           // foam holds the light: barely shaded, the beam lighting it up
           col = mix(col, base * mix(shade, vec3(1.0), 0.7), 0.75);
-          col += BEACON_COL * bk * 0.5;
+          col += BEACON_COL * bk * (0.5 + 1.5 * uBeacon2.w);
         }
         if (isWave > 0.0) {
           float fr = pow(1.0 - abs(dot(n, V)), 3.0);
@@ -491,7 +491,7 @@ export const COAST_FS_LIGHT = /* glsl */ `
         col += BEACON_COL * bk * base * 0.6 * (1.0 - isFoam);
         #if defined(SURGE) || defined(WASH) || defined(BREAKER)
           // the spray flung up into the beam lights up warm
-          col += BEACON_COL * bk * vSpray * (0.8 + 2.6 * uBeacon2.w);
+          col += BEACON_COL * bk * vSpray * (0.9 + 4.0 * uBeacon2.w);
         #endif
       #endif
     #endif
@@ -576,8 +576,8 @@ export const COAST_GROUND = /* glsl */ `
     float ridge = smoothstep(0.85, 1.15, lx) * smoothstep(0.45, 0.7, n3);
     path = mix(path, vec3(0.22, 0.3, 0.29), ridge * 0.6 * (1.0 - far));
     // grit and small stones, soft-edged
-    float gn = texture2D(uNoise, p * vec2(1.25, 0.75) + 0.19).g;
-    path = mix(path, uGroundC, smoothstep(0.7, 0.82, gn) * 0.35 * (1.0 - far));
+    float gn = texture2D(uNoise, p * vec2(0.6875, 0.4375) + 0.19).g * 0.6 + texture2D(uNoise, p * vec2(0.21875, 0.1875) + 0.47).g * 0.4;
+    path = mix(path, uGroundC, smoothstep(0.55, 0.8, gn) * 0.22 * (1.0 - far));
     path = mix(path, uGroundA * 1.25, smoothstep(0.74, 0.86, n3) * 0.25 * (1.0 - far));
     float pd = texture2D(uNoise, p * vec2(0.34375, 0.25) + 0.17).g;
     float puddle = smoothstep(0.75, 0.79, pd + worn * 0.06) * (1.0 - smoothstep(3.6, 4.0, ax));
