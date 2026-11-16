@@ -513,35 +513,42 @@ function burningFire(ctx, sit, x, z, s, rng) {
   }
 }
 
-// Where they are along a stretch of Hell: nine of them, spread from just
+// Where they are along a stretch of Hell: nine of them at the road, spread from just
 // inside the door in to just short of the door out, now one side of the road
 // and now the other, right at its edge. Each chunk asks whether one of them
 // is in it (index: the chunk's, count: how many chunks the stretch is long).
 const BURNING = 9;
 const BURNING_KINDS = ['burningStand', 'burningSit', 'burningReach', 'burningSit', 'burningStand', 'burningSit', 'burningReach', 'burningStand', 'burningSit'];
 const BURNING_SIDES = [1, -1, -1, 1, -1, 1, 1, -1, 1];
+// (and five more further out on the plain, between those)
+const BURNING_FAR = 5;
 function burningIn(index, count, start, visit) {
+  const out = [];
   const span = count - 7;
-  if (span < BURNING) return null;
+  if (span < BURNING) return out;
   const rnd = seeded(1 + (Math.abs(Math.round(start / 16)) * 131 + visit * 17) % 9973);
   rnd();
   const turn = Math.floor(rnd() * BURNING);
   const flip = rnd() < 0.5 ? -1 : 1;
-  for (let k = 0; k < BURNING; k++) {
+  for (let k = 0; k < BURNING + BURNING_FAR; k++) {
+    const far = k >= BURNING;
     const jitter = rnd();
-    const u = [rnd(), rnd(), rnd(), rnd()];
-    if (3 + Math.floor(((k + 0.2 + jitter * 0.6) * span) / BURNING) !== index) continue;
-    const name = BURNING_KINDS[(k + turn) % BURNING];
+    const u = [rnd(), rnd(), rnd(), rnd(), rnd()];
+    const slot = far ? ((k - BURNING + 0.25 + jitter * 0.5) * span) / BURNING_FAR : ((k + 0.2 + jitter * 0.6) * span) / BURNING;
+    if (3 + Math.floor(slot) !== index) continue;
+    const name = far ? (u[4] < 0.45 ? 'burningSit' : u[4] < 0.8 ? 'burningStand' : 'burningReach') : BURNING_KINDS[(k + turn) % BURNING];
     const sit = name === 'burningSit';
-    const side = BURNING_SIDES[k] * flip;
-    // nearer the road every time you come back
-    const off = (sit ? 5.0 : 5.1) + u[0] * (visit ? 0.5 : 1.1);
+    const side = far ? (u[4] * 7 % 1 < 0.5 ? -1 : 1) : BURNING_SIDES[k] * flip;
+    // at the road's edge (nearer every time you come back), or out on the plain
+    const off = far ? 9 + u[0] * 11 : (sit ? 5.3 : 5.4) + u[0] * (visit ? 0.5 : 1.1);
     // turned toward the road, anywhere from facing you as you come to
     // facing well away down it
     const away = sit ? 0.35 + u[1] * 1.3 : 0.3 + u[1] * 2.1;
-    return { name, sit, side, x: side * off, z: 3 + u[2] * 10, ry: -side * away, s: sit ? 1.1 + u[3] * 0.15 : 1.05 + u[3] * 0.15 };
+    // taller than anyone living, the far ones taller still
+    const s = (sit ? 1.6 : 1.5) + u[3] * 0.25 + (far ? 0.35 : 0);
+    out.push({ name, sit, far, side, x: side * off, z: 3 + u[2] * 10, ry: -side * away, s });
   }
-  return null;
+  return out;
 }
 
 // Lava splashing (see SPLASH in the shaders): every so often a spot in the
@@ -622,32 +629,27 @@ function crustRimGeo(seed) {
   return merge(parts);
 }
 
-// A stretch of lava river running alongside the road (16 m, its banks
-// wandering in whole waves so the stretches join up).
-function riverGeo(w, seed) {
-  const n = 16;
-  const s = new THREE.Shape();
-  const edge = (z, side) => side * (w + 0.5 * Math.sin((z / 16) * Math.PI * 2 + seed) + 0.3 * Math.sin((z / 16) * Math.PI * 4 + side));
-  s.moveTo(edge(0, -1), 0);
-  for (let i = 1; i <= n; i++) s.lineTo(edge(i, -1), i);
-  for (let i = n; i >= 0; i--) s.lineTo(edge(i, 1), i);
-  s.closePath();
-  const g = new THREE.ShapeGeometry(s, 1);
+// The lava river running alongside the road: a wide flat strip a chunk long
+// (uv in metres), on which the shader draws the river itself - its wandering
+// channel, the rafts of crust crowding its banks (see RIVER in the shaders).
+const RIVER_X = 20;
+const RIVER_HALF = 17;
+function riverGeo() {
+  const g = new THREE.PlaneGeometry(RIVER_HALF * 2, 16, 1, 1);
   g.rotateX(-Math.PI / 2);
+  g.translate(0, 0, -8);
+  const pos = g.attributes.position.array;
+  const uv = g.attributes.uv.array;
+  for (let i = 0; i < pos.length / 3; i++) {
+    uv[i * 2] = pos[i * 3];
+    uv[i * 2 + 1] = -pos[i * 3 + 2];
+  }
   return merge([part(g, C.lava, { y: 0.06, emit: 1, outline: 0 })]);
 }
-
-function riverBankGeo(w, seed) {
-  const rnd = seeded(seed);
-  const parts = [];
-  for (const side of [-1, 1]) {
-    for (let z = 0.5; z < 16; z += 1.4 + rnd()) {
-      const x = side * (w + 0.5 * Math.sin((z / 16) * Math.PI * 2 + seed) + 0.6);
-      parts.push(...basaltRock({ r: 0.3 + rnd() * 0.35, sy: 0.55, seed: seed + z * 3 }).map((g) => g.translate(x, -0.1, -z)));
-    }
-  }
-  return merge(parts);
-}
+// which side it's on and how surely, a metres along (the shader's own wave)
+const riverSide = (a) => Math.sin(a * 0.0030679616 + 1.3);
+// and where its middle lies across the strip there (the shader's riverBed)
+const riverMid = (a) => 4.5 * Math.sin(a * 0.0245437) + 2.2 * Math.sin(a * 0.0736311 + 1.7);
 
 // --- obstacles ---------------------------------------------------------------------
 // L · A low ridge of black basalt across one lane, ash on its crest, fire in
@@ -884,7 +886,7 @@ export default {
     b.toon('cage', gibbetCageGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.12, 0.9, 0] });
     yield;
     // the burning: lit by nothing but themselves, standing clear of the smoke
-    const burn = (neck, o) => ({ cap: 6, ink: 0.022, crust: [1.25, 0.16, 1], clear: 0.6, watch: { neck, far: 78, near: 26, ...o } });
+    const burn = (neck, o) => ({ cap: 10, ink: 0.022, crust: [1.25, 0.16, 1], clear: 0.6, watch: { neck, far: 78, near: 26, ...o } });
     b.toon('burningStand', burningStandGeo(false), burn(STAND_NECK, { body: 0.8, bow: 0.6, head: 1.25 }));
     yield;
     b.toon('burningReach', burningStandGeo(true), burn(STAND_NECK, { body: 1, bow: 0.5, head: 1.1 }));
@@ -897,15 +899,13 @@ export default {
     yield;
     b.toon('poolSplash', splashGeo({ bursts: 3, n: 7, rx: 3.0, rz: 1.8, up: [4.5, 7], out: 1.8, size: [0.11, 0.26], period: [1.2, 2.2], seed: 7 }), { cap: 16, anim: 'pop', ink: 0, splash: true });
     yield;
-    b.toon('river', riverGeo(2.2, 1), { cap: 24, lava: true, ink: 0 });
-    yield;
-    b.toon('riverBank', riverBankGeo(2.2, 1), { cap: 24, ink: 0.03, crust: FINE });
+    b.toon('river', riverGeo(), { cap: 24, lava: true, river: true, ink: 0 });
     yield;
     b.toon('riverSplash', splashGeo({ bursts: 2, n: 6, rx: 1.6, rz: 6, cz: -8, up: [4, 7], out: 1.6, size: [0.12, 0.26], seed: 11 }), { cap: 24, ink: 0, splash: true });
     yield;
     b.glow('glow', { cap: 100, anim: 'pop' });
     yield;
-    b.fire('fire', { cap: 48 });
+    b.fire('fire', { cap: 96 });
     yield;
     b.pool('pool', { cap: 60, anim: 'pop' });
     yield;
@@ -963,20 +963,20 @@ export default {
     ctx.put('ground', 0, 0, 0, { p0: ctx.d0 % 4096 });
     // the plain stays empty near the road: only now and then a little rubble,
     // a dead tree or a gibbet, and the big shapes stand far off
-    const river = Math.sin(ctx.d0 * 0.004 + 1.3);
+    const along = ((ctx.d0 % 4096) + 4096) % 4096;
+    const river = riverSide(along + 8);
     // one of the burning, at the road's edge (never in what carries on round
     // the doorway out)
-    const burning = ctx.continuation ? null : burningIn(ctx.index, ctx.index + Math.round(ctx.toEnd / ctx.L), ctx.seg.start, ctx.visit);
-    if (burning) {
-      const { name, sit, x, z, ry, s } = burning;
+    const burning = ctx.continuation ? [] : burningIn(ctx.index, ctx.index + Math.round(ctx.toEnd / ctx.L), ctx.seg.start, ctx.visit);
+    for (const { name, sit, x, z, ry, s } of burning) {
       ctx.put(name, x, 0, z, { ry, s });
       burningFire(ctx, sit, x, z, s, rng);
-      ctx.put('glow', x, (sit ? 1.1 : 1.6) * s, z, { s: (sit ? 5.5 : 6.5) * s, c: [0.8, 0.3, 0.07] });
+      ctx.put('glow', x, (sit ? 1.3 : 1.9) * s, z, { s: (sit ? 3.4 : 4.2) * s, c: [0.8, 0.3, 0.07] });
       ctx.put('pool', x, 0.05, z, { sx: 7 * s, sz: 7 * s, c: [0.75, 0.75, 0.75] });
     }
     for (const s of [-1, 1]) {
       // (nothing else stands where one of them is)
-      const clear = burning && burning.side === s;
+      const clear = burning.some((f) => !f.far && f.side === s);
       if (!clear && rng.chance(0.35)) ctx.put(rng.chance(0.5) ? 'rubble' : 'rubbleB', s * rng.float(5.4, 13), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.7, 1.2) });
       if (!clear && rng.chance(0.22)) ctx.put(rng.chance(0.6) ? 'deadTree' : 'deadTreeB', s * rng.float(6.5, 18), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.4) });
       if (rng.chance(0.22)) ctx.put(rng.chance(0.5) ? 'columns' : 'columnsB', s * rng.float(18, 55), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.5) });
@@ -1007,7 +1007,8 @@ export default {
           ctx.put('glow', x, y - 0.8 * k, z, { s: 4.5 * k, c: [0.42, 0.42, 0.46] });
         }
       }
-      if (rng.chance(0.18)) {
+      // (a pool of lava, where the river isn't)
+      if (rng.chance(0.18) && s * river < 0.2) {
         const x = s * rng.float(10, 24);
         const z = rng.float(2, 14);
         const ry = rng.float(0, 6.28);
@@ -1019,12 +1020,13 @@ export default {
         ctx.put('glow', x, 1.2, z, { s: 8 * k, c: [1, 0.42, 0.12] });
       }
       // a lava river winds alongside for long stretches on one side
-      if ((s > 0) === (river > 0) && Math.abs(river) > 0.35) {
-        const x = s * (24 + 6 * Math.abs(river));
-        ctx.put('river', x, 0, 16, {});
-        ctx.put('riverBank', x, 0, 16, {});
-        ctx.put('riverSplash', x, 0, 16, { p0: rng.float(0, 6.28) });
-        if (ctx.index % 2 === 0) ctx.put('glow', x, 1.4, 8, { s: 10, c: [1, 0.4, 0.1] });
+      if (s * riverSide(along) > 0.28 || s * riverSide(along + 16) > 0.28) {
+        ctx.put('river', s * RIVER_X, 0, 0, { p0: along });
+        if (s * river > 0.5) {
+          const x = s * RIVER_X + riverMid(along + 8);
+          ctx.put('riverSplash', x, 0, 0, { p0: rng.float(0, 6.28) });
+          ctx.put('glow', x, 1.6, 8, { s: 14, c: [1, 0.4, 0.1] });
+        }
       }
     }
     if (ctx.index % 9 === 4 && rng.chance(0.7)) {
