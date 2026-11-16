@@ -48,6 +48,12 @@ export const CONFIG = {
   },
 
   jump: { height: 1.6, time: 0.64 }, // apex height (m), total airtime (s)
+  // Something bouncy (spec.bounce: Candy World's gumdrops): come down on it,
+  // or catch it in the air, and it throws you up `k` times as hard as a jump
+  // (`held` more again if jump is pressed as you land on it); and the next
+  // row is kept at least `after` seconds of running past it, for the longer
+  // flight.
+  bounce: { k: 1.3, held: 1.1, after: 1.3 },
   // Low gravity (a world with def.lowGravity: the Red Drift; see
   // game/drift.js). The boost - the jump, there - leaves the ground at v0
   // (m/s) under `up` gravity (m/s²) until it's climbing slower than `hover`,

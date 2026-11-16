@@ -319,7 +319,8 @@ export class ObstacleField {
     const X = this.nextCrossing();
     let limit = Infinity;
     if (X) {
-      const room = Math.max(11, v * o.minAfterVertical);
+      // (in a world of bouncy things, room for the longer flight off one)
+      const room = Math.max(11, v * (X.world.def.bouncy ? CONFIG.bounce.after : o.minAfterVertical));
       if (X.d0 < d + room + 3.5) {
         this.placeCrossing(X);
         this.nextD = Math.max(d, X.d1 + Math.max(12, v * lerp(o.gapEasy, o.gapHard, this.difficultyFor(X.d0, eta)) * 0.8, v * o.minAfterVertical));
@@ -369,8 +370,11 @@ export class ObstacleField {
       const len = this.placeRow(world, d, row);
       d += len;
       last = row;
+      // (something bouncy in it: room for the longer flight off it)
+      const bounced = this.rows[this.rows.length - 1].bounce;
+      if (bounced) last = { ...row, bounced };
       if (i < rows.length - 1) {
-        const min = needsVertical(row) ? o.minAfterVertical * airMul : o.minAfterLane;
+        const min = bounced ? CONFIG.bounce.after : needsVertical(row) ? o.minAfterVertical * airMul : o.minAfterLane;
         d += Math.max(11, v * Math.max(min, rowGap * (rows[i + 1].gap ?? 1)));
       }
     }
@@ -381,7 +385,7 @@ export class ObstacleField {
       gap *= o.breatherMul;
       this.untilBreather = r.int(o.breatherEvery[0], o.breatherEvery[1]);
     }
-    if (last) gap = Math.max(gap, needsVertical(last) ? o.minAfterVertical * airMul : o.minAfterLane);
+    if (last) gap = Math.max(gap, last.bounced ? CONFIG.bounce.after : needsVertical(last) ? o.minAfterVertical * airMul : o.minAfterLane);
     this.nextD = d + Math.max(12, v * gap);
     // (and never past a river's crossing without laying it)
     if (X) this.nextD = Math.min(this.nextD, Math.max(d, X.d0));
@@ -724,6 +728,7 @@ export class ObstacleField {
       if (!spec.flat) this.shadow(world, group, 0, d, spec.len, 8.6, row.wide === 'L' ? 0.9 : 2.2);
       for (let lane = 0; lane < 3; lane++) lanes[lane] = this.record(group, lane, d, spec.len, row.wide, spec);
       laid.end = d + spec.len;
+      if (spec.bounce) laid.bounce = true;
       return spec.len;
     }
     let maxLen = 0;
@@ -748,6 +753,7 @@ export class ObstacleField {
       if (!spec.flat) this.shadow(world, group, x, d, spec.len, 2.4, kind === 'L' ? 0.9 : kind === 'H' ? 2.2 : 3);
       lanes[lane] = this.record(group, lane, d, spec.len, kind, spec);
       laid.end = Math.max(laid.end, d + spec.len);
+      if (spec.bounce) laid.bounce = true;
       maxLen = Math.max(maxLen, spec.len);
     }
     return maxLen;
@@ -826,7 +832,8 @@ export class ObstacleField {
   }
 
   // spec.top overrides the kind's collision top; spec.wade marks something
-  // you can't stand on (water): landing in it trips you like running into it.
+  // you can't stand on (water): landing in it trips you like running into it;
+  // spec.bounce something that bounces you (Candy World's gumdrops).
   record(group, lane, d, len, kind, spec) {
     const y = KIND_Y[kind];
     const rec = {
@@ -840,6 +847,9 @@ export class ObstacleField {
       y1: spec?.top ?? y[1],
       kind,
       wade: !!spec?.wade,
+      // (something bouncy: come down on it, or catch it in the air, and it
+      // throws you up - see CONFIG.bounce and Game.boinged)
+      bounce: !!spec?.bounce,
       hit: false,
     };
     this.records.push(rec);
@@ -858,6 +868,7 @@ export class ObstacleField {
   groundAt(x, dist, y = Infinity) {
     let h = 0;
     let ramp = false;
+    let bounce = null;
     const pw = CONFIG.player.halfWidth;
     const pd = CONFIG.player.halfDepth;
     for (const o of this.records) {
@@ -870,9 +881,12 @@ export class ObstacleField {
       if (top > h || (top === h && o.ramp)) {
         h = top;
         ramp = !!o.ramp;
+        bounce = o.bounce ? o : null;
       }
     }
     this.rampUnder = ramp;
+    // (and whether it's something bouncy: see CONFIG.bounce)
+    this.bounceUnder = bounce;
     return h;
   }
 

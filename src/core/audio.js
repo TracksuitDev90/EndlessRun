@@ -453,6 +453,39 @@ export class Ambient {
     if (crown) this.ting(hz(m + 12), t + 0.06, 0.035);
   }
 
+  // A bounce off a gumdrop: a soft rubbery thup, then a note springing up
+  // with a wobble on it - boing (bigger: a super bounce, sprung higher).
+  boing(big = false) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    this.knock(t, 0.16, 180, 90);
+    const f0 = hz(big ? 55 : 52), f1 = hz(big ? 79 : 74);
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + 0.16);
+    o.frequency.exponentialRampToValueAtTime(f1 * 0.94, t + 0.42);
+    // (the wobble)
+    const lfo = ctx.createOscillator();
+    lfo.frequency.setValueAtTime(15, t);
+    lfo.frequency.linearRampToValueAtTime(8, t + 0.4);
+    const lg = ctx.createGain();
+    lg.gain.setValueAtTime(f1 * 0.05, t);
+    lg.gain.exponentialRampToValueAtTime(f1 * 0.005, t + 0.42);
+    lfo.connect(lg).connect(o.frequency);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(big ? 0.09 : 0.07, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    o.connect(g).connect(this.bus);
+    o.start(t);
+    lfo.start(t);
+    o.stop(t + 0.47);
+    lfo.stop(t + 0.47);
+    setTimeout(() => g.disconnect(), 800);
+  }
+
   // A stumble: a soft, papery thud - a low knock with a scuff of noise on
   // it - and a little wobble of a note dropping, enough to know you were hit
   // without drowning the road.

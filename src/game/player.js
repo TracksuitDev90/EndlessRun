@@ -808,6 +808,20 @@ export class Player {
     this.jumpSide = -this.jumpSide;
   }
 
+  // Thrown up off something bouncy (a gumdrop): a jump of their own, pose,
+  // trick and all, only harder (CONFIG.bounce). (boingNew: for the game to
+  // hear of it.)
+  boing(extra = false) {
+    this.jump();
+    const B = CONFIG.bounce;
+    this.vy = Math.max(this.vy, this.V0 * B.k * (extra ? B.held : 1));
+    this.vyPose = this.vy;
+    this.vyOff = 0;
+    this.landClock = 9;
+    this.boingNew = true;
+    this.boingBig = extra;
+  }
+
   startSlide() {
     if (this.slideT <= 0) {
       this.slideSide = -this.slideSide;
@@ -986,15 +1000,22 @@ export class Player {
         this.ledgeT = 0;
         this.drift = false;
         this.bounding = false;
-        this.onLand(this.landHit);
-        if (low || this.lowG) this.landLow(ground, wasBound, this.landHit);
         // (a jump pressed in the air is remembered for inputBuffer up to the
         // moment the feet touch down, wherever in the step that was - not
         // up to the end of the step: the same at 30 fps as at 60)
         const down = prevY - F.fall > 1e-6 ? Math.min(1, Math.max(0, (prevY - ground) / (prevY - F.fall))) : 1;
-        if (this.crashed) {
-          // stay down
-        } else if (held && this.jumpBuffer + (1 - down) * dt > 0) {
+        const jumped = held && this.jumpBuffer + (1 - down) * dt > 0;
+        if (this.springy && !this.crashed) {
+          // come down on something bouncy: thrown straight back up off it
+          // (higher still if jump was pressed as they landed)
+          this.boing(jumped);
+        } else {
+          this.onLand(this.landHit);
+          if (low || this.lowG) this.landLow(ground, wasBound, this.landHit);
+        }
+        if (this.crashed || !this.grounded) {
+          // stay down (or bounced off)
+        } else if (jumped) {
           this.takeOff();
         } else if (this.slideQueued) {
           this.slideQueued = false;

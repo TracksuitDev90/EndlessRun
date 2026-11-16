@@ -7,12 +7,14 @@ import { CONFIG } from '../config.js';
 // streaming in, or the obstacle director looking ahead), from the run's seed
 // and where the world starts, so both always agree on where it runs.
 //
-// The plan: four crossings, spaced out along the world; between them the
-// river runs alongside the road for a while - close beside it, or winding
-// off into the hills and back - and turns in across the road at a slant, its
-// banks bowed and wandering, to carry on up the other side. Sometimes it
-// comes down toward you on the far side of the hills and swings across in a
-// hairpin. A smooth line is drawn through the waypoints, and the river
+// The plan: five crossings, spaced out along the world - three on their
+// own, and one place where the river cuts back on itself: across the road,
+// round in a loop on the far side and straight back across, two jumps one
+// after the other. Between them the river runs alongside the road for a
+// while - close beside it, or winding off into the hills and back - and
+// turns in across the road at a slant, its banks bowed and wandering, to
+// carry on up the other side. Sometimes it comes down toward you on the far
+// side of the hills and swings across in a hairpin. A smooth line is drawn through the waypoints, and the river
 // follows it the way a stream finds its bed: as a chain of short arcs (each
 // PIECE m long), steered after a point a little way along the line ahead,
 // never bending tighter than a few metres. Every piece's arc and banks are
@@ -37,6 +39,11 @@ const INSET = 0.1;
 // how far the bank (its crumbs, its sweets) reaches out past the chocolate
 export const BANK = 0.85;
 const RMIN = 6.5;
+// a cut-back: how far apart its two crossings are along the road, from the
+// far bank of the first to the near bank of the second (m) - room at the
+// top speed to land and take off again (CONFIG.obstacles.minAfterVertical),
+// and close enough to read as one place, two jumps one after the other
+const CUT_GAP = [25.5, 34];
 
 // The banks wander in and out along the river (the same as riverWob in
 // render/candy.js).
@@ -92,7 +99,8 @@ function catmull(W, step) {
 }
 
 // The waypoints: where the river comes in, each crossing (a slanting line
-// through the road, bowed a little), and between them where it wanders.
+// through the road, bowed a little, or a cut-back: { c, G }), and between
+// them where it wanders.
 function waypoints(seg, rng, crossings) {
   const D0 = seg.start, D1 = seg.end;
   let side = rng.sign();
@@ -107,9 +115,28 @@ function waypoints(seg, rng, crossings) {
       d += rng.float(32, 52);
     }
   };
-  const plan = [];
   for (let k = 0; k < crossings.length; k++) {
-    const c = crossings[k];
+    const { c, G } = crossings[k];
+    if (G) {
+      // a cut-back: in alongside on this side, square across the road, out
+      // on the far side and round in a loop (radius G / 2), and straight
+      // back across G m on, to carry on up this side
+      wander(c - 52, true);
+      W.push([side * 26.5, c - 48]);
+      W.push([side * 26, c - 34]);
+      const out = rng.float(11, 12.5);
+      const R = G / 2;
+      for (const x of [22, 15, 7.5, 0, -7.5]) W.push([side * x, c]);
+      for (let i = 0; i <= 10; i++) {
+        const a = -Math.PI / 2 + (Math.PI * i) / 10;
+        W.push([-side * (out + R * Math.cos(a)), c + R + R * Math.sin(a)]);
+      }
+      for (const x of [-7.5, 0, 7.5, 15, 22]) W.push([side * x, c + G]);
+      W.push([side * 26, c + G + 34]);
+      W.push([side * 26.5, c + G + 48]);
+      at = c + G + 48;
+      continue;
+    }
     const phi = rng.float(0.16, 0.48) * rng.sign();
     const bow = rng.float(0.6, 1.4) * rng.sign();
     const hairpin = c - at > 150 && rng.chance(0.4);
@@ -139,7 +166,6 @@ function waypoints(seg, rng, crossings) {
     W.push([side * 26, c + 34]);
     W.push([side * 26.5, c + 48]);
     at = c + 48;
-    plan.push({ c, phi });
   }
   // and away into the hills before the doorway out
   wander(D1 - 120, true);
@@ -228,18 +254,31 @@ function onRoad(P) {
   return false;
 }
 
-// (n: how many crossings; spread evenly along the world, give or take)
-function attempt(seg, rng, n) {
+// (n: how many places it crosses, spread evenly along the world, give or
+// take; cut: whether one of them is a cut-back, crossing twice)
+function attempt(seg, rng, n, cut = false) {
   const D0 = seg.start, D1 = seg.end;
   const cs = [];
   if (n > 0) {
     const a = D0 + 128, b = D1 - 140;
     const step = n > 1 ? (b - a) / (n - 1) : 0;
     if (n > 1 && step < 98) return null;
+    // (the cut-back anywhere but first, so the river has room to come in)
+    const at = cut ? rng.int(1, n - 1) : -1;
     for (let k = 0; k < n; k++) {
       const jig = n > 1 ? rng.float(-0.12, 0.12) * (step - 98) : 0;
-      cs.push(n > 1 ? a + k * step + jig : D0 + rng.float(0.35, 0.65) * (D1 - D0));
+      const c = n > 1 ? a + k * step + jig : D0 + rng.float(0.35, 0.65) * (D1 - D0);
+      if (k === at) {
+        const G = rng.float(CUT_GAP[0], CUT_GAP[1] - 2) + 2.6;
+        cs.push({ c: c - G / 2, G });
+      } else cs.push({ c });
     }
+  }
+  // (each crossing the plan means to make, in order: a cut-back's two)
+  const want = [];
+  for (const c of cs) {
+    if (c.G) want.push(1, 2);
+    else want.push(0);
   }
   const pieces = follow(catmull(waypoints(seg, rng, cs), 0.5));
   // every run of pieces on the road must be one crossing, right across it
@@ -277,11 +316,24 @@ function attempt(seg, rng, n) {
     const d0 = Math.min(...lanes.map((o) => o.d0));
     const d1 = Math.max(...lanes.map((o) => o.d1));
     if (d0 < D0 + 100 || d1 > D1 - 110) return null;
-    crossings.push({ d0, d1, lanes, top: RIVER_TOP, first: i, last: j, laid: false });
+    // (pair: 1 and 2, a cut-back's first crossing and its second)
+    crossings.push({ d0, d1, lanes, top: RIVER_TOP, first: i, last: j, laid: false, pair: want[crossings.length] || 0 });
     i = j;
   }
-  if (crossings.length !== cs.length) return null;
-  for (let k = 1; k < crossings.length; k++) if (crossings[k].d0 - crossings[k - 1].d1 < 60) return null;
+  if (crossings.length !== want.length) return null;
+  for (let k = 1; k < crossings.length; k++) {
+    const X = crossings[k];
+    // (a cut-back's two close together, but each its own jump at any pace -
+    // from the far bank of the first to the near bank of the second in every
+    // lane; anything else well apart)
+    if (X.pair === 2) {
+      const P = crossings[k - 1];
+      for (let l = 0; l < 3; l++) {
+        const g = X.lanes[l].d0 - P.lanes[l].d1;
+        if (g < CUT_GAP[0] || g > CUT_GAP[1]) return null;
+      }
+    } else if (X.d0 - crossings[k - 1].d1 < 60) return null;
+  }
   return { pieces, crossings };
 }
 
@@ -291,11 +343,16 @@ function attempt(seg, rng, n) {
 // is handed the plan at the end.
 export function* planRiverSteps(seg, seed, done) {
   let plan = null;
-  // (four crossings - four jumps over the chocolate - if it can be done;
-  // failing that three, then two, then one)
-  for (let n = 0; n < 22 && !plan; n++) {
-    plan = attempt(seg, new RNG(hashSeed(seed, seg.start, n, 0x7c)), n < 12 ? 4 : n < 16 ? 3 : n < 19 ? 2 : n < 21 ? 1 : 0);
-    yield;
+  // (five jumps over the chocolate - three crossings and a cut-back - if it
+  // can be done; failing that four crossings, then three, two, one)
+  const TRIES = [[4, true, 16], [4, false, 4], [3, false, 4], [2, false, 3], [1, false, 2], [0, false, 1]];
+  let t = 0;
+  for (const [n, cut, k] of TRIES) {
+    for (let i = 0; i < k && !plan; i++, t++) {
+      plan = attempt(seg, new RNG(hashSeed(seed, seg.start, t, 0x7c)), n, cut);
+      yield;
+    }
+    if (plan) break;
   }
   if (!plan) plan = { pieces: [], crossings: [] };
   const rng = new RNG(hashSeed(seed, seg.start, 0x51));

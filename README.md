@@ -66,7 +66,7 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane through a lived-in neighbourhood: now and then a greengrocer's or a bakery café on a ground floor, picket fences round front gardens of raspberry canes, market stalls on the verge (apples, grapefruit and oranges at one; watermelons, grapes and pineapples at the other), benches, post boxes, a bike with a basket of apples, the bus stop's shelter; and the market spilling into the road (see [The breather](#the-breather-the-cypress-lane)) | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
 | II | **The Glasshouse** — a white-ribbed greenhouse tunnel gone to jungle: a path of mossy old stone pavers between beds crowded with zinnias and spilling over their edges, banana plants arching up into the roof, elephant ears, barred calatheas, ferns, monstera and dark ficus, Spanish moss hanging in curtains from the purlins, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | warm, humid and soft: sunlight through glass fogged with condensation, a gentle golden haze far down the tunnel, soft sunbeams slanting down over the beds, motes drifting in them, leaf-dappled pavers, deep green shade closing in at the edges | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias; old palm houses in the morning sun — Spanish moss, banana leaves, elephant ears and calatheas along a winding paved path |
 | III | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, moss everywhere — cushions of it heaped over the roots and carpeting the floor, its spore stalks standing up out of it, beards of it hanging from the trunks — a trodden path through long grass (thick right along its edges, taller still in among the trunks), ferns, wildflowers, glowing mushrooms, fireflies wandering and flashing over the path and in among the trees (a few by day, the wood full of them by night), campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
-| IV | **Candy World** — out of the Deepwood's shade into a country made of sweets (see [Candy World](#candy-world)): a dead-flat road of big docked biscuits in staggered courses, strips of wafer down the lane lines and round butter cookies scalloping its edges, a shell border of frosting piped along it; rolling hills of frosting, sprinkled, drizzled with chocolate and crowned with cherries; gingerbread villages iced like wedding cakes; layered cake mesas; ice-cream towers of waffle cone with scoops as big as rooms; lollipop orchards, cotton-candy trees and candy canes as tall as trees; and a land, not a sweet shop tipped out: its candy is its nature — gumdrop bushes, lollipop flowers, piped frosting rosettes, meringue peaks, gummy succulents with sugared jelly fruit fallen under them, rock-candy crystals, chocolate outcrops and truffle boulders, groves of giant candy canes, gummy bears grazing — and what's baked is its towns: gingerbread houses with gardens, an ice-cream district with a parlour's stand and a picnic laid out for a garden party; each side of the road one landscape for a while, its sweets growing in patches with open, rolling frosting between; marshmallow clouds drifting overhead; and a river of melted chocolate winding through it all, now alongside the road, now right across it | sugar-bright and soft: pastel light whose shade is lavender rather than grey, glossy chocolate and boiled sweets catching it, sugar glittering | the candy world concept sheet; gingerbread houses, sweet-shop windows, and the chocolate river of every childhood |
+| IV | **Candy World** — out of the Deepwood's shade into a country made of sweets (see [Candy World](#candy-world)): a dead-flat road of big docked biscuits in staggered courses, strips of wafer down the lane lines and round butter cookies scalloping its edges, a shell border of frosting piped along it; rolling hills of frosting, sprinkled, drizzled with chocolate and crowned with cherries; gingerbread villages iced like wedding cakes; layered cake mesas; ice-cream towers of waffle cone with scoops as big as rooms; lollipop orchards, cotton-candy woods and candy canes as tall as trees; cupcakes as big as houses and hills of ice cream; and a land, not a sweet shop tipped out: its candy is its nature — gumdrop bushes, lollipop flowers, piped frosting rosettes, meringue peaks, gummy succulents with sugared jelly fruit fallen under them, rock-candy crystals, chocolate outcrops and truffle boulders, groves of giant candy canes, gummy bears grazing — and what's baked is its towns: gingerbread houses with gardens, an ice-cream district with a parlour's stand and a picnic laid out for a garden party; each side of the road one landscape for a while, its sweets growing in patches with open, rolling frosting between; marshmallow clouds drifting overhead; bouncy gumdrops in the road that throw you up high; and a river of melted chocolate winding through it all, now alongside the road, now right across it, once cutting back across twice in a row | sugar-bright and soft: pastel light whose shade is lavender rather than grey, glossy chocolate and boiled sweets catching it, sugar glittering | the candy world concept sheet; gingerbread houses, sweet-shop windows, and the chocolate river of every childhood |
 | V | **The Night Rooftops** — New York over the roofs at night (see [New York at night](#new-york-at-night)): a tar-paper roof walkway behind a brick parapet, gooseneck lamps and strings of little lights, washing stirring on the lines strung across it; either side the roofs of tenements and lofts at every height — brick and limestone, cornices, windows lit warm, air conditioners in them, iron fire escapes down their fronts — water towers on stilts, stair bulkheads, antennas, rooftop gardens, a lit sign now and then; and out past them the towers of the city, every window a light, and a great art-deco spire lit at its crown | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the tar, puddles give back the sky, fog pools in the streets below, a warm glow of city light along the horizon | the night garden illustration; New York — fire escapes in the rain, a roof of water towers at blue hour, the skyline from a roof |
 | VI | **The Hall of Doors** — a mustard-yellow corridor through the heart of a library that goes on for ever, a floor of dark old storybook boards laid wall to wall — wandering seams, knots curled into spirals, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, books fluttering up off the shelves and stacks in the way; over its walls the library rises on either side in four tiers of books, each a gallery railed and lamplit with rolling ladders on its shelves, and behind them rows and rows and rows of book stacks run off into a warm haze, lamps glowing on their ends; great timber arches span the hall under a beamed and plastered roof, green-shaded lamps hanging from them, shafts of sunlight slant down from high windows, a ladder leans now and then on the hall's wall up to the gallery, and doors and armchairs drift down the aisles between the stacks (see [The endless library](#the-endless-library)) | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration; old reading rooms — timber galleries under hammerbeam roofs, alcoves of shelves, rolling ladders, a domed reading room |
 | VII | **The Sky Road** — the processional way of the sun, high over a sea of golden cloud: a road of painted limestone with a band of lapis down its middle strewn with gold stars like a tomb's ceiling, colonnades of painted papyrus columns either side (shafts banded in red, gold, lapis and green, figures striding round them, capitals opening like papyrus heads, a striped cornice over them), now and then an avenue of sphinxes with braziers burning between them, great temple pylons painted with figures spanning the road with obelisks before them, golden pyramids and palms on floating islands, the three great pyramids far off on a plateau of their own, and Ra's disc low over the end of the road with its wings spread across the sky (see [The Sky Road of the sun](#the-sky-road-of-the-sun)) | a low sun ahead and to the right: warm light on the painted faces, the shade still showing their colours, golden rims, lapis overhead fading to gold | Sky Dancer; Egyptian temple painting — the winged sun, the eye of Horus, the scarab, the ankh — the pyramids of Giza at sunset, the painted columns of Philae |
@@ -109,23 +109,41 @@ bright creases. It's built as a land rather than a heap of sweets: candy
 is its nature and baking its towns, and each side of the road is one
 landscape for a while, changing every few chunks in its own time — an open
 frosting meadow with stands of cotton-candy trees and groves of giant candy
-canes; a gingerbread village, each house with its garden (a candy-cane
+canes; a cotton-candy wood, floss trees as big as oaks spun in two colours
+the way it comes off the machine (pink and blue, lilac and pink, mint and
+lemon) on paper sticks striped like straws, puffs of it grown low between
+them; the cupcake hills, cupcakes as big as houses standing about in the
+frosting, sprinkled or glazed, a cherry on each; a gingerbread village, each house with its garden (a candy-cane
 fence, a gumdrop or donut arch for a gate, flowers by the path); a lollipop
 orchard planted in rows that run on down the road; a chocolate quarry of
 outcrops and truffle boulders; a gummy wood where gummy bears graze among
 gummy succulents and rock-candy crystals; and the ice-cream district, its
 towers with doors, a parlour's stand by the road (the only cones are in its
 rack and on its sign - and the giant one you dodge stands in a display
-stand). Sweets grow in spaced patches with open, rolling frosting between
-them, low knolls of it set back from the road, and the verge right by the
-road is kept mostly clear; behind it all rolling frosting hills, cake mesas
-and more ice-cream towers. None of it ever comes onto the road: every prop's
+stand). Sweets grow in patches with open, rolling frosting between them -
+near the road and further back, and some of every land's candy in every
+other (little cupcakes, lollipops stuck in the frosting with peppermints
+and wrapped sweets round them, heaps of donuts and stacked macarons,
+gumdrops, cotton-candy puffs) - low knolls of frosting or scoops of ice
+cream set back from the road, and the verge right by the road kept mostly
+clear; behind it all rolling frosting hills, hills of ice cream (a scoop as
+big as a hill, dripping, chocolate-chipped, a cherry on top; a scoop on a
+scoop of chocolate, sprinkled; one melting into a puddle of itself), the
+odd cupcake as big as a hill, cake mesas and more ice-cream towers. The
+light's sugar-bright: a clear blue overhead going to candy pink. None of it ever comes onto the road: every prop's
 reach is measured as the world is built, and anything beside the road that
 would reach in over its piped edge, however it's scaled or turned, is left
 out (or, a big frosting hill, pushed back).
 
 In the road: chocolate bars, cookie stacks, caramel heaps and gumdrops as
-big as footstools to jump; a candy-striped bag of pick-and-mix tipped over,
+big as footstools to jump - and the gumdrops are **bouncy** (a big one on
+its own, a pair, a trio, or a row of them right across the road): come down
+on one, or catch one in the air with a jump a hair early or late, and it
+squashes flat under you and throws you up twice as high as a jump - boing -
+higher still if you press jump just as you land on it (run into one with
+your feet on the road and you trip over it like anything else). Now and then
+the gems show you how: a run that comes down on the gumdrop and goes up off
+it, high, a crown at the top; a candy-striped bag of pick-and-mix tipped over,
 its sweets poured out in a heap with a lollipop lying on top - big and
 bright, so it never reads as one of the verge's little heaps - and, right
 across the road, a long heap of them between two tipped bags, or a row of
@@ -142,9 +160,12 @@ and a ring of hard candy; and for the prize spots, a Jolly Rancher still in
 its wrapper.
 
 **The chocolate river** (see `world/river.js`) is planned whole each time
-through the world, from the run's seed: four crossings spaced out along it -
-four jumps over the chocolate each time through -
-and between them the river running alongside the road — close beside it, or
+through the world, from the run's seed: five jumps over the chocolate each
+time through - three crossings spaced out along it, and one place where the
+river cuts back on itself, square across the road, round in a loop on the
+far side and straight back across, two jumps one after the other (from the
+far bank of one to the near bank of the next 25½–34 m: room to land and go
+again at the top speed) - and between them the river running alongside the road — close beside it, or
 winding off into the hills and back, or out wide and round in a hairpin to
 come down toward you — then turning in across the road at a slant, its
 banks bowed and wandering, to carry on up the other side. It's built as a
@@ -3590,6 +3611,15 @@ visit after); `particles.still: 1` stops a layer of motes dead in the air,
 and `particles.flake: 1` draws them as snowflakes laid over the picture
 rather than as light;
 and `skyFx.range` stands a range of jagged mountains along the horizon.
+
+Something bouncy: an obstacle spec with `bounce: true` (Candy World's
+gumdrops) throws the runner up off it when they come down on it or catch
+it in the air (`CONFIG.bounce`: `k` times a jump, `held` more if jump is
+pressed as they land; `Player.boing`, `Game.boinged`, which squashes the
+prop and wobbles it back), keeps the next row `after` seconds of running
+past it, and gets the odd gem run laid down onto it and up off it
+(`GemField.boingArc`); `def.bouncy` keeps a river's crossings that much
+further from the row before them.
 
 Candy World (see [above](#candy-world)): `b.toon(…, { candy: true })`
 gives every part whose mark flag is between 0.10 and 0.54 the stuff that

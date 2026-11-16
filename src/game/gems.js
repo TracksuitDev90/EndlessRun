@@ -147,7 +147,13 @@ export class GemField {
     const arrive = this.route(this.lane, to, kind === 'L' ? takeoff : row.d, v, diff);
     let act = null;
     let first = row.d - v * 0.3;
-    if (kind === 'L' && (row.hint || diff >= C.unlock.arc) && arrive <= takeoff && r.chance(0.85)) {
+    // (something bouncy: now and then a run that comes down on it and is
+    // thrown up off it, high, a crown at the top - see CONFIG.bounce)
+    const B = rec?.bounce ? this.boingArc(rec, v) : null;
+    if (B && diff >= C.unlock.arc && arrive <= B.takeoff && r.chance(0.6)) {
+      act = 'boing';
+      first = B.takeoff + (v * B.tl) / 8;
+    } else if (kind === 'L' && (row.hint || diff >= C.unlock.arc) && arrive <= takeoff && r.chance(0.85)) {
       act = 'arc';
       first = takeoff + (v * T) / 10;
     } else if (kind === 'H' && (row.hint || diff >= C.unlock.slide) && arrive <= row.d - v * 0.1 && r.chance(0.8)) {
@@ -161,11 +167,47 @@ export class GemField {
     this.cruise(this.cursor, act ? first - sp : row.d - v * 0.35, v, diff, sp, !!act);
     if (act && (first >= this.restUntil || this.joins(first, sp))) {
       if (act === 'arc') this.arc(takeoff, v, diff, sp, true);
+      else if (act === 'boing') this.boing(B, v, diff, sp);
       else if (act === 'slide') this.under(row, v, diff, sp);
       else this.thread(row, v, diff, sp);
     }
     this.lane = to;
-    this.cursor = Math.max(row.end, kind === 'L' ? takeoff + v * T : 0) + v * 0.12;
+    this.cursor = Math.max(row.end, kind === 'L' ? takeoff + v * T : 0, B ? B.mid + v * B.tb : 0) + v * 0.12;
+  }
+
+  // Coming down on something bouncy (rec) and thrown up off it: where to
+  // take off to land on the middle of its top, and the flight off it.
+  boingArc(rec, v) {
+    if (this.game.course.segAt(rec.d).world.def.lowGravity) return null;
+    const A = this.arcAt(rec.d);
+    const V0 = (4 * A.apex) / A.T, G = (8 * A.apex) / (A.T * A.T);
+    const top = rec.y1;
+    if (V0 * V0 < 2 * G * top) return null;
+    const mid = rec.d + rec.len / 2;
+    const tl = (V0 + Math.sqrt(V0 * V0 - 2 * G * top)) / G;
+    const vb = V0 * CONFIG.bounce.k;
+    const tb = (vb + Math.sqrt(vb * vb + 2 * G * top)) / G;
+    return { A, G, top, mid, tl, vb, tb, takeoff: mid - v * tl };
+  }
+
+  // The run for it: up and down onto it, then high off it - its top a crown
+  // stone - and one on the road where you land.
+  boing(B, v, diff, sp) {
+    const x = this.xAt(B.takeoff);
+    for (let i = 0; i < 3; i++) {
+      const t = (B.tl * (i + 0.5)) / 3.4;
+      this.gem(B.takeoff + v * t, x, B.A.feet(t) + CONFIG.gems.ground, v, diff);
+    }
+    const n = 7;
+    const apex = B.vb / B.G;
+    let top = 0, best = Infinity;
+    for (let i = 0; i < n; i++) if (Math.abs((B.tb * (i + 0.5)) / n - apex) < best) best = Math.abs((B.tb * (i + 0.5)) / n - apex), top = i;
+    for (let i = 0; i < n; i++) {
+      const t = (B.tb * (i + 0.5)) / n;
+      this.gem(B.mid + v * t, x, B.top + B.vb * t - 0.5 * B.G * t * t + CONFIG.gems.ground, v, diff, i === top);
+    }
+    const land = B.mid + v * B.tb + sp * 0.6;
+    this.gem(land, this.xAt(land), CONFIG.gems.ground, v, diff);
   }
 
   // The lane the route takes past a row: never a wall; at first the nearest
