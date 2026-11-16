@@ -10,7 +10,8 @@ import { CONFIG } from '../config.js';
 // lava that seethe and splash, far-off volcanoes throwing up fountains of
 // fire. And it is haunted: pale hooded souls drift over the plain, the ribs
 // of colossal dead things arch up out of the ash, gibbet cages creak on
-// crooked posts beside the road, dead trees claw at the smoke, and dry
+// crooked posts beside the road, dead trees claw at the smoke, people on fire
+// stand and sit at the road's edge and turn to watch you pass, and dry
 // lightning flickers in it, now and then forking down to the plain and
 // lighting everything for an instant. Embers rise and ash falls all the time.
 //
@@ -333,6 +334,225 @@ function gibbetCageGeo() {
   parts.push(part(P.cyl(0.03, 0.03, 0.7, 5), C.bone, { x: -0.15, y: bot + 0.12, rz: 1.3, ry: 0.4 }));
   for (let i = 0; i < 3; i++) parts.push(part(P.torus(0.16, 0.02, 4, 8, Math.PI), C.bone, { x: -0.05, y: bot + 0.32 + i * 0.1, z: -0.12, rx: 0.3 }));
   return merge(parts);
+}
+
+// --- the burning ------------------------------------------------------------------
+// People on fire beside the road: gaunt, hairless, sexless figures charred
+// black, the fire showing through the cracks in their skin, two embers where
+// their eyes were, flames streaming up off their backs and shoulders. Some
+// stand, their arms hanging - one holds a hand out toward the road - and some
+// sit in the ash with their arms round their knees. Each is built facing +z
+// with its head hung forward; as you come it lifts its head and turns to
+// watch you, and goes on watching as you pass (toon option `watch`: the head
+// is role 1, and so is whatever burns on it).
+const SKIN = ['#0c0807', '#3a2a24'];
+const _up = new THREE.Vector3(0, 1, 0);
+function asRole(g, k) {
+  g.setAttribute('role', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(k), 1));
+  return g;
+}
+// a length of limb from a to b (its radius at each), a joint at b
+function limb(parts, a, b, ra, rb, top, joint = true) {
+  const A = new THREE.Vector3(...a);
+  const B = new THREE.Vector3(...b);
+  const d = B.clone().sub(A);
+  const len = d.length();
+  const g = P.cyl(rb, ra, len, 7, 2);
+  g.applyMatrix4(new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(_up, d.normalize()), new THREE.Vector3(1, 1, 1)));
+  parts.push(part(g, null, { grad: [...SKIN, 0, top], mark: CHAR }));
+  if (joint) parts.push(part(P.sphere(rb * 1.08, 7, 5), null, { x: b[0], y: b[1], z: b[2], grad: [...SKIN, 0, top], mark: CHAR }));
+}
+// a hand: a narrow palm and long thin fingers, hanging (or held out) along dir
+function hand(parts, at, dir, top, spread = 0.12) {
+  const D = new THREE.Vector3(...dir).normalize();
+  const tip = (k) => [at[0] + D.x * k, at[1] + D.y * k, at[2] + D.z * k];
+  limb(parts, at, tip(0.075), 0.03, 0.034, top, false);
+  const side = new THREE.Vector3().crossVectors(D, Math.abs(D.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : _up).normalize();
+  for (let i = -1; i <= 1; i++) {
+    const a = tip(0.07);
+    const b = tip(0.2 - Math.abs(i) * 0.02);
+    for (let k = 0; k < 3; k++) {
+      a[k] += side.getComponent(k) * i * 0.016;
+      b[k] += side.getComponent(k) * i * spread * 0.35;
+    }
+    limb(parts, a, b, 0.012, 0.006, top, false);
+  }
+}
+// the head, on its neck at [0, y, z]: a smooth skull, hollow sockets, an
+// ember in each
+function headParts(parts, y, z, top, tilt = 0) {
+  const out = [];
+  out.push(part(P.sphere(0.112, 12, 10), null, { y: y + 0.125, z: z + 0.012, sx: 0.9, sy: 1.2, sz: 1.02, rz: tilt, grad: [...SKIN, 0, top], mark: CHAR }));
+  // the jaw, narrow and long
+  out.push(part(P.sphere(0.075, 9, 7), null, { y: y + 0.05, z: z + 0.04, sx: 0.85, sy: 1.1, sz: 0.95, rz: tilt, grad: [...SKIN, 0, top], mark: CHAR }));
+  for (const sd of [-1, 1]) {
+    const ex = sd * 0.04 - tilt * 0.12;
+    out.push(part(P.sphere(0.036, 8, 6), '#020101', { x: ex, y: y + 0.13, z: z + 0.094, sz: 0.5, outline: 0 }));
+    // (not quite fully self-lit, so the flames' flicker leaves the eyes be)
+    out.push(part(P.sphere(0.021, 7, 5), '#ffd070', { x: ex, y: y + 0.128, z: z + 0.108, emit: 0.94, outline: 0 }));
+  }
+  // a dark gape of a mouth
+  out.push(part(P.sphere(0.024, 7, 5), '#020101', { x: -tilt * 0.06, y: y + 0.04, z: z + 0.105, sy: 1.5, sz: 0.4, outline: 0 }));
+  for (const g of out) parts.push(asRole(g, 1));
+}
+// A tongue of fire rising from `at`, leaning (rx back, rz aside), its tip
+// deep red (or white-hot yellow, a core). uv: x its own beat, y how far up
+// it (the lathe's own v).
+function fireTongue(parts, at, h, r, { rx = 0, rz = 0, seed = 0, hot = false, role = 0 } = {}) {
+  const prof = [[0, 0], [r * 0.7, h * 0.07], [r, h * 0.2], [r * 0.9, h * 0.36], [r * 0.62, h * 0.55], [r * 0.34, h * 0.74], [r * 0.14, h * 0.9], [0, h]];
+  const g = part(P.lathe(prof, 7), null, {
+    x: at[0], y: at[1], z: at[2], rx, rz,
+    grad: hot ? ['#fff6c0', '#ffa828', at[1], at[1] + h * 0.8] : ['#ffa024', '#f03c0c', at[1] + h * 0.1, at[1] + h * 0.9],
+    emit: 1, outline: 0,
+  });
+  const uv = g.attributes.uv.array;
+  for (let i = 0; i < uv.length; i += 2) uv[i] = seed;
+  parts.push(asRole(g, role));
+}
+// a lick of flame come loose above a tongue
+function fireLick(parts, at, r, seed, role = 0) {
+  const g = part(P.lathe([[0, 0], [r, r * 0.9], [r * 0.55, r * 2.2], [0, r * 3.6]], 6), '#ff7a1a', { x: at[0], y: at[1], z: at[2], emit: 1, outline: 0 });
+  const uv = g.attributes.uv.array;
+  for (let i = 0; i < uv.length; i += 2) {
+    uv[i] = seed;
+    uv[i + 1] = 0.75 + uv[i + 1] * 0.25;
+  }
+  parts.push(asRole(g, role));
+}
+// the fire on a figure: [x, y, z, height, radius, lean back, lean aside, hot,
+// on the head], and a lick loose above each of the big ones
+function fire(parts, list, seed) {
+  const rnd = seeded(seed);
+  for (const [x, y, z, h, r, rx = 0, rz = 0, hot = 0, role = 0] of list) {
+    const beat = rnd();
+    fireTongue(parts, [x, y, z], h, r, { rx: -rx, rz, seed: beat, hot: !!hot, role });
+    if (h > 0.7 && !hot) {
+      const k = 1.08 + rnd() * 0.12;
+      fireLick(parts, [x - Math.sin(rz) * h * k + (rnd() - 0.5) * 0.1, y + Math.cos(rx) * Math.cos(rz) * h * k, z - Math.sin(rx) * h * k], r * 0.3, beat + 0.07, role);
+    }
+  }
+}
+
+const STAND_NECK = [1.56, 0];
+// Standing: reach - one hand held out toward whoever it's looking at.
+function burningStandGeo(reach, seed) {
+  const H = 1.86;
+  const parts = [];
+  for (const s of [-1, 1]) {
+    // legs, a little apart, and long narrow feet
+    limb(parts, [s * 0.09, 0.93, 0], [s * 0.105, 0.5, 0.025], 0.074, 0.052, H);
+    limb(parts, [s * 0.105, 0.5, 0.025], [s * 0.11, 0.07, -0.01], 0.05, 0.034, H);
+    parts.push(part(P.sphere(0.05, 8, 6), null, { x: s * 0.115, y: 0.035, z: 0.06, sx: 0.85, sy: 0.6, sz: 2.3, grad: [...SKIN, 0, H], mark: CHAR }));
+    // arms too long for the body, the shoulders rolled forward
+    const sh = [s * 0.195, 1.43, 0.015];
+    parts.push(part(P.sphere(0.06, 8, 6), null, { x: sh[0], y: sh[1], z: sh[2], grad: [...SKIN, 0, H], mark: CHAR }));
+    if (reach && s > 0) {
+      limb(parts, sh, [0.25, 1.24, 0.2], 0.045, 0.036, H);
+      limb(parts, [0.25, 1.24, 0.2], [0.2, 1.3, 0.5], 0.034, 0.026, H);
+      hand(parts, [0.2, 1.3, 0.5], [-0.1, 0.05, 1], H, 0.3);
+    } else {
+      limb(parts, sh, [s * 0.235, 1.1, -0.01], 0.045, 0.036, H);
+      limb(parts, [s * 0.235, 1.1, -0.01], [s * 0.225, 0.8, 0.05], 0.034, 0.026, H);
+      hand(parts, [s * 0.225, 0.8, 0.05], [0, -1, 0.12], H);
+    }
+  }
+  // the trunk: narrow, straight, a little hollow under the ribs
+  const trunk = [[0, 0.86], [0.1, 0.875], [0.132, 0.94], [0.128, 1.04], [0.11, 1.16], [0.128, 1.3], [0.15, 1.41], [0.13, 1.475], [0.06, 1.51], [0, 1.52]];
+  parts.push(part(P.lathe(trunk, 10), null, { sz: 0.66, grad: [...SKIN, 0, H], mark: CHAR }));
+  limb(parts, [0, 1.48, 0], [0, 1.6, 0.012], 0.046, 0.04, H, false);
+  headParts(parts, STAND_NECK[0], STAND_NECK[1], H, reach ? -0.16 : 0.1);
+  // prettier-ignore
+  fire(parts, [
+    [0, 1.2, -0.1, 1.5, 0.22, 0.32, 0.04],
+    [-0.2, 1.36, -0.05, 1.05, 0.16, 0.22, 0.3],
+    [0.2, 1.36, -0.05, 0.9, 0.15, 0.3, -0.26],
+    [0.05, 0.9, -0.1, 0.95, 0.17, 0.5, -0.1],
+    [-0.09, 1.3, -0.14, 0.8, 0.11, 0.26, 0.1, 1],
+    [0.1, 1.36, -0.13, 0.6, 0.09, 0.36, -0.14, 1],
+    [0, 1.74, -0.06, 0.6, 0.1, 0.34, 0, 0, 1],
+    [0.02, 1.76, -0.09, 0.34, 0.06, 0.4, 0.1, 1, 1],
+    [-0.24, 0.92, -0.02, 0.5, 0.085, 0.2, 0.22],
+    ...(reach ? [[0.23, 1.28, 0.34, 0.42, 0.07, 0.25, -0.1], [0.22, 1.3, 0.42, 0.24, 0.045, 0.2, 0, 1]] : [[0.24, 0.95, -0.02, 0.44, 0.08, 0.24, -0.2]]),
+    [-0.12, 0.3, -0.06, 0.5, 0.09, 0.3, 0.12],
+    [0.13, 0.12, -0.08, 0.42, 0.1, 0.36, -0.1],
+    [-0.02, 0.0, -0.2, 0.3, 0.1, 0.2, 0],
+  ], seed);
+  return merge(parts);
+}
+
+const SIT_NECK = [0.79, 0.02];
+// Sitting in the ash, knees drawn up, arms wrapped round them, hunched.
+function burningSitGeo(seed) {
+  const H = 1.05;
+  const parts = [];
+  for (const s of [-1, 1]) {
+    const hip = [s * 0.1, 0.11, -0.19];
+    const knee = [s * 0.13, 0.53, 0.2];
+    limb(parts, hip, knee, 0.076, 0.054, H);
+    limb(parts, knee, [s * 0.12, 0.07, 0.41], 0.05, 0.034, H);
+    parts.push(part(P.sphere(0.05, 8, 6), null, { x: s * 0.125, y: 0.035, z: 0.49, sx: 0.85, sy: 0.6, sz: 2.3, grad: [...SKIN, 0, H], mark: CHAR }));
+    const sh = [s * 0.185, 0.67, -0.02];
+    parts.push(part(P.sphere(0.06, 8, 6), null, { x: sh[0], y: sh[1], z: sh[2], grad: [...SKIN, 0, H], mark: CHAR }));
+    // arms round the shins, the forearms crossed
+    const elbow = [s * 0.225, 0.46, 0.21];
+    const wrist = [-s * 0.05, 0.4 + s * 0.035, 0.36];
+    limb(parts, sh, elbow, 0.045, 0.036, H);
+    limb(parts, elbow, wrist, 0.034, 0.026, H);
+    hand(parts, wrist, [-s, -0.5, -0.1], H);
+  }
+  parts.push(part(P.sphere(0.15, 9, 7), null, { y: 0.13, z: -0.2, sy: 0.75, grad: [...SKIN, 0, H], mark: CHAR }));
+  // the trunk, bent forward over the knees
+  const trunk = [[0, 0], [0.12, 0.02], [0.13, 0.12], [0.112, 0.27], [0.13, 0.42], [0.15, 0.53], [0.13, 0.6], [0.06, 0.635], [0, 0.645]];
+  parts.push(part(P.lathe(trunk, 10), null, { y: 0.09, z: -0.21, rx: 0.3, sz: 0.7, grad: [...SKIN, 0, H], mark: CHAR }));
+  limb(parts, [0, 0.7, -0.03], [0, 0.82, 0.03], 0.046, 0.04, H, false);
+  headParts(parts, SIT_NECK[0], SIT_NECK[1], H, 0.08);
+  // prettier-ignore
+  fire(parts, [
+    [0, 0.42, -0.26, 1.45, 0.23, 0.28, 0.06],
+    [-0.19, 0.6, -0.12, 1.0, 0.16, 0.2, 0.3],
+    [0.19, 0.6, -0.12, 0.85, 0.15, 0.3, -0.24],
+    [0.04, 0.12, -0.34, 0.9, 0.18, 0.55, -0.1],
+    [-0.08, 0.52, -0.24, 0.75, 0.11, 0.24, 0.1, 1],
+    [0.1, 0.56, -0.22, 0.55, 0.09, 0.34, -0.14, 1],
+    [0, 0.96, -0.04, 0.55, 0.1, 0.32, 0, 0, 1],
+    [0.02, 0.98, -0.07, 0.32, 0.06, 0.4, 0.1, 1, 1],
+    [-0.24, 0.4, 0.1, 0.42, 0.08, 0.2, 0.2],
+    [0.25, 0.42, 0.08, 0.36, 0.075, 0.25, -0.2],
+    [-0.2, 0.0, -0.3, 0.4, 0.11, 0.3, 0.2],
+    [0.14, 0.5, 0.2, 0.3, 0.06, 0.1, 0],
+  ], seed);
+  return merge(parts);
+}
+
+// Where they are along a stretch of Hell: nine of them, spread from just
+// inside the door in to just short of the door out, now one side of the road
+// and now the other, right at its edge. Each chunk asks whether one of them
+// is in it (index: the chunk's, count: how many chunks the stretch is long).
+const BURNING = 9;
+const BURNING_KINDS = ['burningStand', 'burningSit', 'burningReach', 'burningSit', 'burningStand', 'burningSit', 'burningReach', 'burningStand', 'burningSit'];
+const BURNING_SIDES = [1, -1, -1, 1, -1, 1, 1, -1, 1];
+function burningIn(index, count, start, visit) {
+  const span = count - 7;
+  if (span < BURNING) return null;
+  const rnd = seeded(1 + (Math.abs(Math.round(start / 16)) * 131 + visit * 17) % 9973);
+  rnd();
+  const turn = Math.floor(rnd() * BURNING);
+  const flip = rnd() < 0.5 ? -1 : 1;
+  for (let k = 0; k < BURNING; k++) {
+    const jitter = rnd();
+    const u = [rnd(), rnd(), rnd(), rnd()];
+    if (3 + Math.floor(((k + 0.2 + jitter * 0.6) * span) / BURNING) !== index) continue;
+    const name = BURNING_KINDS[(k + turn) % BURNING];
+    const sit = name === 'burningSit';
+    const side = BURNING_SIDES[k] * flip;
+    // nearer the road every time you come back
+    const off = (sit ? 5.0 : 5.1) + u[0] * (visit ? 0.5 : 1.1);
+    // turned toward the road, anywhere from facing you as you come to
+    // facing well away down it
+    const away = sit ? 0.35 + u[1] * 1.3 : 0.3 + u[1] * 2.1;
+    return { name, sit, side, x: side * off, z: 3 + u[2] * 10, ry: -side * away, s: sit ? 1.2 + u[3] * 0.25 : 1.12 + u[3] * 0.25 };
+  }
+  return null;
 }
 
 // Lava splashing (see SPLASH in the shaders): every so often a spot in the
@@ -674,6 +894,14 @@ export default {
     // the cage swings slowly along the road on its chain
     b.toon('cage', gibbetCageGeo(), { cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.12, 0.9, 0] });
     yield;
+    // the burning: lit by nothing but themselves, standing clear of the smoke
+    const burn = (neck, o) => ({ cap: 6, ink: 0.022, crust: [1.25, 0.16, 1], flame: [2.3, 0.07], clear: 0.6, watch: { neck, far: 78, near: 26, ...o } });
+    b.toon('burningStand', burningStandGeo(false, 3), burn(STAND_NECK, { body: 0.8, bow: 0.6, head: 1.25 }));
+    yield;
+    b.toon('burningReach', burningStandGeo(true, 8), burn(STAND_NECK, { body: 1, bow: 0.5, head: 1.1 }));
+    yield;
+    b.toon('burningSit', burningSitGeo(5), burn(SIT_NECK, { body: 0.12, bow: 0.85, head: 1.75 }));
+    yield;
     b.toon('lavaPool', lavaPoolGeo(4), { cap: 16, lava: true, ink: 0, anim: 'pop' });
     yield;
     b.toon('crustRim', crustRimGeo(4), { cap: 16, anim: 'pop', ink: 0.03, crust: FINE });
@@ -745,14 +973,25 @@ export default {
     // the plain stays empty near the road: only now and then a little rubble,
     // a dead tree or a gibbet, and the big shapes stand far off
     const river = Math.sin(ctx.d0 * 0.004 + 1.3);
+    // one of the burning, at the road's edge (never in what carries on round
+    // the doorway out)
+    const burning = ctx.continuation ? null : burningIn(ctx.index, ctx.index + Math.round(ctx.toEnd / ctx.L), ctx.seg.start, ctx.visit);
+    if (burning) {
+      const { name, sit, x, z, ry, s } = burning;
+      ctx.put(name, x, 0, z, { ry, s });
+      ctx.put('glow', x, (sit ? 1.1 : 1.6) * s, z, { s: (sit ? 5.5 : 6.5) * s, c: [1, 0.4, 0.1] });
+      ctx.put('pool', x, 0.05, z, { sx: 7 * s, sz: 7 * s, c: [0.75, 0.75, 0.75] });
+    }
     for (const s of [-1, 1]) {
-      if (rng.chance(0.35)) ctx.put(rng.chance(0.5) ? 'rubble' : 'rubbleB', s * rng.float(5.4, 13), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.7, 1.2) });
-      if (rng.chance(0.22)) ctx.put(rng.chance(0.6) ? 'deadTree' : 'deadTreeB', s * rng.float(6.5, 18), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.4) });
+      // (nothing else stands where one of them is)
+      const clear = burning && burning.side === s;
+      if (!clear && rng.chance(0.35)) ctx.put(rng.chance(0.5) ? 'rubble' : 'rubbleB', s * rng.float(5.4, 13), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.7, 1.2) });
+      if (!clear && rng.chance(0.22)) ctx.put(rng.chance(0.6) ? 'deadTree' : 'deadTreeB', s * rng.float(6.5, 18), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.4) });
       if (rng.chance(0.22)) ctx.put(rng.chance(0.5) ? 'columns' : 'columnsB', s * rng.float(18, 55), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.5) });
       if (rng.chance(0.12)) ctx.put(rng.chance(0.5) ? 'spire' : 'spireB', s * rng.float(45, 120), 0, rng.float(0, 16), { ry: rng.float(0, 6.28), s: rng.float(0.8, 1.6) });
       // a gibbet beside the road, its arm reaching out over it, the cage
       // creaking on its chain
-      if (rng.chance(0.07)) {
+      if (!clear && rng.chance(0.07)) {
         const x = s * rng.float(7.2, 10);
         const z = rng.float(2, 14);
         const ry = (s < 0 ? 0 : Math.PI) + rng.float(-0.35, 0.35);

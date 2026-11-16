@@ -438,6 +438,28 @@ uniform vec4 uCloth;
 // spin about the local y axis (rad/s)
 uniform vec4 uTurn;
 #endif
+#ifdef WATCH
+// Something that watches you come (Hell's burning figures; toon option
+// watch), built facing +z with its feet at the origin. Far off it stands as
+// it was placed, its head (role 1) hung forward by uWatch2.y radians about
+// the neck (the height uWatch.x, uWatch2.x along z). As the camera nears -
+// from uWatch.z metres ahead of it down to uWatch.w - the head lifts and
+// turns to face the camera, as far past the body as uWatch2.z radians lets
+// it, and the body (role 0) turns after it, more slowly, through uWatch.y of
+// the way round; and they go on following the camera as it passes. All of it
+// is worked out from where the camera is, so it costs nothing on the CPU.
+uniform vec4 uWatch;
+uniform vec4 uWatch2;
+// where each vertex stood before it turned, and its normal: the crust is
+// laid from these, so it turns with the figure rather than swimming over it
+varying vec3 vRest;
+varying vec3 vRestN;
+#endif
+#ifdef FLAME
+// x how far the tongues lick about (1: a campfire's), y a wave running up a
+// long tongue (m at its tip)
+uniform vec2 uFlame;
+#endif
 #ifdef TUMBLE
 // Tumbling about its own middle (an asteroid): x turns a second about the
 // local x axis, y about the local z axis, both through (0, z, 0); each
@@ -458,7 +480,7 @@ attribute vec4 aInst;
 // clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
 uniform float uWonk;
 #endif
-#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID) || defined(SWIM)
+#if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID) || defined(SWIM) || defined(WATCH)
 attribute float role;
 #endif
 #if defined(SCHOOL) || defined(LID)
@@ -961,13 +983,54 @@ void main() {
   #endif
   #ifdef FLAME
     // a fire's tongues (its fully self-lit parts) lick and flicker, each on
-    // its own beat (uv.x), more and more toward its tip (uv.y)
+    // its own beat (uv.x), more and more toward its tip (uv.y); a long one
+    // snakes, a wave running up it
     if (fx.y > 0.95) {
       float k = clamp(uv.y, 0.0, 1.0);
       float t = uTime * (6.5 + uv.x * 3.5) + uv.x * 17.0 + phase * 5.0;
-      lp.x += (sin(t) * 0.07 + sin(t * 2.7 + 1.3) * 0.03) * k * k;
-      lp.z += sin(t * 1.3 + 2.0) * 0.045 * k * k;
-      lp.y += (sin(t * 1.9 + 0.7) * 0.5 + 0.5) * 0.14 * k;
+      lp.x += (sin(t) * 0.07 + sin(t * 2.7 + 1.3) * 0.03) * k * k * uFlame.x;
+      lp.z += sin(t * 1.3 + 2.0) * 0.045 * k * k * uFlame.x;
+      lp.y += (sin(t * 1.9 + 0.7) * 0.5 + 0.5) * 0.14 * k * uFlame.x;
+      lp.x += sin(t * 0.55 - k * 5.0) * uFlame.y * k;
+      lp.z += cos(t * 0.43 - k * 4.0) * uFlame.y * 0.6 * k;
+    }
+  #endif
+  #ifdef WATCH
+    {
+      vRest = (M * vec4(position, 1.0)).xyz;
+      vRestN = normalize(mat3(M) * normal);
+      // the way it faces as it stands, and the way to the camera from it
+      vec2 face = normalize(vec2(M[2].x, M[2].z));
+      vec2 to = uCamPos.xz - pivot.xz;
+      to /= max(length(to), 0.001);
+      float delta = atan(to.x * face.y - to.y * face.x, dot(to, face));
+      float lift = 1.0 - smoothstep(uWatch.z * 0.75, uWatch.z * 1.2, aP);
+      float tH = 1.0 - smoothstep(uWatch.w, uWatch.z, aP);
+      float tB = 1.0 - smoothstep(uWatch.w * 0.4, uWatch.z * 0.7, aP);
+      float bodyA = delta * tB * uWatch.y;
+      if (role > 0.5) {
+        float bow = uWatch2.y * (1.0 - lift);
+        float c = cos(bow), sn = sin(bow);
+        vec2 r = vec2(lp.y - uWatch.x, lp.z - uWatch2.x);
+        lp.yz = vec2(uWatch.x + r.x * c - r.y * sn, uWatch2.x + r.x * sn + r.y * c);
+        ln.yz = vec2(ln.y * c - ln.z * sn, ln.y * sn + ln.z * c);
+        #ifdef OUTLINE
+          lo.yz = vec2(lo.y * c - lo.z * sn, lo.y * sn + lo.z * c);
+        #endif
+        float headA = clamp(delta * tH - bodyA, -uWatch2.z, uWatch2.z);
+        lp.z -= uWatch2.x;
+        lp = rotY(lp, headA);
+        lp.z += uWatch2.x;
+        ln = rotY(ln, headA);
+        #ifdef OUTLINE
+          lo = rotY(lo, headA);
+        #endif
+      }
+      lp = rotY(lp, bodyA);
+      ln = rotY(ln, bodyA);
+      #ifdef OUTLINE
+        lo = rotY(lo, bodyA);
+      #endif
     }
   #endif
 
@@ -1749,6 +1812,10 @@ float hash12(vec2 p) {
 float hashS(vec2 p) {
   return hash12(p);
 }
+#ifdef WATCH
+varying vec3 vRest;
+varying vec3 vRestN;
+#endif
 #ifdef CRUST
 // A textured crust for rock, charred wood and volcanic glass (Hell's
 // obstacles and stones). Each part picks its kind with its mark flag (fx.x:
@@ -2614,9 +2681,16 @@ void main() {
     markK *= 1.0 - isCrev;
   #endif
   #ifdef CRUST
-    vec3 an = abs(n);
+    // (something that turns to watch you wears its crust: see WATCH)
+    #ifdef WATCH
+      vec3 cw3 = vRest;
+      vec3 an = abs(normalize(vRestN));
+    #else
+      vec3 cw3 = vPos;
+      vec3 an = abs(n);
+    #endif
     an /= an.x + an.y + an.z;
-    vec3 cp = vPos * uCrust.z;
+    vec3 cp = cw3 * uCrust.z;
     float c1 = tri(cp, an);
     float c2 = tri(cp * 3.0 + 0.37, an);
     float c3 = tri(cp * 8.0 + 0.71, an);
@@ -2628,14 +2702,14 @@ void main() {
       // basalt: pitted and mottled, laid down in faint strata, split by
       // cracks with fire glowing deep in them
       base *= 0.68 + 0.5 * c2 + 0.3 * (c3 - 0.5);
-      float strata = smoothstep(0.72, 0.95, sin(vPos.y * 9.0 + c1 * 7.0) * 0.5 + 0.5);
+      float strata = smoothstep(0.72, 0.95, sin(cw3.y * 9.0 + c1 * 7.0) * 0.5 + 0.5);
       base *= 1.0 - strata * 0.35;
       float cw = fwidth(c1) * 1.2 + 0.004;
       vein = (1.0 - smoothstep(0.005, 0.005 + cw, abs(c1 - 0.5 + (c3 - 0.5) * 0.04))) * smoothstep(0.38, 0.6, c2);
     } else if (vFx.x < 0.75) {
       // charred wood: split along the grain into blocks (alligatored), each
       // block a little domed and sooty, embers glowing in the splits
-      vec2 uvp = an.z > max(an.x, an.y) ? vPos.xy : (an.y > an.x ? vPos.xz : vPos.zy);
+      vec2 uvp = an.z > max(an.x, an.y) ? cw3.xy : (an.y > an.x ? cw3.xz : cw3.zy);
       vec2 gq = uvp * vec2(3.5, 7.0) + vec2(c2, c1) * 0.9;
       gq.x += hash12(vec2(floor(gq.y), 3.0)) * 0.7;
       vec2 cell = floor(gq);
@@ -8390,7 +8464,18 @@ export function makeToonMaterial(env, o = {}) {
   if (o.splash) defines.SPLASH = '';
   if (o.wonky) defines.WONKY = '';
   if (o.sandfall) defines.SANDFALL = '';
-  if (o.flame) defines.FLAME = '';
+  if (o.flame) {
+    // (true: a campfire's; [how far the tongues lick, the wave up a long one])
+    defines.FLAME = '';
+    uniforms.uFlame = { value: new THREE.Vector2(...(o.flame === true ? [1, 0] : o.flame)) };
+  }
+  if (o.watch) {
+    // { neck: [y, z], body, far, near, bow, head } (see WATCH)
+    const w = o.watch;
+    defines.WATCH = '';
+    uniforms.uWatch = { value: new THREE.Vector4(w.neck[0], w.body ?? 1, w.far ?? 70, w.near ?? 30) };
+    uniforms.uWatch2 = { value: new THREE.Vector4(w.neck[1] ?? 0, w.bow ?? 0, w.head ?? 1.2, 0) };
+  }
   if (o.bark) defines.BARK = '';
   // shelves of books on parts marked 0.7 (along the run) or 0.75 (across it)
   if (o.shelves) defines.SHELVES = '';
@@ -8503,7 +8588,7 @@ export function makeInkMaterial(toon, width) {
   const uniforms = Object.assign({}, toon.uniforms, { uOutline: { value: width } });
   // (the ink hull turns with its prop)
   const defines = { OUTLINE: '' };
-  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW', 'BEND']) if (toon.defines && k in toon.defines) defines[k] = '';
+  for (const k of ['TURN', 'TUMBLE', 'KINDS', 'SPLASH', 'SAND', 'WONKY', 'FLAME', 'WATCH', 'CLOTH', 'CURRENT', 'SCHOOL', 'SWIM', 'JELLY', 'CROSS', 'LID', 'SNOW', 'BEND']) if (toon.defines && k in toon.defines) defines[k] = '';
   return new THREE.ShaderMaterial({
     uniforms,
     defines,
