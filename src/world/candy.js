@@ -50,10 +50,11 @@ const C = {
   wafer: '#f0c27a', caramel: '#d88a2a', cherry: '#e3192f', red: '#ff3550', gold: '#f0c050', foil: '#d8dde6',
 };
 const PASTELS = [C.pink, C.mint, C.lav, C.blue, C.butter, C.peach];
-const PASTEL_TINTS = ['#ffb3d1', '#a8f0d0', '#cdb6ff', '#acdcff', '#ffe79a', '#ffc9a6', '#ffd2e4', '#c8f5e4'];
+const PASTEL_TINTS = ['#ffaad0', '#9ff2d0', '#c8acff', '#a2d8ff', '#ffe98c', '#ffc29c', '#ffcde6', '#bdf7e2'];
 const BRIGHT = ['#ff4d8d', '#ffa62e', '#ffe14d', '#4fd67a', '#4fb6ff', '#a66cff', '#ff6a3d', '#ff8fd0'];
 const GUMMY_TINTS = ['#ff3b4e', '#ff8a1f', '#ffd21f', '#4fd64a', '#ff5fae', '#ffffff', '#b061ff'];
 const STRIPES = ['#ff2d4a', '#ff2d4a', '#3fc46a', '#ff6fb0', '#4f9cff', '#a660ff'];
+const GUMDROPS = ['#ff3b4e', '#ff8a1f', '#ffd21f', '#4fd64a', '#4fb6ff', '#b061ff', '#ff5fae'];
 
 function seeded(seed) {
   let k = seed;
@@ -620,6 +621,47 @@ function cottonTreeParts(seed, { trunk = '#c8283a' } = {}) {
   return parts;
 }
 
+// a cotton-candy tree of the other kind: a great puff of spun sugar, two
+// colours swirled through it the way it comes off the machine, on a paper
+// stick striped like a straw (cols: its colours, bottom to top)
+function cottonFlossParts(seed, cols, { stick = C.hot } = {}) {
+  const rnd = seeded(seed);
+  const h = 2.6 + rnd() * 0.9;
+  const parts = [mat(roundAlong(P.cyl(0.12, 0.16, h + 0.6, 10, 4), { along: h + 0.6 }), stick, K.STRIPE, { y: (h + 0.6) / 2 })];
+  // the puff: lobes heaped round an egg, the colours wound up through it
+  const n = 15;
+  const R = 1.55 + rnd() * 0.35;
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const a = i * 2.39996 + rnd() * 0.5;
+    const yy = -0.9 + t * 2.1;
+    const ring = Math.sqrt(Math.max(0.05, 1 - (yy / 1.25) ** 2));
+    const rr = i === n - 1 ? 0 : R * 0.72 * ring;
+    const r = (0.62 + rnd() * 0.32) * (i === n - 1 ? 1.25 : 1);
+    const c = cols[Math.min(cols.length - 1, Math.max(0, Math.floor((t + (rnd() - 0.5) * 0.3) * cols.length)))];
+    parts.push(mat(P.sphere(r, 14, 10), c, K.MALLOW, { x: Math.cos(a) * rr, y: h + 1.2 + yy * R * 0.75, z: Math.sin(a) * rr, sy: 0.84 }));
+  }
+  // and wisps pulled out of it here and there
+  for (let i = 0; i < 6; i++) {
+    const a = rnd() * Math.PI * 2;
+    parts.push(mat(P.sphere(0.34 + rnd() * 0.16, 10, 6), cols[i % cols.length], K.MALLOW, { x: Math.cos(a) * R * 1.05, y: h + 0.9 + rnd() * 1.4, z: Math.sin(a) * R * 1.05, sx: 1.5, sy: 0.55, ry: -a, outline: 0.4 }));
+  }
+  return parts;
+}
+
+// a puff of cotton candy grown low on the frosting, like a bush (tinted)
+function cottonPuffParts(seed) {
+  const rnd = seeded(seed);
+  const parts = [];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + rnd();
+    const rr = i ? 0.42 + rnd() * 0.2 : 0;
+    const r = i ? 0.32 + rnd() * 0.14 : 0.5;
+    parts.push(mat(P.sphere(r, 12, 8), C.white, K.MALLOW, { x: Math.cos(a) * rr, y: r * 0.75 + (i ? 0 : 0.18), z: Math.sin(a) * rr, sy: 0.85, tint: 1 }));
+  }
+  return parts;
+}
+
 // a gummy succulent: a rosette of fat jelly leaves curling out of the frosting
 function gummyPlantParts(seed, n = 8) {
   const rnd = seeded(seed);
@@ -962,6 +1004,53 @@ function frostHillParts(kind, seed) {
   return parts;
 }
 
+// A cupcake as big as a house, standing in the frosting: its pleated case,
+// the sponge risen over it and a great swirl of frosting (or a glazed dome,
+// sprinkled), a cherry on top. (The frosting tinted.)
+function cupcakeGiantParts(kind) {
+  const caseColor = [C.pink, C.mint, C.lav][kind];
+  const parts = cupcakeParts(5, { caseColor, frost: C.white, glazed: kind === 1, seed: 4 + kind });
+  // (sprinkles strewn over a swirled one too: the glaze's)
+  if (kind !== 1) {
+    const rnd = seeded(17 + kind);
+    for (let i = 0; i < 26; i++) {
+      const a = rnd() * Math.PI * 2;
+      const t = rnd() * 0.85;
+      // (on the swirl's own surface, round and up it)
+      const tube = 0.89 * (1 - 0.65 * t);
+      const rr = 2.15 * (1 - t) + tube * 0.55;
+      const y = 3.74 + t * 2.8 + tube * 0.75;
+      parts.push(mat(P.capsule(0.05, 0.22, 2, 4), BRIGHT[i % BRIGHT.length], K.HARD, { x: Math.cos(a) * rr, y, z: Math.sin(a) * rr, rz: rnd() * 3, ry: rnd() * 3, outline: 0 }));
+    }
+  }
+  return parts;
+}
+
+// A hill of ice cream: a scoop as big as a hill sitting on the land, its
+// rim ragged where it was scooped and dripping; chocolate chips in it and a
+// cherry on top - or a scoop on a scoop of chocolate, sprinkled - or one
+// melting into a puddle of itself. (The ice cream tinted.)
+function scoopHillParts(kind, seed) {
+  const parts = [];
+  if (kind === 0) {
+    parts.push(...scoopParts(5, { tint: 1, drips: 14, seed, chips: 24 }));
+    parts.push(...cherry(0.9, { y: 8.5 }));
+  } else if (kind === 1) {
+    parts.push(...scoopParts(5, { color: '#8a5230', tint: 0, drips: 12, seed }));
+    parts.push(...moved(scoopParts(3.9, { tint: 1, sprinkles: true, drips: 10, seed: seed + 3 }), { y: 7.2 }));
+    parts.push(...cherry(0.8, { y: 13.8 }));
+  } else {
+    parts.push(mat(P.sphere(7.2, 26, 6), C.white, K.CREAM, { y: 0, sy: 0.07, tint: 1 }));
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + 0.3 * Math.sin(i * 7.1);
+      parts.push(mat(P.sphere(1.5 + 0.6 * Math.sin(i * 3.3), 10, 4), C.white, K.CREAM, { x: Math.cos(a) * 6.6, z: Math.sin(a) * 6.6, sy: 0.12, tint: 1, outline: 0 }));
+    }
+    parts.push(...moved(scoopParts(4.6, { tint: 1, sprinkles: true, drips: 16, seed }), { y: -0.6 }));
+    parts.push(...cherry(0.8, { y: 7.0 }));
+  }
+  return parts;
+}
+
 // a spill of frosting in another colour over the land, its edge soft and
 // lumpy where it ran (tinted)
 function frostPatchGeo(seed) {
@@ -1189,6 +1278,42 @@ function assortParts(kind, seed) {
     }
     parts.push(brittle(0.32, 0.05, seed + 3, { x: 0.35, y: 0.16, z: -0.25, rz: 0.5, ry: 0.4 }));
     parts.push(brittle(0.26, 0.05, seed + 9, { x: -0.4, y: 0.03, z: 0.2 }));
+  } else if (kind === 'cupcakes') {
+    // a cluster of cupcakes grown up out of the frosting, every case and
+    // every frosting its own colour, a donut fallen among them
+    const frosts = [C.white, C.pink, C.mint, C.lav, C.butter, '#8a5230'];
+    for (let i = 0; i < 4; i++) {
+      const [x, z] = at(0.55);
+      parts.push(...moved(cupcakeParts(0.5 + rnd() * 0.25, { caseColor: PASTELS[(i * 2 + seed) % 6], frost: frosts[(i + seed) % frosts.length], glazed: rnd() < 0.35, seed: seed + i }), { x, z, ry: rnd() * 6 }));
+    }
+    parts.push(...moved(donutParts(0.16, 0.08, { glaze: C.pink, seed }), { x: 0.5, z: 0.45, rz: 0.1 }));
+  } else if (kind === 'lollies') {
+    // little lollipops stuck in the frosting, peppermints and wrapped
+    // sweets lying round them
+    for (let i = 0; i < 5; i++) {
+      const [x, z] = at(0.6);
+      const r = 0.1 + rnd() * 0.07;
+      const h = 0.3 + rnd() * 0.35;
+      parts.push(...moved(lollipopParts(r, r * 0.25, i % 2 ? C.white : BRIGHT[(i * 3 + seed) % BRIGHT.length], h, {}), { x, y: h + r * 0.9, z, ry: rnd() * 6, rz: (rnd() - 0.5) * 0.3 }));
+    }
+    for (let i = 0; i < 3; i++) {
+      const [x, z] = at(0.8);
+      parts.push(...moved(peppermint(0.11, 0.05, [C.red, '#3fc46a', C.hot][i % 3]), { x, y: 0.03, z, rx: (rnd() - 0.5) * 0.4 }));
+    }
+    for (let i = 0; i < 3; i++) {
+      const [x, z] = at(0.8);
+      parts.push(...moved(wrapped(0.07, BRIGHT[(i * 5 + seed) % BRIGHT.length]), { x, y: 0.06, z, ry: rnd() * 6 }));
+    }
+  } else if (kind === 'donuts') {
+    // donuts heaped up, glazed and sprinkled, and macarons stacked by them
+    const gl = [C.pink, C.white, '#8a4a28', C.lav, C.mint];
+    for (let i = 0; i < 3; i++) parts.push(...moved(donutParts(0.2, 0.1, { glaze: gl[(i + seed) % gl.length], sprinkled: i !== 1, seed: seed + i }), { y: i * 0.19, x: (rnd() - 0.5) * 0.08, rz: (rnd() - 0.5) * 0.15 }));
+    for (let i = 0; i < 2; i++) parts.push(...moved(donutParts(0.2, 0.1, { glaze: gl[(i + 3 + seed) % gl.length], seed: seed + 7 + i }), { x: 0.55 - i * 1.0, z: 0.35 - i * 0.6, rx: i ? 1.2 : 0 }));
+    let y = 0;
+    for (let i = 0; i < 3; i++) {
+      parts.push(...moved(macaronParts(0.12, { color: PASTELS[(i + seed) % 6] }), { x: -0.45, y, z: -0.3 }));
+      y += 0.15;
+    }
   } else if (kind === 'fruity') {
     // gummy fruit fallen under the gummy plants: sugared jelly slices
     const fr = [['#ff9a1f', '#ffd27a'], ['#ffe02e', '#fff2a0'], ['#7fe04a', '#d8ff9a'], ['#ff4a6a', '#ffb0c0']];
@@ -1283,6 +1408,28 @@ function gumdropTrioGeo() {
     gumdrop(0.3, 0.44, '#ffe14d', { x: 0.62, z: -0.08, rz: -0.08 }),
     gumdrop(0.13, 0.16, '#ff4d8d', { x: -0.25, z: 0.36 }),
     gumdrop(0.12, 0.15, '#4fb6ff', { x: 0.3, z: 0.34 }),
+  ];
+  return merge(parts).translate(0, 0, -0.45);
+}
+
+// L · one gumdrop as big as an armchair, so springy it bounces you (tinted),
+// little ones fallen round its foot
+function gumdropBigGeo() {
+  const parts = [gumdrop(0.56, 0.62, C.white, { tint: 1 })];
+  const c = ['#ff4d8d', '#4fb6ff', '#ffe14d', '#4fd67a', '#a66cff'];
+  for (let i = 0; i < 5; i++) {
+    const a = 0.6 + i * 1.25;
+    parts.push(gumdrop(0.1 + (i % 2) * 0.03, 0.13, c[i], { x: Math.cos(a) * 0.68, z: Math.sin(a) * 0.36 }));
+  }
+  return merge(parts).translate(0, 0, -0.5);
+}
+
+// L · two gumdrops side by side, a sugared pair (the left tinted)
+function gumdropTwinsGeo() {
+  const parts = [
+    gumdrop(0.42, 0.62, C.white, { x: -0.34, tint: 1 }),
+    gumdrop(0.4, 0.58, '#ff8a1f', { x: 0.38, z: -0.06 }),
+    gumdrop(0.12, 0.15, '#4fd67a', { x: 0.02, z: 0.38 }),
   ];
   return merge(parts).translate(0, 0, -0.45);
 }
@@ -1700,22 +1847,24 @@ export default {
   gem: GEM,
   // (a world with a river: see world/river.js and ObstacleField.placeCrossing)
   river: { name: 'chocolate river' },
+  // (its gumdrops are bouncy: room before a crossing for the flight off one)
+  bouncy: true,
   env: {
-    sky: ['#6cc0ff', '#ffcfe5', '#ffd8ea'],
-    bloom: ['#ff8cc0', '#9ff0cf', '#ffe48a'],
-    sun: { dir: [-0.5, 0.78, -1], glow: '#ffe4ee' },
+    sky: ['#5cc4ff', '#ffc6ea', '#ffe2f0'],
+    bloom: ['#ff8cc8', '#9ff5d4', '#ffec8a'],
+    sun: { dir: [-0.5, 0.78, -1], glow: '#fff0f6' },
     stars: 0,
-    skyFx: { rays: 0.12, clouds: 0.08 },
-    light: { dir: SUN, shadow: [0.8, 0.7, 0.88], hi: [1.06, 1.03, 0.98], soft: 0.3, wrap: 0.42, hiAmt: 0.42, lift: 1 },
-    rim: [1.0, 0.86, 0.95, 0.3],
-    mist: { color: '#ffd8ea', amount: 0.18, top: 3, fade: 5, near: 40, far: 170 },
+    skyFx: { rays: 0.14, clouds: 0.08 },
+    light: { dir: SUN, shadow: [0.86, 0.78, 0.94], hi: [1.12, 1.09, 1.03], soft: 0.3, wrap: 0.45, hiAmt: 0.45, lift: 1.08 },
+    rim: [1.0, 0.88, 0.97, 0.32],
+    mist: { color: '#ffe0f0', amount: 0.14, top: 3, fade: 5, near: 44, far: 180 },
     dapple: [0, 0.05, 0],
-    grade: { sat: 1.06, contrast: 1.04, vignette: 0.26, exposure: 1.0, tint: '#6a2448' },
+    grade: { sat: 1.14, contrast: 1.05, vignette: 0.18, exposure: 1.08, tint: '#6a2448' },
     beam: { color: '#fff0f6', amount: 0.1 },
     pool: '#ffd6a8',
     ink: '#5c2a2e',
     fog: [80, 260],
-    ground: ['#efc27e', '#d0904c', '#7a4426'],
+    ground: ['#f6cc86', '#d89a52', '#7a4426'],
     shadowDecal: [0.84, 0.64, 0.76],
     cast: [0.53, 0.35],
     glowGain: 0.8,
@@ -1733,7 +1882,7 @@ export default {
         light: { dir: [-0.6, 0.55, -0.35], shadow: [0.78, 0.6, 0.82], hi: [1.14, 1.0, 0.86] },
         rim: [1.0, 0.75, 0.6, 0.34],
         mist: { color: '#ffd0bc', amount: 0.36 },
-        grade: { tint: '#5a1a30', exposure: 1.0 },
+        grade: { tint: '#5a1a30', exposure: 1.06, sat: 1.12 },
         cast: [0.9, 0.5],
         particles: { color: '#ffe6c8', size: 2.4, drift: [0.06, -0.1, 0], opacity: 0.85 },
       },
@@ -1751,7 +1900,7 @@ export default {
         light: { dir: [0.4, 0.8, -0.35], shadow: [0.3, 0.26, 0.5], hi: [0.7, 0.68, 0.92], soft: 0.32, lift: 0.7 },
         rim: [0.75, 0.6, 1.0, 0.4],
         mist: { color: '#3a2468', amount: 0.5, top: 4 },
-        grade: { tint: '#0c0420', vignette: 0.5, exposure: 0.9, sat: 1.1 },
+        grade: { tint: '#0c0420', vignette: 0.42, exposure: 0.98, sat: 1.16 },
         ground: ['#b08a68', '#8a6448', '#3a2230'],
         pool: '#6a3a9a',
         glowGain: 1.6,
@@ -1769,7 +1918,7 @@ export default {
         light: { dir: [0.2, 0.85, -0.3], shadow: [0.74, 0.66, 0.92], hi: [1.06, 1.06, 1.12] },
         rim: [0.9, 0.8, 1.0, 0.36],
         mist: { color: '#ffd0f8', amount: 0.32 },
-        grade: { sat: 1.12, tint: '#3a1a5a', vignette: 0.3, exposure: 0.96 },
+        grade: { sat: 1.18, tint: '#3a1a5a', vignette: 0.24, exposure: 1.04 },
         glowGain: 1.2,
         cast: [-0.24, 0.35],
         particles: { color: '#ffffff', size: 2.8, drift: [0.1, 0.25, 0], opacity: 1 },
@@ -1789,7 +1938,7 @@ export default {
     const sweet = { candy: true };
     b.ground('ground', groundStrip(8.8, 16, '#ffffff', 8), 17);
     yield;
-    b.toon('floor', groundStrip(440, 16, '#ffc2dc', 8, { y: -0.03, mark: K.FIELD }), { ...sweet, ink: 0, cap: 40 });
+    b.toon('floor', groundStrip(440, 16, '#ffc6e2', 8, { y: -0.03, mark: K.FIELD }), { ...sweet, ink: 0, cap: 40 });
     yield;
     b.toon('piping', merge(pipingParts(4)), { ...sweet, cap: 200, anim: 'popLate', ink: 0.03 });
     yield;
@@ -1811,8 +1960,9 @@ export default {
     for (const [name, kind, seed] of [
       ['assortGumdrops', 'gumdrops', 3], ['assortMeringues', 'meringues', 7],
       ['assortChocolates', 'chocolates', 11], ['assortCaramels', 'caramels', 13], ['assortFruity', 'fruity', 17],
+      ['assortCupcakes', 'cupcakes', 19], ['assortLollies', 'lollies', 23], ['assortDonuts', 'donuts', 29],
     ]) {
-      b.toon(name, merge(coarse(0.55, () => assortParts(kind, seed))), { ...sweet, cap: 150, anim: 'pop', ink: 0.025 });
+      b.toon(name, merge(coarse(0.55, () => assortParts(kind, seed))), { ...sweet, cap: 200, anim: 'pop', ink: 0.025 });
       yield;
     }
     b.toon('candyGrass', merge(lod(0.6, () => candyGrassParts(7))), { ...sweet, cap: 900, anim: 'popLate', ink: 0, wobble: [0.08, 0, 1.6, 0] });
@@ -1835,6 +1985,22 @@ export default {
     yield;
     b.toon('cottonTreeB', merge(coarse(0.7, () => cottonTreeParts(23, { trunk: '#2a1a20' }))), { ...sweet, cap: 80, anim: 'popEarly', wobble: [0.004, 0, 0.7, 0] });
     yield;
+    // cotton candy the way it comes off the machine, as big as trees: pink
+    // and blue, lilac and pink, mint and lemon
+    for (const [name, seed, cols, stick] of [
+      ['cottonFloss', 5, ['#ff9ccf', '#ffb8dc', '#9fd8ff', '#8ccaff'], C.hot],
+      ['cottonFlossB', 9, ['#c9a8ff', '#e2c4ff', '#ffb0d8', '#ff98c8'], C.sky],
+      ['cottonFlossC', 13, ['#9ff0d0', '#c2f7e2', '#fff09a', '#ffe36e'], C.lilac],
+    ]) {
+      b.toon(name, merge(coarse(0.7, () => cottonFlossParts(seed, cols, { stick }))), { ...sweet, cap: 110, anim: 'popEarly', wobble: [0.005, 0, 0.6, 0] });
+      yield;
+    }
+    b.toon('cottonPuff', merge(coarse(0.7, () => cottonPuffParts(3))), { ...sweet, cap: 220, anim: 'pop', wobble: [0.01, 0, 0.9, 0] });
+    yield;
+    for (let k = 0; k < 3; k++) {
+      b.toon(`cupcakeGiant${['', 'B', 'C'][k]}`, merge(coarse(0.7, () => cupcakeGiantParts(k))), { ...sweet, cap: 50, anim: 'popEarly', ink: 0.035 });
+      yield;
+    }
     b.toon('gummyBear', merge(coarse(0.7, () => gummyBearParts())), { ...sweet, cap: 80, anim: 'pop', wobble: [0, 0.05, 2.2, 0] });
     yield;
     b.toon('caneFence', merge(coarse(0.55, () => caneFenceParts(6))), { ...sweet, cap: 60, anim: 'pop' });
@@ -1892,6 +2058,10 @@ export default {
     yield;
     b.toon('hillC', merge(coarse(0.8, () => frostHillParts(2, 7))), { ...sweet, cap: 110, anim: 'liftFar', ink: 0.04 });
     yield;
+    for (let k = 0; k < 3; k++) {
+      b.toon(`scoopHill${'ABC'[k]}`, merge(coarse(0.7, () => scoopHillParts(k, 3 + k * 4))), { ...sweet, cap: 70, anim: 'liftFar', ink: 0.04 });
+      yield;
+    }
     b.toon('cakeMesa', merge(yield* coarseSteps(0.45, cakeMesaParts(5))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
     yield;
     b.toon('cakeMesaB', merge(yield* coarseSteps(0.45, cakeMesaParts(10))), { ...sweet, cap: 30, anim: 'liftFar', ink: 0.04 });
@@ -1923,6 +2093,10 @@ export default {
     b.toon('caramelHeap', caramelHeapGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
     yield;
     b.toon('gumdropTrio', gumdropTrioGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
+    yield;
+    b.toon('gumdropBig', gumdropBigGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
+    yield;
+    b.toon('gumdropTwins', gumdropTwinsGeo(), { ...sweet, cap: 12, anim: 'popEarly' });
     yield;
     b.toon('cookieWall', cookieWallGeo(9), { ...sweet, cap: 16, anim: 'popEarly' });
     yield;
@@ -1966,7 +2140,12 @@ export default {
       { name: 'chocoBarA', len: 0.9, top: 0.6, tints: ['#ff3550', '#3f8cff', '#ffb02e', '#8a3cff', '#2fb86a'] },
       { name: 'chocoBarB', len: 0.9, top: 0.6, tints: ['#ff6fb0', '#ffd23a', '#4fc8ff'] },
       { name: 'sweetPile', len: 1.24, top: 0.62, tints: ['#ff2d4a', '#4f9cff', '#a660ff', '#3fc46a', '#ff6fb0', '#ffa62e'] },
-      { name: 'gumdropTrio', len: 0.9, top: 0.62, tints: ['#ff3b4e', '#ff8a1f', '#a66cff', '#ff5fae', '#4fb6ff'] },
+      // (the gumdrops, every one of them bouncy: come down on one - or
+      // catch one in the air - and it throws you up high; see CONFIG.bounce)
+      { name: 'gumdropTrio', len: 0.9, top: 0.62, bounce: true, tints: ['#ff3b4e', '#ff8a1f', '#a66cff', '#ff5fae', '#4fb6ff'] },
+      { name: 'gumdropBig', len: 1.0, top: 0.62, bounce: true, tints: GUMDROPS },
+      { name: 'gumdropTwins', len: 0.9, top: 0.62, bounce: true, tints: GUMDROPS },
+      { name: 'gumdropBig', len: 1.0, top: 0.62, bounce: true, tints: GUMDROPS },
       { name: 'cookieStack', len: 1.7, top: 0.68, flip: true },
       { name: 'caramelHeap', len: 0.9, top: 0.72 },
     ],
@@ -1979,14 +2158,15 @@ export default {
       { name: 'cookieWall', len: 1.0 },
       { name: 'sandwichWall', len: 1.32 },
       { name: 'gummyBearWall', len: 1.24, tints: GUMMY_TINTS },
-      { name: 'gumdropGiant', len: 1.96, tints: ['#ff3b4e', '#ff8a1f', '#ffd21f', '#4fd64a', '#4fb6ff', '#b061ff', '#ff5fae'] },
+      { name: 'gumdropGiant', len: 1.96, tints: GUMDROPS },
       { name: 'coneWall', len: 1.7, tints: ['#ffb3d1', '#a8f0d0', '#fff0c8', '#a8693a', '#cdb6ff'] },
       { name: 'lollipopWall', len: 0.84, tints: ['#ffffff', '#ffffff', '#ff4d8d', '#4fb6ff', '#a66cff', '#ffa62e'] },
     ],
     LW: [
       { name: 'chocoBarWide', len: 1.0, top: 0.62, tints: ['#8a3cff', '#ff3550', '#2fb86a'] },
       { name: 'sweetsWide', len: 1.24, top: 0.62, tints: ['#ff2d4a', '#4f9cff', '#a660ff', '#3fc46a'] },
-      { name: 'gumdropRow', len: 0.9, top: 0.62 },
+      { name: 'gumdropRow', len: 0.9, top: 0.62, bounce: true },
+      { name: 'gumdropRow', len: 0.9, top: 0.62, bounce: true },
     ],
     HW: { name: 'waferBridge', len: 0.6 },
   },
@@ -2035,14 +2215,24 @@ export default {
       // (and a far ring of them closing the horizon)
       if (rng.chance(0.7)) {
         const x = s * rng.float(85, 160);
-        ctx.put(rng.chance(0.6) ? 'hillA' : 'hillC', x, 0, rng.float(0, L), { s: rng.float(3, 5), sy: rng.float(1.0, 1.8), ry: rng.float(0, 6.28), c: rng.pick(PASTEL_TINTS) });
+        const k = rng.weighted([['hillA', 1.4], ['hillC', 1], ['scoopHillA', 0.8], ['scoopHillB', 0.6]]);
+        const scoop = k.startsWith('scoop');
+        ctx.put(k, x, 0, rng.float(0, L), { s: scoop ? rng.float(2.4, 3.6) : rng.float(3, 5), sy: scoop ? undefined : rng.float(1.0, 1.8), ry: rng.float(0, 6.28), c: rng.pick(scoop ? SCOOPS : PASTEL_TINTS) });
       }
       if (rng.chance(0.85)) {
         const x = s * rng.float(36, 95);
         const dz = rng.float(0, L);
         if (free(x, dz, 8)) {
-          const k = rng.weighted([['hillA', 2], ['hillB', 1], ['hillC', 1.2]]);
-          ctx.put(k, x, 0, dz, { s: rng.float(1.6, 3.2), sy: rng.float(1.2, 2.2), ry: rng.float(0, 6.28), c: rng.pick(PASTEL_TINTS) });
+          // rolling frosting, and hills of ice cream; now and then a
+          // cupcake as big as a hill
+          const k = rng.weighted([['hillA', 1.6], ['hillB', 0.9], ['hillC', 1], ['scoopHillA', 1], ['scoopHillB', 0.8], ['scoopHillC', 0.8], ['cupcakeGiant', 0.35], ['cupcakeGiantB', 0.3], ['cupcakeGiantC', 0.3]]);
+          const scoop = k.startsWith('scoop'), cake = k.startsWith('cupcake');
+          ctx.put(k, x, 0, dz, {
+            s: cake ? rng.float(1.6, 2.6) : scoop ? rng.float(1.1, 2.0) : rng.float(1.6, 3.2),
+            sy: cake || scoop ? undefined : rng.float(1.2, 2.2),
+            ry: rng.float(0, 6.28),
+            c: rng.pick(scoop ? SCOOPS : cake ? FROSTINGS : PASTEL_TINTS),
+          });
         }
       }
       if (rng.chance(0.3)) {
@@ -2103,9 +2293,9 @@ export default {
       }
       const T = LAND[land];
       // how busy this stretch is (some of it left almost bare)
-      const busy = T.busy * (0.4 + 0.6 * zh(1));
+      const busy = T.busy * (0.65 + 0.35 * zh(1));
       const tint = (name) => (TINT[name] ? rng.pick(TINT[name]) : undefined);
-      const put = (name, x, dz, o = {}) => ctx.put(name, x, 0, dz, { s: (SIZE[name] || 1) * rng.float(0.85, 1.2), ry: rng.float(0, 6.28), c: tint(name), ...o });
+      const put = (name, x, dz, o) => ctx.put(name, x, 0, dz, { s: (SIZE[name] || 1) * rng.float(0.85, 1.2), ry: rng.float(0, 6.28), c: tint(name), ...o });
 
       // the land rolls: low knolls of frosting, set back from the road, the
       // open ground between things never just flat
@@ -2117,7 +2307,9 @@ export default {
         const dz = rng.float(0, L);
         if (free(x, dz, r * 0.9) && roomFor(x, dz, r * 0.7)) {
           claim(x, dz, r * 0.7);
-          ctx.put(rng.chance(0.7) ? 'hillA' : 'hillC', x, 0, dz, { s: sc, sy: rng.float(0.5, 0.8), ry: rng.float(0, 6.28), c: rng.pick(PASTEL_TINTS) });
+          // (or a scoop of ice cream, a knoll of it)
+          if (rng.chance(0.4)) ctx.put(rng.pick(['scoopHillA', 'scoopHillC']), x, 0, dz, { s: sc * 0.85, ry: rng.float(0, 6.28), c: rng.pick(SCOOPS) });
+          else ctx.put(rng.chance(0.7) ? 'hillA' : 'hillC', x, 0, dz, { s: sc, sy: rng.float(0.5, 0.8), ry: rng.float(0, 6.28), c: rng.pick(PASTEL_TINTS) });
         }
       }
       // tufts of sour-straw grass, in a clump or two
@@ -2129,16 +2321,20 @@ export default {
         }
       }
       // patches of what grows here, spaced out, none hard by the road
-      const patches = Math.floor(rng.float(1.2, 3.6) * busy);
+      // (near the road and further back - and some of every land's own
+      // candy, wherever you are)
+      const patches = Math.floor(rng.float(2.4, 5.2) * busy);
       for (let k = 0; k < patches; k++) {
-        const patch = rng.weighted(T.patches);
-        const cx = s * rng.float(6.8, 17), cz = rng.float(1, L - 1);
-        if (!free(cx, cz, 1.8) || !roomFor(cx, cz, 2.4)) continue;
-        claim(cx, cz, 2.4);
+        const patch = rng.chance(0.25) ? rng.pick(ANY) : rng.weighted(T.patches);
+        const back = rng.chance(0.35);
+        const cx = s * (back ? rng.float(17, 28) : rng.float(6.6, 16)), cz = rng.float(1, L - 1);
+        const big = back ? 1.35 : 1;
+        if (!free(cx, cz, 1.8 * big) || !roomFor(cx, cz, 2.2 * big)) continue;
+        claim(cx, cz, 2.2 * big);
         for (const [name, lo, hi] of PATCH_OF[patch]) {
           for (let i = rng.int(lo, hi); i > 0; i--) {
-            const x = cx + rng.float(-1.4, 1.4), dz = cz + rng.float(-1.4, 1.4);
-            if (Math.abs(x) > 5.6 && free(x, dz, 0.6)) put(name, x, dz);
+            const x = cx + rng.float(-1.4, 1.4) * big, dz = cz + rng.float(-1.4, 1.4) * big;
+            if (Math.abs(x) > 5.6 && free(x, dz, 0.6 * big)) put(name, x, dz, back ? { s: (SIZE[name] || 1) * rng.float(1.1, 1.5) } : undefined);
           }
         }
       }
@@ -2208,17 +2404,23 @@ const PATCH_OF = {
   gummies: [['gummyPlant', 2, 3], ['assortFruity', 0, 1]],
   chocolate: [['assortChocolates', 1, 2]],
   caramel: [['assortCaramels', 1, 1], ['assortChocolates', 0, 1]],
+  cupcakes: [['assortCupcakes', 1, 2], ['rosettes', 0, 1]],
+  lollies: [['assortLollies', 1, 2], ['candyGrass', 0, 1]],
+  donuts: [['assortDonuts', 1, 1], ['assortMeringues', 0, 1]],
+  floss: [['cottonPuff', 2, 3], ['assortGumdrops', 0, 1]],
 };
+// (and some candy from anywhere, in any land)
+const ANY = ['cupcakes', 'lollies', 'donuts', 'gumdrops', 'floss', 'flowers'];
 const LAND = {
   meadow: {
-    weight: 1.4, busy: 0.75,
-    patches: [['flowers', 2], ['frosting', 1], ['gumdrops', 1.4], ['meringues', 0.8]],
-    back: [['cottonTree', 1], ['lollipopBall', 0.7], ['cottonTreeB', 0.7]],
+    weight: 1.4, busy: 0.85,
+    patches: [['flowers', 2], ['frosting', 1], ['gumdrops', 1.4], ['meringues', 0.8], ['lollies', 1], ['floss', 0.8]],
+    back: [['cottonTree', 1], ['lollipopBall', 0.7], ['cottonTreeB', 0.7], ['cottonFloss', 1], ['cupcakeGiant', 0.5]],
     lay(o) {
       const { rng, s, free, put } = o;
-      if (rng.chance(0.55)) {
+      if (rng.chance(0.65)) {
         // a stand of trees, two or three together
-        const name = rng.pick(['cottonTree', 'cottonTreeB', 'lollipopTree', 'lollipopBall']);
+        const name = rng.pick(['cottonTree', 'cottonTreeB', 'cottonFloss', 'cottonFlossB', 'lollipopTree', 'lollipopBall']);
         const t = placeBig(o, name, [10, 22]);
         if (t) {
           for (let i = rng.int(1, 2); i > 0; i--) {
@@ -2242,8 +2444,8 @@ const LAND = {
     },
   },
   village: {
-    weight: 1.2, busy: 0.9,
-    patches: [['flowers', 1], ['gumdrops', 1], ['frosting', 1]],
+    weight: 1.2, busy: 0.95,
+    patches: [['flowers', 1], ['gumdrops', 1], ['frosting', 1], ['cupcakes', 1], ['donuts', 0.6]],
     back: [['gingerHouseA', 1], ['gingerHouseB', 1], ['gingerCottage', 1]],
     // a house with its garden: a fence of candy canes along the front, a
     // gumdrop arch for a gate, flowers either side of the path
@@ -2263,18 +2465,18 @@ const LAND = {
     },
   },
   orchard: {
-    weight: 1.0, busy: 0.7,
-    patches: [['flowers', 1], ['gumdrops', 1]],
-    back: [['lollipopTree', 1], ['cottonTree', 1]],
+    weight: 1.0, busy: 0.8,
+    patches: [['flowers', 1], ['gumdrops', 1], ['lollies', 1]],
+    back: [['lollipopTree', 1], ['cottonTree', 1], ['cottonFloss', 1]],
     // trees planted in rows, row after row running on down the road
     lay(o) {
       const { ctx, rng, s, free, roomFor, claim, put } = o;
-      const rows = [[11.5, 'lollipopTree'], [17, 'cottonTree'], [22.5, 'lollipopBall']];
+      const rows = [[11.5, 'lollipopTree'], [17, (ctx.d0 >> 7) % 2 ? 'cottonFloss' : 'cottonTree'], [22.5, 'lollipopBall']];
       rows.forEach(([rx, name], i) => {
         const step = 6.4;
         const off = i * 2.1;
         const tintKey = Math.floor((ctx.d0 + off) / 96) + i * 3 + (s > 0 ? 1 : 0);
-        const c = TINT[name][tintKey % TINT[name].length];
+        const c = TINT[name] ? TINT[name][tintKey % TINT[name].length] : undefined;
         for (let d = Math.ceil((ctx.d0 - off) / step) * step + off; d < ctx.d0 + ctx.L; d += step) {
           const x = s * rx, dz = d - ctx.d0;
           if (!free(x, dz, 2) || !roomFor(x, dz, 1.4)) continue;
@@ -2285,8 +2487,8 @@ const LAND = {
     },
   },
   quarry: {
-    weight: 0.8, busy: 0.8,
-    patches: [['chocolate', 1.5], ['caramel', 1]],
+    weight: 0.7, busy: 0.85,
+    patches: [['chocolate', 1.5], ['caramel', 1], ['donuts', 0.5]],
     back: [['chocoBlocks', 1], ['truffleRocks', 1]],
     // outcrops of chocolate, boulders of truffle, a giant cookie half sunk
     lay(o) {
@@ -2295,9 +2497,9 @@ const LAND = {
     },
   },
   gummy: {
-    weight: 0.9, busy: 0.85,
-    patches: [['gummies', 2], ['crystals', 1.2]],
-    back: [['rockCandyGiant', 1], ['cottonTree', 0.6]],
+    weight: 0.9, busy: 0.9,
+    patches: [['gummies', 2], ['crystals', 1.2], ['floss', 0.6]],
+    back: [['rockCandyGiant', 1], ['cottonTree', 0.6], ['cottonFlossC', 0.8]],
     // gummy bears out grazing, a mother and her cub; crystals of rock candy
     lay(o) {
       const { rng, s, free, put } = o;
@@ -2310,31 +2512,77 @@ const LAND = {
     },
   },
   parlour: {
-    weight: 0.8, busy: 0.8,
-    patches: [['flowers', 1], ['frosting', 1], ['meringues', 1]],
-    back: [['iceTower', 1]],
+    weight: 0.9, busy: 0.9,
+    patches: [['flowers', 1], ['frosting', 1], ['meringues', 1], ['cupcakes', 1.2], ['donuts', 0.8]],
+    back: [['iceTower', 1], ['scoopHillA', 0.7], ['cupcakeGiant', 0.6]],
     // the ice-cream district: a parlour's stand by the road, a picnic
-    // spread out on the frosting, an ice-cream tower behind
+    // spread out on the frosting, an ice-cream tower behind, hills of ice
+    // cream
     lay(o) {
       const { rng } = o;
       if (rng.chance(0.6)) placeBig(o, 'kiosk', [8.5, 11]);
       else if (rng.chance(0.6)) placeBig(o, rng.chance(0.6) ? 'picnic' : 'cakeStand', [8.5, 12]);
       if (rng.chance(0.4)) placeBig(o, 'iceTower', [17, 24], { sc: 0.8 });
+      else if (rng.chance(0.6)) placeBig(o, rng.pick(['scoopHillA', 'scoopHillB', 'scoopHillC']), [16, 24], { sc: 0.55 });
+    },
+  },
+  floss: {
+    weight: 1.1, busy: 0.9,
+    patches: [['floss', 2], ['gumdrops', 1], ['lollies', 0.8], ['flowers', 0.8]],
+    back: [['cottonFloss', 1], ['cottonFlossB', 1], ['cottonFlossC', 0.7], ['cottonTree', 0.7]],
+    // a cotton-candy wood: a grove of floss trees in every colour it's spun
+    // in, puffs of it grown low between them
+    lay(o) {
+      const { rng, s, free, put } = o;
+      const g = placeBig(o, rng.pick(['cottonFloss', 'cottonFlossB', 'cottonFlossC']), [9, 16]);
+      if (!g) return;
+      for (let i = rng.int(2, 4); i > 0; i--) {
+        const x = g.x + s * rng.float(-1, 5), dz = g.z + rng.float(-5, 5);
+        if (Math.abs(x) > 9 && free(x, dz, 2.2)) put(rng.pick(['cottonFloss', 'cottonFlossB', 'cottonFlossC', 'cottonTree']), x, dz, { s: rng.float(0.75, 1.1) });
+      }
+      for (let i = rng.int(1, 3); i > 0; i--) {
+        const x = g.x + s * rng.float(-3, 3), dz = g.z + rng.float(-4, 4);
+        if (Math.abs(x) > 6.5 && free(x, dz, 0.8)) put('cottonPuff', x, dz);
+      }
+    },
+  },
+  bakery: {
+    weight: 1.0, busy: 0.9,
+    patches: [['cupcakes', 2], ['donuts', 1], ['meringues', 0.8], ['frosting', 0.8]],
+    back: [['cupcakeGiant', 1], ['cupcakeGiantB', 1], ['cupcakeGiantC', 1], ['scoopHillB', 0.6]],
+    // cupcake hills: cupcakes as big as houses standing about in the
+    // frosting, a scoop of ice cream as big as a hill behind them
+    lay(o) {
+      const { rng, s, free, put } = o;
+      const c = placeBig(o, rng.pick(['cupcakeGiant', 'cupcakeGiantB', 'cupcakeGiantC']), [10, 18]);
+      if (c && rng.chance(0.6)) {
+        const x = c.x + s * rng.float(3.5, 6), dz = c.z + rng.float(-4, 4);
+        if (free(x, dz, 2.4)) put(rng.pick(['cupcakeGiant', 'cupcakeGiantB', 'cupcakeGiantC']), x, dz, { s: rng.float(0.55, 0.8) });
+      }
+      if (rng.chance(0.5)) placeBig(o, rng.pick(['scoopHillA', 'scoopHillC']), [20, 30], { sc: 0.6 });
     },
   },
 };
 const tint0 = (rng) => rng.pick(GUMMY_TINTS);
+// (ice cream: strawberry, mint, vanilla, blueberry, lemon, raspberry,
+// lilac, peach; and frosting for the cupcakes)
+const SCOOPS = ['#ffa8cc', '#9ff0cf', '#fff0c8', '#a8d8ff', '#fff09a', '#ff8cb8', '#d4b8ff', '#ffc8a0'];
+const FROSTINGS = ['#ffffff', '#ffb3d6', '#a8f0d4', '#d4b8ff', '#fff09a', '#a8d8ff'];
 const LANDS = Object.keys(LAND);
 const LAND_WEIGHT = LANDS.reduce((a, k) => a + LAND[k].weight, 0);
 const SIZE = {
   gummyBear: 1.25, rockCandyGiant: 1.2,
   assortGumdrops: 1.7, assortMeringues: 1.6, assortChocolates: 1.7, assortCaramels: 1.6, assortFruity: 1.7,
+  assortCupcakes: 1.7, assortLollies: 1.6, assortDonuts: 1.7, cottonPuff: 1.3,
   rockCandy: 1.5, gummyPlant: 1.6, rosettes: 1.6, lollipopFlowers: 1.5,
+  cupcakeGiant: 0.75, cupcakeGiantB: 0.75, cupcakeGiantC: 0.75,
 };
 const RADIUS = {
   gingerHouseA: 4.6, gingerHouseB: 4.6, gingerCottage: 3.4, lollipopTree: 2.2, lollipopBall: 1.8, caneTall: 1.6,
   cottonTree: 2.6, cottonTreeB: 2.6, gummyBear: 1.4, cookieGiant: 2.0, donutArch: 2.6,
   truffleRocks: 2.6, chocoBlocks: 2.8, rockCandyGiant: 1.8, gumdropArch: 2.0, kiosk: 2.2, picnic: 2.2, cakeStand: 1.2, iceTower: 3.2,
+  cottonFloss: 2.4, cottonFlossB: 2.4, cottonFlossC: 2.4, cupcakeGiant: 2.4, cupcakeGiantB: 2.4, cupcakeGiantC: 2.4,
+  scoopHillA: 8, scoopHillB: 8, scoopHillC: 10,
 };
 const TINT = {
   lollipopTree: ['#ffffff', '#ffffff', '#ff7eb6', '#7cc6ff', '#b18cff', '#ffc24d'],
@@ -2347,9 +2595,12 @@ const TINT = {
   gummyBear: GUMMY_TINTS,
   rosettes: PASTEL_TINTS,
   donutArch: ['#ff8cc0', '#ffffff', '#8a4a28', '#c9b0ff', '#9ff0d0'],
-  cottonTree: ['#ffb3d1', '#acdcff', '#cdb6ff', '#ffd2e4'],
-  cottonTreeB: ['#a8f0d0', '#ffe79a', '#ffb3d1', '#acdcff'],
+  cottonTree: ['#ff9ccf', '#8ccaff', '#c9a8ff', '#ffc2e0'],
+  cottonTreeB: ['#9ff0d0', '#ffe36e', '#ff9ccf', '#8ccaff'],
+  cottonPuff: ['#ff9ccf', '#8ccaff', '#c9a8ff', '#9ff0d0', '#ffe36e'],
   iceTower: PASTEL_TINTS,
+  cupcakeGiant: FROSTINGS, cupcakeGiantB: FROSTINGS, cupcakeGiantC: FROSTINGS,
+  scoopHillA: SCOOPS, scoopHillB: SCOOPS, scoopHillC: SCOOPS,
 };
 
 // --- keeping the scenery off the road ----------------------------------------------------
@@ -2369,7 +2620,7 @@ const ROAD_CLEAR = CONFIG.trackHalfWidth + 0.6;
 // where it crosses), and what's put out by the obstacles, not the scenery.
 const ON_ROAD = new Set(['ground', 'floor', 'piping', 'river', 'riverBank', 'riverBankB', 'riverEdge', 'shadow']);
 // The land's big swells, pushed back off the road rather than left out.
-const PUSH_BACK = new Set(['hillA', 'hillB', 'hillC']);
+const PUSH_BACK = new Set(['hillA', 'hillB', 'hillC', 'scoopHillA', 'scoopHillB', 'scoopHillC']);
 // Where a prop can stand (its x, pushed back if it's a hill), or null if it
 // would come onto the road: anything on the ground whose reach - however
 // it's scaled and turned - crosses ROAD_CLEAR. (Clouds, and the dream's

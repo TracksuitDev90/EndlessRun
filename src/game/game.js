@@ -968,6 +968,14 @@ export class Game {
         this.scramble(o, shielded);
         return;
       }
+      // something bouncy caught in the air (a jump taken a hair early or
+      // late, coming down on its shoulder or clipping it on the way up):
+      // bounced, not tripped
+      if (o.bounce && !p.grounded) {
+        p.boing(false);
+        this.boinged(o);
+        continue;
+      }
       if (shielded) {
         o.group.hit = true;
         o.grace = this.time + this.passTime(o) + 0.12;
@@ -1147,6 +1155,49 @@ export class Game {
       g.called = true;
       this.audio.call(g.spec.call);
     }
+  }
+
+  // --- bouncy things ------------------------------------------------------------
+  // The runner's been thrown up off something bouncy (CONFIG.bounce; o its
+  // record, if known): it's let by for the rest of the way over it, heard -
+  // boing - and squashes flat under them and wobbles back up (see squash).
+  boinged(o) {
+    const p = this.player;
+    p.boingNew = false;
+    this.audio.boing(p.boingBig);
+    if (!o) return;
+    o.grace = this.time + this.passTime(o) + 0.2;
+    const g = o.group;
+    if (!g.spec) return;
+    // (its own prop only, not its shadow; a whole row of them, together)
+    const items = [];
+    for (const b of g.world.batches.values()) {
+      if (b.name !== g.spec.name) continue;
+      for (const it of b.items) if (it.owner === g) items.push({ it, b, sx: it.sx, sy: it.sy, sz: it.sz });
+    }
+    if (!items.length) return;
+    (this.squashing ||= []).push({ g, items, t0: this.time, k: p.boingBig ? 1.25 : 1 });
+  }
+
+  // Squashed flat and springing back: a damped wobble about its own shape.
+  squash() {
+    const S = this.squashing;
+    if (!S?.length) return;
+    let w = 0;
+    for (const Q of S) {
+      const t = this.time - Q.t0;
+      const done = t > 0.9 || Q.g.dead;
+      const e = done ? 0 : Q.k * 0.42 * Math.exp(-t * 5.5) * Math.cos(t * 26);
+      for (const I of Q.items) {
+        if (I.it.owner !== Q.g) continue;
+        I.it.sy = I.sy * (1 - e);
+        I.it.sx = I.sx * (1 + e * 0.55);
+        I.it.sz = I.sz * (1 + e * 0.55);
+        I.b.dirty = true;
+      }
+      if (!done) S[w++] = Q;
+    }
+    S.length = w;
   }
 
   // A chest's lid popping open is heard (a muffled clunk and a glug of
@@ -1466,8 +1517,11 @@ export class Game {
       const h = this.obstacles.groundAt(x, this.dist, this.player.y);
       // (on a stair, carried up and down it rather than stepping off it)
       this.player.onRamp = this.obstacles.rampUnder;
+      // (on something bouncy, thrown back up off it: see Game.boinged)
+      this.player.springy = this.state === 'running' && !this.god ? this.obstacles.bounceUnder : null;
       return h;
     });
+    if (this.player.boingNew) this.boinged(this.obstacles.bounceUnder);
     if (this.player.boosted !== boosts) {
       this.cam.boost(this.player.thrust);
       this.audio.thrust(this.player.thrust);
@@ -1487,6 +1541,7 @@ export class Game {
     this.updateWater(dt);
     this.callAhead();
     this.lidPops(dt);
+    this.squash();
     shared.uGemAt.value.set(this.player.x, this.player.y + CHEST, pz);
     this.dream.update(dt);
     this.updateDrain(dt);
