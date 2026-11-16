@@ -1163,6 +1163,9 @@ void main() {
       vUv.y += phase; // the pattern runs on across chunks (p0 = chunk distance)
     #endif
   #endif
+  #ifdef RIVER
+    vUv.y += phase; // the river runs on across chunks (p0 = chunk distance)
+  #endif
   #ifdef SHELVES
     // a wall of books along the run runs on across chunks (its uv.x laid
     // out along the run, p0 the chunk distance); the stacks across it don't
@@ -1807,6 +1810,19 @@ float hashS(vec2 p) {
 #ifdef WATCH
 varying vec3 vRest;
 varying vec3 vRestN;
+#endif
+#ifdef RIVER
+// Hell's river of lava (toon options lava and river), drawn on a wide flat
+// strip laid along the run (uv in metres: x across, y along, from p0): where
+// the river's middle lies across the strip at a metres along (x) and half
+// how wide it is there (y). It wanders, swells and narrows (every wave a
+// whole number of times in 4096 m, where the distance wraps; hell.js keeps
+// the same sums to stand things in it).
+vec2 riverBed(float a) {
+  return vec2(
+    4.5 * sin(a * 0.0245437) + 2.2 * sin(a * 0.0736311 + 1.7),
+    3.6 + 1.0 * sin(a * 0.0490874 + 0.6) + 0.6 * sin(a * 0.1227185 + 2.1));
+}
 #endif
 #ifdef CRUST
 // A textured crust for rock, charred wood and volcanic glass (Hell's
@@ -2887,6 +2903,79 @@ void main() {
     // from deep red through orange to white-yellow where it's hottest, the
     // seams between the plates white-hot, bubbles swelling and bursting all
     // over it; it lights itself and keeps its colour when the world drains
+    #ifdef RIVER
+      // The river: a channel of open lava down its middle, yellow-hot and
+      // streaked along its flow, cooling through orange to deep red toward
+      // its banks; rafts of dark crust on it, few and small out in the
+      // channel, bigger and closer the nearer the bank until only glowing
+      // cracks are left between them, and past the bank they thin out onto
+      // the ash - so the river has no edge but the shapes of its own crust.
+      // The rafts near the flow are lit red by it, their rims glowing. It
+      // runs only along the stretches it's laid for (the same wave hell.js
+      // lays it by), narrowing to nothing at each end.
+      {
+      float rA = vUv.y;
+      float rX = vUv.x;
+      float rSide = vPos.x < 0.0 ? -1.0 : 1.0;
+      float rOn = smoothstep(0.3, 0.55, rSide * sin(rA * 0.0030679616 + 1.3));
+      vec2 bed = riverBed(rA);
+      float wv = texture2D(uNoise, vec2(rX, rA) * 0.046875).g;
+      float wv2 = texture2D(uNoise, vec2(rA, rX) * 0.046875 + 0.3).g;
+      float re = abs(rX - bed.x) / max(bed.y * rOn, 0.01) + (wv - 0.5) * 0.5;
+      // (it keeps clear of the road, however it wanders)
+      re += 2.0 * (1.0 - smoothstep(6.5, 9.5, abs(vPos.x)));
+      vec2 rq = vec2(rX, rA) * 0.5 + (vec2(wv, wv2) - 0.5) * 0.9;
+      rq.y += uTime * 0.06;
+      vec2 ic = floor(rq);
+      vec2 fc = fract(rq);
+      float f1 = 9.0;
+      float f2 = 9.0;
+      vec2 site = vec2(0.0);
+      float sh = 0.0;
+      for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+          vec2 g = vec2(float(i), float(j));
+          vec2 o = vec2(hash12(ic + g + 1.7), hash12(ic + g + 9.2));
+          vec2 r = g + o - fc;
+          float d = dot(r, r);
+          if (d < f1) {
+            f2 = f1;
+            f1 = d;
+            site = r;
+            sh = o.x;
+          } else if (d < f2) {
+            f2 = d;
+          }
+        }
+      }
+      float ed = sqrt(f2) - sqrt(f1);
+      // (each raft is as big as where its own middle lies lets it be)
+      vec2 sp = vec2(rX, rA) + site * 2.0;
+      vec2 bs = riverBed(sp.y);
+      float es = abs(sp.x - bs.x) / max(bs.y * rOn, 0.01) + 2.0 * (1.0 - smoothstep(6.5, 9.5, abs(vPos.x + site.x * 2.0)));
+      float gap = mix(1.3, 0.06, smoothstep(0.04 + 0.3 * sh, 0.7, es)) + 1.3 * smoothstep(1.35 + 0.3 * sh, 1.8, es);
+      float plate = smoothstep(gap, gap + 0.06, ed);
+      if (plate < 0.02 && re > 1.75) discard;
+      float st = texture2D(uNoise, vec2(rX * 0.3, rA * 0.03 + uTime * 0.05)).g;
+      float st2 = texture2D(uNoise, vec2(rX * 0.8 + 0.3, rA * 0.07 + uTime * 0.11)).g;
+      float hot = clamp(1.0 - re, 0.0, 1.0) * (0.75 + 0.5 * st) + (st2 - 0.5) * 0.3;
+      vec3 flow = mix(vec3(0.5, 0.02, 0.0), vec3(1.0, 0.16, 0.02), smoothstep(-0.05, 0.3, hot));
+      flow = mix(flow, vec3(1.0, 0.55, 0.06), smoothstep(0.3, 0.6, hot));
+      flow = mix(flow, vec3(1.0, 0.9, 0.42), smoothstep(0.62, 0.95, hot));
+      // (past the bank only the cracks between the rafts still glow, dimmer
+      // and dimmer)
+      flow *= 1.0 - 0.8 * smoothstep(1.0, 1.75, re);
+      float near = 1.0 - smoothstep(0.15, 1.0, es);
+      vec3 pl = mix(vec3(0.06, 0.035, 0.05), vec3(0.11, 0.065, 0.085), sh) * (0.8 + 0.4 * wv2);
+      pl = mix(pl, vec3(0.55, 0.05, 0.02) * (0.7 + 0.5 * st2), near * 0.85);
+      float prim = 1.0 - smoothstep(gap + 0.06, gap + 0.3, ed);
+      pl += vec3(0.6, 0.08, 0.0) * prim * 0.5 * (1.0 - smoothstep(0.6, 1.2, es));
+      col = mix(flow, pl, plate);
+      gKeep = 1.0 - plate * smoothstep(0.7, 1.1, es);
+      gEmit = 1.0;
+      col *= 1.1;
+      }
+    #else
     vec2 lq = vUv * vec2(0.5, 0.3) + vec2(0.0, -uTime * 0.07);
     float l1 = texture2D(uNoise, lq).g;
     float l2 = texture2D(uNoise, lq * 2.3 + vec2(0.37, uTime * 0.05)).g;
@@ -2918,6 +3007,7 @@ void main() {
     col *= 1.1;
     gKeep = 1.0;
     gEmit = 1.0;
+    #endif
   #endif
 
   #ifdef WATER
@@ -8447,6 +8537,7 @@ export function makeToonMaterial(env, o = {}) {
   if (o.ground) defines.GROUND = o.ground;
   if (o.water) defines.WATER = '';
   if (o.lava) defines.LAVA = '';
+  if (o.river) defines.RIVER = '';
   // Candy World (see render/candy.js): sweets' stuff picked by each part's
   // mark flag; a river piece bent along its arc; its chocolate
   if (o.candy) defines.CANDY = '';

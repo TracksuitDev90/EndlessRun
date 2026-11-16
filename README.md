@@ -419,7 +419,10 @@ someone inside; and dead trees claw up at the smoke.
 
 And then there are the burning. Nine times through every stretch of Hell,
 spread from just inside the door to just short of the door out, someone is on
-fire at the very edge of the road — now on one side, now the other: a
+fire at the very edge of the road — now on one side, now the other — and five
+more burn further out on the plain. Each is a giant, half as tall again as
+anyone living (the far ones taller still), so they're seen from a long way
+off: a
 hairless, sexless figure of ordinary human build (seven and a half heads tall,
 the fingertips at mid-thigh), charred black, fire showing through the cracks
 in its skin, two embers where its eyes were, wrapped in flame so that it
@@ -449,6 +452,18 @@ fragment shader — turbulence rising through it at three scales, broad and
 yellow-hot low down, wavering more the higher it climbs and torn there into
 tongues that thin through orange to deep red and are gone; its core hides
 what's behind it and its edges only add their light.
+
+The river of lava that winds alongside the road is drawn on a wide flat strip
+by the fragment shader (toon options `lava` and `river`), so it has no
+modelled banks at all: a channel of open lava wanders down its middle,
+swelling and narrowing, yellow-hot and streaked along its flow, cooling
+through orange to deep red toward its banks; rafts of dark crust float on it
+— few and small out in the channel, lit red by it, bigger and closer the
+nearer the bank until only glowing cracks are left between them — and past
+the bank the crust carries on over the ash, its cracks dimming, until it
+thins out. The river's only edge is the shapes of its own crust. It keeps
+clear of the road however it wanders, and narrows to nothing at each end of
+a stretch.
 
 ### Time coming unstuck
 
