@@ -21,8 +21,9 @@ import { CONFIG } from '../config.js';
 //                        come out onto it the lighthouse's beam swings round
 //                        across the road and a great wave breaks beside you,
 //                        its spray lit warm for a moment. Here the sea is part
-//                        of the road: swells rear up against the causeway and
-//                        pour over into an outer lane (go round), now and then
+//                        of the road: great swells rear up against its walls
+//                        and pitch over the coping as you come alongside
+//                        (scenery - they never come into a lane), now and then
 //                        a low wash of white water runs right across it (jump
 //                        it), and tidal cuts break through it (jump those).
 //   the fishing landing  worn boards and old setts by a quay, half abandoned:
@@ -35,9 +36,10 @@ import { CONFIG } from '../config.js';
 // the sea's white foam, and only a few warm lights - the lantern, the boats,
 // their reflections in the wet stone.
 //
-// The waves that are obstacles keep time with the runner (see frame, below,
-// and render/coast.js): a surge builds and breaks as you come up to it, so
-// it always gives the same warning, however fast you're running.
+// The waves keep time with the runner (see frame, below, and
+// render/coast.js): a wash builds and runs across the road as you come up
+// to it, so it always gives the same warning, however fast you're running;
+// a great swell beside the causeway pitches over as you come alongside.
 
 const C = {
   denim: '#2e4a6e',
@@ -355,6 +357,11 @@ const HOLD = [-40, 44];
 const BIG_AHEAD = 22;
 
 const SEA_Y = -2.4;
+// how far past a great swell beside the causeway you are when it pitches
+// over (it breaks a little ahead of you, in full view)
+const SWELL_AT = -14;
+// how long before you reach a wash it starts to build (s)
+const WASH_LEAD = 3.6;
 // where the land meets the sea (m out from the middle of the road), for
 // the sea's foam: the headland's shore, the causeway's walls, the quay
 const SHORE = { headland: 15.5, grass: 15.5, causeway: 5.6, landing: 6.9 };
@@ -547,7 +554,7 @@ function lipShape(depth, seed = 1) {
 // --- a breaker: a swell striking the rocks ------------------------------------------
 // (built for the sea on the right; see BREAKER in render/coast.js for how it
 // moves: role 0 the swell, 1 the spray, 2 the foam thrown over the rocks,
-// 3 the rivulets draining back down them)
+// 4 the lip)
 function breakerGeo({ len = 7, seed = 1, spray = 34, up = [6, 11], wide = 1 } = {}) {
   const rnd = seeded(seed);
   const parts = [];
@@ -585,8 +592,8 @@ function breakerGeo({ len = 7, seed = 1, spray = 34, up = [6, 11], wide = 1 } = 
   }
   // the foam over the rocks
   for (let i = 0; i < 9; i++) parts.push(withRole(part(P.sphere(0.5 + rnd() * 0.5, 8, 5), C.foam, { x: 0.4 + rnd() * 1.6, y: -0.6 + rnd() * 0.4, z: (rnd() - 0.5) * len * 0.85, sy: 0.35, mark: FOAM, outline: 0 }), 2));
-  // the rivulets, down through the cracks
-  for (let i = 0; i < 7; i++) parts.push(withRole(part(P.box(0.08 + rnd() * 0.06, 1, 0.12), C.foam, { x: 0.2 + rnd() * 1.4, y: 0.5, z: (rnd() - 0.5) * len * 0.8, mark: FOAM, outline: 0 }), 3));
+  // (no rivulets: upright white streaks beside the road read as posts - as
+  // something in the way)
   return merge(parts);
 }
 
@@ -594,11 +601,14 @@ function breakerGeo({ len = 7, seed = 1, spray = 34, up = [6, 11], wide = 1 } = 
 // Every one is built at the lane's middle, its front at z 0, running back to
 // -len; nothing an obstacle you slide under has hangs below the duck line.
 
-// An overtopping wave (W, outer lanes; see SURGE). Its roles: 0 the swell, 1
-// the lip, 2 the curtain pouring into the lane, 3 the flood in the lane,
-// 4 spray.
+// A great swell rearing up beside the causeway (scenery: see SURGE). It
+// rolls in from well out, rears against the causeway's wall as you come
+// alongside, its lip pitching over the coping and its spray thrown up into
+// the wind - but the water never comes into a lane: the road stays the road.
+// Its roles: 0 the swell, 1 the lip, 4 spray. (Its curtain and flood, roles
+// 2 and 3, are built only for a wave that pours into a lane.)
 const SURGE_LEN = 2.6;
-function surgeGeo() {
+function surgeGeo({ lane = false } = {}) {
   const rnd = seeded(77);
   const L = SURGE_LEN;
   const parts = [];
@@ -616,7 +626,7 @@ function surgeGeo() {
   parts.push(withRole(part(lip, C.foam, { mark: FOAM, outline: 0 }), 1));
   // the curtain: a ragged sheet of white water, bulging and torn along its
   // edges, a second thinner one behind it
-  for (const [off, k] of [[0, 1], [0.35, 0.7]]) {
+  if (lane) for (const [off, k] of [[0, 1], [0.35, 0.7]]) {
     const sheet = surface(10, 8, (u, v) => {
       const z = 0.5 - u * (L + 1.0);
       const rag = 0.18 * Math.sin(u * 17 + v * 5 + off * 9) + 0.12 * Math.sin(u * 31 - v * 11);
@@ -624,10 +634,10 @@ function surgeGeo() {
     });
     parts.push(withRole(part(sheet, C.foam, { mark: FOAM, outline: 0 }), 2));
   }
-  for (let i = 0; i < 10; i++) parts.push(withRole(part(P.sphere(0.22 + rnd() * 0.18, 7, 5), C.foam, { x: 0.15 + rnd() * 0.3, y: rnd(), z: 0.4 - rnd() * (L + 0.8), sy: 0.14, sx: 0.7, mark: FOAM, outline: 0 }), 2));
+  if (lane) for (let i = 0; i < 10; i++) parts.push(withRole(part(P.sphere(0.22 + rnd() * 0.18, 7, 5), C.foam, { x: 0.15 + rnd() * 0.3, y: rnd(), z: 0.4 - rnd() * (L + 0.8), sy: 0.14, sx: 0.7, mark: FOAM, outline: 0 }), 2));
   // the flood: foam heaped in the lane, over a sheet of water
-  parts.push(withRole(part(P.box(2.8, 0.12, L + 1.2), '#8a8a8a', { x: 0.25, y: 0.06, z: -L / 2, mark: WAVE, outline: 0 }), 3));
-  for (let i = 0; i < 24; i++) {
+  if (lane) parts.push(withRole(part(P.box(2.8, 0.12, L + 1.2), '#8a8a8a', { x: 0.25, y: 0.06, z: -L / 2, mark: WAVE, outline: 0 }), 3));
+  if (lane) for (let i = 0; i < 24; i++) {
     const r = 0.25 + rnd() * 0.32;
     parts.push(withRole(part(P.sphere(r, 9, 6), C.foam, { x: -0.95 + rnd() * 2.5, y: 0.12 + r * 0.4, z: 0.3 - rnd() * (L + 0.6), sy: 0.75, mark: FOAM, outline: 0 }), 3));
   }
@@ -646,7 +656,9 @@ function surgeGeo() {
     parts.push(withRole(g, 4));
   };
   for (let i = 0; i < 40; i++) drop([2.4 + rnd() * 0.8, 3.0 + rnd() * 0.8, 1.5 - rnd() * 6, 0.32 + rnd() * 0.22], [0.5 - rnd() * 1.8, 2 + rnd() * 3, (rnd() - 0.5) * 1.5, 0], 0.05 + rnd() * rnd() * 0.12);
-  for (let i = 0; i < 40; i++) drop([-0.6 + rnd() * 1.8, 0.3, 0.3 - rnd() * (L + 0.6), 0.64 + rnd() * 0.1], [-0.7 + rnd() * 2.6, 4 + rnd() * 4.5, (rnd() - 0.5) * 1.6, 0], 0.06 + rnd() * rnd() * 0.14);
+  // (and, as it strikes the wall, a burst thrown high up off it)
+  if (!lane) for (let i = 0; i < 36; i++) drop([1.6 + rnd() * 1.2, 1.5 + rnd() * 1.5, 1.5 - rnd() * 7, 0.6 + rnd() * 0.12], [0.3 + rnd() * 1.6, 5 + rnd() * 5, (rnd() - 0.5) * 2, 0], 0.06 + rnd() * rnd() * 0.14);
+  if (lane) for (let i = 0; i < 40; i++) drop([-0.6 + rnd() * 1.8, 0.3, 0.3 - rnd() * (L + 0.6), 0.64 + rnd() * 0.1], [-0.7 + rnd() * 2.6, 4 + rnd() * 4.5, (rnd() - 0.5) * 1.6, 0], 0.06 + rnd() * rnd() * 0.14);
   return merge(parts);
 }
 
@@ -660,7 +672,7 @@ function washGeo() {
     const x = -7.2 + u * 13.6;
     const t = Math.pow(Math.sin(v * Math.PI), 0.75);
     const lump = 0.86 + 0.14 * Math.sin(x * 2.3 + 1.1) * Math.sin(x * 0.9);
-    return [x, 0.84 * t * lump, -v * WASH_LEN];
+    return [x, 0.95 * t * lump, -v * WASH_LEN];
   });
   parts.push(withRole(part(ridge, C.foam, { mark: FOAM, outline: 0 }), 0));
   // a skin of foam spreading in front of it
@@ -677,7 +689,7 @@ function washGeo() {
     const n = g.attributes.position.count;
     const A = new Float32Array(n * 4);
     const B = new Float32Array(n * 4);
-    const launch = [5.2 + rnd() * 1.5, 0.2, 1.5 - rnd() * 4, 0.4 + rnd() * 0.12];
+    const launch = [5.2 + rnd() * 1.5, 0.2, 1.5 - rnd() * 4, 0.17 + rnd() * 0.12];
     const vel = [-1 + rnd() * 2.5, 3 + rnd() * 3, (rnd() - 0.5) * 1.5, 0];
     for (let k = 0; k < n; k++) {
       A.set(launch, k * 4);
@@ -708,21 +720,22 @@ function cutGeo(half, seed) {
   }
   return merge(parts);
 }
-// spray bursting up through it now and then (SPLASH, on its own clock)
+// spray bursting up through it, often and high (SPLASH, on its own clock):
+// seen from far off, the white plumes say where the road's cut
 function cutSprayGeo(half, seed) {
   const rnd = seeded(seed);
   const parts = [];
-  const bursts = half > 2 ? 4 : 2;
+  const bursts = half > 2 ? 5 : 2;
   for (let b = 0; b < bursts; b++) {
-    const launch = [(rnd() - 0.5) * half * 1.6, -0.6, -CUT_LEN / 2 + (rnd() - 0.5) * 0.8, rnd()];
-    const per = 2.6 + rnd() * 2.2;
-    for (let i = 0; i < 8; i++) {
-      const g = part(P.ico(0.07 + rnd() * 0.08, 0), C.foam, { mark: FOAM, outline: 0 });
+    const launch = [(b + 0.5) / bursts * half * 1.8 - half * 0.9 + (rnd() - 0.5) * 0.4, -0.6, -CUT_LEN / 2 + (rnd() - 0.5) * 0.8, rnd()];
+    const per = 1.4 + rnd() * 0.9;
+    for (let i = 0; i < 9; i++) {
+      const g = part(P.ico(0.09 + rnd() * 0.1, 0), C.foam, { mark: FOAM, outline: 0 });
       const n = g.attributes.position.count;
       const A = new Float32Array(n * 4);
       const B = new Float32Array(n * 4);
       const a = rnd() * TAU;
-      const vel = [Math.cos(a) * 0.8, 3.2 + rnd() * 2.2, Math.sin(a) * 0.35, per];
+      const vel = [Math.cos(a) * 0.8, 4.2 + rnd() * 2.4, Math.sin(a) * 0.35, per];
       for (let k = 0; k < n; k++) {
         A.set(launch, k * 4);
         B.set(vel, k * 4);
@@ -1279,7 +1292,6 @@ const S_SAIL = { name: 'sail', with: ['sailEdge'], len: 1.2, tints: [C.sail, C.s
 const S_POTS = { name: 'pots', len: 1.5 };
 const S_DINGHY = { name: 'dinghy', len: 1.9, tints: [C.boatBlue, C.boatRed, C.boatGreen, C.boatWhite] };
 const S_TEETH = { name: 'teeth', with: ['teethFoam'], len: 1.3 };
-const S_SURGE = { name: 'surge', len: SURGE_LEN, flat: true, lanes: [0, 2], w: 3 };
 const S_WASH = { name: 'wash', len: WASH_LEN, flat: true };
 const S_CUTW = { name: 'cutW', with: ['cutWSpray'], len: CUT_LEN, top: 0.5, wade: true, flat: true };
 const S_WALLW = { name: 'wallW', with: ['wallWGrass'], len: 1.2 };
@@ -1303,12 +1315,13 @@ const ZONES = {
     twin: { L: [S_DRIFT2] },
     twinChance: 0.4,
   },
-  // the causeway: the sea comes over it - surges into the outer lanes,
-  // washes across it - and cuts it; driftwood and wrecks thrown up on it
+  // the causeway: the sea washes across it and cuts it (the great swells
+  // rearing up beside it are scenery: see swellChunk); driftwood, rocks and
+  // wrecks thrown up on it
   causeway: {
     L: [{ ...S_CUT, w: 1.6 }, S_DRIFT],
     H: [S_ARCH, S_SPAR],
-    W: [S_SURGE, S_TEETH],
+    W: [S_TEETH, { ...S_DINGHY, w: 0.6 }],
     LW: [S_WASH, S_CUTW, S_WASH],
     HW: S_ARCHW,
     twin: { L: [S_DRIFT2], W: [S_DINGHY2] },
@@ -1438,8 +1451,21 @@ function frame(world, game, seg, dt) {
       }
     }
   };
-  step('surge', 3.4, 1.6);
-  step('wash', 3.0, 1.4);
+  step('wash', WASH_LEAD, 1.4);
+  // the great swells beside the causeway, rearing up and pitching over its
+  // wall as you come alongside (scenery: their progress is kept on the
+  // instance itself - put at 0 - and never goes back)
+  if (world.has('swell')) {
+    const b = world.batch('swell');
+    for (const it of b.items) {
+      const T = (it.d - SWELL_AT - game.dist) / v;
+      const p = Math.max(it.p1, T >= 0 ? Math.max(0, 1 - T / 3.4) : Math.min(2, 1 - T / 1.6));
+      if (p !== it.p1) {
+        it.p1 = p;
+        b.dirty = true;
+      }
+    }
+  }
   // (the great wave: breaking the moment the runner is out onto the
   // causeway, f 0.44 - see BREAKER)
   const big = world.batch('bigBreaker');
@@ -1593,12 +1619,12 @@ export default {
     yield;
     b.toon('stackB', merge(stackParts(13, 9)), { ...COAST, cap: 16, anim: 'liftFar', ink: 0.05 });
     yield;
-    b.toon('breaker', breakerGeo({ seed: 3, spray: 50 }), { cap: 50, ink: 0, side: THREE.DoubleSide, breaker: [7.5, 3.6] });
+    b.toon('breaker', breakerGeo({ seed: 3, spray: 32 }), { cap: 50, ink: 0, side: THREE.DoubleSide, breaker: [7.5, 3.6] });
     yield;
-    b.toon('breakerB', breakerGeo({ seed: 8, len: 9, spray: 60, up: [7, 12] }), { cap: 30, ink: 0, side: THREE.DoubleSide, breaker: [9.5, 4.4] });
+    b.toon('breakerB', breakerGeo({ seed: 8, len: 9, spray: 40, up: [7, 12] }), { cap: 30, ink: 0, side: THREE.DoubleSide, breaker: [9.5, 4.4] });
     yield;
     // (the great wave beside you as you come out onto the causeway)
-    b.toon('bigBreaker', breakerGeo({ seed: 21, len: 12, spray: 160, up: [9, 14], wide: 1.5 }), { cap: 4, ink: 0, side: THREE.DoubleSide, breaker: [8, 5.2, 1] });
+    b.toon('bigBreaker', breakerGeo({ seed: 21, len: 12, spray: 120, up: [9, 14], wide: 1.5 }), { cap: 4, ink: 0, side: THREE.DoubleSide, breaker: [8, 5.2, 1] });
     yield;
 
     // the headland's walls, driftwood, old posts
@@ -1712,7 +1738,8 @@ export default {
     yield;
     b.toon('teethFoam', merge(teethFoamParts(3)), { ...COAST, cap: 12, ink: 0, anim: 'popEarly', wobble: [0, 0.05, 2.2, 0] });
     yield;
-    b.toon('surge', surgeGeo(), { cap: 12, ink: 0, side: THREE.DoubleSide, surge: true, clear: 1 });
+    // (the great swells beside the causeway: scenery)
+    b.toon('swell', surgeGeo(), { cap: 8, ink: 0, side: THREE.DoubleSide, surge: true, clear: 1 });
     yield;
   },
 
@@ -1727,7 +1754,7 @@ export default {
   obstacles: {
     L: [S_WALL, S_DRIFT, S_CUT],
     H: [S_ARCH, S_NET, S_SPAR, S_SAIL],
-    W: [S_POTS, S_DINGHY, S_TEETH, S_SURGE],
+    W: [S_POTS, S_DINGHY, S_TEETH],
     LW: [S_WASH, S_CUTW, S_WALLW, S_DRIFTW],
     HW: [S_ARCHW, S_NETW, S_SAILW],
     twin: { L: [S_DRIFT2], W: [S_DINGHY2] },
@@ -1797,9 +1824,10 @@ function grassChunk(ctx, S, rng, z, p0, zone) {
     // right along the path's edge
     for (let i = 0; i < 6; i++) ctx.put('grassLow', s * rng.float(3.9, 5.2), 0, z(), { s: rng.float(0.8, 1.3), ry: rng.float(0, TAU) });
     if (thicket) {
-      for (let i = 0; i < 30; i++) {
+      // (fewer clumps, a little broader: as dense to the eye, lighter to draw)
+      for (let i = 0; i < 22; i++) {
         const x = s * rng.float(4.5, s > 0 ? 10.5 : 14);
-        ctx.put('grassTall', x, landY(x), z(), { s: rng.float(0.9, 1.25), sy: rng.float(1.0, 1.35), ry: rng.float(0, TAU) });
+        ctx.put('grassTall', x, landY(x), z(), { s: rng.float(1.0, 1.35), sy: rng.float(1.0, 1.35), ry: rng.float(0, TAU) });
       }
       for (let i = 0; i < 8; i++) ctx.put('grass', s * rng.float(4.3, 5.4), 0, z(), { s: rng.float(0.9, 1.2), ry: rng.float(0, TAU) });
     } else {
@@ -1852,9 +1880,9 @@ function causewayChunk(ctx, S, rng, z, p0) {
   for (const s of [-1, 1]) {
     ctx.put(rng.chance(0.5) ? 'rockPile' : 'rockPileB', s * rng.float(5.7, 6.3), 0, 0, { ry: s < 0 ? Math.PI : 0 });
     if (s < 0) ctx.put('rockPileB', -6.0, 0, 0);
-    // the swell striking them, bursting into spray, draining back
-    const n = rng.chance(0.55) ? 2 : 1;
-    for (let i = 0; i < n; i++) ctx.put(rng.chance(0.55) ? 'breaker' : 'breakerB', s * rng.float(6.3, 6.9), 0, z(), { p0: rng.float(0, TAU), s: rng.float(0.95, 1.2) });
+    // the swell striking them, bursting into spray, draining back (one at a
+    // time along each wall, out at sea beyond it)
+    if (rng.chance(0.6)) ctx.put(rng.chance(0.55) ? 'breaker' : 'breakerB', s * rng.float(6.3, 6.9), 0, z(), { p0: rng.float(0, TAU), s: rng.float(0.95, 1.2) });
     if (rng.chance(0.35)) {
       const x = s * rng.float(8, 14);
       ctx.put(rng.chance(0.5) ? 'rockA' : 'rockB', x, SEA_Y + 0.4, z(), { ry: rng.float(0, TAU), s: rng.float(1.2, 2.2) });
@@ -1862,6 +1890,13 @@ function causewayChunk(ctx, S, rng, z, p0) {
   }
   // the great wave, alongside you as you come out of the grass
   if (d0 === S.mouth + CONFIG.chunkLength) ctx.put('bigBreaker', -7.6, 0, BIG_AHEAD - CONFIG.chunkLength, { p0: 0, p1: 0, s: 1.3 });
+  // and further out, now and then, a great swell rearing up beside the
+  // causeway as you come alongside it and pitching over its wall (scenery:
+  // it never comes into a lane)
+  else if (d0 > S.mouth + CONFIG.chunkLength * 3 && d0 < S.landing - CONFIG.chunkLength * 2 && rng.chance(0.3)) {
+    const s = rng.chance(0.5) ? -1 : 1;
+    ctx.put('swell', s * 4.5, 0, z(), { p0: 0, p1: 0 });
+  }
 }
 
 // --- the fishing landing ---------------------------------------------------------
