@@ -8,9 +8,11 @@
 //                        in the wind, gusts running through it (WIND)
 //   toon option sea      the sea itself: a strip of swell rolling in on the
 //                        land, foam at its edge (SEA)
-//   toon option surge    an overtopping wave: a swell that rears up beside
-//                        the causeway and pours over into an outer lane
-//                        (SURGE: a dodge)
+//   toon option surge    a great swell that rears up beside the causeway and
+//                        pitches over its wall as you come alongside (SURGE:
+//                        scenery; built with lane: true it would pour into
+//                        an outer lane - roles 2 and 3 - but nothing deals
+//                        that now: it was too easily mistaken)
 //   toon option wash     a low ridge of white water spilling across the whole
 //                        causeway (WASH: a jump)
 //   toon option breaker  a swell striking the rocks off the road and
@@ -20,11 +22,12 @@
 //                        causeway's wet slabs, 20 the fishing landing's
 //                        boards and setts (COAST_GROUND)
 //
-// A surge's and a wash's progress (p1, 0 far off .. 1 the moment the runner
+// A swell's and a wash's progress (p1, 0 far off .. 1 the moment the runner
 // reaches it .. 2 drained away) is the world's to write every frame (see
 // frame in world/coast.js), from how long the runner will take to get there;
 // so a wave always breaks as you come up to it, however fast you're running,
-// and never un-breaks if you stumble.
+// and never un-breaks if you stumble. A wash is across every lane a good two
+// seconds before you reach it.
 //
 // Everything keyed on where a fragment is in the world (vPos, wp) has its
 // periods along the run divide 512 m, and everything keyed on the distance
@@ -186,13 +189,14 @@ export const COAST_VS_LOCAL = /* glsl */ `
   {
     // A wash: a swell builds beside the causeway and breaks over its edge,
     // and a low ridge of white water runs right across the road, covering
-    // every lane before the runner gets to it; once they're over it, it
-    // spills off the far side and drains away.
+    // every lane a good two seconds before the runner gets to it (so it's
+    // plainly across the whole road, to be jumped); once they're over it,
+    // it spills off the far side and drains away.
     float u = sgn;
     float t = uTime;
-    float E = mix(0.5, 2.9, smoothstep(0.0, 0.42, u)) * (1.0 - smoothstep(0.44, 0.62, u));
+    float E = mix(0.5, 2.9, smoothstep(0.0, 0.2, u)) * (1.0 - smoothstep(0.22, 0.4, u));
     if (role < 0.5) {
-      float F = mix(6.4, -7.2, smoothstep(0.4, 0.74, u));
+      float F = mix(6.4, -7.2, smoothstep(0.18, 0.45, u));
       float on = smoothstep(F - 0.05, F + 1.5, lp.x);
       float k = 1.0 - smoothstep(1.12, 1.6, u);
       lp.y *= on * k * (0.9 + 0.1 * sin(t * 5.0 + lp.x * 2.2 + lp.z * 4.0));
@@ -201,10 +205,10 @@ export const COAST_VS_LOCAL = /* glsl */ `
       lp.z += sin(t * 3.0 + lp.x * 0.8) * 0.05 * on;
     } else if (role < 1.5) {
       // the swell beside the road (built out at x 7.5, foot at the sea)
-      lp.x += mix(5.0, 0.0, smoothstep(0.0, 0.42, u));
+      lp.x += mix(5.0, 0.0, smoothstep(0.0, 0.2, u));
       lp.y = SEA_Y + lp.y * E;
     } else {
-      float tau = (u - spA.w) * 3.0;
+      float tau = (u - spA.w) * 3.6;
       float g = 15.0;
       float fl = 2.0 * spB.y / g;
       float sz = step(0.0, tau) * (1.0 - smoothstep(fl * 0.7, fl, tau));
@@ -288,7 +292,7 @@ export const COAST_VS_LOCAL = /* glsl */ `
     float t = uTime;
     float env = mix(0.3, 1.0, smoothstep(5.0, 45.0, ax)) * (1.0 - smoothstep(170.0, 240.0, ax));
     vec3 ph = vec3(0.21 * ax + 0.0383495 * sp.y + 1.05 * t, 0.13 * ax - 0.0613592 * sp.y + 0.8 * t + 1.3, 0.37 * ax + 0.0981748 * sp.y + 1.6 * t + 2.1);
-    vec3 A = vec3(0.5, 0.42, 0.14) * env;
+    vec3 A = vec3(0.58, 0.46, 0.16) * env;
     vec3 s = sin(ph);
     vec3 c = cos(ph);
     // (peaked: a crest is sharper than a trough is deep)
@@ -298,6 +302,12 @@ export const COAST_VS_LOCAL = /* glsl */ `
     float sx = sp.x < 0.0 ? -1.0 : 1.0;
     float dhx = dot(A * dpk, vec3(0.21, 0.13, 0.37)) * sx;
     float dhy = dot(A * dpk, vec3(0.0383495, -0.0613592, 0.0981748));
+    // and a short chop running across them, slanting the other way
+    float chA = 0.07 * env;
+    float chP = 0.83 * ax - 0.196350 * sp.y + 2.3 * t + 0.7;
+    h += chA * sin(chP);
+    dhx += chA * cos(chP) * 0.83 * sx;
+    dhy -= chA * cos(chP) * 0.196350;
     lp.y += h;
     // (the strip's local -z is further along the run)
     ln = normalize(vec3(-dhx, 1.0, dhy));
@@ -406,13 +416,16 @@ export const COAST_FS_BASE = /* glsl */ `
       base = mix(vec3(0.66, 0.76, 0.82), vec3(0.95, 0.97, 0.98), fm) * mix(vec3(1.0), vColor, 0.15);
     }
     if (isWave > 0.0) {
-      // the body of a wave: slate and denim, paler and greener toward its
-      // crest where the light comes through it, streaked as it runs
+      // the body of a wave: the sea's own navy at its foot, a clear blue
+      // toward its crest where the light comes through it (a little
+      // greener there), streaked as it runs
       float st = texture2D(uNoise, vec2((vPos.x + vPos.z) * 0.15625, vPos.y * 0.28 - uTime * 0.22)).g;
       // (how far up the wave: its parts are painted black at the foot to
       // white at the crest)
       float up = vColor.r;
-      base = mix(vec3(0.07, 0.13, 0.19), vec3(0.17, 0.3, 0.36), up) * (0.88 + 0.26 * st);
+      base = mix(vec3(0.035, 0.085, 0.2), vec3(0.15, 0.36, 0.58), smoothstep(0.1, 0.9, up)) * (0.86 + 0.28 * st);
+      // (darker strokes running down its face)
+      base *= 1.0 - smoothstep(0.62, 0.7, st) * 0.3 * (1.0 - up);
       // white water streaming off its crest
       float crest = smoothstep(0.55, 0.95, up);
       base = mix(base, vec3(0.84, 0.9, 0.93), smoothstep(0.55, 0.75, st + crest * 0.35) * crest * 0.85);
@@ -432,38 +445,58 @@ export const COAST_FS_LIGHT = /* glsl */ `
     float bk = beaconAt(vPos);
     #ifdef SEA
       {
-        // the open sea: deep denim in the troughs, slate-teal up the swells,
-        // the sky in it toward the horizon; foam breaking along the crests
-        // and lacing white along the shore, the sky and the lantern in it,
-        // and the beam glittering on it as it sweeps by
+        // the open sea, painted: deep navy in the troughs, blue up the
+        // swells in soft-edged bands, a paler blue on the faces turned to
+        // the sky; darker strokes drawn along the swells and thin pale
+        // lines of light along their backs; foam on the crests in two
+        // tones, pale blue round a white heart, lacing white along the
+        // shore; the sky in it toward the horizon, the lantern laid down it
+        // in a broken streak, and the beam glittering on it as it sweeps by
         float h = vSea.x;
         vec2 sp = vSea.zw;
-        vec3 deep = vec3(0.075, 0.13, 0.2);
-        vec3 body = mix(deep, vec3(0.15, 0.26, 0.32), smoothstep(-0.7, 0.4, h));
-        body = mix(body, vec3(0.24, 0.4, 0.44), smoothstep(0.35, 0.95, h));
-        float fr = 0.05 + 0.5 * pow(1.0 - max(dot(n, -V), 0.0), 5.0);
-        vec3 sky = skyColor(reflect(V, n));
-        col = mix(body * mix(shade, vec3(1.0), 0.5), sky, fr);
         float t = uTime;
         float n1 = texture2D(uNoise, sp * vec2(0.046875, 0.0625) + vec2(t * 0.012, t * 0.02)).g;
         float n2 = texture2D(uNoise, sp * vec2(0.140625, 0.1875) + vec2(-t * 0.03, t * 0.017)).g;
-        float cap = smoothstep(0.78, 0.98, h + (n1 - 0.5) * 0.5 + (n2 - 0.5) * 0.3) * smoothstep(8.0, 25.0, vSea.y);
+        // (strokes: stretched along the swells' crests, which run with the
+        // road, drifting in with them)
+        float sk = texture2D(uNoise, vec2(vSea.y * 0.28 - t * 0.05, sp.y * 0.03125) + vec2(0.31, n1 * 0.08)).g;
+        float far = smoothstep(60.0, 200.0, dist);
+        // how high up the swell, the edges of its bands wavered by the noise
+        float hp = h + (n1 - 0.5) * 0.45 + (n2 - 0.5) * 0.2;
+        // how much it faces the sky (the light off the whole sky, from up and behind)
+        float lit = clamp(dot(n, normalize(vec3(0.15, 0.8, 0.55))), 0.0, 1.0);
+        vec3 deep = vec3(0.035, 0.085, 0.2);
+        vec3 body = vec3(0.07, 0.19, 0.38);
+        vec3 face = vec3(0.17, 0.36, 0.6);
+        vec3 bc = mix(deep, body, smoothstep(-0.42, -0.28, hp));
+        bc = mix(bc, face, smoothstep(0.26, 0.4, hp + (lit - 0.85) * 1.5) * 0.85);
+        // darker strokes along the swells, in their lee
+        bc *= 1.0 - smoothstep(0.6, 0.68, sk) * smoothstep(0.3, -0.2, hp) * 0.35 * (1.0 - far);
+        float fr = 0.04 + 0.42 * pow(1.0 - max(dot(n, -V), 0.0), 5.0);
+        vec3 sky = skyColor(reflect(V, n));
+        col = mix(bc * mix(shade, vec3(1.0), 0.6), sky, fr);
+        // thin pale lines of light along the backs of the swells
+        float ln1 = smoothstep(0.035, 0.012, abs(sk - 0.42)) * smoothstep(-0.1, 0.3, hp) * (1.0 - far);
+        col = mix(col, vec3(0.55, 0.78, 0.92), ln1 * 0.5);
+        float cap = smoothstep(0.46, 0.56, hp + (n2 - 0.5) * 0.4) * smoothstep(8.0, 25.0, vSea.y);
+        // (its pale-blue rim round the white)
+        float capCore = smoothstep(0.6, 0.7, hp + (n2 - 0.5) * 0.4);
         // the shore: lace drawn in and out with the swell, solid white
         // right against the rocks
         float off = vSea.y;
         float surge = 0.5 + 0.5 * sin(t * 1.05 + sp.y * 0.0383495 + 0.4);
-        float band = 1.0 - smoothstep(0.0, 6.0 + 3.0 * surge, off);
+        float band = 1.0 - smoothstep(0.0, 2.6 + 1.8 * surge, off);
         float lace = smoothstep(0.42, 0.62, n2 * 0.7 + n1 * 0.3 + band * 0.35) * band;
-        float solid = 1.0 - smoothstep(0.0, 1.4 + 1.6 * surge, off);
-        float foam = max(max(cap * 0.85, lace), solid);
-        float far = smoothstep(60.0, 200.0, dist);
+        float solid = 1.0 - smoothstep(0.0, 0.6 + 0.9 * surge, off);
+        float foam = max(max(cap * 0.9, lace), solid);
         foam *= 1.0 - far * 0.6;
-        col = mix(col, vec3(0.86, 0.91, 0.94) * mix(shade, vec3(1.0), 0.7), foam);
+        vec3 fc = mix(vec3(0.56, 0.76, 0.9), vec3(0.9, 0.95, 0.97), max(max(capCore, lace * 0.8), solid));
+        col = mix(col, fc * mix(shade, vec3(1.0), 0.75), foam);
         // glitter: the ripples catching the sky
         float gl = smoothstep(0.83, 0.9, n2 * 0.6 + n1 * 0.5) * (1.0 - foam) * (1.0 - far);
         col += vec3(0.5, 0.62, 0.78) * gl * 0.12;
         // the lantern laid down the water toward you in a broken streak
-        col = wetLight(col, V, normalize(n + vec3(n1 - 0.5, 0.0, n2 - 0.5) * 0.25), 0.9 * (1.0 - foam) * smoothstep(0.35, 0.5, n2 * 0.5 + n1 * 0.5 + 0.15), 3.0);
+        col = wetLight(col, V, normalize(n + vec3(n1 - 0.5, 0.0, n2 - 0.5) * 0.25), 0.5 * (1.0 - foam) * smoothstep(0.35, 0.5, n2 * 0.5 + n1 * 0.5 + 0.15), 3.0);
         col += BEACON_COL * bk * (0.16 + 0.7 * foam + 0.5 * gl);
         gKeep = max(gKeep, foam * 0.5);
       }
@@ -528,10 +561,12 @@ export const COAST_FS_LIGHT = /* glsl */ `
         cc *= 0.8 + 0.2 * smoothstep(0.0, 1.0, q.y / W);
         cc += BEACON_COL * bk * foam * 0.6;
       }
-      // the lips, pale wet stone
+      // the lips: a band of white water slopping over each edge, so the
+      // gap's edges read bright and plain from far off
       float aa = fwidth(vUv.y) * 1.5 + 0.01;
-      float lip = 1.0 - smoothstep(0.08, 0.08 + aa, min(vUv.y, W - vUv.y));
-      cc = mix(cc, vec3(0.62, 0.7, 0.76), lip * 0.85);
+      float lw = 0.2 + 0.06 * sin(uTime * 3.1 + vPos.x * 1.7);
+      float lip = 1.0 - smoothstep(lw, lw + aa, min(vUv.y, W - vUv.y));
+      cc = mix(cc, vec3(0.88, 0.93, 0.96), lip * 0.95);
       col = cc * mix(uShadowTint, vec3(1.0), 0.8);
       gEmit = max(gEmit, 0.35);
     }

@@ -738,8 +738,7 @@ export class ObstacleField {
   }
 
   // One of a kind's specs for a lane. A spec can be kept to some lanes
-  // (spec.lanes: an overtopping wave only ever floods an outer lane, a
-  // wreck's spar only reaches in from the verge) and weighted (spec.w); a
+  // (spec.lanes: a wreck's spar only reaches in from the verge) and weighted (spec.w); a
   // list that does neither is dealt from exactly as it always was.
   specFor(list, lane) {
     const r = this.rng;
