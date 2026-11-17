@@ -436,6 +436,12 @@ export class Player {
     this.spinX = 0;
     this.spinZ = 0;
     this.spinDir = 1;
+    // What the runner did, for the game to hear (see Game.moveSounds): a
+    // count of each kind of thing as it happens - a jump taken (and whether
+    // the thruster took it: it has its own sound), a landing (and how hard),
+    // a lane change taken. (Only ever counted up, so nothing between two
+    // frames is missed, at any frame rate.)
+    this.sfx ||= { jumps: 0, boost: false, lands: 0, landK: 0, dodges: 0, dodgeDir: 1 };
     this.resetSim();
   }
 
@@ -455,6 +461,8 @@ export class Player {
         this.prevLane = this.lane;
         this.lane = next;
         this.onDodge(a === 'left' ? -1 : 1);
+        this.sfx.dodges++;
+        this.sfx.dodgeDir = a === 'left' ? -1 : 1;
       }
     } else if (a === 'up') {
       // (in low gravity a bound is no more than a lope: the thruster fires
@@ -492,6 +500,8 @@ export class Player {
   // out over it. Out of it, a jump is a jump. Whatever's in the air when
   // they cross keeps its arc until it lands.
   takeOff() {
+    this.sfx.jumps++;
+    this.sfx.boost = this.lowG;
     this.bounding = false;
     this.jump();
     if (this.lowG) this.boost();
@@ -977,6 +987,7 @@ export class Player {
     this.thrust = Math.max(0, this.thrust - dt / 0.34);
     if (!this.grounded) {
       const prevY = this.y;
+      const prevVy = this.vy;
       if (this.drift) boostStep(this, dt);
       else if (this.bounding) {
         const g = CONFIG.drift.bound.g;
@@ -993,7 +1004,9 @@ export class Player {
         // in low gravity they come down softer, a bound softest)
         const wasBound = this.bounding;
         const low = this.drift || wasBound;
-        this.landHit = clamp(-this.vy / this.V0, 0.35, 1.7) * (wasBound ? 0.45 : this.drift ? 0.8 : 1);
+        const soft = wasBound ? 0.45 : this.drift ? 0.8 : 1;
+        this.landHit = clamp(-this.vy / this.V0, 0.35, 1.7) * soft;
+        const vEnd = this.vy;
         this.landClock = 0;
         this.vy = 0;
         this.grounded = true;
@@ -1005,11 +1018,19 @@ export class Player {
         // up to the end of the step: the same at 30 fps as at 60)
         const down = prevY - F.fall > 1e-6 ? Math.min(1, Math.max(0, (prevY - ground) / (prevY - F.fall))) : 1;
         const jumped = held && this.jumpBuffer + (1 - down) * dt > 0;
+        // (heard as hard as it really was - a little drop lightly - at the
+        // moment they touched down, not the end of the step: the same at
+        // 30 fps as at 60)
+        const heard = clamp(-(prevVy + (vEnd - prevVy) * down) / this.V0, 0, 1.7) * soft;
         if (this.springy && !this.crashed) {
           // come down on something bouncy: thrown straight back up off it
           // (higher still if jump was pressed as they landed)
           this.boing(jumped);
         } else {
+          if (!this.crashed) {
+            this.sfx.lands++;
+            this.sfx.landK = heard;
+          }
           this.onLand(this.landHit);
           if (low || this.lowG) this.landLow(ground, wasBound, this.landHit);
         }

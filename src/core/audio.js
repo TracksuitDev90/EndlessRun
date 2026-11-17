@@ -12,6 +12,8 @@ const CHIMES = [74, 76, 78, 81, 83, 86, 88];
 // a gem's ting climbs this ladder (D major pentatonic, like the pads) one
 // step per gem along its run
 const GEM_NOTES = [81, 83, 86, 88, 90, 93, 95, 98, 100, 102];
+// how many of the runner's one-shot sounds can sound at once (see buildMoves)
+const MOVE_VOICES = 4;
 const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
 export class Ambient {
@@ -77,6 +79,7 @@ export class Ambient {
       last = last * 0.97 + (Math.random() * 2 - 1) * 0.03;
       data[i] = last * 6;
     }
+    this.brownBuf = buf;
     const noise = ctx.createBufferSource();
     noise.buffer = buf;
     noise.loop = true;
@@ -88,6 +91,8 @@ export class Ambient {
     this.wind.gain.value = 0;
     noise.connect(band).connect(this.wind).connect(this.master);
     noise.start();
+
+    this.buildMoves();
 
     this.chordIndex = 0;
     this.nextChordAt = ctx.currentTime + 0.1;
@@ -591,6 +596,299 @@ export class Ambient {
     [74, 78, 81, 86, 90].forEach((m, i) => this.chime(hz(m), t + i * 0.09, 0.06));
   }
 
+  // --- movement ---------------------------------------------------------------------
+  // The runner's own sounds: a landing's thump, a slide's scrape, the air of
+  // a jump and the swish of a lane change (Hazel's wheels instead of feet: a
+  // board's clack, a wheel scrape and her wheels rolling under her). Kept
+  // low, under the music, and built once with the context so that playing
+  // them costs no more than a buffer source (and an oscillator):
+  //   - two loops of noise run all the time, silent until wanted - a slide's
+  //     scrape and the wheels' roll - and are only ever eased up and down;
+  //   - the one-shots share MOVE_VOICES voices (a filter, a gain and a pan
+  //     kept wired up): a sound takes whichever is free, or the one closest
+  //     to done, so no more than that many ever overlap; the thump and the
+  //     board's clack have a gain each of their own;
+  //   - a burst of them in quick succession comes out quieter (busy), and
+  //     every one is a little different from the last.
+  // The game says what happened (see Game.moveSounds); nothing here listens
+  // to a button.
+  buildMoves() {
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = 1;
+    out.connect(this.master);
+    // (a breath of the delay's space, so they sit with everything else)
+    const send = ctx.createGain();
+    send.gain.value = 0.16;
+    out.connect(send).connect(this.bus);
+    this.mvOut = out;
+    const white = this.noise();
+    const loop = (buf, at) => {
+      const s = ctx.createBufferSource();
+      s.buffer = buf;
+      s.loop = true;
+      s.start(ctx.currentTime, at);
+      return s;
+    };
+    // the slide: noise through a band, its colour set as each slide starts
+    this.slideF = ctx.createBiquadFilter();
+    this.slideF.type = 'bandpass';
+    this.slideG = ctx.createGain();
+    this.slideG.gain.value = 0;
+    loop(white, 0.3).connect(this.slideF).connect(this.slideG).connect(out);
+    // the wheels: a low rumble (the wind's soft noise, low-passed) with a
+    // fainter grit of hiss over it, both fluttering a little with the
+    // wheels going round
+    this.rollG = ctx.createGain();
+    this.rollG.gain.value = 0;
+    const flutter = ctx.createGain();
+    flutter.gain.value = 1;
+    this.rollLfo = ctx.createOscillator();
+    this.rollLfo.frequency.value = 6;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.22;
+    this.rollLfo.connect(depth).connect(flutter.gain);
+    this.rollLfo.start();
+    this.rollLow = ctx.createBiquadFilter();
+    this.rollLow.type = 'lowpass';
+    this.rollLow.frequency.value = 420;
+    this.rollLow.Q.value = 0.8;
+    loop(this.brownBuf, 0.7).connect(this.rollLow).connect(flutter);
+    const grit = ctx.createBiquadFilter();
+    grit.type = 'bandpass';
+    grit.frequency.value = 2400;
+    grit.Q.value = 0.9;
+    const gritG = ctx.createGain();
+    gritG.gain.value = 0.045;
+    loop(white, 0.9).connect(grit).connect(gritG).connect(flutter);
+    flutter.connect(this.rollG).connect(out);
+    // the one-shots' voices
+    this.voices = [];
+    for (let i = 0; i < MOVE_VOICES; i++) {
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      f.connect(g);
+      if (p) g.connect(p).connect(out);
+      else g.connect(out);
+      this.voices.push({ f, g, p, src: null, until: 0 });
+    }
+    this.thumpG = ctx.createGain();
+    this.thumpG.gain.value = 0;
+    this.thumpG.connect(out);
+    this.clackG = ctx.createGain();
+    this.clackG.gain.value = 0;
+    this.clackG.connect(out);
+    this.thumpO = null;
+    this.clackO = null;
+    // what the loops were last set to (only a change is passed on)
+    this.mvSlide = 0;
+    this.mvRoll = 0;
+    this.mvSpeed = -1;
+    this.busy = 0;
+    this.busyAt = 0;
+    this.lastSwish = -9;
+    this.lastLeap = -9;
+  }
+
+  // Can a movement sound play now?
+  moveReady() {
+    const ctx = this.ctx;
+    return !!(ctx && this.voices && !this.muted && ctx.state === 'running');
+  }
+
+  // How much a sound is held back by those just before it (each one counts
+  // 1, fading over about a second); counts this one in.
+  hush(w = 1) {
+    const t = this.ctx.currentTime;
+    this.busy = this.busy * Math.exp(-(t - this.busyAt) / 0.9) + w;
+    this.busyAt = t;
+    return 1 / (1 + 0.22 * Math.max(0, this.busy - 1));
+  }
+
+  // A burst of noise through one of the voices (the free one, else whichever
+  // is nearest done - cut short with a quick fade): a filter of `type`
+  // sweeping f0 to f1 over its length, a gain rising to `peak` over `att`
+  // and dying away by `dur`, panned pan0 to pan1.
+  noiseShot(t, type, q, f0, f1, peak, att, dur, pan0 = 0, pan1 = pan0) {
+    let v = this.voices[0];
+    for (const w of this.voices) if (w.until < v.until) v = w;
+    const g = v.g.gain;
+    if (v.until > t) {
+      g.cancelScheduledValues(t);
+      g.setTargetAtTime(0, t, 0.004);
+      try {
+        v.src.stop(t + 0.02);
+      } catch {
+        /* already stopped */
+      }
+      t += 0.02;
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise();
+    v.f.type = type;
+    v.f.Q.setValueAtTime(q, t);
+    v.f.frequency.cancelScheduledValues(t);
+    v.f.frequency.setValueAtTime(f0, t);
+    v.f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(0.0001, t);
+    g.exponentialRampToValueAtTime(peak, t + att);
+    g.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.setValueAtTime(0, t + dur + 0.005);
+    if (v.p) {
+      v.p.pan.cancelScheduledValues(t);
+      v.p.pan.setValueAtTime(pan0, t);
+      v.p.pan.linearRampToValueAtTime(pan1, t + dur);
+    }
+    src.connect(v.f);
+    // (from somewhere new in the noise each time)
+    src.start(t, Math.random() * 0.8);
+    src.stop(t + dur + 0.03);
+    v.src = src;
+    v.until = t + dur + 0.03;
+  }
+
+  // A pitched knock on one of the two gains of their own (a newer one cuts
+  // the last short): a `type` wave falling f0 to f1, peak, gone by dur.
+  tone(which, t, type, f0, f1, peak, dur) {
+    const g = which === 'clack' ? this.clackG : this.thumpG;
+    const prev = which === 'clack' ? this.clackO : this.thumpO;
+    if (prev) {
+      try {
+        prev.stop(t + 0.01);
+      } catch {
+        /* already stopped */
+      }
+    }
+    const o = this.ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.7);
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.setValueAtTime(0, t + dur + 0.005);
+    o.connect(g);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+    if (which === 'clack') this.clackO = o;
+    else this.thumpO = o;
+  }
+
+  // Touching down (k: how hard - the speed they came down at, over a plain
+  // jump's; about 1 for a jump, less for a little drop, up to 1.7 for a
+  // fast-fall slammed in). Feet: a low thump and the soft scuff of soles
+  // on the ground. A board (Hazel): its wheels thudding down, the deck's
+  // wooden clack, and a brief scrape of the wheels as they bite. On water
+  // (wet), only a softer thump.
+  land(k, board = false, wet = false) {
+    if (!this.moveReady() || !(k > 0.1)) return;
+    const t = this.ctx.currentTime;
+    const a = Math.min(k, 1.6) / 1.6; // 0..1
+    const h = this.hush(0.6 + 0.6 * a);
+    const r = () => 0.92 + 0.16 * Math.random();
+    const vol = (0.035 + 0.12 * Math.pow(a, 0.9)) * h * (wet ? 0.6 : 1);
+    if (board) {
+      this.tone('thump', t, 'sine', (120 + 40 * a) * r(), 52, vol, 0.12 + 0.08 * a);
+      if (!wet) {
+        this.tone('clack', t + 0.004, 'triangle', 540 * r(), 330, (0.012 + 0.03 * a) * h, 0.05);
+        this.noiseShot(t + 0.01, 'bandpass', 1.3, 2600 * r(), 1500, (0.008 + 0.02 * a) * h, 0.008, 0.07 + 0.08 * a);
+      }
+    } else {
+      this.tone('thump', t, 'sine', (92 + 30 * a) * r(), 44, vol, 0.13 + 0.09 * a);
+      if (!wet) this.noiseShot(t + 0.012, 'bandpass', 0.8, 1300 * r(), 650, (0.01 + 0.026 * a) * h, 0.006, 0.08 + 0.07 * a);
+    }
+  }
+
+  // Leaving the ground: a short, soft rush of air rising. Hazel's begins
+  // with the pop of her tail on the road.
+  leap(board = false) {
+    if (!this.moveReady()) return;
+    const t = this.ctx.currentTime;
+    // (jumps straight off a landing, one after another, ease back a little)
+    const quick = t - this.lastLeap < 0.5 ? 0.8 : 1;
+    this.lastLeap = t;
+    const h = this.hush(0.7) * quick;
+    const f = 560 * (0.92 + 0.16 * Math.random());
+    if (board) this.tone('clack', t, 'triangle', 380, 210, 0.03 * h, 0.045);
+    this.noiseShot(t + (board ? 0.015 : 0), 'bandpass', 0.7, f, f * 2.6, 0.13 * h, 0.05, 0.24);
+  }
+
+  // A lane change taken (dir: -1 left, +1 right): a restrained swish
+  // passing across; Hazel's a carve, the wheels hissing as they lean
+  // through it. A quick run of them softens.
+  swish(dir, board = false) {
+    if (!this.moveReady()) return;
+    const t = this.ctx.currentTime;
+    const quick = t - this.lastSwish < 0.25 ? 0.7 : 1;
+    this.lastSwish = t;
+    const h = this.hush(0.5) * quick;
+    const r = 0.9 + 0.2 * Math.random();
+    if (board) this.noiseShot(t, 'bandpass', 1.6, 1700 * r, 1000 * r, 0.085 * h, 0.06, 0.22, -0.1 * dir, 0.22 * dir);
+    else this.noiseShot(t, 'bandpass', 1.1, 760 * r, 1800 * r, 0.095 * h, 0.05, 0.17, -0.12 * dir, 0.25 * dir);
+  }
+
+  // Every frame, the running sounds: slide (0/1: in a slide, on the
+  // ground), roll (0..1: the board rolling on the ground - 0 in the air, so
+  // it falls quiet the moment she leaves it and comes back as she lands),
+  // speed 0..1, and whether it's the board (her wheels scraping through her
+  // slide, not feet). Only a change is passed on.
+  moving(slide, roll, speed, board = false) {
+    if (!this.voices || this.ctx.state !== 'running') return;
+    if (this.muted) slide = roll = 0;
+    const t = this.ctx.currentTime;
+    if (slide !== this.mvSlide) {
+      this.mvSlide = slide;
+      const g = this.slideG.gain, F = this.slideF.frequency;
+      g.cancelScheduledValues(t);
+      if (slide) {
+        // (its colour drifts a little lower as the slide wears on)
+        const f = (board ? 2100 : 950) * (0.92 + 0.16 * Math.random());
+        this.slideF.Q.setValueAtTime(board ? 2.2 : 0.7, t);
+        F.cancelScheduledValues(t);
+        F.setValueAtTime(f, t);
+        F.setTargetAtTime(f * 0.72, t, 0.45);
+        g.setTargetAtTime((board ? 0.042 : 0.052) * this.hush(0.4), t, 0.03);
+      } else g.setTargetAtTime(0, t, 0.045);
+    }
+    if (Math.abs(roll - this.mvRoll) > 0.02 || (roll === 0) !== (this.mvRoll === 0)) {
+      // (down quickly as she leaves the ground; back as her wheels touch)
+      this.rollG.gain.setTargetAtTime(0.016 * roll, t, roll < this.mvRoll ? 0.035 : 0.07);
+      this.mvRoll = roll;
+    }
+    if (roll > 0 && Math.abs(speed - this.mvSpeed) > 0.03) {
+      this.mvSpeed = speed;
+      this.rollLfo.frequency.setTargetAtTime(5 + 9 * speed, t, 0.3);
+      this.rollLow.frequency.setTargetAtTime(340 + 360 * speed, t, 0.3);
+    }
+  }
+
+  // Everything of the runner's stopped at once (a new run, the title, sound
+  // off).
+  silenceMoves() {
+    if (!this.voices) return;
+    const t = this.ctx.currentTime;
+    for (const g of [this.slideG.gain, this.rollG.gain, this.thumpG.gain, this.clackG.gain, ...this.voices.map((v) => v.g.gain)]) {
+      g.cancelScheduledValues(t);
+      g.setTargetAtTime(0, t, 0.015);
+    }
+    for (const v of this.voices) {
+      if (v.until > t) {
+        try {
+          v.src.stop(t + 0.05);
+        } catch {
+          /* already stopped */
+        }
+      }
+      v.until = 0;
+    }
+    this.mvSlide = 0;
+    this.mvRoll = 0;
+  }
+
   setIntensity(v) {
     if (!this.ctx || this.muted || Math.abs(v - this.intensity) < 0.03) return;
     this.intensity = v;
@@ -615,6 +913,7 @@ export class Ambient {
       /* ignore */
     }
     this.applyVolume();
+    if (m) this.silenceMoves();
   }
 
   suspend() {

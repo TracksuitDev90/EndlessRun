@@ -456,6 +456,8 @@ export class Game {
     this.ui.setGemColor(this.current.def.gem?.color, this.current.def.gem?.icon);
 
     this.player.reset();
+    this.heardMoves();
+    this.audio.silenceMoves();
     this.companion?.reset(title);
     this.powers.reset();
     this.powerFx.reset();
@@ -1157,6 +1159,41 @@ export class Game {
     }
   }
 
+  // --- the runner heard --------------------------------------------------------------
+  // What the runner did this step (their record of it, Player.sfx - so it's
+  // what really happened, not what was pressed: a lane change into the
+  // side of the road, or a jump in mid-air, isn't heard), passed on to the
+  // audio (see Ambient's movement section). A bounce off something springy
+  // is heard as its boing, a thruster's boost as its burst, and a crash as
+  // the crash, not as a landing or a jump as well; and only while the run's
+  // going. The slide's scrape and Hazel's wheels follow along every frame.
+  moveSounds() {
+    const p = this.player, S = p.sfx, H = this.heard;
+    const live = this.state === 'running' && p.mode === 'run' && !p.crashed;
+    const board = !!p.onBoard;
+    if (live) {
+      if (S.lands !== H.lands) this.audio.land(S.landK, board, !!p.wet);
+      if (S.jumps !== H.jumps && !S.boost) this.audio.leap(board);
+      if (S.dodges !== H.dodges) this.audio.swish(S.dodgeDir, board);
+    }
+    this.heardMoves();
+    const ground = live && p.grounded && !p.bounding;
+    const slide = ground && p.sliding ? 1 : 0;
+    const sp = Math.min(1, Math.max(0, (this.speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start)));
+    // (her wheels, on the road at least: not on water, and not under the sea)
+    const roll = board && ground && !p.wet && !p.submerged ? Math.min(1, this.speed / 8) * (0.55 + 0.45 * sp) : 0;
+    this.audio.moving(slide, roll, sp, board);
+  }
+
+  // (all that's happened so far, taken as heard)
+  heardMoves() {
+    const S = this.player.sfx;
+    const H = (this.heard ||= {});
+    H.lands = S.lands;
+    H.jumps = S.jumps;
+    H.dodges = S.dodges;
+  }
+
   // --- bouncy things ------------------------------------------------------------
   // The runner's been thrown up off something bouncy (CONFIG.bounce; o its
   // record, if known): it's let by for the rest of the way over it, heard -
@@ -1536,6 +1573,7 @@ export class Game {
       return h;
     });
     if (this.player.boingNew) this.boinged(this.obstacles.bounceUnder);
+    this.moveSounds();
     if (this.player.boosted !== boosts) {
       this.cam.boost(this.player.thrust);
       this.audio.thrust(this.player.thrust);
