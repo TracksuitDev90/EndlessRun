@@ -3443,9 +3443,13 @@ tips; two small amber eyes peek out from under the leaves of its hood; it
 runs on three root legs out of its underside, two in front and one behind;
 and on top it wears a crown of silver plumes, each a slender curved stem
 dividing into finer and finer filaments, open enough to see the world
-through. What it's about is static: it builds as it runs. Its abilities are
-still to come — the companion menu says so — so for now it's all movement
-and electricity, and now and then a gem caught for you.
+through. What it's about is static: it builds as it runs — and its
+abilities spend it on you (see [Companion abilities](#companion-abilities)).
+
+Its abilities draw with its own lightning: each frame its body calls the
+running ability's overlay (`overlay` in `thistle.js`) with its arcs and
+glows, so the strike, the sparks drawing gems in and the current you ride
+as are lit and drawn exactly as its own storm is.
 
 **Sculpted like the others.** `tools/runner/thistle.py` builds the pod and
 its legs with `build.py`'s kit. Every leaf is a thin shell laid over the
@@ -3780,8 +3784,27 @@ soil, water and wind), the obstacles' own instances (moved, not rebuilt),
 the doorway's effects; only the water's sheen and Nep's roots are new, a few
 small meshes drawn only while they're in use.
 
-**Teasel, the storm thistle** — abilities still to come. Its badge and the
-companion menu say so, and there's nothing to buy for it yet.
+**Teasel, the storm thistle**
+
+1. **Electric Bolt** (8 s, 30 s) — a bolt from its crown strikes you: for
+   8 s you run 45% faster than your pace, easing back over the last second
+   and a half, the charge crawling over you and sparks flicking off your
+   feet. A way to get through the worlds quicker early on (the obstacles
+   still count: you're just coming at them faster).
+2. **Static Attraction** (10 s, 45 s) — you're charged: every gem near you
+   — up to 24 m ahead, across all three lanes and high in the air — is
+   drawn to you one after another, zooming in along a violet spark, while a
+   crackling glow hangs round you.
+3. **Ride the Spark** (up to 7 s, 120 s) — you and Teasel become a current
+   of lightning racing on through the world, more than three times your
+   pace (58 m/s at most): you're gone, and in your place a crackling figure
+   of light at the head of a crooked channel streaming back behind you,
+   forks lashing out to the road. Every gem you pass is yours, whatever lane
+   it's in, and you pass straight through every obstacle. It stops short of
+   the world's doorway (never closer than 70 m, and the next world is
+   hurried along to be ready); you come back into yourself with a moment
+   of grace — nothing can hurt you for a second more — and Teasel arrives
+   beside you in a flash, as it does through a spark.
 
 **Shoal, the giant opal crab** — two abilities for now (his two levels):
 

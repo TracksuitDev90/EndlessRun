@@ -183,6 +183,8 @@ export class Scurrier extends Companion {
 
   safety() {
     if (this.zap) return;
+    // (riding the spark with you, it's in the current: nothing to dodge)
+    if (this.power?.def?.id === 'ride' && this.power.phase === 'ride') return;
     super.safety();
   }
 
