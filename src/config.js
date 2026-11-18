@@ -136,7 +136,7 @@ export const CONFIG = {
   },
 
   // The companion who runs with you (see game/companions.js): who it is by
-  // default ('fox', 'dragon' or 'pitcher'; 'none' to run alone; the title screen's
+  // default ('fox', 'dragon', 'pitcher' or 'thistle'; 'none' to run alone; the title screen's
   // pick, then ?companion=, override it). The fox (game/companion.js): her
   // gravity (m/s²) and
   // how long she winds up before each kind of jump (s), how high she leaps
@@ -184,6 +184,31 @@ export const CONFIG = {
       lateral: { slant: 0.34, dodge: 0.66, base: 0.55, acc: 8.5, accDodge: 30, accAir: 5 },
       rest: [1.8, 3.8],
       fetch: { every: [10, 18], reach: [6, 24], chance: 0.5, mischief: 0.08 },
+    },
+    // The storm thistle (game/thistle.js, its mind game/scurrier.js), over
+    // the fox's: light on its roots, hopping low, never pouncing; never far
+    // ahead; quick across the road. Its static: how long it takes to charge
+    // full (s of running at 12 m/s - faster quicker). Gliding: the hop up
+    // into a glide (m), its gravity while it glides (a share of its own),
+    // how fast it sinks at most (m/s) and for how long at most (s), and the
+    // chance a leap over a hurdle turns into one. Travelling through a
+    // spark: how long it holds its full charge before it drops back on
+    // purpose to use it (s), how far behind you it must be to go (m), and
+    // how far ahead of you it lands (m).
+    thistle: {
+      gravity: 24,
+      windup: { leap: 0.08, pounce: 0.2, hop: 0.07, glide: 0.09 },
+      leap: 1.1,
+      pounceEvery: 1e9,
+      ahead: 6,
+      behind: -3.0,
+      surge: [-6, 8],
+      lateral: { slant: 0.4, dodge: 0.66, base: 0.6, acc: 10, accDodge: 28, accAir: 5 },
+      rest: [1.6, 3.4],
+      fetch: { every: [10, 18], reach: [6, 24], chance: 0.45, mischief: 0.08 },
+      charge: { full: 14 },
+      glide: { hop: 0.55, fall: 0.2, sink: 1.3, max: 0.8, chance: 0.45 },
+      zap: { hold: [3, 7], behind: -1.2, land: [1.6, 3.0] },
     },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
     // body streams back in (m/s: base + a share of your pace; less of it and

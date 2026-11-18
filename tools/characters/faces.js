@@ -1,6 +1,6 @@
 // The companions' portraits for their badges on the title screen: each
 // one's head rendered from its own sculpt and shader (tools/runner/fox.html,
-// dragon.html, pitcher.html) on a clear background, cropped to it and written to
+// dragon.html, pitcher.html, thistle.html) on a clear background, cropped to it and written to
 // assets/characters/<id>-face.webp.
 //
 // Serve the repository root (python3 -m http.server 8000), then:
@@ -19,6 +19,7 @@ const JOBS = [
   ['fox', 'tools/runner/fox.html?pose=sit&views=three&bg=0&zoom=2.6&y=0.68&z=-0.3&up=0.15&t=3'],
   ['dragon', 'tools/runner/dragon.html?pose=stand&views=three&bg=0&zoom=3.2&y=1.42&fx=0.0&fz=-0.15&dist=5.2&up=0.15&t=3'],
   ['pitcher', 'tools/runner/pitcher.html?pose=stand&views=front&bg=0&zoom=1.6&y=0.64&up=0.4&look=camera&t=2'],
+  ['thistle', 'tools/runner/thistle.html?pose=stand&views=front&bg=0&zoom=1.25&y=0.5&up=0.35&look=camera&t=3&charge=0.75'],
 ];
 const only = process.argv.slice(2);
 

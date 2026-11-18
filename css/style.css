@@ -975,6 +975,23 @@ body:not(.touch) .touch-only {
     display: none;
   }
 }
+/* (with four or more badges to the row, each is that narrow sooner) */
+@container pals (max-width: 439px) {
+  .pals.many .pal {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 4px 5px;
+    border-radius: 16px;
+  }
+  .pals.many .pal-text {
+    align-items: center;
+    max-width: 100%;
+  }
+  .pals.many .pal-name {
+    font-size: 13.5px;
+  }
+}
 @container pals (max-width: 299px) {
   .pal {
     flex-direction: column;

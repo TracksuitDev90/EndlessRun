@@ -552,6 +552,8 @@ export class UI {
   setCompanions(list, selected, ready = () => true) {
     const root = $('pals');
     for (const el of root.querySelectorAll('.pal')) el.remove();
+    // (four or more to a row: each gets narrow sooner - see .pals.many)
+    root.classList.toggle('many', list.length > 3);
     this.pals = {};
     for (const c of list) {
       const b = document.createElement('button');
@@ -1117,7 +1119,8 @@ export class UI {
       const next = pal.powers[pal.level];
       $('up-who').textContent = `${pal.name} · level ${pal.level}`;
       const short = next ? Math.max(0, pal.price - v.bank) : 0;
-      $('up-next').innerHTML = next ? `next: <b></b>` + (short > 0 ? `<small class="up-short"></small>` : '') : 'every ability unlocked';
+      // (a companion whose abilities are still to come has none to unlock)
+      $('up-next').innerHTML = next ? `next: <b></b>` + (short > 0 ? `<small class="up-short"></small>` : '') : pal.powers.length ? 'every ability unlocked' : 'abilities still to come';
       if (next) $('up-next').querySelector('b').textContent = next.name;
       if (short > 0) $('up-next').querySelector('.up-short').textContent = `${fmt.format(short)} more gems`;
       const buy = $('btn-buy');
@@ -1163,6 +1166,12 @@ export class UI {
       sec.querySelector('.pm-who b').textContent = pal.name;
       sec.querySelector('.pm-who i').textContent = pal.title;
       const ol = sec.querySelector('ol');
+      if (!pal.powers.length) {
+        const li = document.createElement('li');
+        li.className = 'pm-pw locked';
+        li.innerHTML = '<span class="pm-text"><span class="pm-blurb">Abilities still to come.</span></span>';
+        ol.appendChild(li);
+      }
       pal.powers.forEach((d, i) => {
         const lvl = i + 1;
         const li = document.createElement('li');
