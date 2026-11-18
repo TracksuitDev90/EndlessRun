@@ -7,15 +7,23 @@ import { makeSparkMaterial } from '../render/shaders.js';
 // down and winking out. Like the dust, they're thrown from the runner's own
 // space and left behind in the world (track coordinates), so a poof trails
 // back off him as he runs. One draw call while any are alight, none
-// otherwise.
+// otherwise. (The storm thistle's are the same, more of them, quicker and
+// falling faster: see game/thistle.js.)
 
 const MAX = 48;
 
 export class Sparks {
-  constructor(env) {
-    this.pos = new Float32Array(MAX * 3);
-    this.spark = new Float32Array(MAX * 3);
-    this.col = new Float32Array(MAX * 3);
+  // (max: how many at once; o.fall: how fast they drop, m/s²; o.drag: how
+  // quickly the air stops them; o.life: how long they last, s (and up to
+  // as long again) - the storm thistle's are many, quick and fast-falling)
+  constructor(env, max = MAX, o = {}) {
+    this.max = max;
+    this.fall = o.fall ?? 1.6;
+    this.drag = o.drag ?? 3.2;
+    this.life = o.life ?? 0.45;
+    this.pos = new Float32Array(max * 3);
+    this.spark = new Float32Array(max * 3);
+    this.col = new Float32Array(max * 3);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('aSpark', new THREE.BufferAttribute(this.spark, 3).setUsage(THREE.DynamicDrawUsage));
@@ -26,9 +34,9 @@ export class Sparks {
     this.points.frustumCulled = false;
     this.points.renderOrder = 6;
     this.points.visible = false;
-    this.p = Array.from({ length: MAX }, () => ({ live: false, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.05, seed: 0, r: 1, g: 1, b: 1 }));
+    this.p = Array.from({ length: max }, () => ({ live: false, x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, age: 0, life: 1, size: 0.05, seed: 0, r: 1, g: 1, b: 1 }));
     // (what's been thrown since the last update, in preallocated slots)
-    this.queue = Array.from({ length: MAX }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, r: 1, g: 1, b: 1 }));
+    this.queue = Array.from({ length: max }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, r: 1, g: 1, b: 1 }));
     this.queued = 0;
     this.next = 0;
   }
@@ -36,7 +44,7 @@ export class Sparks {
   // A spark at p moving at v (both in the runner's space), size m across,
   // colour c ([r, g, b], 0..1).
   emit(p, v, size, c) {
-    if (this.queued >= MAX) return;
+    if (this.queued >= this.max) return;
     const q = this.queue[this.queued++];
     q.p.copy(p);
     q.v.copy(v);
@@ -50,7 +58,7 @@ export class Sparks {
     for (let i = 0; i < this.queued; i++) {
       const q = this.queue[i];
       const it = this.p[this.next];
-      this.next = (this.next + 1) % MAX;
+      this.next = (this.next + 1) % this.max;
       const w = q.p.applyQuaternion(root.quaternion).add(root.position);
       const v = q.v.applyQuaternion(root.quaternion);
       it.live = true;
@@ -62,7 +70,7 @@ export class Sparks {
       it.vd = -v.z;
       it.age = 0;
       it.seed = Math.random();
-      it.life = 0.45 + 0.4 * it.seed;
+      it.life = this.life * (1 + 0.9 * it.seed);
       it.size = q.size * (0.75 + 0.5 * Math.random());
       it.r = q.r;
       it.g = q.g;
@@ -74,10 +82,10 @@ export class Sparks {
       if (!it.live) continue;
       it.age += dt;
       // the still air stops them quickly; they drift down as they fade
-      const k = Math.exp(-3.2 * dt);
+      const k = Math.exp(-this.drag * dt);
       it.vx *= k;
       it.vd *= k;
-      it.vy = it.vy * k - 1.6 * dt;
+      it.vy = it.vy * k - this.fall * dt;
       it.x += it.vx * dt;
       it.y = Math.max(0.03, it.y + it.vy * dt);
       it.d += it.vd * dt;

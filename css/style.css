@@ -2821,3 +2821,22 @@ body.touch .pw-key {
 .pm-price .gem-body {
   fill: #a982ff;
 }
+
+/* The storm thistle's strike: the screen lit violet for a blink (ui.strike). */
+.strike-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at 50% 62%, rgba(236, 222, 255, 0.55), rgba(150, 100, 255, 0.28) 45%, rgba(110, 60, 220, 0) 80%);
+  mix-blend-mode: screen;
+}
+.strike-flash.go {
+  animation: strike-flash 0.32s ease-out;
+}
+@keyframes strike-flash {
+  0% { opacity: 0.9; }
+  18% { opacity: 0.25; }
+  30% { opacity: 0.6; }
+  100% { opacity: 0; }
+}

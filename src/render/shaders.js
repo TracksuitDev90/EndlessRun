@@ -7606,9 +7606,54 @@ void main() {
   float gl = clamp(glow * b * 0.75, 0.0, 1.0);
   if (c + gl < 0.01) discard;
   vec3 violet = vec3(0.58, 0.32, 1.0);
-  vec3 col = grade(violet * gl * 1.3 + vec3(1.0, 0.95, 1.0) * c * 1.2, uTrip);
+  vec3 col = grade(mix(violet, vec3(1.0, 0.95, 1.0), c / max(gl + c, 1e-4)), uTrip) * (gl * 1.05 + c * 1.1);
   gKeep = 1.0;
-  gl_FragColor = vec4(col, clamp(gl * 0.55 + c * 0.9, 0.0, 1.0));
+  gl_FragColor = vec4(col, clamp(gl * 0.78 + c * 0.9, 0.0, 1.0));
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Light thrown off the storm thistle's electricity (game/thistle.js): soft
+// round glows - stood up to face the camera (the halo round its charged
+// crown, a strike's flash in the air) or laid flat on the road (where a
+// strike hits it) - a white heart in a violet bloom, drawn premultiplied so
+// it lights a dark world and tints a bright one.
+// ---------------------------------------------------------------------------
+const VS_STORMGLOW = COMMON + /* glsl */ `
+attribute vec2 aCorner;
+attribute vec4 aHalo; // x radius (m), y brightness, z 1 laid flat on the road, w how white its heart
+varying vec2 vCorner;
+varying vec4 vHalo;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+  vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+  vec3 off = aHalo.z > 0.5 ? vec3(aCorner.x, 0.0, aCorner.y) : right * aCorner.x + up * aCorner.y;
+  vec3 wp = bendPos(position + off * aHalo.x);
+  vPos = wp;
+  vWorld = wp;
+  vCorner = aCorner;
+  vHalo = aHalo;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_STORMGLOW = FS_HEAD + /* glsl */ `
+varying vec2 vCorner;
+varying vec4 vHalo;
+void main() {
+  float r2 = dot(vCorner, vCorner);
+  if (r2 > 1.0) discard;
+  float bloom = exp(-r2 * 3.2) * (1.0 - r2);
+  float core = exp(-r2 * 26.0);
+  float b = vHalo.y;
+  vec3 violet = vec3(0.55, 0.3, 1.0);
+  // (graded as a colour, then scaled by how much of it there is: nothing
+  // at its edge, not even the grade's lift)
+  float kb = bloom * 1.2, kc = core * vHalo.w;
+  vec3 col = grade(mix(violet, vec3(1.0, 0.95, 1.0), kc / max(kb + kc, 1e-4)), uTrip) * (kb + kc) * b;
+  gKeep = 1.0;
+  gl_FragColor = vec4(col, clamp((bloom * 0.22 + core * 0.5 * vHalo.w) * b, 0.0, 1.0));
 }
 `;
 
@@ -9527,6 +9572,21 @@ export function makeArcMaterial(env) {
     uniforms: withShared(env, {}),
     vertexShader: VS_ARC,
     fragmentShader: FS_ARC,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    side: THREE.DoubleSide,
+  });
+}
+
+// The storm thistle's glows (game/thistle.js): its halo, a strike's flash.
+export function makeHaloMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_STORMGLOW,
+    fragmentShader: FS_STORMGLOW,
     transparent: true,
     depthWrite: false,
     blending: THREE.CustomBlending,

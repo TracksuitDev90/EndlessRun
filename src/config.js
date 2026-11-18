@@ -192,23 +192,24 @@ export const CONFIG = {
     // into a glide (m), its gravity while it glides (a share of its own),
     // how fast it sinks at most (m/s) and for how long at most (s), and the
     // chance a leap over a hurdle turns into one. Travelling through a
-    // spark: how long it holds its full charge before it drops back on
-    // purpose to use it (s), how far behind you it must be to go (m), and
-    // how far ahead of you it lands (m).
+    // spark: how long it holds its full charge before it uses it anyway
+    // (dropping back first, or just going) (s), how far behind you it must
+    // be to go (m), how far ahead of you it lands catching up and going on a
+    // whim (m), and the longest bolt it'll travel (m).
     thistle: {
       gravity: 24,
       windup: { leap: 0.08, pounce: 0.2, hop: 0.07, glide: 0.09 },
       leap: 1.1,
       pounceEvery: 1e9,
       ahead: 6,
-      behind: -3.0,
+      behind: -4.2,
       surge: [-6, 8],
       lateral: { slant: 0.4, dodge: 0.66, base: 0.6, acc: 10, accDodge: 28, accAir: 5 },
       rest: [1.6, 3.4],
       fetch: { every: [10, 18], reach: [6, 24], chance: 0.45, mischief: 0.08 },
-      charge: { full: 14 },
+      charge: { full: 10 },
       glide: { hop: 0.55, fall: 0.2, sink: 1.3, max: 0.8, chance: 0.45 },
-      zap: { hold: [3, 7], behind: -1.2, land: [1.6, 3.0] },
+      zap: { hold: [2, 4], behind: -0.6, land: [3.5, 7], far: [5, 8.5], reach: 30 },
     },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
     // body streams back in (m/s: base + a share of your pace; less of it and

@@ -1193,6 +1193,22 @@ export class UI {
     }
   }
 
+  // A strike of lightning close by (the storm thistle arriving through a
+  // spark): the screen lit violet for a blink. (Not with reduced motion.)
+  strike() {
+    if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let el = this.strikeEl;
+    if (!el) {
+      el = this.strikeEl = document.createElement('div');
+      el.className = 'strike-flash';
+      el.setAttribute('aria-hidden', 'true');
+      $('ui').appendChild(el);
+    }
+    el.classList.remove('go');
+    void el.offsetWidth;
+    el.classList.add('go');
+  }
+
   stats(text) {
     const el = $('stats');
     el.style.display = 'block';
