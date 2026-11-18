@@ -3961,6 +3961,134 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   }
   return c;
 }
+#elif defined(THISTLE)
+// --- Teasel, the storm thistle -------------------------------------------------------
+// (on a leaf d: x across it (-1..1), y along it (0 the base, 1 the tip), z how
+// far in from its edge (m), w a seed for the leaf; on the legs x which leg, y
+// how far down it (0 the hip, 1 a toe's tip, past 1 out along a toe). r: the
+// rest position. See tools/runner/thistle.py.)
+#define TH_DEEP 13
+#define TH_VEIN 14
+#define TH_EDGE 15
+#define TH_MAGENTA 16
+#define TH_PUPIL 17
+#define TH_EYE_LIGHT 18
+#define TH_BARK_DARK 19
+#define TH_BARK_LIGHT 20
+#define TH_VIOLET 21
+#define TH_DRY 22
+// x eyes open (0 shut .. 1), y how happily they're squeezed shut, zw where
+// they look (across, up; -1..1)
+uniform vec4 uFace;
+// each eye's centre (its right one: x mirrored) and radius
+uniform vec4 uEye;
+// x how much static it holds (0..1), y a flash of it (arriving through a
+// spark), z sparks snapping over it now (0..1)
+uniform vec4 uStatic;
+float thHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float thNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(thHash(i), thHash(i + vec3(1, 0, 0)), f.x), mix(thHash(i + vec3(0, 1, 0)), thHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(thHash(i + vec3(0, 0, 1)), thHash(i + vec3(1, 0, 1)), f.x), mix(thHash(i + vec3(0, 1, 1)), thHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// A papery leaf: plum, deepest down its middle and at its root, a pale midrib
+// and veins running out from it toward the tip (each forking once), a fine
+// net between them; the edges dried pale and peachy where they curl, the tip
+// paler still. The hood a little warmer and pinker than the husk.
+vec3 thLeaf(vec3 c, vec3 r, vec4 d, float hood) {
+  float x = d.x, t = d.y, edge = d.z, s = d.w;
+  float mott = thNoise(r * 55.0 + s * 9.0) * 0.6 + thNoise(r * 160.0) * 0.4;
+  c = mix(c, uPal[TH_MAGENTA], smoothstep(0.25, 0.85, abs(x)) * 0.35 * (0.6 + 0.6 * mott) + hood * 0.12);
+  c = mix(c, uPal[TH_DEEP], smoothstep(0.35, 0.0, abs(x)) * 0.35 * smoothstep(0.1, 0.5, t) + smoothstep(0.25, 0.0, t) * 0.4);
+  c *= 0.92 + 0.16 * mott;
+  // the midrib, fine toward the tip
+  float rib = band(x, 0.03 * (1.0 - 0.7 * t) + 0.008);
+  // the side veins: out from the rib at a slant toward the tip, each forking
+  // near the edge
+  float va = (t - abs(x) * 0.36) * (9.0 + 2.0 * s);
+  float side = band(abs(fract(va) - 0.5) - 0.5, 0.05) * step(0.06, abs(x)) * smoothstep(0.98, 0.75, abs(x));
+  float vb = (t - abs(x) * 0.6 + 0.04) * (18.0 + 4.0 * s);
+  float fork = band(abs(fract(vb) - 0.5) - 0.5, 0.06) * smoothstep(0.5, 0.75, abs(x)) * smoothstep(1.0, 0.8, abs(x));
+  // and a fine net between them
+  float net = band(thNoise(r * 300.0 + s * 4.0) - 0.5, 0.03) * smoothstep(0.08, 0.3, abs(x)) * 0.5;
+  float veins = max(max(rib * 0.9, side * 0.6), max(fork * 0.4, net));
+  c = mix(c, uPal[TH_VEIN], veins * (0.55 + 0.35 * t) * (0.7 + 0.3 * mott));
+  // dried, curling edges: pale peach running in a little way, uneven
+  float dry = smoothstep(0.009 + 0.004 * mott, 0.0, edge);
+  c = mix(c, mix(uPal[TH_DRY], uPal[TH_EDGE], 0.5 + 0.5 * smoothstep(0.004, 0.0, edge)), dry * 0.85);
+  c = mix(c, uPal[TH_EDGE], smoothstep(0.72, 1.0, t) * 0.55 * (0.7 + 0.3 * mott));
+  return c;
+}
+vec3 thEye(vec3 c, vec3 r, inout float unlit) {
+  vec3 E = uEye.xyz;
+  vec3 q = vec3(abs(r.x) - E.x, r.y - E.y, r.z - E.z) / uEye.w;
+  // where it looks: the iris slides across the ball
+  vec2 look = uFace.zw * vec2(0.32, 0.26);
+  vec2 w = vec2(q.x * sign(r.x), q.y);
+  vec2 e = w - look;
+  float rr = length(e);
+  // amber, glowing warmer at its heart, a dark pupil, a ring round the iris
+  vec3 col = mix(uPal[TH_EYE_LIGHT], uPal[4], smoothstep(0.1, 0.7, rr));
+  col = mix(col, uPal[4] * 0.55, smoothstep(0.62, 0.85, rr));
+  col = mix(col, uPal[TH_PUPIL], fill(rr - 0.22));
+  // the glint: up and to one side, catching the light
+  float gl = fill(length(w - vec2(-0.32, 0.36)) - 0.16) + 0.5 * fill(length(w - vec2(0.2, -0.3)) - 0.07);
+  col = mix(col, vec3(1.0), min(gl, 1.0) * 0.9);
+  // the lid: the core's dark coming down over it as it blinks (and squeezed
+  // into a happy arc)
+  float open = clamp(uFace.x, 0.0, 1.0) * (1.0 - 0.75 * uFace.y);
+  float lid = smoothstep(-0.05, 0.05, q.y - mix(-1.05, 1.05, open));
+  col = mix(col, uPal[3] * 0.8, lid);
+  unlit = max(unlit, (1.0 - lid) * 0.55);
+  return col;
+}
+vec3 thDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1 || m == 2 || m == 6) {
+    c = thLeaf(c, r, d, m == 2 ? 1.0 : m == 6 ? 0.6 : 0.0);
+    // static: violet glints crawling along the leaves' edges as it charges
+    // (and the whole husk washed with it, arriving through a spark)
+    float crawl = thNoise(vec3(r.xz * 90.0, uTime * 7.0 + r.y * 60.0));
+    float glint = smoothstep(0.006, 0.0, d.z) * smoothstep(0.72, 0.9, crawl) * uStatic.z;
+    c = mix(c, uPal[TH_VIOLET] * 1.4, glint);
+    unlit = max(unlit, glint);
+    return c;
+  }
+  if (m == 3) {
+    // the core: dark plum in the shade of the hood, faint ribs
+    float rib = band(abs(fract(atan(r.x, -r.z) * 2.2) - 0.5) - 0.5, 0.06);
+    c = mix(c, uPal[TH_DEEP] * 0.7, rib * 0.4);
+    return c;
+  }
+  if (m == 4) return thEye(c, r, unlit);
+  if (m == 5) {
+    // the root legs: pinkish bark ringed with growth rings, darker in the
+    // creases, paler and smoother toward the toes
+    float t = d.y;
+    float s = thNoise(r * vec3(220.0, 70.0, 220.0)) * 0.6 + thNoise(r * 520.0) * 0.4;
+    float ring = band(abs(fract(t * 11.0 + s * 0.4) - 0.5) - 0.5, 0.07) * step(t, 0.95);
+    c = mix(c, uPal[TH_BARK_DARK], ring * 0.55 + smoothstep(0.42, 0.2, s) * 0.4);
+    c = mix(c, uPal[TH_BARK_LIGHT], smoothstep(0.6, 0.85, s) * 0.35 + smoothstep(0.95, 1.2, t) * 0.4);
+    return c;
+  }
+  return c;
+}
+// (arriving through a spark it's all white-violet light for a moment, fading
+// back into its colours)
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = thDetail(m, base, r, d, unlit);
+  float f = clamp(uStatic.y, 0.0, 1.0);
+  c = mix(c, mix(uPal[TH_VIOLET], vec3(1.0), 0.45) * 1.3, f);
+  unlit = max(unlit, f);
+  return c;
+}
 #elif defined(ITEMS)
 // --- the things that fly out of the explorer's backpack -------------------------
 // (d: x, y across the part, z which face: 1 the front, 2 the back, 0 an edge)
@@ -5962,6 +6090,9 @@ void main() {
     // (his coral rim, his leaf and the eyes in the dark keep their colour
     // through a drain)
     gKeep = (m == 2 || m == 3 || m == 4) ? 1.0 : 0.0;
+  #elif defined(THISTLE)
+    // (its amber eyes keep their colour through a drain)
+    gKeep = m == 4 ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -6004,6 +6135,9 @@ void main() {
   #elif defined(PITCHER)
     // (a waxy, rounded pitcher in soft gradients; the leaves a little softer)
     float soft = (m == 4) ? 0.12 : (m == 6) ? 0.06 : 0.085;
+  #elif defined(THISTLE)
+    // (papery leaves take the light softly; the eyes crisp, glassy)
+    float soft = m == 4 ? 0.04 : m == 5 ? 0.07 : 0.11;
   #elif defined(BUNNY)
     // (fur takes the light softly; the billowy trousers in soft gradients)
     float soft = (m == 1 || m == 2 || m == 6 || m == 8 || m == 11) ? 0.1 : m == 4 ? 0.11 : (m == 12 || m == 14) ? 0.04 : 0.07;
@@ -6063,6 +6197,9 @@ void main() {
   #elif defined(PITCHER)
   // (a waxy sheen on his pitcher and his leaves where they face the light)
   if (m == 1 || m == 4 || m == 2) {
+  #elif defined(THISTLE)
+  // (a dry sheen on its leaves where they face the light)
+  if (m == 1 || m == 2 || m == 6) {
   #else
   if (m == 2) {
   #endif
@@ -6114,6 +6251,8 @@ void main() {
     gKeep = (m == 4 || m == 15) ? 1.0 : 0.0;
   #elif defined(PITCHER)
     gKeep = (m == 2 || m == 3 || m == 4) ? 1.0 : 0.0;
+  #elif defined(THISTLE)
+    gKeep = m == 4 ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -7341,6 +7480,138 @@ void main() {
 // flies; drawn additively (it lights what's behind it) and keeping its colour
 // through a drain, as magic should.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// The storm thistle's crown (game/thistle.js): each plume a strip laid along
+// its simulated spine and turned partly toward the camera about it (never
+// edge-on), drawn from one shared feather atlas - r the stem and its barbs, g
+// the finer filaments off them, b the filaments' tips. Squeezed narrow the
+// barbs lie flat along the stem; widened (as it charges) they stand out from
+// it and the fine hairs part. Silver, lavender toward the tips, the stem
+// peach at its root; back-lit it glows; charged, its tips glint violet.
+// ---------------------------------------------------------------------------
+const VS_PLUME = COMMON + /* glsl */ `
+attribute vec3 aTan;
+attribute vec3 aFix; // the side the plume lies to on its own (its fan)
+attribute vec4 aPl; // x side (-1 / +1), y how far up it (0..1), z atlas column, w half its width (m)
+attribute vec4 aSt; // x how far its hairs have parted (0..1), y how lifted, z seed, w glow
+varying vec4 vPl;
+varying vec4 vSt;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 view = normalize(position - uCamPos);
+  vec3 side = cross(aTan, view);
+  float l = length(side);
+  side = l > 1e-4 ? side / l : aFix;
+  // (half turned to you, half lying in its own fan)
+  vec3 fx = aFix - aTan * dot(aFix, aTan);
+  fx = length(fx) > 1e-4 ? normalize(fx) : side;
+  fx *= sign(dot(fx, side) + 1e-4);
+  side = normalize(mix(fx, side, 0.6));
+  vec3 wp = position + side * aPl.x * aPl.w;
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  vPl = aPl;
+  vSt = aSt;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_PLUME = FS_HEAD + /* glsl */ `
+uniform sampler2D uAtlas;
+uniform vec3 uLightDir;
+uniform vec3 uShadowTint;
+uniform vec4 uPlume; // x how visible (vanishing through a spark), y uTime-free flicker seed
+varying vec4 vPl;
+varying vec4 vSt;
+void main() {
+  float u = 0.5 + 0.5 * vPl.x;
+  float v = vPl.y;
+  vec4 tx = texture2D(uAtlas, vec2((vPl.z + u) * 0.25, v));
+  float sep = vSt.x;
+  // the finest hairs come out as they part
+  float a = min(1.0, max(tx.r * 1.3, tx.g * mix(0.55, 1.15, sep)));
+  a *= smoothstep(1.0, 0.94, v) * uPlume.x;
+  if (a < 0.035) discard;
+  float stem = smoothstep(0.08, 0.0, abs(vPl.x)) * tx.r;
+  vec3 silver = vec3(0.95, 0.94, 0.98);
+  vec3 lav = vec3(0.8, 0.72, 0.98);
+  vec3 peach = vec3(0.95, 0.74, 0.62);
+  vec3 col = mix(silver, lav, smoothstep(0.4, 1.0, v) * 0.6 + tx.g * (1.0 - tx.r) * 0.15);
+  col = mix(col, peach, stem * smoothstep(0.55, 0.05, v));
+  col = mix(col, peach * 0.92, smoothstep(0.2, 0.0, v) * 0.8);
+  // lit softly (they're too fine to shade), glowing where the light comes
+  // through them toward you
+  vec3 vw = vWorld - uCamPos;
+  float dist = length(vw);
+  float through = pow(clamp(dot(normalize(vw), uLightDir) * -1.0 * 0.5 + 0.5, 0.0, 1.0), 3.0);
+  col *= mix(mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35), vec3(1.0), 0.8);
+  col += vec3(1.0, 0.95, 0.98) * through * 0.25;
+  // charged: violet glints at the tips of the hairs, flickering
+  float fl = 0.6 + 0.4 * sin(uTime * 37.0 + vSt.z * 40.0 + v * 23.0);
+  // (the hairs' tips, and the outer filaments as a whole, so it shows from
+  // afar)
+  float g = vSt.w * max(tx.b, smoothstep(0.5, 1.0, v) * max(tx.g, tx.r) * 0.55) * fl;
+  col = mix(col, vec3(0.78, 0.6, 1.0) * 1.5, clamp(g, 0.0, 1.0));
+  a = max(a, g * 0.8);
+  col = atmos(col, vw, dist, g);
+  gKeep = clamp(g, 0.0, 1.0);
+  gl_FragColor = vec4(grade(col, uTrip), min(a, 1.0) * 0.95);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Electric arcs (game/thistle.js): the sparks snapping between the thistle's
+// plumes, and the bolt it travels along. Each a crooked strip turned to the
+// camera: a white-hot thread in a violet glow, a bright pulse racing along
+// it. Added on top of the world.
+// ---------------------------------------------------------------------------
+const VS_ARC = COMMON + /* glsl */ `
+attribute vec3 aTan;
+attribute vec4 aArc; // x side (-1 / +1), y how far along (0..1), z half width (m), w brightness
+attribute vec3 aPulse; // x where the pulse is (0..1, < 0 none), y its length, z how much of it is drawn yet (0..1)
+varying vec4 vArc;
+varying vec3 vPulse;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 view = normalize(position - uCamPos);
+  vec3 side = cross(aTan, view);
+  float l = length(side);
+  side = l > 1e-4 ? side / l : vec3(0.0, 1.0, 0.0);
+  vec3 wp = position + side * aArc.x * aArc.z;
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  vArc = aArc;
+  vPulse = aPulse;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_ARC = FS_HEAD + /* glsl */ `
+varying vec4 vArc;
+varying vec3 vPulse;
+void main() {
+  float x = abs(vArc.x);
+  float along = vArc.y;
+  if (along > vPulse.z) discard;
+  // (a thread of white-hot light down the middle, in a violet glow that
+  // shows as violet on a bright world as well as a dark one: drawn
+  // premultiplied - it lights what's behind it and tints it)
+  float core = exp(-x * x / 0.012);
+  float glow = exp(-x * x / 0.22);
+  float p = vPulse.x >= 0.0 ? exp(-pow((along - vPulse.x) / max(vPulse.y, 0.01), 2.0)) : 0.0;
+  float b = vArc.w * (1.0 + 2.2 * p);
+  float c = clamp(core * b * (0.8 + p), 0.0, 1.0);
+  float gl = clamp(glow * b * 0.75, 0.0, 1.0);
+  if (c + gl < 0.01) discard;
+  vec3 violet = vec3(0.58, 0.32, 1.0);
+  vec3 col = grade(violet * gl * 1.3 + vec3(1.0, 0.95, 1.0) * c * 1.2, uTrip);
+  gKeep = 1.0;
+  gl_FragColor = vec4(col, clamp(gl * 0.55 + c * 0.9, 0.0, 1.0));
+}
+`;
+
 const VS_SPARK = COMMON + /* glsl */ `
 uniform vec2 uResolution;
 attribute vec3 aSpark; // x size (m), y brightness, z seed
@@ -8719,7 +8990,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', fisher: 'FISHER', pitcher: 'PITCHER' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', fisher: 'FISHER', pitcher: 'PITCHER', thistle: 'THISTLE' };
   const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
@@ -9232,6 +9503,35 @@ export function makeSplashMaterial(env) {
     fragmentShader: FS_SPLASH,
     transparent: true,
     depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
+// The storm thistle's plumes (game/thistle.js), lit by env, drawn from the
+// shared feather atlas.
+export function makePlumeMaterial(env, atlas) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, { uAtlas: { value: atlas }, uPlume: { value: new THREE.Vector4(1, 0, 0, 0) } }),
+    vertexShader: VS_PLUME,
+    fragmentShader: FS_PLUME,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
+// The storm thistle's sparks and the bolt it travels by (game/thistle.js),
+// graded by env.
+export function makeArcMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: withShared(env, {}),
+    vertexShader: VS_ARC,
+    fragmentShader: FS_ARC,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
     side: THREE.DoubleSide,
   });
 }

@@ -817,6 +817,32 @@ export class Ambient {
     this.noiseShot(t + (board ? 0.015 : 0), 'bandpass', 0.7, f, f * 2.6, 0.13 * h, 0.05, 0.24);
   }
 
+  // The storm thistle travelling through a spark (pan: where it is, -1
+  // left .. 1 right): as it goes, a crackling hiss tearing up through the
+  // air with a sharp snap on top; as it lands (arrive), a softer snap.
+  zap(pan = 0, arrive = false) {
+    if (!this.moveReady()) return;
+    const t = this.ctx.currentTime;
+    const h = this.hush(0.6);
+    if (arrive) {
+      this.tone('clack', t, 'square', 2400, 900, 0.022 * h, 0.05);
+      this.noiseShot(t, 'highpass', 0.8, 5200, 2600, 0.05 * h, 0.006, 0.12, pan, pan);
+      return;
+    }
+    this.tone('clack', t, 'square', 3200, 1400, 0.03 * h, 0.04);
+    this.noiseShot(t, 'bandpass', 1.4, 2200, 7000, 0.11 * h, 0.008, 0.2, pan, pan * 0.4);
+  }
+
+  // A tiny spark snapping in its crown: a tick of high noise, very quiet.
+  crackle(pan = 0) {
+    if (!this.moveReady()) return;
+    const t = this.ctx.currentTime;
+    if (t - (this.lastCrackle || 0) < 0.09) return;
+    this.lastCrackle = t;
+    const f = 5000 + Math.random() * 3000;
+    this.tone('clack', t, 'square', f, f * 0.6, 0.006 * this.hush(0.15), 0.018);
+  }
+
   // A lane change taken (dir: -1 left, +1 right): a restrained swish
   // passing across; Hazel's a carve, the wheels hissing as they lean
   // through it. A quick run of them softens.

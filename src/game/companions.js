@@ -57,6 +57,28 @@ export const COMPANIONS = [
     // (how far his pot reaches, for tools/companion/audit.js)
     extent: { front: 0.26, back: 0.26, side: 0.24, top: 0.98 },
   },
+  {
+    id: 'thistle',
+    name: 'Teasel',
+    title: 'the storm thistle',
+    blurb: 'scurries · glides · travels by spark',
+    asset: 'assets/thistle/',
+    face: 'assets/characters/thistle-face.webp',
+    tint: ['#d8b4ff', '#7a2a5e'],
+    // (a mind of its own - scurrier.js: quick on its three roots, charging
+    // as it runs, catching up through a spark - built on the runner's for
+    // reading the road; its own tunables over the fox's, its size, and
+    // where it catches a gem: in its crown)
+    load: lazy(() => Promise.all([import('./thistle.js'), import('./scurrier.js')]), ([b, m]) => ({
+      make: (env, asset) => new b.Thistle(env, asset),
+      mind: (game, def, body) => new m.Scurrier(game, def, body),
+    })),
+    tune: CONFIG.companion.thistle,
+    hw: 0.28,
+    mouth: [0.0, 0.62],
+    // (how far its pod and legs reach, for tools/companion/audit.js)
+    extent: { front: 0.24, back: 0.34, side: 0.29, top: 0.56 },
+  },
 ];
 
 // (load(): fetch the modules once, set def.make and def.mind from them; one

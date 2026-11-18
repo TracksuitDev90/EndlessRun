@@ -56,7 +56,12 @@ a squat lime pitcher with a coral rim, two yellow eyes peering out of the
 dark inside him from under a big floppy leaf — waddles along on his root
 feet doing his best to keep up, wobbling, the water in him sloshing over
 the rim and crumbs of soil shaking loose behind him (see [The pitcher
-plant](#the-pitcher-plant)).
+plant](#the-pitcher-plant)). Or Teasel, a storm thistle — a living seedpod
+in a deep plum husk of papery leaves, two amber eyes peeking out from under
+them, a crown of silver plumes on top — scurries along on three root legs,
+building static as it runs until its crown fans out and sparks snap across
+it, and then, when it falls behind, travels to your side along a bolt of
+violet lightning (see [The storm thistle](#the-storm-thistle)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -1660,7 +1665,7 @@ Append to the URL:
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`, `samurai`), over the one remembered — even one locked on the title screen |
-| `?companion=dragon` | who runs with you (`fox`, the default, `dragon` or `pitcher`), over the one remembered; `none` runs alone |
+| `?companion=dragon` | who runs with you (`fox`, the default, `dragon`, `pitcher` or `thistle`), over the one remembered; `none` runs alone |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
@@ -3420,6 +3425,127 @@ and a half minutes of play on each of four seeds
 (`node tools/companion/audit.js "?manual&seed=2&companion=pitcher" 150`) he
 touches nothing.
 
+## The storm thistle
+
+![Teasel: from the front, three-quarters, its left side and behind, fully charged, its crown fanned; the same uncharged, the plumes swept back and the longest brushing the road; its scurry from the side, the front roots reaching and planting in turn and the rear root pushing; a hop into a glide, the crown held up like a parachute; in a run, its crown lifting and fanning as the charge builds; and a spark: the bolt flickering into being, the pulse racing along it, Teasel there again beside the runner in a flash of violet](docs/thistle.jpg)
+
+Teasel is a storm thistle: a living seedpod about the size of a grapefruit
+(drawn larger than life, as Nep is, so you can see its feet from behind the
+runner: `SCALE` in `thistle.js`). Its husk is deep plum, built of
+overlapping papery leaves with fine veins, curled, dried edges and pointed
+tips; two small amber eyes peek out from under the leaves of its hood; it
+runs on three root legs out of its underside, two in front and one behind;
+and on top it wears a crown of silver plumes, each a slender curved stem
+dividing into finer and finer filaments, open enough to see the world
+through. What it's about is static: it builds as it runs. Its abilities are
+still to come — the companion menu says so — so for now it's all movement
+and electricity, and now and then a gem caught for you.
+
+**Sculpted like the others.** `tools/runner/thistle.py` builds the pod and
+its legs with `build.py`'s kit. Every leaf is a thin shell laid over the
+pod's sphere — its outline a pointed oval, a crease down its middle, its
+edges rolled outward and its tip curled away — in three layers: the husk's
+twelve long leaves rising from the bottom and wrapping up round it, each a
+little proud of its neighbour so their edges overlap; the hood's twelve
+hanging from the top, shortest at the front, where they stop just above a
+dark slot in the husk with the eyes in it (the middle one's tip coming down
+between them), longest round the sides and back, where their tips flare out
+in a spiky ruff; and a little tuft of upright leaves round the top where
+the plumes come out. The legs are knobbly two-segment roots, bowed at the
+knee and splayed into rootlet toes, the pod held high enough off the road
+that every step shows. The front leaves of the hood hang on a bone of their
+own (the brow), so it can lift them to peek out and press them down when
+it's startled. About a minute to build (`python3 tools/runner/thistle.py`,
+then `python3 tools/preload.py`); look at it in `tools/runner/thistle.html`
+(`?pose=stand|sit|run|leap|glide|zap`, `&charge=0..1` or `&build=<s>`,
+`&views=front,left,back,game` — `game` is the runner's camera — or a film
+strip).
+
+**Painted** (`THISTLE` in `CHAR_DETAIL`): plum leaves, deepest at their
+roots and down their middles, a pale midrib and side veins slanting out to
+the tip and forking near the edge, a fine net between them, mottled; their
+edges dried pale and peachy where they curl, their tips paler still; the
+hood warmer and pinker than the husk. The eyes are amber, glowing warmer at
+their hearts, with dark pupils, a glint, a lid of the core's dark that comes
+down when they blink (and squeezes them happy), and they look about. The
+legs are pinkish bark ringed with growth rings. As it charges, violet glints
+crawl along its leaves' edges; arriving through a spark it's all white-violet
+light for a moment. The eyes keep their colour through Hell's drain.
+
+**The crown** is not sculpted: it's seventeen curved strips (twelve plumes
+and five stray wisps, longer and finer, that break the outline), each laid
+along a simulated spine of nine points and drawn from one shared feather
+texture made once at load (`makeFeatherAtlas`: three plumes and a wisp, each
+a stem dividing into barbs that sweep toward the tip and divide again into
+finer filaments, open between them — the stem and barbs in one channel, the
+finer filaments in another, the hairs' tips in a third). Each strip turns
+part-way toward the camera about its spine (never edge-on) and lies the rest
+of the way in its own fan, so they sit at different angles. Every plume has
+its own length, curve and twist. Each spine point is pulled toward its rest
+shape by a spring — stiff at the root, looser toward the tip — thrown by the
+body's own lurches and swept by the air going past: so the plumes' roots go
+with the body while the fine tips lag behind, flutter and settle, and the
+long ones drag on the road. A few dozen triangles and one draw call.
+
+**The static.** It builds with every step (full in about 14 s at the
+starting pace, quicker the faster you go; `CONFIG.companion.thistle.charge`).
+Uncharged, the plumes sweep back from the crown and droop, the longest wisps
+brushing the road. As it charges they lift one by one, each at its own
+threshold, and their hairs part — the strips widen, so the barbs stand out
+from the stem and the finest filaments come apart; the crown fans wider and
+wider, until it's spread like the reference, every hair standing apart. The
+charge itself pushes the plumes apart: each pair of plumes repels as the
+square of the charge. Only near full do tiny violet sparks start snapping
+across the gaps between them — a crooked thread of light from one plume to
+its neighbour, re-jagged every frame, there for a few hundredths of a second
+(with the faintest tick) — and its plumes' outer filaments glint violet.
+A stumble jolts some of the charge out of it in a crackle; a crash, all of
+it.
+
+**Travelling through a spark.** Full, whenever it's fallen behind you (a
+hurdle, a wall, a dawdle), it picks a spot a lane beside yours, a couple of
+metres ahead of where you'll be, with nothing round it — and nothing tall
+just short of it to hide it — and goes there along a bolt
+(`ZAP` in `thistle.js`): the bolt flickers into being from its feet to the
+spot, short and crooked and arching up, with a fork or two, as it braces;
+in a flash its body is gone, and a bright pulse races along the bolt; at the
+far end it's there again in a flash of violet-white light, its roots braced
+wide and low, its eyes wide; the bolt flickers out; and a beat later its
+crown falls loose — the springs go slack and the plumes flop — and the
+charge starts again from nothing. The bolt is drawn in track coordinates, so
+it stays where it struck as you run on. A crackling hiss and a snap as it
+goes, a softer snap as it lands. If it's been full a while with no need, it
+drops back on purpose, to use it.
+
+**How it moves** (`src/game/thistle.js`). A quick three-legged scurry: the
+front left root reaches and plants, then the front right, then the rear root
+plants under the pod and pushes it forward (most of its sweep back coming
+late, as a push does) and swings through. The pod's weight rolls toward
+whichever feet are down — onto the right and the rear as the left reaches,
+onto the left as the right does — on a loose spring, so it sways on after
+each shift; it bobs down onto each plant, lunges and pitches forward on each
+push. Each foot is placed (a two-bone reach from its hip on the pod, the knee
+bowed out and up), held flat while it carries the pod and lifted and swung
+through, its toes curled as it lifts; a puff of dust off each one as it
+plants. Its stride gets longer and quicker with its pace, but stays short
+enough to see. In the air its legs hang and paddle; and now and then — on
+the way down from a hop, or a leap over a hurdle — it catches the air: its
+crown flares up like a parachute, its legs splay, and it sinks slowly for a
+moment (slower the more charged it is) before it lands and is straight back
+into its stride, no pause. Its hood lifts to peek, droops when it's startled.
+
+**Its mind** (`src/game/scurrier.js`, built on the fox's `companion.js` for
+reading the road): it scurries a lane over, never far from you, and every
+few seconds has an idea — a hop into a glide, a quick dash out ahead and a
+look back, a dawdle (it falls behind, distracted, and then either sparks back
+up to you or scurries back in a hurry) — and now and then fetches a gem. On
+the title screen it sits by the runner, its charge creeping up; picked, it
+hops and its crown crackles; when the run starts it starts from nothing.
+`tools/companion/audit.js` checks it as it does the others: over two and a
+half minutes of play on each of three seeds
+(`node tools/companion/audit.js "?manual&seed=2&companion=thistle" 150`) it
+touches nothing.
+
 ## Companion abilities
 
 Your companion can be brought on, for keeps, with gems. **Bank** the gems in
@@ -3427,7 +3553,7 @@ hand on the crash card (or just leave the run: whatever's still in hand is
 banked), then spend them — on the crash card, where the next level of
 whoever ran with you is offered with its price, or in the **Companions** menu
 (the button under the companion badges on the title screen, or the link on
-the crash card), which lists all three, every ability, what each level costs
+the crash card), which lists them all, every ability, what each level costs
 and how many gems you still need. Each companion has **three levels**, each
 dearer than the last (120, 360 and 900 gems to start with), and each level
 **unlocks one more ability**, keeping the ones before it. The bank and the
@@ -3515,6 +3641,9 @@ soil, water and wind), the obstacles' own instances (moved, not rebuilt),
 the doorway's effects; only the water's sheen and Nep's roots are new, a few
 small meshes drawn only while they're in use.
 
+**Teasel, the storm thistle** — abilities still to come. Its badge and the
+companion menu say so, and there's nothing to buy for it yet.
+
 ## Project layout
 
 ```
@@ -3578,7 +3707,10 @@ src/game/                     game loop, player (the runners' shared core:
                               legs, whiskers and frills; pitcher.js: Nep's
                               body, waddle, wobble, leaf, tendrils, sloshing
                               water and the soil off his roots; sprout.js:
-                              his own mind, on the runner's); progress.js (the
+                              his own mind, on the runner's; thistle.js:
+                              Teasel's body, scurry, crown of plumes, static,
+                              sparks and the bolt it travels by; scurrier.js:
+                              its own mind, on the runner's); progress.js (the
                               gem bank and the companions' levels), powers.js
                               (their abilities) and powerfx.js (what the
                               abilities leave in the world: soil, water,
@@ -3596,12 +3728,17 @@ tools/runner/samurai.py       offline sculpt of the samurai, his scabbard
 tools/runner/fox.py           offline sculpt of the fox -> assets/fox/
 tools/runner/dragon.py        offline sculpt of the dragon -> assets/dragon/
 tools/runner/pitcher.py       offline sculpt of the pitcher plant -> assets/pitcher/
+tools/runner/thistle.py       offline sculpt of the storm thistle's pod and legs
+                              -> assets/thistle/ (its crown is drawn in the game)
 tools/runner/view.html        a runner turned round like their reference sheet
 tools/runner/fox.html         the fox turned round, posed, or as a film strip
 tools/runner/dragon.html      the dragon turned round, posed, flying, or as a
                               film strip
 tools/runner/pitcher.html     the pitcher plant turned round, posed, or as a
                               film strip (drops and crumbs and all)
+tools/runner/thistle.html     the storm thistle turned round, posed, gliding,
+                              travelling through a spark, at any charge, from
+                              the runner's camera too, or as a film strip
 tools/companion/audit.js      plays the game unseen, checking the companion
                               never touches an obstacle (and that one who
                               flies keeps out of your way)
