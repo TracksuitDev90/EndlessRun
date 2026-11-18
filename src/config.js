@@ -316,6 +316,21 @@ export const CONFIG = {
       // Pitcher Protection: dur s, the coating fading over its last fade s
       shield: { dur: 5, cd: 70, fade: 1.3 },
     },
+    thistle: {
+      // Electric Bolt: a shock from its crown that sends you on mul times
+      // as fast for dur s, easing back over its last fade s
+      bolt: { dur: 8, cd: 30, mul: 1.45, fade: 1.6 },
+      // Static Attraction: for dur s every gem within reach m ahead (and a
+      // little behind), side m across and up to high m is drawn to you, one
+      // every `every` s at the most
+      attract: { dur: 10, cd: 45, reach: 24, side: 5.5, high: 4.5, every: 0.035 },
+      // Ride the Spark: you and it become a current racing through the
+      // world, mul times as fast (max m/s at most) for dur s at most - and
+      // never closer than door m to the next doorway - taking every gem on
+      // the way and passing through everything; `out` s to come back into
+      // yourself (and guard s more that nothing can hurt you)
+      ride: { dur: 7, cd: 120, mul: 3.2, max: 58, door: 70, out: 0.9, guard: 1.2 },
+    },
     crab: {
       // Crystal Resonance: every gem collected (yours or a companion's)
       // counts mul times over for dur s

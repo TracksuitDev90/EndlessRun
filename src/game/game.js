@@ -927,7 +927,8 @@ export class Game {
     if (p.invulnT > 0 || p.crashed || this.god) return;
     // (Pitcher Protection, or Iris's portal closing over you: nothing hurts -
     // whatever they run through lets them by, and pays no clear bonus)
-    const shielded = this.shieldT > 0 || this.folding;
+    // (and riding Teasel's spark: you pass straight through it all)
+    const shielded = this.shieldT > 0 || this.folding || this.powers.riding;
     const pw = CONFIG.player.halfWidth;
     const pd = CONFIG.player.halfDepth;
     const a = this.prevDist;
@@ -1514,8 +1515,10 @@ export class Game {
       this.runTime += dt;
       this.stumbleWindow = Math.max(0, this.stumbleWindow - dt);
       this.speedMul = damp(this.speedMul, 1, 0.8, dt);
-      const target = this.speedAt(this.runTime) * this.speedMul;
-      this.speed = damp(this.speed, target, this.speed < target * 0.8 ? 2.2 : 4, dt);
+      // (Teasel's Electric Bolt and Ride the Spark send you on faster than
+      // your pace - see Powers.speedBoost - and back to it as they end)
+      const target = Math.min(this.speedAt(this.runTime) * this.speedMul * this.powers.speedBoost, Math.max(this.powers.speedCap, this.speedAt(this.runTime)));
+      this.speed = damp(this.speed, target, this.speed < target * 0.8 ? (this.powers.speedBoost > 1.5 ? 6 : 2.2) : 4, dt);
     } else if (st === 'crashed') {
       this.speed = damp(this.speed, 0, 10, dt);
       this.crashTimer -= dt;
@@ -1585,6 +1588,8 @@ export class Game {
     // (the companions' abilities: before the hits, so protection that runs
     // out this frame has let go of whatever it was letting through)
     this.powers.update(dt);
+    // (riding the spark you're not there to be seen: only the current is)
+    if (this.powers.riding && !this.powers.active.back) this.player.root.visible = false;
     if (this.state === 'running') this.collide();
     if (this.state === 'running') this.collectGems();
     if (this.state === 'running') this.updateScore(dt);

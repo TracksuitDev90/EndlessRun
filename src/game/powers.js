@@ -38,6 +38,16 @@ import { CONFIG } from '../config.js';
 //   2 Root Reach      he plants his feet and his roots fetch one cluster of
 //                     gems ahead, across the lanes near you
 //   3 Pitcher Protection  he drenches you: ~5 s that nothing can hurt you
+// Teasel, the storm thistle:
+//   1 Electric Bolt   a shock from its crown into you: for ~8 s you run
+//                     nearly half as fast again, crackling (a way to get
+//                     through the worlds quicker, early on)
+//   2 Static Attraction  for ~10 s you're charged: every gem near you is
+//                     drawn to you, zooming in along a spark
+//   3 Ride the Spark  you and Teasel become a current of lightning racing
+//                     on through the world (stopping short of its
+//                     doorway): every gem on the way is yours and nothing
+//                     can stop you - you pass straight through it all
 // Shoal, the giant opal crab (two abilities, for now):
 //   1 Crystal Resonance  he hums, and every crystal on the road hums with
 //                     him: for ~10 s every gem collected (yours, or one a
@@ -72,6 +82,11 @@ export const POWERS = {
     { id: 'freshen', name: 'Freshen Up', icon: 'drop', tip: 'Shake off that stumble before the next hit', blurb: 'After a stumble: Nep splashes it away - the second-hit danger gone, back up to pace.' },
     { id: 'roots', name: 'Root Reach', icon: 'roots', tip: 'Nep’s roots fetch the gems up ahead', blurb: 'Nep plants his feet and his roots fetch one cluster of gems ahead, across nearby lanes.' },
     { id: 'shield', name: 'Pitcher Protection', icon: 'shield', tip: `${P.pitcher.shield.dur} s where nothing can hurt you`, blurb: `Nep drenches you: ${P.pitcher.shield.dur} s that nothing can hurt you.` },
+  ],
+  thistle: [
+    { id: 'bolt', name: 'Electric Bolt', icon: 'bolt', tip: 'Teasel shocks you: run faster for a while', blurb: `Teasel shocks you with a bolt from its crown: you run ${Math.round((P.thistle.bolt.mul - 1) * 100)}% faster for ${P.thistle.bolt.dur} s.` },
+    { id: 'attract', name: 'Static Attraction', icon: 'magnet', tip: 'Every gem near you zooms to you', blurb: `For ${P.thistle.attract.dur} s you're charged with static: every gem nearby is drawn to you and zooms in.` },
+    { id: 'ride', name: 'Ride the Spark', icon: 'spark', tip: 'Become lightning: every gem is yours, nothing stops you', blurb: 'You and Teasel become a current of lightning racing through the world: every gem on the way is yours, and you pass straight through every obstacle.' },
   ],
   crab: [
     { id: 'resonance', name: 'Crystal Resonance', icon: 'crystal', tip: `Every gem counts double for ${P.crab.resonance.dur} s`, blurb: `Shoal hums and every gem hums with him: gems collected are worth double for ${P.crab.resonance.dur} s.` },
@@ -205,6 +220,25 @@ export class Powers {
   // however it comes to you.
   get resMul() {
     return this.resT > 0 ? P.crab.resonance.mul : 1;
+  }
+
+  // How much faster than their pace the runner goes (Electric Bolt, Ride the
+  // Spark), and the most they may go (m/s) - see Game.update.
+  get speedBoost() {
+    const A = this.active;
+    return A && A.boost ? A.boost : 1;
+  }
+
+  get speedCap() {
+    const A = this.active;
+    return A && A.cap ? A.cap : Infinity;
+  }
+
+  // Riding the spark: nothing can hurt the runner, they're not there to be
+  // seen - only the current is.
+  get riding() {
+    const A = this.active;
+    return !!A && A.def.id === 'ride' && A.phase !== 'done';
   }
 
   // Seconds left of a doubling (whichever is running), for the gem counter.
@@ -740,6 +774,255 @@ const H = {
     },
   },
 
+  // --- Teasel ----------------------------------------------------------------
+  bolt: {
+    ok: (Pw) => Pw.game.state === 'running' && !!Pw.game.companion,
+    start(Pw, A) {
+      const g = Pw.game;
+      const C = P.thistle.bolt;
+      const c = g.companion;
+      A.boost = 1;
+      A.strike = 0;
+      A.crawl = 0;
+      A.left = () => clamp(1 - A.t / C.dur, 0, 1);
+      // the strike: from its crown into you
+      A.from = new THREE.Vector3();
+      if (c?.body?.crown) c.body.crown.point(0, 0, c.body.crownM || c.body.root.matrixWorld, A.from);
+      else Pw.runnerAt(A.from).add(_a.set(1.5, 0.6, -1));
+      c?.cheer(2);
+      c?.lookFor(0.8, 'runner');
+      if (c?.body) c.body.spike = 1;
+      g.audio.zap?.(clamp((c?.x ?? 0) / 3, -1, 1), true);
+      g.cam.kick(0.3);
+      g.ui.strike?.();
+      g.ui.powerNote('Electric Bolt!', 'thistle');
+      const tr = { x: g.player.x, y: 0, d: g.dist };
+      c?.body?.impact?.(tr, 0.9);
+      sparkBurst(Pw, 18);
+      A.overlay = (Ar, Gl, z, dist, dt, b) => {
+        const p = g.player;
+        _b.set(p.x, p.y + p.height * 0.6, z);
+        // the strike itself, a moment, flickering
+        if (A.t < 0.3) {
+          const br = A.t < 0.08 ? 1.4 : (1 - A.t / 0.3) * (0.4 + 0.8 * Math.random());
+          if (c) b.crown?.point(0, 0, b.crownM || b.root.matrixWorld, A.from);
+          const pts = jag(A.from, _b, 12, 0.07, 0.25, tmpPts(12));
+          Ar.add(pts, 12, 0.07, br);
+          const pts2 = jag(A.from, _b, 9, 0.12, 0.35, tmpPts(9, 1));
+          Ar.add(pts2, 9, 0.03, br * 0.7);
+          Gl.add(_b, 0.6, br * 0.5, false, 0.8);
+        }
+        // and the charge crawling over you as you go, a glow round you
+        crawl(Ar, Gl, g, z, A.boost > 1.05 ? 1 : 0.4, A.boost > 1.05 ? 4 : 2);
+        if (A.boost > 1.05) Gl.add(_b, 0.85, 0.14 + 0.06 * Math.random(), false, 0.2);
+      };
+      if (c?.body) c.body.overlay = A.overlay;
+    },
+    step(Pw, A, dt) {
+      const C = P.thistle.bolt;
+      const k = Math.min(1, A.t / 0.35) * clamp((C.dur - A.t) / C.fade, 0, 1);
+      A.boost = 1 + (C.mul - 1) * k;
+      // sparks flicking off your feet as you run
+      A.crawl -= dt;
+      if (A.crawl <= 0) {
+        A.crawl = 0.09;
+        sparkBurst(Pw, 2);
+      }
+      return A.t < C.dur;
+    },
+    end(Pw, A) {
+      A.boost = 1;
+      clearOverlay(Pw, A);
+    },
+  },
+
+  attract: {
+    ok: (Pw) => Pw.game.state === 'running',
+    start(Pw, A) {
+      const g = Pw.game;
+      const C = P.thistle.attract;
+      A.next = 0;
+      A.arcs = [];
+      A.left = () => clamp(1 - A.t / C.dur, 0, 1);
+      const c = g.companion;
+      c?.cheer(C.dur);
+      if (c?.body) c.body.spike = 1;
+      g.ui.powerNote('Static Attraction', 'thistle');
+      g.audio.zap?.(0);
+      sparkBurst(Pw, 14);
+      A.overlay = (Ar, Gl, z, dist, dt) => {
+        const p = g.player;
+        // each gem's spark, from it to you, flickering out
+        for (let i = A.arcs.length - 1; i >= 0; i--) {
+          const s = A.arcs[i];
+          s.t += dt;
+          if (s.t > 0.22) {
+            A.arcs.splice(i, 1);
+            continue;
+          }
+          _a.set(s.x, s.y, -(s.d - g.origin));
+          _b.set(p.x, p.y + p.height * 0.55, z);
+          const pts = jag(_a, _b, 9, 0.08, 0.1, tmpPts(9));
+          Ar.add(pts, 9, 0.05, (1.3 - s.t * 4) * (0.6 + 0.5 * Math.random()), clamp(s.t / 0.16, 0, 1), 0.12);
+          if (s.t < 0.06) Gl.add(_a, 0.35, 0.6, false, 0.7);
+        }
+        // charged: a halo of it round you, crackling
+        crawl(Ar, Gl, g, z, 0.7, 2);
+        _b.set(p.x, p.y + p.height * 0.55, z);
+        Gl.add(_b, 0.9, 0.12 + 0.05 * Math.sin(g.time * 23), false, 0);
+      };
+      if (c?.body) c.body.overlay = A.overlay;
+    },
+    step(Pw, A, dt) {
+      const g = Pw.game;
+      const C = P.thistle.attract;
+      const p = g.player;
+      A.next -= dt;
+      // the nearest gem in reach, one after another (quicker when there are
+      // many), each with its spark
+      while (A.next <= 0) {
+        let best = null;
+        for (const gem of g.gems.gems) {
+          if (gem.taken || gem.lucky) continue;
+          const a = gem.d - g.dist;
+          if (a < -1.5 || a > C.reach || Math.abs(gem.x - p.x) > C.side || gem.y > C.high) continue;
+          if (!best || gem.d < best.d) best = gem;
+        }
+        if (!best) {
+          A.next = 0.05;
+          break;
+        }
+        A.next += C.every;
+        A.arcs.push({ x: best.x, y: best.y, d: best.d, t: 0 });
+        if (A.arcs.length > 14) A.arcs.shift();
+        g.creditGem(best, 'pulled');
+      }
+      return A.t < C.dur;
+    },
+    end(Pw, A) {
+      clearOverlay(Pw, A);
+    },
+  },
+
+  ride: {
+    ok: (Pw) => {
+      const g = Pw.game;
+      if (g.state !== 'running' || !g.companion || g.portal.active || g.warp.active || g.splash.active) return false;
+      const b = g.course.boundaryAfter(g.dist + 1);
+      return !b || b.d - g.dist > P.thistle.ride.door + 40;
+    },
+    start(Pw, A) {
+      const g = Pw.game;
+      const C = P.thistle.ride;
+      const c = g.companion;
+      A.phase = 'ride';
+      A.boost = 1;
+      A.cap = C.max;
+      A.got = 0;
+      A.left = () => (A.phase === 'ride' ? clamp(1 - A.t / C.dur, 0, 1) : 0.02);
+      A.trail = [];
+      A.door = g.course.boundaryAfter(g.dist + 1);
+      // (the world beyond is hurried along: you'll be at its door sooner)
+      if (A.door && !A.door.to.world.ready) g.prepareWorld(A.door.to.world, 3);
+      g.ui.powerNote('Ride the Spark!', 'thistle');
+      g.ui.strike?.();
+      g.cam.kick(0.45);
+      g.audio.zap?.(0, true);
+      c?.body?.impact?.({ x: g.player.x, y: 0, d: g.dist }, 1.3);
+      if (c?.body) c.body.impact({ x: c.x, y: 0, d: g.dist + c.dz }, 1);
+      sparkBurst(Pw, 30);
+      // (it goes into the current with you: at your side, out of sight)
+      A.drive = (c) => {
+        const G = c.goal;
+        G.x = g.player.x;
+        G.dz = 0;
+        G.w = 30;
+        G.wz = 8;
+        G.low = 0;
+        if (A.phase !== 'ride') {
+          // coming out: beside you again
+          const side = g.player.x > 0 ? -1 : 1;
+          G.x = clamp(g.player.x + side * 2.4, -2.4, 2.4);
+          G.dz = 1.5;
+        }
+        return true;
+      };
+      if (c?.body) {
+        c.body.hide = true;
+        c.body.charge = 1;
+      }
+      A.overlay = (Ar, Gl, z, dist, dt, b) => rideOverlay(Pw, A, Ar, Gl, z, dt, b);
+      if (c?.body) c.body.overlay = A.overlay;
+    },
+    step(Pw, A, dt) {
+      const g = Pw.game;
+      const C = P.thistle.ride;
+      const c = g.companion;
+      const p = g.player;
+      if (A.phase === 'ride') {
+        A.boost = 1 + (C.mul - 1) * Math.min(1, A.t / 0.3);
+        // every gem on the way is yours, whatever lane it's in
+        for (const gem of g.gems.gems) {
+          if (gem.taken || gem.lucky) continue;
+          if (gem.d < g.prevDist - 2 || gem.d > g.dist + 3) continue;
+          g.creditGem(gem, 'pulled');
+          A.got++;
+        }
+        // (and now and then it strikes the road as it goes)
+        if (c?.body && Math.random() < dt * 9) c.body.impact({ x: p.x + rand(-0.6, 0.6), y: 0, d: g.dist + rand(-1, 2) }, 0.55);
+        const door = A.door && A.door.d - g.dist < C.door;
+        if (A.t >= C.dur || door) {
+          A.phase = 'out';
+          A.outT = 0;
+          g.ui.powerNote(`Rode the spark · ${A.got} ${A.got === 1 ? 'gem' : 'gems'}`, 'thistle');
+        }
+      } else if (A.phase === 'out') {
+        A.outT += dt;
+        A.boost = 1 + (C.mul - 1) * (1 - smoothK(A.outT / C.out));
+        // gems still under you as you slow
+        for (const gem of g.gems.gems) {
+          if (!gem.taken && !gem.lucky && gem.d > g.prevDist - 2 && gem.d < g.dist + 2) g.creditGem(gem, 'pulled');
+        }
+        if (A.outT >= C.out * 0.4 && !A.back) {
+          // you again - and it, beside you, arriving as it does through a
+          // spark - and a moment's grace to find your feet
+          A.back = true;
+          p.invulnT = Math.max(p.invulnT || 0, C.guard);
+          g.cam.kick(0.3);
+          g.audio.zap?.(0, true);
+          if (c?.body) {
+            c.body.hide = false;
+            c.x = clamp(p.x + (p.x > 0 ? -2.4 : 2.4), -2.4, 2.4);
+            c.dz = 1.5;
+            c.vdz = 0;
+            c.vx = 0;
+            c.body.flash = 1;
+            c.body.brace = 1;
+            c.body.impact({ x: c.x, y: 0, d: g.dist + c.dz }, 1.2);
+            c.body.impact({ x: p.x, y: 0, d: g.dist }, 1);
+            c.cheer(2);
+            c.lookFor(1, 'runner');
+          }
+          sparkBurst(Pw, 26);
+        }
+        if (A.outT >= C.out) {
+          A.phase = 'done';
+          return false;
+        }
+      }
+      return true;
+    },
+    end(Pw, A) {
+      const g = Pw.game;
+      const c = g.companion;
+      A.boost = 1;
+      A.phase = 'done';
+      if (c?.body) c.body.hide = false;
+      g.player.root.visible = true;
+      clearOverlay(Pw, A);
+    },
+  },
+
   // --- Shoal -----------------------------------------------------------------
   resonance: {
     ok: (Pw) => Pw.game.state === 'running',
@@ -887,6 +1170,142 @@ const H = {
     },
   },
 };
+
+// --- Teasel's lightning ---------------------------------------------------------------
+// (drawn with Teasel's own arcs and glows: its body calls the ability's
+// overlay each frame - see thistle.js - and lights it as it lights its own)
+const VIOLET = [0.72, 0.5, 1.0];
+const WHITE = [1.0, 0.95, 1.0];
+const _UP = new THREE.Vector3(0, 1, 0);
+const _j1 = new THREE.Vector3();
+const _j2 = new THREE.Vector3();
+const _jd = new THREE.Vector3();
+const _ja = new THREE.Vector3();
+const _jb = new THREE.Vector3();
+// A crooked line from a to b: n points, each step knocked aside (most in the
+// middle), arched up by arch (m), into out.
+function jag(a0, b0, n, rough, arch, out) {
+  const a = _ja.copy(a0), b = _jb.copy(b0);
+  _jd.subVectors(b, a);
+  const L = _jd.length() || 1e-3;
+  _j1.crossVectors(_jd, _UP);
+  if (_j1.lengthSq() < 1e-8) _j1.set(1, 0, 0);
+  _j1.normalize();
+  _j2.crossVectors(_j1, _jd).normalize();
+  let ox = 0, oy = 0;
+  for (let k = 0; k < n; k++) {
+    const t = k / (n - 1);
+    const env = Math.sin(Math.PI * t);
+    ox = ox * 0.4 + (Math.random() - 0.5) * 2 * rough * L;
+    oy = oy * 0.4 + (Math.random() - 0.5) * 2 * rough * L;
+    out[k].copy(a).lerp(b, t).addScaledVector(_j1, ox * env).addScaledVector(_j2, oy * env).addScaledVector(_UP, arch * env);
+  }
+  return out;
+}
+const _pts = [[], []];
+function tmpPts(n, which = 0) {
+  const a = _pts[which];
+  while (a.length < n) a.push(new THREE.Vector3());
+  return a;
+}
+const _c = new THREE.Vector3();
+const _d = new THREE.Vector3();
+const smoothK = (x) => {
+  const t = clamp(x, 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+// Little arcs crawling over the runner (k: how many, how bright).
+function crawl(Ar, Gl, g, z, k, n) {
+  const p = g.player;
+  for (let i = 0; i < n; i++) {
+    if (Math.random() > k) continue;
+    const h = p.height * (0.15 + 0.8 * Math.random());
+    const a0 = Math.random() * Math.PI * 2;
+    const a1 = a0 + (Math.random() - 0.5) * 2.2;
+    const r = 0.28;
+    _c.set(p.x + Math.cos(a0) * r, p.y + h, z + Math.sin(a0) * r);
+    _d.set(p.x + Math.cos(a1) * r, p.y + h + (Math.random() - 0.5) * 0.6, z + Math.sin(a1) * r);
+    const pts = jag(_c, _d, 6, 0.3, 0.02, tmpPts(6, 1));
+    Ar.add(pts, 6, 0.026, 1.1 + 0.5 * Math.random());
+  }
+}
+
+// Sparks flung off the runner (Teasel's own violet and white).
+function sparkBurst(Pw, n) {
+  const g = Pw.game;
+  const b = g.companion?.body;
+  if (!b?.sparkW) return;
+  const p = g.player;
+  const z = -(g.dist - g.origin);
+  for (let i = 0; i < n; i++) {
+    _c.set(p.x + rand(-0.25, 0.25), p.y + rand(0.05, p.height), z + rand(-0.2, 0.2));
+    _d.set(rand(-2.5, 2.5), rand(1, 3.5), rand(-1, 2) + g.speed * 0.2);
+    b.sparkW(_c, _d, rand(0.04, 0.08), i % 3 ? VIOLET : WHITE);
+  }
+}
+
+function clearOverlay(Pw, A) {
+  const b = Pw.game.companion?.body;
+  if (b && b.overlay === A.overlay) b.overlay = null;
+}
+
+// The current you ride as: a thick crooked channel of lightning running
+// along the road where you are, its head bright at your chest, its tail
+// streaming back behind you; two more strands wandering round it, forks
+// lashing out to the air and down to the road; a ball of light at its head
+// and a glow all along it. Coming out of it, it shrinks into you.
+function rideOverlay(Pw, A, Ar, Gl, z, dt, b) {
+  const g = Pw.game;
+  const p = g.player;
+  const C = P.thistle.ride;
+  if (A.phase === 'done' || A.back) {
+    if (A.back && A.outT < C.out) crawl(Ar, Gl, g, z, 1, 3);
+    return;
+  }
+  const out = A.phase === 'out' ? smoothK(A.outT / (C.out * 0.4)) : 0;
+  // (short: its tail stays well in front of the camera)
+  const len = (1.6 + Math.min(2.6, g.speed * 0.05)) * (1 - out);
+  const y = p.y + 0.85;
+  _c.set(p.x, y, z - 0.5);
+  _d.set(p.x - p.vx * 0.05, y - 0.15, z + len);
+  const n = 14;
+  const pts = jag(_c, _d, n, 0.04, 0.08, tmpPts(n));
+  const br = 1.3 * (0.8 + 0.4 * Math.random());
+  Ar.add(pts, n, 0.15, br, (g.time * 3) % 1, 0.1);
+  for (let s = 0; s < 2; s++) {
+    const p2 = jag(_c, _d, 10, 0.08, 0.18 * (s ? -1 : 1), tmpPts(10, 1));
+    Ar.add(p2, 10, 0.05, br * 0.7);
+  }
+  // where you were: a figure of crackling light, road to head height
+  for (let s = 0; s < 3; s++) {
+    _a.set(p.x + rand(-0.18, 0.18), p.y + 0.02, z + rand(-0.15, 0.15));
+    _b.set(p.x + rand(-0.12, 0.12), p.y + (1.45 + rand(-0.1, 0.15)) * (1 - out * 0.7), z + rand(-0.15, 0.15));
+    const p4 = jag(_a, _b, 8, 0.14, 0, tmpPts(8, 1));
+    Ar.add(p4, 8, 0.045, br * (0.7 + 0.3 * Math.random()));
+  }
+  // forks to the road and the air
+  for (let f = 0; f < 4; f++) {
+    const k = 2 + Math.floor(Math.random() * (n - 4));
+    const q = pts[k];
+    const down = Math.random() < 0.55;
+    _a.set(q.x + rand(-0.8, 0.8), down ? 0.02 : q.y + rand(0, 0.7), q.z + rand(-0.4, 0.4));
+    const p3 = jag(q, _a, 6, 0.3, 0, tmpPts(6, 1));
+    Ar.add(p3, 6, 0.04, br * 0.8);
+    if (down) Gl.add(_a, 0.3, 0.5, true, 0.5);
+  }
+  // its head, and the light it throws
+  _a.set(p.x, y, z);
+  Gl.add(_a, 0.8, 1.2, false, 0.95);
+  _a.copy(_c).lerp(_d, 0.5);
+  Gl.add(_a, 1.5, 0.25, false, 0);
+  Gl.add(_b.set(p.x, 0.02, z), 1.3, 0.5, true, 0.3);
+  // sparks streaming off it
+  if (b?.sparkW && Math.random() < 0.8) {
+    _a.copy(_c).lerp(_d, Math.random() * 0.6);
+    b.sparkW(_a, _b.set(rand(-2, 2), rand(0.5, 2.5), rand(1, 4)), rand(0.04, 0.07), Math.random() < 0.6 ? VIOLET : WHITE);
+  }
+}
 
 // --- Shoal: the bulldozer -------------------------------------------------------------
 // Out ahead of you in the middle of the road - far enough that the road he's

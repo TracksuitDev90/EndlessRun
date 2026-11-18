@@ -83,8 +83,8 @@ export const SCALE = 1.9;
 export const ZAP = { lock: 0.11, travel: 0.15, fade: 0.5, loose: 0.35 };
 export const zapTravel = (L) => clamp(0.1 + L * 0.011, 0.14, 0.28);
 // (its violet, and the white of a spark's heart, for the flying sparks)
-const VIOLET = [0.72, 0.5, 1.0];
-const WHITE = [1.0, 0.95, 1.0];
+export const VIOLET = [0.72, 0.5, 1.0];
+export const WHITE = [1.0, 0.95, 1.0];
 
 const K = 9; // points along each plume's spine
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -647,7 +647,7 @@ class Crown {
 // --- arcs ----------------------------------------------------------------------------
 // Crooked strips of light: the crackles in the crown and the bolt it travels
 // by. Each frame: begin(), add() each arc as it is (world points), end().
-const ARCS = 44;
+const ARCS = 60;
 const AN = 18;
 class Arcs {
   constructor(u) {
@@ -735,7 +735,7 @@ class Arcs {
 // --- glows ---------------------------------------------------------------------------
 // Soft round lights: the halo round a charged crown, a strike's flash in the
 // air and where it hits the road. Each frame: begin(), add(), end().
-const GLOWS = 12;
+const GLOWS = 16;
 class Glows {
   constructor(u) {
     const geo = new THREE.BufferGeometry();
@@ -794,7 +794,7 @@ const _jb = new THREE.Vector3();
 const _jd = new THREE.Vector3();
 const _j1 = new THREE.Vector3();
 const _j2 = new THREE.Vector3();
-function jag(a0, b0, n, rough, arch, out) {
+export function jag(a0, b0, n, rough, arch, out) {
   const a = _ja.copy(a0), b = _jb.copy(b0);
   _jd.subVectors(b, a);
   const L = _jd.length() || 1e-3;
@@ -1126,7 +1126,9 @@ export class Thistle {
       this.zapT += dt;
       if (this.arrived && this.zapT > ZAP.lock + this.travel + Math.max(ZAP.fade, ZAP.loose) + 0.05) this.zapT = -1;
     }
-    const hidden = this.zapT >= ZAP.lock && !this.arrived;
+    // (gone into a bolt; or ridden off in the current with you - Ride the
+    // Spark, see powers.js: hide)
+    const hidden = (this.zapT >= ZAP.lock && !this.arrived) || !!this.hide;
     this.vis = hidden ? 0 : 1;
     this.root.visible = !hidden;
     this.flash = Math.max(0, this.flash - dt * 2.6);
@@ -1631,6 +1633,10 @@ export class Thistle {
         Gl.add(_p, 0.32 + 0.3 * k + 0.1 * Math.min(1, this.spike), b, false, 0);
       }
     }
+    // (and whatever its abilities draw with its lightning: powers.js sets
+    // overlay(A, Gl, z, dist, dt, body) - arcs and glows in the world, its
+    // sparks through sparkW)
+    if (this.overlay) this.overlay(A, Gl, z, dist, dt, this);
     A.end();
     Gl.end();
     this.sparks.update(dt, this.root, z, dist);
