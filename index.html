@@ -62,7 +62,8 @@
         }
         var wanted = {};
         var preload = function (p) {
-          var href = map['./' + p] || p;
+          // (as the browser will name it when it's here: no leading ./)
+          var href = (map['./' + p] || p).replace(/^\.\//, '');
           if (wanted[href]) return;
           wanted[href] = 1;
           var l = document.createElement('link');
@@ -133,6 +134,57 @@
         } catch (e) {
           /* no resource timing: the bar starts once the code has run */
         }
+      })();
+    </script>
+    <!-- If the game's code never starts (a file that failed to arrive, or
+         one the browser couldn't run - an old copy kept from before an
+         update, say), the loading screen says so and offers another go,
+         rather than sitting on "fetching the code" for ever. Once the code
+         is running (ui.js sets window.__erLoader) its own error screen takes
+         over and this stands down. -->
+    <script>
+      (function () {
+        var shown = false;
+        var fail = function (why) {
+          if (window.__erLoader || shown) return;
+          var el = document.getElementById('loading');
+          if (!el) return;
+          shown = true;
+          el.classList.add('failed');
+          el.querySelector('.loader-title').textContent = "The game couldn't start.";
+          el.querySelector('.loader-stage').textContent = why ? why : 'check the connection, then';
+          el.querySelector('.loader-retry').onclick = function () {
+            location.reload();
+          };
+          // (the stylesheet may not be in yet: show the screen regardless)
+          document.documentElement.classList.add('styled');
+        };
+        // a file of the game's code that didn't arrive (capturing: such
+        // errors don't bubble), or code the browser couldn't run
+        window.addEventListener(
+          'error',
+          function (e) {
+            var t = e.target;
+            if (t && t.tagName === 'SCRIPT') fail('part of the code didn’t arrive');
+            else if (t && t.tagName === 'LINK' && t.rel === 'modulepreload') return;
+            else if (e.message) fail(String(e.message).slice(0, 160));
+          },
+          true
+        );
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          fail(String((r && r.message) || r || '').slice(0, 160));
+        });
+        // and if it's simply taking far too long, a way to try again
+        setTimeout(function () {
+          if (window.__erLoader || shown) return;
+          var b = document.querySelector('#loading .loader-retry');
+          if (!b) return;
+          b.style.display = 'block';
+          b.onclick = function () {
+            location.reload();
+          };
+        }, 20000);
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
