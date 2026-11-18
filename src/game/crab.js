@@ -134,19 +134,39 @@ export const WORLDS = {
   },
 };
 const MORPH = Object.keys(BASE).map(Number);
-// his palette in a world, as colours
+// his palette in a world, as colours - and laid on thick: every world's
+// mineral much more saturated than it's written (INTENSE: how much more, and
+// how far its pale tones are pulled down toward the full colour), so he's
+// unmistakably the world's own colour wherever you meet him. His window's
+// tint and his sheen only a little; his own sheet's colours as they are.
+export const INTENSE = { sat: 1.75, lift: 0.14, dark: 0.12 };
+const GENTLE = new Set([6, 17, 18, 30]);
+const _hsl = {};
 const _palCache = {};
 function worldPal(id) {
   if (_palCache[id]) return _palCache[id];
   const w = WORLDS[id] || {};
   const out = {};
-  for (const k of MORPH) out[k] = new THREE.Color(w[k] || BASE[k]);
+  for (const k of MORPH) {
+    const c = new THREE.Color(w[k] || BASE[k]);
+    if (id !== 'village' && WORLDS[id]) {
+      c.getHSL(_hsl);
+      const g = GENTLE.has(k) ? 0.3 : 1;
+      const s = Math.min(1, _hsl.s * (1 + (INTENSE.sat - 1) * g) + INTENSE.lift * g);
+      // (pale tones down toward the full colour, dark ones a little up)
+      let l = _hsl.l;
+      if (l > 0.62) l -= (l - 0.62) * INTENSE.dark * 3 * g;
+      c.setHSL(_hsl.h, s, l);
+    }
+    out[k] = c;
+  }
   return (_palCache[id] = out);
 }
 export const COL = { ...BASE, ...FIXED };
 
-// He's sculpted life-size (a giant of a crab), and drawn a touch smaller.
-export const SCALE = 0.9;
+// He's sculpted life-size (a giant of a crab), and drawn smaller: big
+// beside the runner, never towering over them.
+export const SCALE = 0.68;
 // How much bigger he grows for the Living Bulldozer.
 export const GROW = 0.5;
 // How long his colours take to turn to a new world's (s).
@@ -386,6 +406,8 @@ export class Crab {
     this.resonate = 0;
     this.dozer = 0;
     this.grow = 0;
+    // (how far he's turned side on to the way he's going: his mind sets it)
+    this.crabwise = 0;
     for (const k in this.wS) this.wS[k].reset(k === 'sit' ? 1 : 0);
     for (const s of Object.values(this.S)) s.reset();
     this.low.reset();
@@ -621,7 +643,11 @@ export class Crab {
       const up = Math.max(0, Math.sin(a));
       const hip = _p.copy(g.hip).applyMatrix4(shell.matrix);
       const foot = _t.copy(g.tip);
-      foot.z += amp * swing * 1.0;
+      // (the stride runs the way he's going over the ground: straight back
+      // under him as he runs forward, across under him when he runs
+      // crabwise - see crabwise)
+      foot.x -= Math.sin(this.crabwise || 0) * amp * swing;
+      foot.z += Math.cos(this.crabwise || 0) * amp * swing;
       foot.y += (0.05 + 0.25 * amp) * up * up * run;
       // (crossing the road: his feet reach the way he's going)
       foot.x += clamp(this.lat * 0.03, -0.12, 0.12) * up;

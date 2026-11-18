@@ -299,7 +299,9 @@ export class ObstacleField {
           // (each piece outward from the middle of the road, whatever group
           // it's in; the middle one the way the claw swings)
           const out = Math.abs(it.x) < 0.6 ? dir : Math.sign(it.x);
-          items.push({ it, b, x: it.x, y: it.y, ry: it.ry, sx: it.sx, sy: it.sy, sz: it.sz, out, far: 5 + Math.random() * 4, up: 0.8 + Math.random() * 1.6, spin: (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 3) });
+          // (thrown clear of the road - it's 7 m across - in a high arc,
+          // spinning as it goes)
+          items.push({ it, b, x: it.x, y: it.y, ry: it.ry, sx: it.sx, sy: it.sy, sz: it.sz, out, far: 7 + Math.random() * 4 + Math.max(0, 2.4 - Math.abs(it.x)), up: 2.2 + Math.random() * 1.8, spin: (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 5) });
         }
       }
       const rec = row.lanes.find((r) => r && r.group === g);
@@ -319,18 +321,23 @@ export class ObstacleField {
     for (const B of this.blowing) {
       const k = Math.min(1, (time - B.t0) / B.dur);
       if (B.smash) {
-        // smashed: flung out and up, tumbling, crumbling away (a bar swept
-        // up and aside)
-        const e = 1 - Math.pow(1 - k, 2.2);
-        const gone = 1 - smoothK(0.3, 1, k);
+        // smashed: knocked clean off the road - out in a high arc, spinning
+        // as it goes, coming down at the roadside - a bar swept up and
+        // aside; and only once it's there, crumbling away
+        const e = 1 - Math.pow(1 - Math.min(1, k / 0.75), 2);
+        const gone = 1 - smoothK(0.72, 1, k);
+        // (a jolt of it as the claw lands: knocked over a little before it flies)
+        const jolt = Math.sin(Math.min(1, k / 0.12) * Math.PI) * (1 - Math.min(1, k / 0.12));
         for (const I of B.items) {
           const it = I.it;
           if (it.owner !== B.g) continue;
-          it.x = I.x + I.out * e * I.far * (B.high ? 1.3 : 1);
-          it.y = I.y + (B.high ? 1.8 * e : I.up * Math.sin(Math.min(1, e * 1.15) * Math.PI * 0.9));
+          it.x = I.x + I.out * (e * I.far * (B.high ? 1.25 : 1) + 0.3 * jolt);
+          it.y = I.y + (B.high ? 2.6 * e : I.up * 4 * e * (1 - e) + 0.15 * jolt);
           it.ry = I.ry + I.spin * e;
-          it.sx = I.sx * gone;
-          it.sy = I.sy * gone * (B.high ? 1 : 0.6 + 0.4 * gone);
+          // (squashed by the blow, then whole as it flies, then crumbling)
+          const hitK = 1 - 0.25 * Math.sin(Math.min(1, k / 0.1) * Math.PI);
+          it.sx = I.sx * gone * (2 - hitK);
+          it.sy = I.sy * gone * hitK;
           it.sz = I.sz * gone;
           I.b.dirty = true;
         }

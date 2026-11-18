@@ -10,6 +10,10 @@ import { Companion } from './companion.js';
 //   - peer: he drifts in a little closer, level with you, and looks at you
 //     with his head on one side - the way a dog does - his eyes on you;
 //   - wave: a wave of his little claw, and a smile;
+//   - shuffle: now and then he turns side on and runs along crabwise, the
+//     way a crab really goes, weaving a little from side to side in his
+//     lane (and sometimes turning about to face the other side), his eyes
+//     kept on the road ahead, then turns back to it;
 //   - sidle: he changes lane the way a crab would, crabwise - turned side
 //     on, scuttling across - and turns back to the road;
 //   - gaze: something at the side of the road catches his eye and he
@@ -67,7 +71,6 @@ export class Scuttler extends Companion {
 
   powerBegin() {
     super.powerBegin();
-    this.crabwise = 0;
   }
 
   // --- the frame ---------------------------------------------------------------------
@@ -78,8 +81,13 @@ export class Scuttler extends Companion {
     // (the world he's standing in: his colours turn to it)
     if (Number.isFinite(g.dist) && g.course?.segAt) b.world = g.course.segAt(g.dist + this.dz)?.world?.def?.id || b.world;
     else if (g.current) b.world = g.current.def.id;
-    // crabwise: turned side on to the way he's going
-    if (Math.abs(this.crabwise) > 1e-3) b.root.quaternion.multiply(_q.setFromAxisAngle(_UP, this.crabwise));
+    // crabwise: turned side on to the way he's going (and, whenever no idea
+    // of his wants it, easing back round to face the road)
+    if (this.beat !== 'sidle' && this.beat !== 'shuffle') this.crabwise *= Math.exp(-(dt || 0) * 5);
+    if (Math.abs(this.crabwise) < 1e-3) this.crabwise = 0;
+    if (this.crabwise) b.root.quaternion.multiply(_q.setFromAxisAngle(_UP, this.crabwise));
+    // (his legs step the way he's really going over the ground)
+    b.crabwise = this.crabwise;
   }
 
   // His eyes and a tilt follow what he looks at; and every so often he
@@ -126,6 +134,7 @@ export class Scuttler extends Companion {
       ['hop', this.canLeap(1.2) && this.openRoad(this.x, 1.4) ? 0.7 : 0],
       ['sidle', [0, 1, 2].some((l) => l !== lane && l !== this.laneOf(this.x) && this.openRoad(LANES[l], 2.4)) ? 1 : 0],
       ['peer', this.openRoad(this.x, 2.4) ? 1 : 0],
+      ['shuffle', this.grounded && this.openRoad(this.x, 2.5) ? 2.4 : 0],
     ];
     if (this.lastBeat) for (const o of opts) if (o[0] === this.lastBeat) o[1] *= 0.2;
     let total = 0;
@@ -166,6 +175,14 @@ export class Scuttler extends Companion {
       this.body.tiltNow(this.gazeSide, 0.9);
     }
     if (name === 'hop') this.jump(rand(0.22, 0.32), 'hop');
+    if (name === 'shuffle') {
+      this.beatLane = this.laneOf(this.x) !== lane ? this.laneOf(this.x) : pick(others);
+      // (which side he turns to face: toward you, mostly)
+      this.sideDir = (this.x > p.x ? 1 : -1) * (Math.random() < 0.75 ? 1 : -1);
+      this.shuffleT = rand(...this.C.shuffle.dur);
+      this.flipAt = Math.random() < 0.35 ? rand(0.4, 0.6) * this.shuffleT : -1;
+      this.cheer(1);
+    }
     if (name === 'sidle') {
       const from = this.laneOf(this.x);
       this.beatLane = toLane ?? pick([0, 1, 2].filter((l) => l !== lane && l !== from));
@@ -176,7 +193,6 @@ export class Scuttler extends Companion {
 
   endBeat() {
     super.endBeat();
-    this.crabwise = 0;
   }
 
   beatStep(dt) {
@@ -219,6 +235,25 @@ export class Scuttler extends Companion {
           this.cheer(0.8);
           this.endBeat();
         }
+        break;
+      }
+      case 'shuffle': {
+        // side on, running along crabwise and weaving a little across his
+        // lane; the moment there's anything to see to, back to the road
+        G.dz = clamp(this.dz, 0, 2.4);
+        G.x = LANES[this.beatLane] + this.C.shuffle.weave * Math.sin(t * this.C.shuffle.rate);
+        G.w = 3.5;
+        if (this.flipAt > 0 && t > this.flipAt) {
+          this.sideDir = -this.sideDir;
+          this.flipAt = -1;
+        }
+        const ending = t > this.shuffleT || !this.openRoad(this.x, 1.2) || !this.grounded;
+        const want = ending ? 0 : this.sideDir * Math.PI * 0.5;
+        this.crabwise += (want - this.crabwise) * (1 - Math.exp(-dt * 5));
+        // (his eyes on the road ahead, whichever way he's turned)
+        this.lookFor(0.2, { x: this.x, y: 0.6, dz: this.dz + 8 });
+        if (ending && Math.abs(this.crabwise) < 0.08) this.endBeat();
+        if (t > this.shuffleT + 3) this.endBeat();
         break;
       }
       case 'sidle': {
