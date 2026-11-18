@@ -692,6 +692,9 @@ export class Game {
   // A companion's next level, bought with banked gems (the crash card or the
   // companion menu).
   buyLevel(id) {
+    // (nothing to buy past a companion's last ability: Shoal has two, for
+    // now, and Teasel none)
+    if (this.progress.level(id) >= (POWERS[id] || []).length) return false;
     if (!this.progress.buy(id)) return false;
     this.audio.fanfare();
     if (id === this.companionId) this.showPowers();
@@ -793,7 +796,8 @@ export class Game {
   // tossed it back; 'carried' Sorrel brought it back in her haul (already
   // taken: see GemField.stash); 'pulled' Iris's wind drew it in (Dragon's
   // Gift). Only the gems the runner takes themselves count double under
-  // Lucky Find (and never more than double). quiet: no ting of its own (a
+  // Lucky Find (and never more than double); under Crystal Resonance every
+  // gem does, however it comes. quiet: no ting of its own (a
   // haul's handed over all at once). Returns the points it paid.
   creditGem(g, how = false, quiet = false) {
     const p = this.player;
@@ -801,12 +805,12 @@ export class Game {
     if (how === true) this.gems.take(g, this.time, this.dist, true);
     else if (how === 'pulled') this.gems.take(g, this.time, this.dist);
     const mine = how === false;
-    const mul = mine ? this.powers.gemMul : 1;
+    const mul = Math.max(mine ? this.powers.gemMul : 1, this.powers.resMul);
     let pts = (g.crown ? S.crown : S.gem) * this.depth * mul;
     this.score += pts;
     this.gemCount += mul;
     this.gemWorth += this.gemWorthAt(g.d, g.crown) * mul;
-    if (mine || how === 'pulled') this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, (g.crown ? 1.25 : 1) * (mul > 1 || g.lucky ? 1.4 : 1));
+    if (mine || how === 'pulled' || mul > 1) this.sparkles.emit(g.x - p.x, g.y - (p.y + CHEST), g.light, this.time, (g.crown ? 1.25 : 1) * (mul > 1 || g.lucky ? 1.4 : 1));
     p.onGem?.(g);
     if (!quiet) this.audio.gem(g.index, g.crown);
     if (g.whole) {
@@ -1639,7 +1643,7 @@ export class Game {
     if (st === 'running' && !this.tutorialDone) this.updateLesson();
     this.ui.setInk(this.stumbleWindow / CONFIG.stumbleWindow);
     if (st !== 'title') this.ui.updatePowers(this.powers, this);
-    this.ui.setDouble(this.powers.doubleT > 0, this.powers.doubleT);
+    this.ui.setDouble(this.powers.doubleLeft > 0, this.powers.doubleLeft);
     const sp = (this.speed - CONFIG.speed.start) / (CONFIG.speed.max - CONFIG.speed.start);
     this.audio.setIntensity(this.state === 'running' ? 0.3 + 0.7 * Math.max(0, sp) : 0.15);
   }

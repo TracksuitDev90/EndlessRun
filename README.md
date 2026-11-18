@@ -61,7 +61,13 @@ in a deep plum husk of papery leaves, two amber eyes peeking out from under
 them, a crown of silver plumes on top — scurries along on three root legs,
 building static as it runs until its crown fans out and sparks snap across
 it, and then, when it falls behind, travels to your side along a bolt of
-violet lightning (see [The storm thistle](#the-storm-thistle)).
+violet lightning (see [The storm thistle](#the-storm-thistle)). Or Shoal,
+a giant opal crab — a broad, gentle crab grown from translucent opalescent
+mineral, coral branching out of his shell, eyes on stalks, one claw very
+much bigger than the other with a window of clear crystal in it — scuttles
+along beside you on eight crystal legs, tilting his head at you, and turns
+to the colours of every world he walks into (see [The giant
+crab](#the-giant-crab)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -3581,6 +3587,96 @@ half minutes of play on each of three seeds
 (`node tools/companion/audit.js "?manual&seed=2&companion=thistle" 150`) it
 touches nothing.
 
+## The giant crab
+
+![Shoal: front, left side, behind and three-quarters; his colours in the Deepwood, the Blue Hour, Candy World and Hell; his scuttle from the side; and in a run - beside the runner in the Deepwood, out ahead in Candy World as the Living Bulldozer, a gumdrop he's smashed flying off the road, and humming beside you in the Blue Hour with Crystal Resonance](docs/crab.jpg)
+
+Shoal is a giant crab, and a very friendly one: broad and softly rounded,
+knee-high to the runner at the crown of his shell (taller with his coral),
+everything about him grown from translucent, opalescent mineral. His shell
+is laid over with tiers of plates, each a thin lamina proud of the one
+beneath with a scalloped, flared edge; under it a pale body and a soft face
+with a smile, two eyes on gently curved stalks standing up in front of the
+shell's lip; eight walking legs, four a side, each a chain of faceted
+crystals between rounded mineral joints, the last a long crystal point; a
+small claw on his left held up, and on his right one very much bigger,
+resting forward on the road — its middle a window of clear crystal you can
+see the road and his own legs through. Two clusters of coral grow out of
+his shell, branching and porous, their roots crusted with mineral beads
+where they meet it.
+
+**Sculpted like the others.** `tools/runner/crab.py` builds him with
+`build.py`'s kit. The shell's tiers are thin shells laid over a squat
+ellipsoid in its own coordinates (how far round, how far down), each
+reaching a little further down than the one above, its lower edge
+scalloped and lifted away over his face at the front; the legs and arms are
+hexagonal crystals drawn to points at their ends (a max of six planes round
+a tapering axis, so their faces come out flat); the claws are a lens of a
+palm in the claw's own frame, a raised rim round its window, flattened
+strokes for the fingers (the moving one on a bone of its own); the coral is
+grown — branches splitting, bending and thinning from a seeded random
+walk, rounded tips — and its crust is a scatter of little beads on the
+shell. Each vertex carries where it is on its part (down a plate and how
+far from its edge, along a leg, how far out across the window, up a
+branch), and the shader, `CRAB`, paints the rest. About a minute to build
+(`python3 tools/runner/crab.py`, writing `assets/crab/`), 30 bones.
+
+**Opal.** Every mineral of him is drawn the same way: a body colour, and a
+play of colour over it — three hues round a wheel, the one you see picked
+by the angle you see him at and where on him it is, in patches that drift —
+strongest toward his outline and in his claws; faint facets, cells of the
+stone a little lighter or darker with their edges catching the light; and
+veins of paler mineral inside him, drawn twice, the deeper set shifted
+against your view so it slides behind the surface as he turns. The light
+comes through him (his shade is shallow), the plates' thin edges are lit
+through, and a crisp highlight comes off every facet. The coral is
+pocked all over with little pores; his smile and his cheeks are drawn on
+his face, the smile widening and his eyes squeezing up from beneath when
+he's pleased. **The window in his claw** is a pass of its own
+(`FS_CRAB_GLASS`), drawn after him and the world: nearly clear face-on, so
+you see whatever's behind it (the road, his legs), denser toward its edges,
+the light glancing off it, a ring of split colour where it bends the light
+most, fine fractures and veils inside catching the light, a little of the
+sky reflected in it. The window's edge is cut by the shader from how far
+out across the palm a point is, so it's a smooth oval whatever the mesh.
+
+**He turns to every world.** Each world has his mineral — a palette over
+his own in `crab.js` (`WORLDS`): mossy green and amber in the Deepwood, cool
+blues and violet in the Blue Hour, candy pinks and candy-coloured opal in
+Candy World, ice and alexandrite in the Frostbound Pass, obsidian lit like
+embers in Hell, pearl in the Kelp Deep, and so on for all thirteen. His
+shell, legs, joints, both claws and his coral all change, and so does the
+play of colour over them; the window in his claw stays clear, only tinted.
+When he walks into a new world (his own position, not yours: he can be a
+little ahead) his colours turn over a couple of seconds, a band of light
+sweeping up him from his feet with the new colours flaring in its wake.
+
+**How he moves** (`src/game/crab.js`). He scuttles: his eight legs in two
+sets of four — the first and third on one side with the second and fourth
+on the other — one set planted while the other swings through, a little
+ripple running front to back along each side; every foot placed by a
+two-bone reach, the knee bowed up and out. His shell rides the steps in a
+gentle bob, rocking from set to set, leaning a little into his run. His
+eyes sway on their stalks (thrown back as he speeds up, out on a turn),
+glance about on their own and turn together to whatever he's looking at;
+he blinks. Every so often — and whenever he looks at you — he leans his
+whole shell over to one side, the way a dog cocks its head. His big claw is
+heavy, on a slow spring, its finger working now and then; the little one is
+held up, clicking, and waved when he's happy. His coral sways to every
+lurch. Glints of opal fly off his feet as they strike the road.
+
+**His mind** (`src/game/scuttler.js`, built on the fox's `companion.js` for
+reading the road): unhurried, curious and fond of you. He ambles a lane
+over, level with you or a little ahead, and his ideas are quiet ones — he
+comes in close and peers at you, head on one side; waves; changes lane the
+way a crab would, turned side on and scuttling across; watches something
+go by at the side of the road, tilting after it; a little hop, because he's
+happy — and now and then he fetches a gem in his little claw. He's broad:
+a bar across his lane he goes round if there's a lane he can reach, and if
+there isn't he flattens himself and scuttles under it. When you stumble he
+looks back at you, worried; on the title screen he sits by you looking
+about; picked, he waves.
+
 ## Companion abilities
 
 Your companion can be brought on, for keeps, with gems. **Bank** the gems in
@@ -3679,6 +3775,27 @@ small meshes drawn only while they're in use.
 **Teasel, the storm thistle** — abilities still to come. Its badge and the
 companion menu say so, and there's nothing to buy for it yet.
 
+**Shoal, the giant opal crab** — two abilities for now (his two levels):
+
+1. **Crystal Resonance** (10 s, 40 s) — he hums, and every crystal on the
+   road hums with him: for 10 s every gem collected counts double — yours,
+   and any a companion catches for you (it's never more than double). He
+   comes in close beside you glowing, light running along the veins inside
+   him and filling the window in his claw; a ring of opal glints pulses off
+   him, and glints rise off every gem ahead. The counter wears its ×2 badge.
+2. **Living Bulldozer** (15 s, 80 s) — he charges out ahead into the middle
+   of the road and grows half as big again, his great claw up; for 15 s
+   every breakable row of obstacles that reaches him, in every lane, he
+   smashes off the road with a swing of it — from that moment it can't hit
+   you; what's left of it is flung outward and up, tumbling, a bar overhead
+   swept up and aside, and all of it crumbles away to nothing in under a
+   second while chunks of it and glints of his crystal fly. He keeps far
+   enough ahead (more the faster you go: `CONFIG.powers.crab.dozer`) that
+   you see the road he's cleared lying open between you. A climb or a river
+   isn't his to break: he clambers over and wades through. Rows he smashes
+   pay no clear bonus. When it's over he shrinks back and comes back to
+   your side.
+
 ## Project layout
 
 ```
@@ -3745,11 +3862,15 @@ src/game/                     game loop, player (the runners' shared core:
                               his own mind, on the runner's; thistle.js:
                               Teasel's body, scurry, crown of plumes, static,
                               the storm round it and the bolt it travels by; scurrier.js:
-                              its own mind, on the runner's); progress.js (the
+                              its own mind, on the runner's; crab.js: Shoal's
+                              body, scuttle, eyes, claws, coral and his colours
+                              world to world; scuttler.js: his own mind, on the
+                              runner's); progress.js (the
                               gem bank and the companions' levels), powers.js
                               (their abilities) and powerfx.js (what the
                               abilities leave in the world: soil, water,
-                              wind, the water's sheen, Nep's roots)
+                              wind, opal glints, rubble, the water's sheen,
+                              Nep's roots)
 tools/preload.py              what index.html fetches first, every file's version,
                               the gzipped models (run after changing any of them)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/
@@ -3765,6 +3886,7 @@ tools/runner/dragon.py        offline sculpt of the dragon -> assets/dragon/
 tools/runner/pitcher.py       offline sculpt of the pitcher plant -> assets/pitcher/
 tools/runner/thistle.py       offline sculpt of the storm thistle's pod and legs
                               -> assets/thistle/ (its crown is drawn in the game)
+tools/runner/crab.py          offline sculpt of the giant crab -> assets/crab/
 tools/runner/view.html        a runner turned round like their reference sheet
 tools/runner/fox.html         the fox turned round, posed, or as a film strip
 tools/runner/dragon.html      the dragon turned round, posed, flying, or as a
@@ -3774,6 +3896,9 @@ tools/runner/pitcher.html     the pitcher plant turned round, posed, or as a
 tools/runner/thistle.html     the storm thistle turned round, posed, gliding,
                               travelling through a spark, at any charge, from
                               the runner's camera too, or as a film strip
+tools/runner/crab.html        the giant crab turned round, posed, in any
+                              world (or caught changing), ducking, smashing,
+                              resonating, or as a film strip
 tools/companion/audit.js      plays the game unseen, checking the companion
                               never touches an obstacle (and that one who
                               flies keeps out of your way)

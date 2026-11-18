@@ -38,6 +38,17 @@ import { CONFIG } from '../config.js';
 //   2 Root Reach      he plants his feet and his roots fetch one cluster of
 //                     gems ahead, across the lanes near you
 //   3 Pitcher Protection  he drenches you: ~5 s that nothing can hurt you
+// Shoal, the giant opal crab (two abilities, for now):
+//   1 Crystal Resonance  he hums, and every crystal on the road hums with
+//                     him: for ~10 s every gem collected (yours, or one a
+//                     companion brings you) counts double
+//   2 Living Bulldozer   he charges out ahead, grows larger, and for ~15 s
+//                     smashes every breakable row of obstacles off the road
+//                     with his great claw as it reaches him - barriers
+//                     tumbling outward, bars swept aside, the wreckage
+//                     dissolving - always far enough ahead that you can see
+//                     the road he's cleared (a climb, a river, isn't his to
+//                     break: he wades through and clambers over)
 
 const P = CONFIG.powers;
 const LANES = CONFIG.laneX;
@@ -62,6 +73,10 @@ export const POWERS = {
     { id: 'roots', name: 'Root Reach', icon: 'roots', tip: 'Nep’s roots fetch the gems up ahead', blurb: 'Nep plants his feet and his roots fetch one cluster of gems ahead, across nearby lanes.' },
     { id: 'shield', name: 'Pitcher Protection', icon: 'shield', tip: `${P.pitcher.shield.dur} s where nothing can hurt you`, blurb: `Nep drenches you: ${P.pitcher.shield.dur} s that nothing can hurt you.` },
   ],
+  crab: [
+    { id: 'resonance', name: 'Crystal Resonance', icon: 'crystal', tip: `Every gem counts double for ${P.crab.resonance.dur} s`, blurb: `Shoal hums and every gem hums with him: gems collected are worth double for ${P.crab.resonance.dur} s.` },
+    { id: 'dozer', name: 'Living Bulldozer', icon: 'claw', tip: 'Shoal smashes a clear road ahead of you', blurb: `Shoal charges ahead, grows, and spends ${P.crab.dozer.dur} s smashing every breakable obstacle out of your way with his huge claw.` },
+  ],
 };
 
 // Each ability's cooldown (s); World Fold has none: it's once a run.
@@ -77,6 +92,7 @@ export class Powers {
     this.active = null;
     this.folded = false;
     this.doubleT = 0;
+    this.resT = 0;
   }
 
   // A new run: everything ready, World Fold too.
@@ -85,6 +101,7 @@ export class Powers {
     this.cd = {};
     this.folded = false;
     this.doubleT = 0;
+    this.resT = 0;
   }
 
   get pal() {
@@ -175,12 +192,24 @@ export class Powers {
   // Sorrel's haul - is handed over before the card comes up).
   crashed() {
     this.doubleT = 0;
+    this.resT = 0;
     this.stop(true);
   }
 
   // Lucky Find: the gems you take yourself count this many times over.
   get gemMul() {
     return this.doubleT > 0 ? P.fox.lucky.mul : 1;
+  }
+
+  // Crystal Resonance: every gem collected counts this many times over,
+  // however it comes to you.
+  get resMul() {
+    return this.resT > 0 ? P.crab.resonance.mul : 1;
+  }
+
+  // Seconds left of a doubling (whichever is running), for the gem counter.
+  get doubleLeft() {
+    return Math.max(this.doubleT, this.resT);
   }
 
   // The special gem's been taken by the runner.
@@ -710,7 +739,203 @@ const H = {
       g.endShield();
     },
   },
+
+  // --- Shoal -----------------------------------------------------------------
+  resonance: {
+    ok: (Pw) => Pw.game.state === 'running',
+    start(Pw, A) {
+      const g = Pw.game;
+      const C = P.crab.resonance;
+      Pw.resT = C.dur;
+      A.pulse = 0.25;
+      A.shim = 0;
+      A.left = () => Pw.resT / C.dur;
+      g.ui.powerNote(`×${C.mul} gems · Crystal Resonance`, 'crab');
+      g.audio.resonance?.();
+      const c = g.companion;
+      if (c) {
+        c.cheer(C.dur);
+        c.lookFor(1.2, 'runner');
+        c.body.wave?.();
+        c.body.tiltNow?.(c.x > g.player.x ? -1 : 1, 1);
+      }
+      // (close beside you, level with you, humming)
+      A.drive = (c) => {
+        const p = g.player;
+        const G = c.goal;
+        const lane = c.laneOf(p.x);
+        const mine = c.laneOf(c.x);
+        const l = mine !== lane ? mine : lane === 1 ? (c.x > p.x ? 2 : 0) : 1;
+        G.x = CONFIG.laneX[l];
+        G.dz = 0.9;
+        G.w = 3;
+        G.wz = 1.4;
+        G.low = 0;
+        if (Math.random() < 0.01) c.lookFor(0.9, Math.random() < 0.5 ? 'runner' : 'camera');
+        return true;
+      };
+    },
+    step(Pw, A, dt) {
+      const g = Pw.game;
+      const fx = g.powerFx;
+      const c = g.companion;
+      if (g.state === 'running') Pw.resT = Math.max(0, Pw.resT - dt);
+      const fade = Math.min(1, A.t / 0.4) * Math.min(1, Pw.resT / 0.8);
+      if (c) c.body.resonate = fade;
+      // a pulse of it off him every so often: a ring of opal glints
+      A.pulse -= dt;
+      const pz = -(g.dist - g.origin);
+      if (A.pulse <= 0 && c) {
+        A.pulse = 0.85;
+        const cz = pz - c.dz;
+        const sc = c.body.scale || 1;
+        for (let i = 0; i < 18; i++) {
+          const a = (i / 18) * Math.PI * 2 + Math.random() * 0.2;
+          fx.emit(c.x + Math.cos(a) * 0.5 * sc, 0.5 * sc + Math.random() * 0.3, cz + Math.sin(a) * 0.5 * sc, Math.cos(a) * 3.2, 1.6 + Math.random() * 1.2, -g.speed + Math.sin(a) * 3.2, 0.05 + Math.random() * 0.03, 7);
+        }
+        g.audio.hum?.();
+      }
+      // and every gem ahead of you ringing with him: glints rising off them
+      A.shim -= dt;
+      while (A.shim <= 0) {
+        A.shim += 0.03;
+        let n = 0, pickG = null;
+        for (const gem of g.gems.gems) {
+          if (gem.taken) continue;
+          const a = gem.d - g.dist;
+          if (a < 0 || a > 30) continue;
+          n++;
+          if (Math.random() * n < 1) pickG = gem;
+        }
+        if (pickG) fx.emit(pickG.x + rand(-0.15, 0.15), pickG.y + rand(-0.1, 0.25), -(pickG.d - g.origin), rand(-0.4, 0.4), rand(0.8, 1.6), rand(-0.3, 0.3), rand(0.04, 0.07), 7);
+      }
+      return Pw.resT > 0;
+    },
+    end(Pw, A, abort) {
+      if (abort) Pw.resT = 0;
+      const c = Pw.game.companion;
+      if (c) c.body.resonate = 0;
+    },
+  },
+
+  dozer: {
+    ok: (Pw) => Pw.game.state === 'running' && !!Pw.game.companion,
+    start(Pw, A) {
+      const g = Pw.game;
+      const C = P.crab.dozer;
+      A.phase = 'charge';
+      A.struck = new Set();
+      A.pending = [];
+      A.swing = 1;
+      A.smashed = 0;
+      A.left = () => (A.phase === 'back' ? 0.02 : clamp(1 - A.t / C.dur, 0, 1));
+      A.drive = (c, dt) => dozerDrive(Pw, A, c, dt);
+      const c = g.companion;
+      c.cheer(2);
+      c.lookFor(0.8, 'camera');
+      g.ui.powerNote('Living Bulldozer!', 'crab');
+      g.audio.smash?.(0, true);
+    },
+    step(Pw, A, dt) {
+      const g = Pw.game;
+      const C = P.crab.dozer;
+      const c = g.companion;
+      if (!c) return false;
+      const b = c.body;
+      if (A.phase === 'charge' && A.t > 0.7) A.phase = 'doze';
+      if (A.phase === 'doze' && A.t >= C.dur) {
+        A.phase = 'back';
+        A.back = 0;
+        g.ui.powerNote(`Shoal cleared ${A.smashed} ${A.smashed === 1 ? 'row' : 'rows'}`, 'crab');
+        c.cheer(2);
+      }
+      // he grows into it, and back down after
+      b.dozer = A.phase === 'back' ? 0 : Math.min(1, A.t / 0.6);
+      if (A.phase !== 'back') {
+        // every breakable row reaching his claw, struck as it does (the claw
+        // swung through a beat before it lands)
+        const sc = b.scale || 1;
+        const front = g.dist + c.dz + C.reach * sc + g.speed * 0.16;
+        for (const row of g.obstacles.rows) {
+          if (row.d > front) break;
+          if (row.d + 0.5 < g.dist || A.struck.has(row)) continue;
+          if (row.climb || row.high || row.river) continue;
+          if (!row.lanes.some((r) => r && !r.group.dead && !r.group.blown)) continue;
+          A.struck.add(row);
+          A.pending.push({ row, at: A.t + 0.16, dir: A.swing });
+          b.smash(A.swing);
+          A.swing = -A.swing;
+        }
+      }
+      for (let i = A.pending.length - 1; i >= 0; i--) {
+        const S = A.pending[i];
+        if (A.t < S.at) continue;
+        A.pending.splice(i, 1);
+        smashRow(Pw, A, S.row, S.dir);
+      }
+      if (A.phase === 'back') {
+        A.back += dt;
+        return A.back < 1.2 || A.pending.length > 0;
+      }
+      return true;
+    },
+    end(Pw, A) {
+      for (const S of A.pending) smashRow(Pw, A, S.row, S.dir);
+      A.pending.length = 0;
+      const c = Pw.game.companion;
+      if (c) c.body.dozer = 0;
+    },
+  },
 };
+
+// --- Shoal: the bulldozer -------------------------------------------------------------
+// Out ahead of you in the middle of the road - far enough that the road he's
+// cleared lies open between you, further the faster you go - grown, his claw
+// up and ready; then, when it's over, back to your side.
+function dozerDrive(Pw, A, c, dt) {
+  const g = Pw.game;
+  const C = P.crab.dozer;
+  const G = c.goal;
+  const p = g.player;
+  if (A.phase === 'back') {
+    const side = c.x >= p.x ? 1 : -1;
+    G.x = clamp(p.x + side * 2.4, -2.4, 2.4);
+    G.dz = 2;
+    G.w = 3;
+    G.wz = 1.2;
+    G.low = 0;
+    return true;
+  }
+  G.x = 0;
+  G.dz = clamp(C.ahead + g.speed * C.lead, C.ahead, C.max);
+  G.w = 3;
+  G.wz = A.phase === 'charge' ? 3 : 1.6;
+  G.low = 0;
+  G.urgent = false;
+  c.lookFor(0.2, { x: 0, y: 0.4, dz: c.dz + 6 });
+  return true;
+}
+
+// A row struck: off the road (obstacles.smash), and the wreck of it flying.
+function smashRow(Pw, A, row, dir) {
+  const g = Pw.game;
+  const fx = g.powerFx;
+  const C = P.crab.dozer;
+  const hit = g.obstacles.smash(row, g.time, C.clear, dir);
+  if (!hit.length) return;
+  A.smashed++;
+  const z = -(row.d - g.origin);
+  for (const h of hit) {
+    const out = h.x === 0 ? dir : Math.sign(h.x);
+    const y0 = h.kind === 'H' ? 1.6 : 0.3, y1 = h.kind === 'H' ? 2.6 : h.kind === 'W' ? 2.2 : 0.9;
+    // chunks of it flung out and up, glints of his claw's crystal, a puff
+    for (let i = 0; i < 9; i++) fx.emit(h.x + rand(-0.8, 0.8), rand(y0, y1), z + rand(-0.4, 0.4), out * rand(2, 7), rand(2, 6), -g.speed * 0.3 + rand(-2, 2), rand(0.07, 0.16), 8);
+    for (let i = 0; i < 4; i++) fx.emit(h.x + rand(-0.6, 0.6), rand(y0, y1), z, out * rand(1, 4), rand(2, 5), rand(-1, 1), rand(0.04, 0.07), 7);
+    fx.emit(h.x, (y0 + y1) * 0.4, z, out * 1.5, 0.6, 0, 0.9, 0, 0.6, 0.9, 1.6);
+  }
+  g.cam.kick(0.22);
+  g.audio.smash?.(clamp(hit[0].x / 3, -1, 1));
+}
 
 // --- Sorrel's ways ------------------------------------------------------------------
 // The haul: off after each gem near you in turn - nearest first, and none

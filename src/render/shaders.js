@@ -4089,6 +4089,249 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   unlit = max(unlit, f);
   return c;
 }
+#elif defined(CRAB)
+// --- Shoal, the giant opal crab ------------------------------------------------------
+// (shell plates d: x how far round, y down the plate (0 root, 1 edge), z how
+// far in from its edge (m), w the tier; belly z 1 on the face; legs x which,
+// y along it, w 1 on a joint; claws x across the window (1 its rim), y along
+// it, z which face, w 1 on the big claw; coral x up its branch, w 1 on the
+// crust. r: the rest position. See tools/runner/crab.py.)
+// Everything about him is opal: a body colour he takes from the world he's
+// in (the palette is blended world to world by game/crab.js), a play of
+// colour over it (three hues, OP_A..C, sliding with the angle you see him
+// at, in patches), faint facets catching the light, and veins of paler
+// mineral inside him - drawn twice, the deeper set shifted against the view,
+// so they read as lying inside the stone.
+#define CR_OP_A 13
+#define CR_OP_B 14
+#define CR_OP_C 15
+#define CR_DEEP 16
+#define CR_VEIN 17
+#define CR_EDGE 18
+#define CR_CORAL_TIP 19
+#define CR_PORE 20
+#define CR_CLAW_A 21
+#define CR_CLAW_B 22
+#define CR_MOUTH 23
+#define CR_BLUSH 24
+#define CR_GLOW 25
+// how far out across the big claw's palm its window reaches (1 the rim)
+#define CR_WIN 0.93
+// x eyes open (0 shut .. 1), y how happy (a wider smile, cheeks), z a
+// resonance shiver, w the bulldozer's flush
+uniform vec4 uFace;
+// the right eye's centre (rest space; the left mirrored) and radius
+uniform vec4 uEye;
+// x how strongly he resonates (Crystal Resonance, 0..1), y the pulse's
+// phase, z the world change sweeping over him (0..1: how far up him the new
+// colours have come; 0 / 1 nothing to show), w its strength
+uniform vec4 uCrab;
+float crFres = 0.0;
+vec3 crV = vec3(0.0, 0.0, -1.0);
+float crHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float crNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(crHash(i), crHash(i + vec3(1, 0, 0)), f.x), mix(crHash(i + vec3(0, 1, 0)), crHash(i + vec3(1, 1, 0)), f.x), f.y);
+  float b = mix(mix(crHash(i + vec3(0, 0, 1)), crHash(i + vec3(1, 0, 1)), f.x), mix(crHash(i + vec3(0, 1, 1)), crHash(i + vec3(1, 1, 1)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// (the nearest and second-nearest cell points: x, y; a cell id in z)
+vec3 crCells(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  float d1 = 9.0, d2 = 9.0, id = 0.0;
+  for (int z = -1; z <= 1; z++)
+  for (int y = -1; y <= 1; y++)
+  for (int x = -1; x <= 1; x++) {
+    vec3 g = vec3(float(x), float(y), float(z));
+    vec3 o = vec3(crHash(i + g), crHash(i + g + 17.1), crHash(i + g + 41.7));
+    vec3 q = g + o * 0.85 - f;
+    float d = dot(q, q);
+    if (d < d1) {
+      d2 = d1;
+      d1 = d;
+      id = crHash(i + g + 5.3);
+    } else if (d < d2) d2 = d;
+  }
+  return vec3(sqrt(d1), sqrt(d2), id);
+}
+// The play of colour: three hues round a wheel, one picked by the angle you
+// see it at and where on him it is (in patches that drift a little).
+vec3 crIris(vec3 r, float seed, vec3 a, vec3 b, vec3 c) {
+  float n = crNoise(r * 5.0 + seed * 7.0) * 0.7 + crNoise(r * 15.0 + 3.0) * 0.3;
+  float h = fract(crFres * 0.85 + n * 1.1 + seed * 0.37 + uTime * 0.015);
+  vec3 w = 0.5 + 0.5 * cos(6.2832 * (h - vec3(0.0, 0.3333, 0.6667)));
+  w = w * w;
+  return (a * w.x + b * w.y + c * w.z) / (w.x + w.y + w.z);
+}
+vec3 crOpal(vec3 c, vec3 r, float seed, float k, vec3 a, vec3 b, vec3 cc) {
+  vec3 ir = crIris(r, seed, a, b, cc);
+  // (brightest in patches, and toward where he turns from you)
+  float pch = smoothstep(0.35, 0.75, crNoise(r * 7.0 + seed * 3.0 + vec3(0.0, uTime * 0.03, 0.0)));
+  float amt = k * (0.28 + 0.5 * crFres + 0.3 * pch);
+  return mix(c, ir, clamp(amt, 0.0, 0.9));
+}
+// Faint facets: cells of the stone a little lighter or darker, and the
+// edges between them catching the light.
+vec3 crFacets(vec3 c, vec3 r, float scale, float k) {
+  vec3 cl = crCells(r * scale);
+  c *= 1.0 + (cl.z - 0.5) * 0.12 * k;
+  float edge = 1.0 - smoothstep(0.0, 0.07, cl.y - cl.x);
+  return mix(c, min(c * 1.35 + 0.08, vec3(1.0)), edge * 0.45 * k);
+}
+// Veins of paler mineral inside him: a near set and a deeper one, the deeper
+// shifted against your view (so it slides behind the surface as he turns).
+vec3 crVeins(vec3 c, vec3 r, float k, inout float unlit) {
+  vec3 q = r * 7.0;
+  float v1 = abs(crNoise(q) - 0.5) + abs(crNoise(q * 2.3 + 4.0) - 0.5) * 0.5;
+  float near = band(v1 - 0.03, 0.012) * smoothstep(0.3, 0.7, crNoise(r * 3.0 + 9.0));
+  vec3 qd = (r + crV * 0.06) * 5.0;
+  float v2 = abs(crNoise(qd + 20.0) - 0.5);
+  float deep = (1.0 - smoothstep(0.0, 0.035, v2)) * 0.7;
+  c = mix(c, uPal[CR_DEEP], deep * 0.22 * k);
+  c = mix(c, uPal[CR_VEIN], (near * 0.55 + deep * 0.25) * k);
+  // (and when he resonates, light runs along them)
+  float pulse = 0.5 + 0.5 * sin(uCrab.y * 6.2832 - r.y * 9.0 + v1 * 6.0);
+  float glow = (near + deep * 0.6) * uCrab.x * (0.45 + 0.55 * pulse);
+  c = mix(c, uPal[CR_GLOW] * 1.3, glow * 0.85);
+  unlit = max(unlit, glow);
+  return c;
+}
+vec3 crShell(vec3 c, vec3 r, vec4 d, inout float unlit) {
+  float t = d.y, edge = d.z, tier = d.w;
+  // deeper toward the plate's root, where it lies under the plate above;
+  // thin and lit through at its edge
+  c = mix(c, uPal[CR_DEEP], smoothstep(0.45, 0.0, t) * 0.25 * step(tier, 0.99));
+  // growth lines running along the plate's edge, and fine ribs across it
+  float grow = lines(edge * 32.0, 0.06) * smoothstep(0.005, 0.03, edge) * smoothstep(0.2, 0.06, edge);
+  float rib = lines(d.x * 26.0 + crNoise(r * 9.0) * 0.6, 0.04) * smoothstep(0.25, 0.7, t) * 0.5;
+  c = mix(c, uPal[CR_EDGE], max(grow * 0.35, rib * 0.3));
+  c = crFacets(c, r, 7.0, 1.0);
+  c = crOpal(c, r, tier * 3.1, 0.75, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+  float lip = smoothstep(0.03, 0.0, edge) * step(tier, 0.99);
+  c = mix(c, uPal[CR_EDGE], lip * 0.35);
+  unlit = max(unlit, lip * 0.3);
+  return crVeins(c, r, 1.0, unlit);
+}
+vec3 crFace(vec3 c, vec3 r, vec4 d, inout float unlit) {
+  // pearly plates beneath, lines across them
+  c = mix(c, c * 0.86, lines(r.z * 7.5 + crNoise(r * 6.0) * 0.4, 0.05) * (1.0 - d.z) * 0.8);
+  c = crOpal(c, r, 0.4, 0.3, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+  if (d.z > 0.3 && r.z < -0.3) {
+    // the smile: a soft curve, wider and deeper when he's happy
+    float hp = clamp(uFace.y, 0.0, 1.0);
+    float x = r.x;
+    float yc = 0.286 + (2.2 + 1.6 * hp) * x * x;
+    float halfw = 0.075 + 0.035 * hp;
+    float sm = band(r.y - yc, 0.0045 + 0.002 * hp) * smoothstep(halfw, halfw - 0.02, abs(x));
+    // (little upturned corners)
+    vec2 cn = vec2(abs(x) - halfw + 0.01, r.y - (yc + 0.008));
+    sm = max(sm, band(length(cn) - 0.012, 0.003) * step(0.0, cn.y) * step(cn.x, 0.0));
+    c = mix(c, uPal[CR_MOUTH], sm * 0.9);
+    // rosy cheeks
+    float ck = 1.0 - smoothstep(0.0, 0.045, length(vec2(abs(x) - 0.125, r.y - 0.325)));
+    c = mix(c, uPal[CR_BLUSH], ck * (0.35 + 0.35 * hp));
+  }
+  return c;
+}
+vec3 crEye(vec3 c, vec3 r, inout float unlit) {
+  vec3 E = uEye.xyz;
+  vec3 q = vec3(abs(r.x) - E.x, r.y - E.y, r.z - E.z) / uEye.w;
+  // glossy black, a deep blue-violet sheen toward its edge, a big glint and
+  // a little one
+  vec3 col = mix(vec3(0.03, 0.03, 0.05), uPal[CR_DEEP] * 0.4, smoothstep(0.5, 1.0, length(q.xy)) * 0.6);
+  vec2 w = vec2(q.x * sign(r.x), q.y);
+  float gl = fill(length(w - vec2(-0.3, 0.38) - q.z * 0.0) - 0.24) + 0.7 * fill(length(w - vec2(0.25, -0.2)) - 0.09);
+  col = mix(col, vec3(1.0), min(gl, 1.0) * step(q.z, 0.2));
+  // the lids: from above as he blinks, and from below as he smiles
+  float open = clamp(uFace.x, 0.0, 1.0);
+  float lid = smoothstep(-0.05, 0.05, q.y - mix(-1.1, 1.1, open));
+  float low = smoothstep(0.05, -0.05, q.y - mix(-1.1, -0.35, clamp(uFace.y, 0.0, 1.0)));
+  col = mix(col, uPal[8] * 0.8, max(lid, low));
+  unlit = max(unlit, min(gl, 1.0) * (1.0 - max(lid, low)));
+  return col;
+}
+vec3 crCoral(vec3 c, vec3 r, vec4 d, inout float unlit) {
+  float up = d.x;
+  c = mix(c * 0.92, uPal[CR_CORAL_TIP], smoothstep(0.35, 1.0, up) * 0.75);
+  // its pores: little pits all over, darker in their depths, rimmed lighter
+  vec3 cl = crCells(r * 75.0);
+  float pore = 1.0 - smoothstep(0.12, 0.26, cl.x);
+  c = mix(c, uPal[CR_PORE], pore * 0.5);
+  c = mix(c, min(c * 1.18, vec3(1.0)), smoothstep(0.26, 0.34, cl.x) * (1.0 - smoothstep(0.34, 0.46, cl.x)) * 0.5);
+  c *= 0.92 + 0.16 * crNoise(r * 30.0);
+  return c;
+}
+vec3 crDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = base;
+  if (m == 1) return crShell(c, r, d, unlit);
+  if (m == 2) return crFace(c, r, d, unlit);
+  if (m == 3) {
+    // the leg crystals: facets cut into them, clearer toward their points
+    c = mix(c, uPal[CR_DEEP], 0.18 * (1.0 - crFres));
+    c = mix(c, uPal[CR_EDGE], smoothstep(0.75, 1.0, d.y) * 0.4);
+    c = crOpal(c, r, d.x * 5.0, 0.85, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+    return crVeins(c, r * 1.4, 0.8, unlit);
+  }
+  if (m == 4) {
+    // the joints: smooth, a darker mineral, speckled
+    c *= 0.9 + 0.2 * crNoise(r * 60.0);
+    return crOpal(c, r, 1.7, 0.35, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+  }
+  if (m == 5) {
+    // the claws' casing: the strongest of his colour, round the window a
+    // raised rim catching the light, rings of growth round it
+    float big = d.w;
+    float ring = lines(d.x * 7.0, 0.05) * smoothstep(1.05, 1.25, d.x) * 0.35;
+    c = mix(c, uPal[CR_EDGE], ring);
+    c = crFacets(c, r, 9.0, 0.8);
+    c = crOpal(c, r, 2.3, 1.15, uPal[CR_CLAW_A], uPal[CR_CLAW_B], uPal[CR_OP_C]);
+    float rim = big * (1.0 - smoothstep(0.0, 0.1, abs(d.x - 1.0))) * step(0.3, abs(d.z));
+    c = mix(c, min(uPal[CR_EDGE] * 1.15, vec3(1.0)), rim * 0.7);
+    unlit = max(unlit, rim * 0.4);
+    return crVeins(c, r, 0.7, unlit);
+  }
+  if (m == 7) return crEye(c, r, unlit);
+  if (m == 8) {
+    // the eye stalks: pale, ringed
+    c = mix(c, c * 0.84, lines(d.y * 16.0, 0.08) * 0.6);
+    return crOpal(c, r, 0.9, 0.3, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+  }
+  if (m == 9) return crCoral(c, r, d, unlit);
+  if (m == 10) {
+    // the crust round the coral's roots: white mineral beads
+    c *= 0.88 + 0.24 * crNoise(r * 90.0);
+    return crOpal(c, r, 3.3, 0.35, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+  }
+  return c;
+}
+vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
+  vec3 c = crDetail(m, base, r, d, unlit);
+  // a world's new colours sweeping up over him as he enters it: a bright
+  // band of light running up him, the play of colour flaring in its wake
+  float sw = uCrab.z;
+  if (uCrab.w > 0.0) {
+    float y = r.y / 1.3;
+    float front = band(y - sw, 0.045 + 0.02 * crNoise(r * 12.0));
+    float wake = smoothstep(0.0, 0.25, sw - y) * (1.0 - smoothstep(0.25, 0.6, sw - y));
+    vec3 ir = crIris(r * 2.0, 1.3, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+    c = mix(c, min(ir * 1.12 + 0.05, vec3(1.0)), (front * 0.5 + wake * 0.3) * uCrab.w * step(float(m), 9.5) * (1.0 - step(6.5, float(m)) * step(float(m), 8.5)));
+    unlit = max(unlit, front * uCrab.w * 0.4);
+  }
+  // resonating: a glow welling through all of him
+  float res = uCrab.x * (0.55 + 0.45 * sin(uCrab.y * 6.2832));
+  c = mix(c, c + uPal[CR_GLOW] * 0.35, res * 0.5 * step(float(m), 6.5));
+  unlit = max(unlit, res * 0.3);
+  // the bulldozer's flush: warmer, brighter
+  c = mix(c, min(c * 1.25 + 0.04, vec3(1.0)), uFace.w * 0.5);
+  return c;
+}
 #elif defined(ITEMS)
 // --- the things that fly out of the explorer's backpack -------------------------
 // (d: x, y across the part, z which face: 1 the front, 2 the back, 0 an edge)
@@ -6093,6 +6336,25 @@ void main() {
   #elif defined(THISTLE)
     // (its amber eyes keep their colour through a drain)
     gKeep = m == 4 ? 1.0 : 0.0;
+  #elif defined(CRAB)
+    // (the window in his big claw is drawn by a pass of its own, see
+    // FS_CRAB_GLASS; his claws, his coral and his eyes keep their colour
+    // through a drain)
+    // (m 6 is the big claw's palm: the window is cut out of it by how far
+    // out across it this is, d.x; round it, it's casing)
+    if (m == 6) {
+      if (vD.x < CR_WIN) discard;
+      m = 5;
+    }
+    gKeep = (m == 5 || m == 7 || m == 9) ? 1.0 : 0.0;
+    {
+      vec3 nn = normalize(vNormal);
+      nn = gl_FrontFacing ? nn : -nn;
+      crV = normalize(vWorld - uCamPos);
+      crFres = 1.0 - abs(dot(nn, crV));
+    }
+    // (translucent stone: light comes through it, so its shade is shallow)
+    if (m == 1 || m == 3 || m == 5 || m == 10) unlit = 0.22;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -6138,6 +6400,9 @@ void main() {
   #elif defined(THISTLE)
     // (papery leaves take the light softly; the eyes crisp, glassy)
     float soft = m == 4 ? 0.04 : m == 5 ? 0.07 : 0.11;
+  #elif defined(CRAB)
+    // (polished stone a little crisp; the coral and his pale body soft)
+    float soft = m == 7 ? 0.04 : (m == 9 || m == 2 || m == 8) ? 0.11 : 0.08;
   #elif defined(BUNNY)
     // (fur takes the light softly; the billowy trousers in soft gradients)
     float soft = (m == 1 || m == 2 || m == 6 || m == 8 || m == 11) ? 0.1 : m == 4 ? 0.11 : (m == 12 || m == 14) ? 0.04 : 0.07;
@@ -6200,6 +6465,16 @@ void main() {
   #elif defined(THISTLE)
   // (a dry sheen on its leaves where they face the light)
   if (m == 1 || m == 2 || m == 6) {
+  #elif defined(CRAB)
+  {
+    // polished stone: a crisp highlight off every facet, tinted by its own
+    // play of colour, and a glassy one off his eyes
+    vec3 hv = normalize(uLightDir - V);
+    float sp = pow(max(dot(n, hv), 0.0), m == 7 ? 60.0 : 28.0);
+    float shine = (m == 1 || m == 3 || m == 5) ? 0.55 : m == 7 ? 0.45 : m == 4 || m == 10 ? 0.3 : 0.12;
+    col += mix(uPal[30], vec3(1.0), 0.4) * min(sp * shine, 0.6) * (0.4 + 0.6 * lit);
+  }
+  if (m == 99) {
   #else
   if (m == 2) {
   #endif
@@ -6253,6 +6528,12 @@ void main() {
     gKeep = (m == 2 || m == 3 || m == 4) ? 1.0 : 0.0;
   #elif defined(THISTLE)
     gKeep = m == 4 ? 1.0 : 0.0;
+  #elif defined(CRAB)
+    if (m == 6) {
+      if (vD.x < CR_WIN) discard;
+      m = 5;
+    }
+    gKeep = (m == 5 || m == 7 || m == 9) ? 1.0 : 0.0;
   #else
     gKeep = (m == 9 || m == 10) ? 1.0 : 0.0;
   #endif
@@ -6260,6 +6541,61 @@ void main() {
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   gl_FragColor = vec4(grade(atmos(ink, v, dist, 0.0), uTrip), 1.0);
+}
+`;
+
+// The window of clear crystal in Shoal's big claw (game/crab.js): drawn over
+// him and the world as glass is - nearly clear face-on, so you see what's
+// behind it (the road, his own legs), denser toward its edges; the light
+// glancing off its faces, a ring of split colour round its rim where it
+// bends the light most, fine fractures and veils inside it catching the
+// light, a little of the sky reflected in it and a breath of the world's
+// colour (uPal[6]). Every other material of his is discarded here.
+const FS_CRAB_GLASS = FS_HEAD + CHAR_DETAIL + /* glsl */ `
+uniform vec3 uLightDir;
+void main() {
+  int m = int(vMat + 0.5);
+  if (m != 6 || vD.x >= CR_WIN) discard;
+  vec3 n = normalize(vNormal);
+  n = gl_FrontFacing ? n : -n;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  crV = V;
+  float f0 = 1.0 - abs(dot(n, V));
+  crFres = f0;
+  float fres = f0 * f0;
+  vec3 tint = uPal[6];
+  // fractures and veils inside it, the deeper ones shifted against the view
+  vec3 r = vRest;
+  float c1 = abs(crNoise(r * 16.0) - 0.5);
+  float crack = band(c1 - 0.01, 0.006) * smoothstep(0.35, 0.7, crNoise(r * 5.0 + 3.0));
+  float c2 = abs(crNoise((r + V * 0.05) * 9.0 + 11.0) - 0.5);
+  float veil = (1.0 - smoothstep(0.0, 0.05, c2)) * 0.6;
+  // the light off its faces, and a streak of it across (as glass does)
+  vec3 hv = normalize(uLightDir - V);
+  float spec = pow(max(dot(n, hv), 0.0), 90.0) * 1.4;
+  float k = fract(dot(r, vec3(2.1, 3.3, 1.7)) + crFres * 0.4);
+  float streak = smoothstep(0.86, 0.89, k) * (1.0 - smoothstep(0.92, 0.95, k));
+  // the sky in it, toward the edges
+  vec3 sky = skyColor(reflect(V, n));
+  // a ring of split colour where it bends the light most
+  vec3 split = crIris(r * 3.0, 0.6, uPal[CR_OP_A], uPal[CR_OP_B], uPal[CR_OP_C]);
+  float ring = smoothstep(0.35, 0.75, f0) * (1.0 - smoothstep(0.85, 1.0, f0));
+  vec3 col = tint;
+  col = mix(col, sky, fres * 0.3);
+  col = mix(col, split * 1.2, ring * 0.45);
+  col += vec3(1.0) * (crack * 0.45 + veil * 0.12 + streak * 0.35) + spec;
+  // (resonating, it fills with his glow)
+  float res = uCrab.x * (0.55 + 0.45 * sin(uCrab.y * 6.2832));
+  col = mix(col, uPal[CR_GLOW] * 1.3, res * 0.35);
+  float a = 0.06 + 0.42 * fres + ring * 0.12 + crack * 0.35 + veil * 0.08 + streak * 0.25 + spec + res * 0.18;
+  // (the far face, seen through the near one: fainter)
+  a *= gl_FrontFacing ? 1.0 : 0.6;
+  // (and a soft edge where it meets the rim)
+  a = mix(a, 0.85, smoothstep(CR_WIN - 0.06, CR_WIN, vD.x) * 0.6);
+  col = atmos(col, v, dist, 0.0);
+  gl_FragColor = vec4(grade(col, uTrip), clamp(a, 0.0, 0.85));
 }
 `;
 
@@ -6984,7 +7320,7 @@ void main() {
 // ---------------------------------------------------------------------------
 const VS_DUST = COMMON + /* glsl */ `
 uniform vec2 uResolution;
-attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour, 5 a crumb of soil, 6 a big clear drop), w seed
+attribute vec4 aDust; // x size (m), y opacity, z kind (0 a puff, 1 grit, 2 a drop of water, 3 spray, 4 vapour, 5 a crumb of soil, 6 a big clear drop, 7 a glint of opal, 8 rubble), w seed
 varying vec4 vDust;
 varying vec3 vWorld;
 varying vec3 vPos;
@@ -7012,13 +7348,17 @@ void main() {
   float r = length(c);
   // (drops of water are drawn like grit, spray like a puff)
   float soil = step(4.5, vDust.z) * (1.0 - step(5.5, vDust.z));
-  float drop = step(5.5, vDust.z);
-  float grit = max(max(step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z)), soil), drop);
+  float shard = step(6.5, vDust.z) * (1.0 - step(7.5, vDust.z));
+  float rubble = step(7.5, vDust.z);
+  float drop = step(5.5, vDust.z) * (1.0 - shard - rubble);
+  float grit = max(max(max(step(0.5, vDust.z) * (1.0 - step(2.5, vDust.z)), soil), drop), shard + rubble);
   float wet = step(1.5, vDust.z) * (1.0 - soil) * (1.0 - drop);
   float a = atan(c.y, c.x);
   // (the lumps stay inside the sprite, or its square would cut them off)
   float lump = (0.028 * sin(a * 5.0 + vDust.w * 6.3) + 0.016 * sin(a * 9.0 - vDust.w * 4.1)) * (1.0 - grit);
   float edge = smoothstep(mix(0.45, 0.5, grit) + lump, mix(0.36, 0.22, grit) + lump, r);
+  // (a glint of opal is a little diamond)
+  edge = mix(edge, smoothstep(0.5, 0.36, abs(c.x) + abs(c.y)), shard);
   float alpha = edge * vDust.y;
   if (alpha < 0.01) discard;
   // the road's own colour, paled with dust; lit from above, a shade beneath
@@ -7042,6 +7382,11 @@ void main() {
   float glint = 1.0 - smoothstep(0.06, 0.13, length(c - vec2(-0.1, -0.12)));
   vec3 dropC = mix(vec3(0.16, 0.45, 0.55), vec3(0.55, 0.86, 0.9), smoothstep(0.48, 0.1, r) * (0.4 + 0.6 * lit));
   col = mix(col, mix(dropC, vec3(1.0), glint), drop);
+  // a glint of opal: a hue of its own, shifting, a white heart
+  vec3 op = 0.62 + 0.38 * cos(6.2832 * (vDust.w + uTime * 0.7 + vec3(0.0, 0.33, 0.67)));
+  col = mix(col, mix(op, vec3(1.0), 0.35 + 0.65 * (1.0 - smoothstep(0.0, 0.2, abs(c.x) + abs(c.y)))), shard);
+  // rubble: the road's colour, dark and chunky
+  col = mix(col, dust * (0.4 + 0.3 * lit), rubble);
   vec3 v = vWorld - uCamPos;
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
@@ -9035,7 +9380,7 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   // beard and skirt).
   while (rig.length < 3) rig.push(new THREE.Vector4());
   const uniforms = withShared(env, Object.assign({ uPal: { value: pal }, uRig: { value: rig }, uDream3: { value: new THREE.Vector4() } }, o.uniforms)); // rig: [Vector4 x 3]
-  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', fisher: 'FISHER', pitcher: 'PITCHER', thistle: 'THISTLE' };
+  const STYLES = { explorer: 'EXPLORER', items: 'ITEMS', fox: 'FOX', elder: 'ELDER', dragon: 'DRAGON', bunny: 'BUNNY', props: 'BUNNY PROPS', skater: 'SKATER', samurai: 'SAMURAI', fisher: 'FISHER', pitcher: 'PITCHER', thistle: 'THISTLE', crab: 'CRAB' };
   const style = STYLES[o.style] ? Object.fromEntries(STYLES[o.style].split(' ').map((k) => [k, ''])) : {};
   const make = (defines0, extra) => {
     const defines = Object.assign({}, style, defines0);
@@ -9057,6 +9402,21 @@ export function makeCharacterMaterials(env, pal, rig, outline, cape, o = {}) {
   if (!cape) return { mat, ink, shell };
   const sheets = (Array.isArray(cape) ? cape : [cape]).map((c) => make({ CAPE: '' }, { uCape: { value: c.texture }, uCapeGrid: { value: c.grid } }));
   return { mat, ink, capeMat: sheets[0][0], capeInk: sheets[0][1], sheets };
+}
+
+// The window in Shoal's claw (game/crab.js): the same skinned geometry as his
+// body, drawn after it, only the crystal (FS_CRAB_GLASS). u: his body
+// material's uniforms (the palette and his own), so the two stay in step.
+export function makeCrabGlassMaterial(u) {
+  return new THREE.ShaderMaterial({
+    uniforms: u,
+    defines: { CRAB: '' },
+    vertexShader: VS_CHAR,
+    fragmentShader: FS_CRAB_GLASS,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
 }
 
 export function makeGlassMaterial(env, o = {}) {

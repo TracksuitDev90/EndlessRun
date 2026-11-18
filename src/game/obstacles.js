@@ -112,6 +112,11 @@ const TUTORIAL = [
 // (a climb's pieces span the whole road: every lane, and between them)
 const CLIMB_HW = 3.7;
 
+const smoothK = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
 const needsVertical = (row) => !!row.wide || row.lanes.some((k) => k === 'L' || k === 'H');
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -266,11 +271,75 @@ export class ObstacleField {
     return groups.size;
   }
 
+  // --- Living Bulldozer ----------------------------------------------------------
+  // (powers.js) The crab's claw takes a row off the road. As a gust does
+  // (blow): from this moment nothing of it can be hit, and it earns no clear
+  // bonus. What you see of it is smashed: each thing in it flung outward,
+  // away from the middle of the road (dir: which way the claw swings, for
+  // what's in the middle), up in an arc and tumbling as it goes, a bar
+  // overhead swept up and aside, and all of it crumbling away to nothing
+  // over `dur` seconds; anything alive just swims aside. Returns where it
+  // was struck: [{ x, kind }] for each piece of it, for the wreckage flying.
+  smash(row, time, dur, dir) {
+    const groups = new Set();
+    const hit = [];
+    for (const r of row.lanes) {
+      if (!r || r.group.dead || r.group.blown) continue;
+      groups.add(r.group);
+      hit.push({ x: r.x, kind: r.kind });
+    }
+    for (const g of groups) {
+      g.blown = true;
+      g.scored = true;
+      const alive = !!g.spec?.call;
+      const items = [];
+      for (const b of g.world.batches.values()) {
+        for (const it of b.items) {
+          if (it.owner !== g) continue;
+          // (each piece outward from the middle of the road, whatever group
+          // it's in; the middle one the way the claw swings)
+          const out = Math.abs(it.x) < 0.6 ? dir : Math.sign(it.x);
+          items.push({ it, b, x: it.x, y: it.y, ry: it.ry, sx: it.sx, sy: it.sy, sz: it.sz, out, far: 5 + Math.random() * 4, up: 0.8 + Math.random() * 1.6, spin: (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 3) });
+        }
+      }
+      const rec = row.lanes.find((r) => r && r.group === g);
+      this.blowing.push({ g, items, t0: time, dur: alive ? 1.6 : dur, dir: rec.lane === 0 ? -1 : rec.lane === 2 ? 1 : dir, alive, smash: !alive, high: rec.kind === 'H', spin: 0 });
+    }
+    let w = 0;
+    for (const r of this.records) if (!r.group.blown) this.records[w++] = r;
+    this.records.length = w;
+    for (let i = 0; i < 3; i++) if (row.lanes[i]?.group.blown) row.lanes[i] = null;
+    this.groups = this.groups.filter((g) => !g.blown);
+    return hit;
+  }
+
   blowStep() {
     const time = this.game.time;
     let w = 0;
     for (const B of this.blowing) {
       const k = Math.min(1, (time - B.t0) / B.dur);
+      if (B.smash) {
+        // smashed: flung out and up, tumbling, crumbling away (a bar swept
+        // up and aside)
+        const e = 1 - Math.pow(1 - k, 2.2);
+        const gone = 1 - smoothK(0.3, 1, k);
+        for (const I of B.items) {
+          const it = I.it;
+          if (it.owner !== B.g) continue;
+          it.x = I.x + I.out * e * I.far * (B.high ? 1.3 : 1);
+          it.y = I.y + (B.high ? 1.8 * e : I.up * Math.sin(Math.min(1, e * 1.15) * Math.PI * 0.9));
+          it.ry = I.ry + I.spin * e;
+          it.sx = I.sx * gone;
+          it.sy = I.sy * gone * (B.high ? 1 : 0.6 + 0.4 * gone);
+          it.sz = I.sz * gone;
+          I.b.dirty = true;
+        }
+        if (k >= 1) {
+          B.g.world.removeOwner(B.g);
+          B.g.dead = true;
+        } else this.blowing[w++] = B;
+        continue;
+      }
       // (the gust shoves hard and lets go; a whale eases away)
       const e = B.alive ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 2.4);
       for (const I of B.items) {
