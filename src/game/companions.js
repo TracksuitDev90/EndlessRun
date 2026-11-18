@@ -95,11 +95,11 @@ export const COMPANIONS = [
       mind: (game, def, body) => new m.Scuttler(game, def, body),
     })),
     tune: CONFIG.companion.crab,
-    hw: 0.92,
-    mouth: [0.5, 0.42],
+    hw: 0.72,
+    mouth: [0.38, 0.32],
     // (how far his shell, legs and claws reach, for tools/companion/audit.js)
     // (duck: how much lower he is flattened under a bar)
-    extent: { front: 1.15, back: 0.6, side: 0.9, top: 1.35, duck: 0.55 },
+    extent: { front: 0.87, back: 0.46, side: 0.7, top: 1.03, duck: 0.42 },
   },
 ];
 

@@ -28,6 +28,8 @@
       //   &bg=0         a transparent background (for portraits)
       //   &look=camera  his eyes (and a tilt) turned to you; &happy=1 smiling
       //   &grow=<0..1>  grown for the bulldozer
+      //   &crabwise=<rad>  turned side on to the way he runs (1.57: a crab's
+      //                 own gait, his right side leading)
       import * as THREE from '../../vendor/three/three.module.min.js';
       import { shared } from '../../src/render/shaders.js';
       import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
@@ -122,6 +124,8 @@
       const vel = new THREE.Vector3();
       let y = 0, vy = 0, x = 0, air = null, crouch = null, jumped = false, smashed = false;
       cr.world = q.get('from') || world;
+      const cw = Number(q.get('crabwise') || 0);
+      const cwQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), cw);
       function step(i) {
         const s = i * dt;
         const moving = pose === 'run' || pose === 'leap' || pose === 'duck' || pose === 'smash' || pose === 'resonate';
@@ -162,6 +166,8 @@
         vel.set(0, air ? vy : 0, moving ? -v : 0);
         at.set(x, y, -travel);
         cr.place(at, qi, 0, 0);
+        if (cw) cr.root.quaternion.multiply(cwQ);
+        cr.crabwise = cw;
         cr.happy = Number(q.get('happy') || 0);
         if (q.get('look') === 'camera') {
           cr.lookAt = new THREE.Vector3(0, 0.6, -6);

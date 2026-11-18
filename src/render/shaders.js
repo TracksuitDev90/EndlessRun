@@ -4183,7 +4183,7 @@ vec3 crFacets(vec3 c, vec3 r, float scale, float k) {
   vec3 cl = crCells(r * scale);
   c *= 1.0 + (cl.z - 0.5) * 0.12 * k;
   float edge = 1.0 - smoothstep(0.0, 0.07, cl.y - cl.x);
-  return mix(c, min(c * 1.35 + 0.08, vec3(1.0)), edge * 0.45 * k);
+  return mix(c, min(c * 1.3 + 0.05, vec3(1.0)), edge * 0.3 * k);
 }
 // Veins of paler mineral inside him: a near set and a deeper one, the deeper
 // shifted against your view (so it slides behind the surface as he turns).
@@ -4247,7 +4247,7 @@ vec3 crEye(vec3 c, vec3 r, inout float unlit) {
   // a little one
   vec3 col = mix(vec3(0.03, 0.03, 0.05), uPal[CR_DEEP] * 0.4, smoothstep(0.5, 1.0, length(q.xy)) * 0.6);
   vec2 w = vec2(q.x * sign(r.x), q.y);
-  float gl = fill(length(w - vec2(-0.3, 0.38) - q.z * 0.0) - 0.24) + 0.7 * fill(length(w - vec2(0.25, -0.2)) - 0.09);
+  float gl = fill(length(w - vec2(-0.3, 0.38)) - 0.17) + 0.7 * fill(length(w - vec2(0.25, -0.2)) - 0.07);
   col = mix(col, vec3(1.0), min(gl, 1.0) * step(q.z, 0.2));
   // the lids: from above as he blinks, and from below as he smiles
   float open = clamp(uFace.x, 0.0, 1.0);
@@ -6471,8 +6471,8 @@ void main() {
     // play of colour, and a glassy one off his eyes
     vec3 hv = normalize(uLightDir - V);
     float sp = pow(max(dot(n, hv), 0.0), m == 7 ? 60.0 : 28.0);
-    float shine = (m == 1 || m == 3 || m == 5) ? 0.55 : m == 7 ? 0.45 : m == 4 || m == 10 ? 0.3 : 0.12;
-    col += mix(uPal[30], vec3(1.0), 0.4) * min(sp * shine, 0.6) * (0.4 + 0.6 * lit);
+    float shine = m == 1 ? 0.3 : (m == 3 || m == 5) ? 0.5 : m == 7 ? 0.2 : m == 4 || m == 10 ? 0.3 : 0.12;
+    col += mix(uPal[30], vec3(1.0), 0.4) * min(sp * shine, 0.4) * (0.4 + 0.6 * lit);
   }
   if (m == 99) {
   #else

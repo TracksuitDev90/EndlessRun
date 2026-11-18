@@ -3592,7 +3592,8 @@ touches nothing.
 ![Shoal: front, left side, behind and three-quarters; his colours in the Deepwood, the Blue Hour, Candy World and Hell; his scuttle from the side; and in a run - beside the runner in the Deepwood, out ahead in Candy World as the Living Bulldozer, a gumdrop he's smashed flying off the road, and humming beside you in the Blue Hour with Crystal Resonance](docs/crab.jpg)
 
 Shoal is a giant crab, and a very friendly one: broad and softly rounded,
-knee-high to the runner at the crown of his shell (taller with his coral),
+about half the runner's height at the crown of his shell (a little more
+with his coral; sculpted life-size and drawn smaller, `SCALE` in `crab.js`),
 everything about him grown from translucent, opalescent mineral. His shell
 is laid over with tiers of plates, each a thin lamina proud of the one
 beneath with a scalloped, flared edge; under it a pale body and a soft face
@@ -3644,7 +3645,10 @@ out across the palm a point is, so it's a smooth oval whatever the mesh.
 his own in `crab.js` (`WORLDS`): mossy green and amber in the Deepwood, cool
 blues and violet in the Blue Hour, candy pinks and candy-coloured opal in
 Candy World, ice and alexandrite in the Frostbound Pass, obsidian lit like
-embers in Hell, pearl in the Kelp Deep, and so on for all thirteen. His
+embers in Hell, pearl in the Kelp Deep, and so on for all thirteen — and
+laid on thick: every world's colours are pushed well past how they're
+written (`INTENSE`: much more saturated, the pale tones pulled down toward
+the full colour), so he's unmistakably the world's own colour. His
 shell, legs, joints, both claws and his coral all change, and so does the
 play of colour over them; the window in his claw stays clear, only tinted.
 When he walks into a new world (his own position, not yours: he can be a
@@ -3668,7 +3672,11 @@ lurch. Glints of opal fly off his feet as they strike the road.
 **His mind** (`src/game/scuttler.js`, built on the fox's `companion.js` for
 reading the road): unhurried, curious and fond of you. He ambles a lane
 over, level with you or a little ahead, and his ideas are quiet ones — he
-comes in close and peers at you, head on one side; waves; changes lane the
+comes in close and peers at you, head on one side; waves; now and then
+turns side on and runs along crabwise — a crab's own gait, his legs
+striding across under him, weaving a little from side to side in his lane,
+sometimes turning about to face the other way, his eyes kept on the road —
+then turns back to it; changes lane the
 way a crab would, turned side on and scuttling across; watches something
 go by at the side of the road, tilting after it; a little hop, because he's
 happy — and now and then he fetches a gem in his little claw. He's broad:
@@ -3787,9 +3795,10 @@ companion menu say so, and there's nothing to buy for it yet.
    of the road and grows half as big again, his great claw up; for 15 s
    every breakable row of obstacles that reaches him, in every lane, he
    smashes off the road with a swing of it — from that moment it can't hit
-   you; what's left of it is flung outward and up, tumbling, a bar overhead
-   swept up and aside, and all of it crumbles away to nothing in under a
-   second while chunks of it and glints of his crystal fly. He keeps far
+   you, and it's knocked clean off the road: thrown out in a high arc over
+   the roadside, spinning, a bar overhead swept up and aside, chunks of it
+   and glints of his crystal flying, and only once it's landed does it
+   crumble away (1.6 s in all, so you see it go as you run past). He keeps far
    enough ahead (more the faster you go: `CONFIG.powers.crab.dozer`) that
    you see the road he's cleared lying open between you. A climb or a river
    isn't his to break: he clambers over and wades through. Rows he smashes

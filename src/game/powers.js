@@ -929,9 +929,10 @@ function smashRow(Pw, A, row, dir) {
     const out = h.x === 0 ? dir : Math.sign(h.x);
     const y0 = h.kind === 'H' ? 1.6 : 0.3, y1 = h.kind === 'H' ? 2.6 : h.kind === 'W' ? 2.2 : 0.9;
     // chunks of it flung out and up, glints of his claw's crystal, a puff
-    for (let i = 0; i < 9; i++) fx.emit(h.x + rand(-0.8, 0.8), rand(y0, y1), z + rand(-0.4, 0.4), out * rand(2, 7), rand(2, 6), -g.speed * 0.3 + rand(-2, 2), rand(0.07, 0.16), 8);
-    for (let i = 0; i < 4; i++) fx.emit(h.x + rand(-0.6, 0.6), rand(y0, y1), z, out * rand(1, 4), rand(2, 5), rand(-1, 1), rand(0.04, 0.07), 7);
-    fx.emit(h.x, (y0 + y1) * 0.4, z, out * 1.5, 0.6, 0, 0.9, 0, 0.6, 0.9, 1.6);
+    for (let i = 0; i < 16; i++) fx.emit(h.x + rand(-0.8, 0.8), rand(y0, y1), z + rand(-0.4, 0.4), out * rand(3, 9), rand(3, 7), rand(-2, 2), rand(0.08, 0.2), 8);
+    for (let i = 0; i < 6; i++) fx.emit(h.x + rand(-0.6, 0.6), rand(y0, y1), z, out * rand(1, 5), rand(2, 6), rand(-1, 1), rand(0.05, 0.08), 7);
+    fx.emit(h.x, (y0 + y1) * 0.4, z, out * 1.5, 0.6, 0, 1.1, 0, 0.65, 1, 1.8);
+    fx.emit(h.x + out * 0.8, 0.3, z, out * 3, 0.4, 0, 0.8, 0, 0.5, 0.8, 1.4);
   }
   g.cam.kick(0.22);
   g.audio.smash?.(clamp(hit[0].x / 3, -1, 1));

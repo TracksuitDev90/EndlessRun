@@ -216,7 +216,8 @@ export const CONFIG = {
     // the road (he's broad: hw in companions.js); never far ahead or
     // behind, and fond of being level with you. His curiosity: how often he
     // stops to peer at you, head on one side (s), and how long he looks.
-    // Sidling: the chance a change of lane goes crabwise. Under a bar he
+    // Sidling: the chance a change of lane goes crabwise; shuffling, below.
+    // Under a bar he
     // flattens himself (duck: how far ahead he sees one coming, s).
     crab: {
       gravity: 22,
@@ -231,6 +232,9 @@ export const CONFIG = {
       fetch: { every: [9, 16], reach: [6, 24], chance: 0.5, mischief: 0.08 },
       peer: { every: [5, 10], look: [1.2, 2.2] },
       sidle: 0.45,
+      // shuffling along crabwise: for how long (s), how far he weaves
+      // either side of his lane's middle (m), and how quickly (rad/s)
+      shuffle: { dur: [2.4, 4.2], weave: 0.4, rate: 2.2 },
       duck: 1.1,
     },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
@@ -319,9 +323,9 @@ export const CONFIG = {
       // Living Bulldozer: dur s of him out ahead, grown, smashing every row
       // of obstacles off the road with his claw: ahead m in front of you
       // at least (more as you speed up: lead s of running), reach m in
-      // front of him where his claw strikes; each row's wreckage gone in
-      // clear s
-      dozer: { dur: 15, cd: 80, ahead: 8, lead: 0.45, max: 14, reach: 2.2, clear: 0.75 },
+      // front of him where his claw strikes; each row knocked off the road
+      // and gone in clear s
+      dozer: { dur: 15, cd: 80, ahead: 7, lead: 0.35, max: 11, reach: 2.2, clear: 1.6 },
     },
   },
 
