@@ -79,6 +79,28 @@ export const COMPANIONS = [
     // (how far its pod and legs reach, for tools/companion/audit.js)
     extent: { front: 0.24, back: 0.34, side: 0.29, top: 0.56 },
   },
+  {
+    id: 'crab',
+    name: 'Shoal',
+    title: 'the giant opal crab',
+    blurb: 'gentle · curious · turns to every world',
+    asset: 'assets/crab/',
+    face: 'assets/characters/crab-face.webp',
+    tint: ['#c6eef2', '#c98ad8'],
+    // (a mind of his own - scuttler.js: unhurried, curious, fond of you -
+    // built on the runner's for reading the road; his own tunables over the
+    // fox's, his breadth, and where he catches a gem: in his little claw)
+    load: lazy(() => Promise.all([import('./crab.js'), import('./scuttler.js')]), ([b, m]) => ({
+      make: (env, asset) => new b.Crab(env, asset),
+      mind: (game, def, body) => new m.Scuttler(game, def, body),
+    })),
+    tune: CONFIG.companion.crab,
+    hw: 0.92,
+    mouth: [0.5, 0.42],
+    // (how far his shell, legs and claws reach, for tools/companion/audit.js)
+    // (duck: how much lower he is flattened under a bar)
+    extent: { front: 1.15, back: 0.6, side: 0.9, top: 1.35, duck: 0.55 },
+  },
 ];
 
 // (load(): fetch the modules once, set def.make and def.mind from them; one

@@ -136,7 +136,7 @@ export const CONFIG = {
   },
 
   // The companion who runs with you (see game/companions.js): who it is by
-  // default ('fox', 'dragon', 'pitcher' or 'thistle'; 'none' to run alone; the title screen's
+  // default ('fox', 'dragon', 'pitcher', 'thistle' or 'crab'; 'none' to run alone; the title screen's
   // pick, then ?companion=, override it). The fox (game/companion.js): her
   // gravity (m/s²) and
   // how long she winds up before each kind of jump (s), how high she leaps
@@ -210,6 +210,28 @@ export const CONFIG = {
       charge: { full: 10 },
       glide: { hop: 0.55, fall: 0.2, sink: 1.3, max: 0.8, chance: 0.45 },
       zap: { hold: [2, 4], behind: -0.6, land: [3.5, 7], far: [5, 8.5], reach: 30 },
+    },
+    // The giant opal crab (game/crab.js, his mind game/scuttler.js), over
+    // the fox's: heavy, hopping low and never pouncing; unhurried across
+    // the road (he's broad: hw in companions.js); never far ahead or
+    // behind, and fond of being level with you. His curiosity: how often he
+    // stops to peer at you, head on one side (s), and how long he looks.
+    // Sidling: the chance a change of lane goes crabwise. Under a bar he
+    // flattens himself (duck: how far ahead he sees one coming, s).
+    crab: {
+      gravity: 22,
+      windup: { leap: 0.12, pounce: 0.2, hop: 0.1 },
+      leap: 1.05,
+      pounceEvery: 1e9,
+      ahead: 5.5,
+      behind: -2.8,
+      surge: [-6, 8.5],
+      lateral: { slant: 0.36, dodge: 0.64, base: 0.55, acc: 8, accDodge: 24, accAir: 4 },
+      rest: [2, 4.2],
+      fetch: { every: [9, 16], reach: [6, 24], chance: 0.5, mischief: 0.08 },
+      peer: { every: [5, 10], look: [1.2, 2.2] },
+      sidle: 0.45,
+      duck: 1.1,
     },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
     // body streams back in (m/s: base + a share of your pace; less of it and
@@ -289,6 +311,17 @@ export const CONFIG = {
       roots: { cd: 32, reach: [3, 24], most: 10 },
       // Pitcher Protection: dur s, the coating fading over its last fade s
       shield: { dur: 5, cd: 70, fade: 1.3 },
+    },
+    crab: {
+      // Crystal Resonance: every gem collected (yours or a companion's)
+      // counts mul times over for dur s
+      resonance: { dur: 10, cd: 40, mul: 2 },
+      // Living Bulldozer: dur s of him out ahead, grown, smashing every row
+      // of obstacles off the road with his claw: ahead m in front of you
+      // at least (more as you speed up: lead s of running), reach m in
+      // front of him where his claw strikes; each row's wreckage gone in
+      // clear s
+      dozer: { dur: 15, cd: 80, ahead: 8, lead: 0.45, max: 14, reach: 2.2, clear: 0.75 },
     },
   },
 

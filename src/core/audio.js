@@ -557,6 +557,39 @@ export class Ambient {
     }, 700);
   }
 
+  // Crystal Resonance: a shimmer of glassy notes, rising and ringing on.
+  resonance() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    [71, 78, 83, 87, 90, 95].forEach((m, i) => this.ting(hz(m), t + 0.05 + i * 0.07, 0.03));
+  }
+
+  // ...and its hum, pulsing off him: one soft glassy note, now and then.
+  hum() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    this.ting(hz([83, 87, 90, 95][Math.floor(Math.random() * 4)]), t, 0.012);
+  }
+
+  // The crab's claw smashing a row off the road (pan: where across it):
+  // a heavy crunch, stone breaking, a ring of crystal over it. start: the
+  // charge as the bulldozer begins - a deep thump and a rumble.
+  smash(pan = 0, start = false) {
+    const ctx = this.ctx;
+    if (!ctx || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (start) {
+      this.knock(t, 0.4, 90, 34);
+      if (this.moveReady()) this.noiseShot(t, 'lowpass', 0.8, 900, 120, 0.12 * this.hush(0.5), 0.02, 0.7, 0, 0);
+      return;
+    }
+    this.knock(t, 0.36, 150, 44);
+    if (this.moveReady()) this.noiseShot(t, 'bandpass', 0.9, 1800, 400, 0.16 * this.hush(0.5), 0.004, 0.42, pan, pan * 1.4);
+    this.ting(hz(88 + Math.floor(Math.random() * 4)), t + 0.02, 0.018);
+  }
+
   // A companion's ability taken: a quick glassy flourish up.
   power() {
     const ctx = this.ctx;

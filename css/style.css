@@ -1897,6 +1897,10 @@ body.touch .pw-key {
 .power-note[data-kind='lucky'] {
   background: #ffe066;
 }
+/* (Shoal's: opal) */
+.power-note[data-kind='crab'] {
+  background: linear-gradient(100deg, #d4f4ee, #e6d6ff 45%, #ffd8e8);
+}
 .power-note.show {
   animation: note 1.9s ease-out both;
 }

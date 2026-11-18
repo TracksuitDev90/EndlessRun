@@ -25,7 +25,7 @@ export class PowerFx {
   constructor(game, env) {
     this.game = game;
     this.u = makeEnvUniforms(env);
-    this.dust = new Dust(this.u, 200);
+    this.dust = new Dust(this.u, 420);
     this.anchor = new THREE.Object3D();
     this.sheen = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 18), makeSheenMaterial(this.u));
     this.sheen.frustumCulled = false;

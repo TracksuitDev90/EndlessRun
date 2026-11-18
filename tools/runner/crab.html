@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Crab viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #f6efe4; overflow: hidden; }
+      canvas { display: block; }
+      #label { position: fixed; left: 8px; top: 6px; font: 12px ui-monospace, monospace; color: #6b5a4a; }
+    </style>
+  </head>
+  <body>
+    <div id="label"></div>
+    <script type="module">
+      // Shoal, the giant opal crab, turned round like a reference sheet, or a
+      // film strip of him moving. Serve the repository root and open
+      // tools/runner/crab.html.
+      //   ?pose=stand|sit|run|leap|duck|smash|resonate   what he's doing
+      //   &t=<s>        how long into it (leap: how long he runs first; smash:
+      //                 how long before he swings)
+      //   &v=<m/s>      his pace over the ground
+      //   &world=<id>   the world he's in (village, forest, candy, coast, ...);
+      //                 &from=<id> the world he's just come from (his colours
+      //                 caught turning: &t after the change)
+      //   &views=left,front,back,right,three,backThree,top,game   one view each
+      //   &strip=<n>&every=<frames>   ...or a film strip of the first view
+      //   &zoom=, &y=, &z=, &up=   framing; &ink=0 hides the outline
+      //   &bg=0         a transparent background (for portraits)
+      //   &look=camera  his eyes (and a tilt) turned to you; &happy=1 smiling
+      //   &grow=<0..1>  grown for the bulldozer
+      import * as THREE from '../../vendor/three/three.module.min.js';
+      import { shared } from '../../src/render/shaders.js';
+      import { makeMarksTexture, makeNoiseTexture } from '../../src/render/textures.js';
+      import { loadRunner } from '../../src/game/runner-asset.js';
+      import { Crab } from '../../src/game/crab.js';
+      import { WORLD_ORDER } from '../../src/world/index.js';
+      import { CONFIG } from '../../src/config.js';
+
+      const q = new URLSearchParams(location.search);
+      const world = q.get('world') || 'village';
+      const entry = WORLD_ORDER.find((e) => e.id === world) || WORLD_ORDER[0];
+      const def = (await entry.load()).default;
+      const pose = q.get('pose') || 'stand';
+      const T = Number(q.get('t') || 1.2);
+      const strip = Number(q.get('strip') || 0);
+      const every = Number(q.get('every') || 3);
+      const views = strip ? Array(strip).fill((q.get('views') || 'left').split(',')[0]) : (q.get('views') || 'left,front,back,three').split(',');
+      const zoom = Number(q.get('zoom') || 1);
+      const focusY = Number(q.get('y') || 0.45);
+      const focusZ = Number(q.get('z') || -0.2);
+      const transparent = q.get('bg') === '0';
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: transparent, preserveDrawingBuffer: true });
+      if (transparent) document.body.style.background = document.documentElement.style.background = 'transparent';
+      renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.autoClear = false;
+      document.body.appendChild(renderer.domElement);
+      shared.uMarks.value = makeMarksTexture();
+      shared.uNoise.value = makeNoiseTexture();
+      shared.uResolution.value.set(innerWidth, innerHeight);
+      const asset = await loadRunner('../../assets/crab/');
+      const cr = new Crab(def.env, asset);
+      window.cr = cr;
+      cr.u.uSunColor.value.set(0, 0, 0);
+      const scene = new THREE.Scene();
+      for (const o of cr.objects) if (o !== cr.shadow) scene.add(o);
+      if (q.get('ink') === '0') cr.inkMesh.visible = false;
+      const groundCol = new THREE.Color(q.get('ground') || '#d9ccb8');
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: groundCol }));
+      ground.position.y = -0.001;
+      if (!transparent) scene.add(ground);
+      // (a stripe every metre, so you can see him go - and see them through
+      // the window in his claw)
+      for (let k = -30; k <= 30 && !transparent; k++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.004, 0.08), new THREE.MeshBasicMaterial({ color: 0x8a7a64 }));
+        m.position.set(0.9, 0, -k);
+        scene.add(m);
+      }
+      const yaws = { front: 0, left: -Math.PI / 2, back: Math.PI, right: Math.PI / 2, three: 0.7, threeL: -0.7, backThree: Math.PI - 0.7, top: 0 };
+      const w = innerWidth / views.length;
+      renderer.setClearColor(0xf6efe4, transparent ? 0 : 1);
+      renderer.clear();
+      let travel = 0;
+      const cam = new THREE.PerspectiveCamera(26 / zoom, w / innerHeight, 0.1, 80);
+      function render(i) {
+        const name = views[i];
+        if (name === 'game') {
+          // the runner's camera: the runner a lane to his left, a little behind him
+          cam.fov = 76;
+          cam.aspect = w / innerHeight;
+          cam.updateProjectionMatrix();
+          const rx = x - 2.4, rz = -travel + 1.5;
+          cam.position.set(rx, CONFIG.camera.height, rz + CONFIG.camera.back);
+          cam.lookAt(rx, CONFIG.camera.lookHeight, rz - CONFIG.camera.lookAhead);
+        } else {
+          cam.fov = 26 / zoom;
+          cam.aspect = w / innerHeight;
+          cam.updateProjectionMatrix();
+          const a = yaws[name] ?? 0;
+          const d = 6.2;
+          const up = name === 'top' ? 6 : Number(q.get('up') || 0.9);
+          const fy = focusY + (q.get('follow') === '0' ? 0 : y * 0.85);
+          cam.position.set(Math.sin(a) * d + x, fy + up, focusZ - Math.cos(a) * d - travel);
+          cam.lookAt(x, fy, focusZ - travel);
+        }
+        shared.uCamPos.value.copy(cam.position);
+        renderer.setViewport(i * w, 0, w, innerHeight);
+        renderer.setScissor(i * w, 0, w, innerHeight);
+        renderer.setScissorTest(true);
+        renderer.render(scene, cam);
+      }
+
+      // --- the simulation ---------------------------------------------------
+      const dt = 1 / 60;
+      const C = { ...CONFIG.companion, ...(CONFIG.companion.crab || {}) };
+      const v = Number(q.get('v') || 10);
+      const G = C.gravity;
+      const jump = pose === 'leap' ? C.leap : 0;
+      const wind = (C.windup && C.windup.leap) || 0.1;
+      const at = new THREE.Vector3();
+      const qi = new THREE.Quaternion();
+      const vel = new THREE.Vector3();
+      let y = 0, vy = 0, x = 0, air = null, crouch = null, jumped = false, smashed = false;
+      cr.world = q.get('from') || world;
+      function step(i) {
+        const s = i * dt;
+        const moving = pose === 'run' || pose === 'leap' || pose === 'duck' || pose === 'smash' || pose === 'resonate';
+        if (q.get('from') && s >= 0.5) cr.world = world;
+        if (jump && !jumped && s >= T) {
+          crouch = { t: 0 };
+          jumped = true;
+        }
+        if (crouch) {
+          crouch.t += dt;
+          if (crouch.t >= wind) {
+            crouch = null;
+            vy = Math.sqrt(2 * G * jump);
+            air = { t: 0, T: (2 * vy) / G };
+          }
+        }
+        if (air) {
+          y += vy * dt - 0.5 * G * dt * dt;
+          vy -= G * dt;
+          air.t += dt;
+          if (y <= 0 && vy < 0) {
+            y = 0;
+            cr.land(Math.min(1.4, -vy / 8));
+            vy = 0;
+            air = null;
+          }
+        }
+        if (pose === 'smash') {
+          cr.dozer = Math.min(1, s / 0.8);
+          if (!smashed && s >= T) {
+            smashed = true;
+            cr.smash(1);
+          }
+        } else cr.dozer = Number(q.get('grow') || 0);
+        cr.resonate = pose === 'resonate' ? 1 : 0;
+        cr.lowTarget = pose === 'duck' ? 1 : 0;
+        if (moving) travel += v * dt;
+        vel.set(0, air ? vy : 0, moving ? -v : 0);
+        at.set(x, y, -travel);
+        cr.place(at, qi, 0, 0);
+        cr.happy = Number(q.get('happy') || 0);
+        if (q.get('look') === 'camera') {
+          cr.lookAt = new THREE.Vector3(0, 0.6, -6);
+          cr.lookW = 1;
+        }
+        let ctx;
+        if (air) ctx = { speed: v, vel, mode: 'air', airT: air.t, airDur: air.T, airKind: pose, fall: G };
+        else if (moving) ctx = { speed: v, vel, mode: 'run', crouch: crouch ? crouch.t / wind : 0, crouchKind: pose, lat: 0 };
+        else ctx = { speed: 0, vel, mode: pose === 'sit' ? 'sit' : 'stand' };
+        cr.update(dt, ctx);
+        cr.after(-travel, travel);
+      }
+      const start = Math.max(1, Math.round((q.has('from') ? 0.5 + T : jump ? Math.max(0.5, T - 0.05) : T) / dt));
+      let frame = 0;
+      for (; frame < start; frame++) step(frame);
+      if (strip) {
+        for (let i = 0; i < views.length; i++) {
+          render(i);
+          for (let k = 0; k < every; k++) step(frame++);
+        }
+      } else views.forEach((_, i) => render(i));
+      document.getElementById('label').textContent = transparent ? '' : `crab · ${pose} · ${world}${strip ? ` · every ${every} frames` : ''}`;
+      window.__ready = true;
+      window.done = true;
+    </script>
+  </body>
+</html>

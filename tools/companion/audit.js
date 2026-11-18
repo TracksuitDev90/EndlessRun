@@ -102,7 +102,8 @@ const { chromium } = require('playwright');
       for (const o of g.obstacles.records) {
         if (df + X.front < o.d || df - X.back > o.d + o.len) continue;
         if (Math.abs(c.x - o.x) > o.hw + X.side) continue;
-        const y0 = c.y, y1 = c.y + X.top;
+        // (one who flattens himself under a bar - the crab - that much lower)
+        const y0 = c.y, y1 = c.y + X.top - (X.duck || 0) * (c.body.lowNow || 0);
         if (o.kind === 'W' || (o.kind === 'L' && y0 < o.y1 - 0.05) || (o.kind === 'H' && y1 > o.y0)) {
           out.touchFrames++;
           const at = (i / 60).toFixed(1);
