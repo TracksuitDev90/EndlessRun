@@ -160,7 +160,7 @@
         th.glide += (glide - th.glide) * (1 - Math.exp(-dt * 8));
         if (pose === 'zap' && !zapped && s >= T) {
           zapped = true;
-          th.zap({ x, y: 0, d: travel }, { x: x + 2.4, y: 0, d: travel + v * (ZAP.lock + ZAP.travel) + 2.0 });
+          th.zap({ x, y: 0, d: travel }, { x: x + 2.4, y: 0, d: travel + v * (ZAP.lock + ZAP.travel) + 6.0 });
         }
         if (th.zapReady) {
           x += 2.4;

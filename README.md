@@ -3487,35 +3487,70 @@ body's own lurches and swept by the air going past: so the plumes' roots go
 with the body while the fine tips lag behind, flutter and settle, and the
 long ones drag on the road. A few dozen triangles and one draw call.
 
-**The static.** It builds with every step (full in about 14 s at the
-starting pace, quicker the faster you go; `CONFIG.companion.thistle.charge`).
-Uncharged, the plumes sweep back from the crown and droop, the longest wisps
-brushing the road. As it charges they lift one by one, each at its own
-threshold, and their hairs part — the strips widen, so the barbs stand out
-from the stem and the finest filaments come apart; the crown fans wider and
-wider, until it's spread like the reference, every hair standing apart. The
-charge itself pushes the plumes apart: each pair of plumes repels as the
-square of the charge. Only near full do tiny violet sparks start snapping
-across the gaps between them — a crooked thread of light from one plume to
-its neighbour, re-jagged every frame, there for a few hundredths of a second
-(with the faintest tick) — and its plumes' outer filaments glint violet.
-A stumble jolts some of the charge out of it in a crackle; a crash, all of
-it.
+**The static.** It's a walking electrical storm, and it builds with every
+step (full in about 10 s at the starting pace, quicker the faster you go;
+`CONFIG.companion.thistle.charge`). Uncharged, the plumes sweep back from the
+crown and droop, the longest wisps brushing the road. As it charges they lift
+one by one, each at its own threshold, and their hairs part — the strips
+widen, so the barbs stand out from the stem and the finest filaments come
+apart; the crown fans wider and wider, until it's spread like the reference,
+every hair standing apart. The charge itself pushes the plumes apart: each
+pair repels as the square of the charge. From about half charge a stray
+violet spark snaps across the gap between two plumes now and then (a crooked
+thread of light, re-jagged every frame, gone in a few hundredths of a second,
+with the faintest tick); the fuller it gets, the more of them, across wider
+gaps, until at full its crown is alive with them. The storm grows round it
+with the charge:
 
-**Travelling through a spark.** Full, whenever it's fallen behind you (a
-hurdle, a wall, a dawdle), it picks a spot a lane beside yours, a couple of
-metres ahead of where you'll be, with nothing round it — and nothing tall
-just short of it to hide it — and goes there along a bolt
-(`ZAP` in `thistle.js`): the bolt flickers into being from its feet to the
-spot, short and crooked and arching up, with a fork or two, as it braces;
-in a flash its body is gone, and a bright pulse races along the bolt; at the
-far end it's there again in a flash of violet-white light, its roots braced
-wide and low, its eyes wide; the bolt flickers out; and a beat later its
-crown falls loose — the springs go slack and the plumes flop — and the
-charge starts again from nothing. The bolt is drawn in track coordinates, so
-it stays where it struck as you run on. A crackling hiss and a snap as it
-goes, a softer snap as it lands. If it's been full a while with no need, it
-drops back on purpose, to use it.
+- a soft violet **halo** round its crown, flickering, flaring with every
+  spark;
+- its plumes' outer filaments and the edges of its leaves **glinting
+  violet**;
+- from about two thirds, **arcs crawling over its husk**, bowed over the
+  leaves from one spot to another;
+- **every footfall earths** a few sparks and a little lightning crawling off
+  over the road;
+- full, now and then a **strike from a plume's tip down to the road** beside
+  it, with a pool of light and sparks where it lands.
+
+A stumble jolts some of the charge out of it, a crash all of it, and landing
+from a charged glide earths a little — each a **discharge** through its
+feet: lightning crawling out over the road from them, a flash, sparks
+flying.
+
+**Travelling through a spark.** About every 12–15 s of a run (`zap` in
+`CONFIG.companion.thistle`). Full, whenever it's fallen behind you (a hurdle,
+a wall, a dawdle), it goes to a spot a lane beside yours, 3.5–7 m ahead of
+where you'll be; and once it's been full a couple of seconds with no need, it
+either drops back to use it or just goes, on a whim, 5–8.5 m up the road and
+more often right across it. Either way the spot is clear — nothing round it,
+nothing tall just short of it to hide it (market stalls and climbs
+included) — and bolts run up to 30 m; most are 8–15. Then
+(`ZAP` in `thistle.js`):
+
+1. it braces, the storm round it flaring — arcs all over its husk, strikes
+   from its crown — while a thin leader flickers out from its feet to the
+   spot;
+2. the bolt strikes: a thick, crooked, arching channel of white-hot light in
+   a violet glow, two more strands wandering beside it, forks lashing off it
+   into the air and down to the road, twigs off the forks; where it stood,
+   a flash, lightning crawling out over the road and sparks flying — and its
+   body's gone;
+3. a ball of light races along the bolt (longer the further it goes,
+   `zapTravel`);
+4. it's there at the far end in a flash of violet-white light, roots braced
+   wide and low, eyes wide, the road lit and crawling with lightning under
+   it, sparks everywhere, the storm crawling over it a moment; the camera
+   jolts, the screen blinks violet (not with reduced motion), and there's a
+   crack and a deep thump with a short rumble;
+5. the bolt strikes twice more and flickers out; a beat later the crown
+   falls loose — the springs go slack and the plumes flop — and the charge
+   starts again from nothing.
+
+The bolt and its strikes on the road are drawn in track coordinates, so
+they stay where they struck as you run on. It all draws in three small
+meshes (the arcs, the glows, the sparks), one draw call each and none while
+there's nothing to draw.
 
 **How it moves** (`src/game/thistle.js`). A quick three-legged scurry: the
 front left root reaches and plants, then the front right, then the rear root
@@ -3709,7 +3744,7 @@ src/game/                     game loop, player (the runners' shared core:
                               water and the soil off his roots; sprout.js:
                               his own mind, on the runner's; thistle.js:
                               Teasel's body, scurry, crown of plumes, static,
-                              sparks and the bolt it travels by; scurrier.js:
+                              the storm round it and the bolt it travels by; scurrier.js:
                               its own mind, on the runner's); progress.js (the
                               gem bank and the companions' levels), powers.js
                               (their abilities) and powerfx.js (what the

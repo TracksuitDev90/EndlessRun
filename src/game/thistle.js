@@ -1,9 +1,10 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
-import { makeCharacterMaterials, makeEnvUniforms, makePlumeMaterial, makeArcMaterial } from '../render/shaders.js';
+import { makeCharacterMaterials, makeEnvUniforms, makePlumeMaterial, makeArcMaterial, makeHaloMaterial } from '../render/shaders.js';
 import { palette, bodyGeometry } from './kit.js';
 import { TAU, clamp, smooth, Spring } from './rig.js';
 import { CastShadow } from '../render/caster.js';
 import { Dust } from './dust.js';
+import { Sparks } from './sparks.js';
 
 // Teasel, the storm thistle who runs with you: the body and how it moves.
 // A living seedpod about the size of a grapefruit - a deep plum husk of
@@ -37,15 +38,20 @@ import { Dust } from './dust.js';
 //   - the static: as it charges, its plumes lift one by one from swept back
 //     (the longest wisps brushing the ground) to fanned out wide; their
 //     hairs part (the strips widen, so the barbs stand out from the stem and
-//     the finest come apart); charged plumes push each other apart; and only
-//     near full do tiny violet sparks start snapping across the gaps between
-//     them, glinting off their tips and crawling along its leaves' edges;
-//   - travelling through a spark (at full charge, to catch up): a short
-//     crooked bolt from its feet to where it's going, flickering into being;
-//     its body gone in a flash at one end as a bright pulse races along the
-//     bolt, there again at the other in a flash of violet light, its roots
-//     braced; the bolt fading; and a beat later the crown falls loose and
-//     begins building again.
+//     the finest come apart); charged plumes push each other apart; from
+//     half charge violet sparks start snapping across the gaps between them,
+//     more and more until its crown is alive with them; and the storm grows
+//     round it - a halo, arcs crawling over its husk, sparks off every
+//     footfall, and at full, strikes from its plumes down to the road (all
+//     in after(), from the effects storm() spawns);
+//   - travelling through a spark (at full charge): a leader flickering out
+//     from its feet to where it's going, then the bolt - a thick crooked
+//     channel, two more strands, forks to the air and the road; its body
+//     gone in a flash where it struck, a ball of light racing along it,
+//     there again at the far end in a flash of violet light, braced, the
+//     road crawling with lightning round it and sparks flying; the bolt
+//     striking twice more and flickering out; and a beat later the crown
+//     falls loose and begins building again.
 
 export const COL = {
   1: '#6a2350', // the husk: deep plum
@@ -72,9 +78,13 @@ export const COL = {
 export const SCALE = 1.9;
 
 // Travelling through a spark (s): the bolt flickers into being, the pulse
-// races along it, the bolt fades; the crown falls loose this long after it
-// arrives.
-export const ZAP = { lock: 0.09, travel: 0.15, fade: 0.3, loose: 0.3 };
+// races along it (longer along a longer bolt: zapTravel), the bolt
+// re-strikes and fades; the crown falls loose this long after it arrives.
+export const ZAP = { lock: 0.11, travel: 0.15, fade: 0.5, loose: 0.35 };
+export const zapTravel = (L) => clamp(0.1 + L * 0.011, 0.14, 0.28);
+// (its violet, and the white of a spark's heart, for the flying sparks)
+const VIOLET = [0.72, 0.5, 1.0];
+const WHITE = [1.0, 0.95, 1.0];
 
 const K = 9; // points along each plume's spine
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -93,6 +103,16 @@ const _M = new THREE.Matrix4();
 const _UP = new THREE.Vector3(0, 1, 0);
 const _kt = new THREE.Vector3();
 const _bc = new THREE.Vector3();
+const _sp = new THREE.Vector3();
+const _sv = new THREE.Vector3();
+// A random direction off the pod's middle, no lower than `low` (its y).
+function randDir(out, low) {
+  do out.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
+  while (out.lengthSq() > 1 || out.lengthSq() < 0.05);
+  out.normalize();
+  if (out.y < low) out.y = low + Math.random() * 0.3;
+  return out.normalize();
+}
 const _kn = new THREE.Vector3();
 const _ka = new THREE.Vector3();
 
@@ -543,12 +563,14 @@ class Crown {
       C[i][4] -= dt;
       if (C[i][4] <= 0) C.splice(i, 1);
     }
-    const k = smooth(0.82, 1.0, charge);
+    // (a stray one now and then from half charge, a storm of them full)
+    const k = smooth(0.45, 1.0, charge);
     if (k <= 0 && !burst) return;
-    this.crackleAcc += dt * (3 + 30 * k * k) + burst;
+    this.crackleAcc += dt * (0.6 + 44 * k ** 2.4) + burst;
+    this.reach = 0.06 + 0.12 * k;
     const p = this.pos;
     let tries = 0;
-    while (this.crackleAcc >= 1 && C.length < 8 && tries++ < 12) {
+    while (this.crackleAcc >= 1 && C.length < 13 && tries++ < 14) {
       this.crackleAcc -= 1;
       const a = Math.floor(Math.random() * this.P);
       const ja = 3 + Math.floor(Math.random() * (K - 3));
@@ -559,7 +581,7 @@ class Crown {
         for (let j = 3; j < K; j++) {
           const ib = (b * K + j) * 3;
           const d = Math.hypot(p[ia] - p[ib], p[ia + 1] - p[ib + 1], p[ia + 2] - p[ib + 2]);
-          if (d > 0.015 && d < 0.09 && d < bd) {
+          if (d > 0.015 && d < (this.reach || 0.09) && d < bd * (0.6 + Math.random())) {
             bd = d;
             best = b;
             bj = j;
@@ -578,7 +600,7 @@ class Crown {
   write(M, q, charge, vis, t) {
     const P = this.P, D = this.defs;
     const p = this.pos;
-    const glowAll = smooth(0.8, 1.0, charge);
+    const glowAll = smooth(0.6, 1.0, charge);
     for (let i = 0; i < P; i++) {
       const d = D[i];
       const o = i * K * 3;
@@ -625,7 +647,7 @@ class Crown {
 // --- arcs ----------------------------------------------------------------------------
 // Crooked strips of light: the crackles in the crown and the bolt it travels
 // by. Each frame: begin(), add() each arc as it is (world points), end().
-const ARCS = 14;
+const ARCS = 44;
 const AN = 18;
 class Arcs {
   constructor(u) {
@@ -710,6 +732,61 @@ class Arcs {
   }
 }
 
+// --- glows ---------------------------------------------------------------------------
+// Soft round lights: the halo round a charged crown, a strike's flash in the
+// air and where it hits the road. Each frame: begin(), add(), end().
+const GLOWS = 12;
+class Glows {
+  constructor(u) {
+    const geo = new THREE.BufferGeometry();
+    this.aPos = new Float32Array(GLOWS * 4 * 3);
+    this.aHalo = new Float32Array(GLOWS * 4 * 4);
+    const corner = new Float32Array(GLOWS * 4 * 2);
+    const idx = [];
+    for (let i = 0; i < GLOWS; i++) {
+      corner.set([-1, -1, 1, -1, 1, 1, -1, 1], i * 8);
+      idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
+    }
+    const dyn = (arr, k) => new THREE.BufferAttribute(arr, k).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', dyn(this.aPos, 3));
+    geo.setAttribute('aHalo', dyn(this.aHalo, 4));
+    geo.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
+    geo.setIndex(idx);
+    geo.setDrawRange(0, 0);
+    this.geo = geo;
+    this.mesh = new THREE.Mesh(geo, makeHaloMaterial(u));
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 9;
+    this.mesh.name = 'thistleGlows';
+    this.mesh.visible = false;
+    this.n = 0;
+  }
+
+  begin() {
+    this.n = 0;
+  }
+
+  // at: world; r: radius (m); bright; flat: laid on the road; white: how
+  // white its heart
+  add(at, r, bright, flat = false, white = 0.6) {
+    if (this.n >= GLOWS || bright < 0.01) return;
+    const i = this.n++;
+    for (let k = 0; k < 4; k++) {
+      at.toArray(this.aPos, (i * 4 + k) * 3);
+      this.aHalo.set([r, bright, flat ? 1 : 0, white], (i * 4 + k) * 4);
+    }
+  }
+
+  end() {
+    this.geo.setDrawRange(0, this.n * 6);
+    this.mesh.visible = this.n > 0;
+    if (this.n) {
+      this.geo.attributes.position.needsUpdate = true;
+      this.geo.attributes.aHalo.needsUpdate = true;
+    }
+  }
+}
+
 // A crooked line from a to b: n points, each step knocked aside (more in the
 // middle), arched up by `arch` (m) - into out (Vector3s).
 const _ja = new THREE.Vector3();
@@ -755,6 +832,9 @@ export class Thistle {
     this.crown = new Crown(this.u);
     this.arcs = new Arcs(this.u);
     this.dust = new Dust(this.u, 120);
+    // the storm round it: sparks flung off its strikes and its feet, glows
+    this.sparks = new Sparks(this.u, 160, { fall: 4.5, drag: 2.4, life: 0.32 });
+    this.glows = new Glows(this.u);
     this.S = {};
     for (const k of ['roll', 'pitch', 'yaw', 'surge', 'heave', 'squash', 'brow', 'lean', 'side']) this.S[k] = new Sway();
     this.wS = { run: new Spring(), stand: new Spring(1), sit: new Spring(), air: new Spring() };
@@ -766,9 +846,16 @@ export class Thistle {
     this.charge = 0;
     this.glide = 0;
     this.act = {};
-    this.boltPts = Array.from({ length: 14 }, () => new THREE.Vector3());
-    this.tmpPts = Array.from({ length: 8 }, () => new THREE.Vector3());
-    this.trackPts = Array.from({ length: 14 }, () => new THREE.Vector3());
+    const pts = (n) => Array.from({ length: n }, () => new THREE.Vector3());
+    this.boltPts = pts(22);
+    this.tmpPts = pts(10);
+    this.tmp2 = pts(10);
+    this.trackPts = pts(22);
+    // (two more strands of the channel, beside the main one)
+    this.strands = [pts(16), pts(16)];
+    this.strandW = [pts(16), pts(16)];
+    // what the storm round it is doing just now (see after())
+    this.fx = [];
     this.reset();
   }
 
@@ -851,7 +938,7 @@ export class Thistle {
   }
 
   get objects() {
-    return [this.root, this.shadow, this.dust.points, this.crown.mesh, this.arcs.mesh];
+    return [this.root, this.shadow, this.dust.points, this.crown.mesh, this.arcs.mesh, this.sparks.points, this.glows.mesh];
   }
 
   reset() {
@@ -898,7 +985,14 @@ export class Thistle {
     this.arrived = false;
     this.vis = 1;
     this.rejagT = 0;
-    this.spikes = [];
+    this.travel = ZAP.travel;
+    this.departed = true;
+    this.spike = 0;
+    this.huskT = 1;
+    this.strikeT = 1;
+    this.aura = 0;
+    if (this.fx) this.fx.length = 0;
+    this.sparks?.clear();
     for (const k in this.wS) this.wS[k].reset(k === 'sit' ? 1 : 0);
     for (const s of Object.values(this.S)) s.reset();
     this.low.reset();
@@ -933,14 +1027,16 @@ export class Thistle {
     this.zapT = 0;
     this.arrived = false;
     this.loosed = false;
+    this.departed = false;
     this.zapFrom = { ...from };
     this.zapTo = { ...to };
+    this.travel = zapTravel(Math.hypot(to.x - from.x, to.d - from.d));
     this.newBolt();
   }
 
   // (the pulse is there: its mind can put it at the far end)
   get zapReady() {
-    return this.zapT >= ZAP.lock + ZAP.travel && !this.arrived;
+    return this.zapT >= ZAP.lock + this.travel && !this.arrived;
   }
 
   get zapping() {
@@ -952,7 +1048,26 @@ export class Thistle {
     this.flash = 1;
     this.brace = 1;
     this.ready = false;
-    this.spikes.push({ at: this.zapTo, t: 0.12 });
+    // where it lands the bolt hits the road: a flash, lightning crawling out
+    // over the road, sparks flying; and the storm crawls over it a moment
+    this.impact(this.zapTo, 1.3);
+    this.aura = 0.6;
+    this.spike = 1;
+  }
+
+  // A burst of the electricity in it, earthed through its feet (a stumble,
+  // a crash, landing from a charged glide): k how much.
+  discharge(k = 1) {
+    if (!this.vis) return;
+    this.dischargeK = Math.max(this.dischargeK || 0, k);
+  }
+
+  // Lightning striking the road at `at` (track: x, y, d), k how hard.
+  impact(at, k) {
+    const rays = [];
+    const n = 5 + Math.round(3 * k);
+    for (let i = 0; i < n; i++) rays.push({ a: (i / n) * TAU + Math.random() * 0.6, len: (0.35 + 0.55 * Math.random()) * (0.6 + 0.5 * k), fork: Math.random() < 0.6 });
+    this.fx.push({ kind: 'impact', at: { x: at.x, y: at.y, d: at.d }, t: 0, life: 0.32 + 0.12 * k, k, rays, fresh: true });
   }
 
   // A fresh crooked line for the bolt (it re-forks as it flickers), in
@@ -961,9 +1076,20 @@ export class Thistle {
     const A = _p.set(this.zapFrom.x, this.zapFrom.y + 0.03, this.zapFrom.d);
     const B = _s.set(this.zapTo.x, this.zapTo.y + 0.03, this.zapTo.d);
     const L = A.distanceTo(B);
-    jag(A, B, this.trackPts.length, 0.07, Math.min(0.9, 0.12 + L * 0.12), this.trackPts);
-    // (a fork or two off it)
-    this.forks = [0, 1].map(() => ({ at: 3 + Math.floor(Math.random() * 8), dir: new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.6, Math.random() - 0.5).normalize(), len: 0.15 + Math.random() * 0.3 }));
+    const arch = Math.min(1.4, 0.2 + L * 0.1);
+    jag(A, B, this.trackPts.length, 0.06, arch, this.trackPts);
+    // (the channel's other strands, wandering either side of it)
+    for (const st of this.strands) jag(A, B, st.length, 0.09, arch * (0.75 + 0.5 * Math.random()), st);
+    // forks off it: some lashing out into the air, some down to the road
+    this.forks = Array.from({ length: 5 + Math.floor(Math.random() * 3) }, () => {
+      const down = Math.random() < 0.45;
+      return {
+        at: 3 + Math.floor(Math.random() * (this.trackPts.length - 6)),
+        dir: new THREE.Vector3(Math.random() - 0.5, down ? -1 : Math.random() * 0.8 - 0.1, Math.random() - 0.5).normalize(),
+        len: 0.35 + Math.random() * (down ? 1.2 : 0.8),
+        down,
+      };
+    });
   }
 
   // --- the frame ----------------------------------------------------------------------
@@ -998,7 +1124,7 @@ export class Thistle {
     // travelling through a spark
     if (this.zapT >= 0) {
       this.zapT += dt;
-      if (this.arrived && this.zapT > ZAP.lock + ZAP.travel + Math.max(ZAP.fade, ZAP.loose) + 0.05) this.zapT = -1;
+      if (this.arrived && this.zapT > ZAP.lock + this.travel + Math.max(ZAP.fade, ZAP.loose) + 0.05) this.zapT = -1;
     }
     const hidden = this.zapT >= ZAP.lock && !this.arrived;
     this.vis = hidden ? 0 : 1;
@@ -1225,7 +1351,7 @@ export class Thistle {
     b.pod.matrixWorld.decompose(_v2, _q, _v3);
     const ground = -(this.root.position.y - this.groundY) / SCALE;
     // (a beat after it arrives through a spark, the crown falls loose)
-    if (this.arrived && !this.loosed && this.zapT >= ZAP.lock + ZAP.travel + ZAP.loose) {
+    if (this.arrived && !this.loosed && this.zapT >= ZAP.lock + this.travel + ZAP.loose) {
       cr.loose = 1;
       this.loosed = true;
     }
@@ -1244,12 +1370,55 @@ export class Thistle {
     cr.write(_M, this.root.quaternion, this.charge, this.vis, t);
     this.crownM = this.crownM || new THREE.Matrix4();
     this.crownM.copy(_M);
+    // (the pod in the world, for the arcs that crawl over its husk; the
+    // road in its own space, for the strikes)
+    this.podM = this.podM || new THREE.Matrix4();
+    this.podM.multiplyMatrices(_M, b.pod.matrixWorld);
+    this.groundL = ground;
+    this.storm(dt);
+  }
+
+  // The storm round it, as its charge builds: arcs crawling over its husk
+  // (from about two thirds), and once it's full, now and then a strike from
+  // a plume's tip down to the road beside it; while it braces to travel
+  // through a spark, and arriving, all of it at once.
+  storm(dt) {
+    if (dt <= 0) return;
+    const c = this.vis ? this.charge : 0;
+    const bracing = this.zapT >= 0 && this.zapT < ZAP.lock;
+    this.aura = Math.max(0, this.aura - dt);
+    this.spike = Math.max(0, this.spike - dt * 5);
+    const husk = Math.max(smooth(0.62, 1, c) * 9, bracing ? 30 : 0, this.aura > 0 ? 24 : 0);
+    this.huskT -= dt * husk;
+    while (this.huskT <= 0) {
+      this.huskT += 1;
+      if (this.fx.length > 40) break;
+      const a = randDir(_v, -0.35);
+      const b = randDir(_v2, -0.35);
+      // (to somewhere a little way round from it)
+      b.lerp(a, 0.35 + 0.35 * Math.random()).normalize();
+      this.fx.push({ kind: 'husk', a: a.clone(), b: b.clone(), t: 0, life: 0.05 + Math.random() * 0.07 });
+      this.spike = Math.max(this.spike, 0.3);
+    }
+    const strike = c >= 0.97 ? 1.6 : 0;
+    this.strikeT -= dt * Math.max(strike, bracing ? 12 : 0);
+    if (this.strikeT <= 0) {
+      this.strikeT = 0.6 + Math.random() * 0.7;
+      const cr = this.crown;
+      const i = Math.floor(Math.random() * cr.P);
+      const ang = Math.random() * TAU;
+      const r = 0.22 + Math.random() * 0.25;
+      this.fx.push({ kind: 'strike', i, j: K - 1 - Math.floor(Math.random() * 3), end: new THREE.Vector3(Math.cos(ang) * r, this.groundL + 0.005, Math.sin(ang) * r), t: 0, life: 0.07 + Math.random() * 0.07, fresh: true });
+      this.spike = 1;
+    }
   }
 
   puffs(run, sp) {
     if (this.lastDt <= 0 || !this.vis) return;
     for (let i = 0; i < 3; i++) {
       const g = this.legs[i];
+      // (charged, every footfall earths a few sparks)
+      if (this.stepped[i] && this.charge > 0.55) this.stepSparks = (this.stepSparks || 0) | (1 << i);
       if (this.stepped[i] && Math.random() < 0.7) {
         _p.copy(g.plant);
         _p.y = 0.012;
@@ -1269,86 +1438,210 @@ export class Thistle {
     this.dust.emit(p.multiplyScalar(SCALE), v, size, kind, alpha, life, grow);
   }
 
-  // After the frame: its dust, and the arcs - the crackles in its crown and
-  // the bolt it travels by - laid into the world (z: the runner's scene z,
-  // dist: how far they've run).
+  // After the frame: its dust, and the storm - the crackles in its crown,
+  // the arcs over its husk, its strikes, the bolt it travels by and where
+  // it hits, the sparks and the glows - laid into the world (z: the
+  // runner's scene z, dist: how far they've run).
   after(z, dist, lowG = false) {
     this.dust.g = lowG ? 6 : 16;
     this.dust.update(this.lastDt, this.root, z, dist);
     const dt = this.lastDt;
     this.lastDt = 0;
     const A = this.arcs;
+    const Gl = this.glows;
     A.begin();
+    Gl.begin();
     const cr = this.crown;
     const M = this.crownM;
-    // the crackles, re-jagged every frame (they snap)
+    const world = (q, out) => out.set(q.x, q.y, z - ((q.d ?? q.z) - dist));
+    const track = (w) => ({ x: w.x, y: w.y, d: dist - (w.z - z) });
+    // the crackles across its crown, re-jagged every frame (they snap)
     if (M && this.vis) {
       for (const c of cr.crackles) {
         cr.point(c[0], c[1], M, _p);
         cr.point(c[2], c[3], M, _s);
         const n = 7;
-        const pts = jag(_v.copy(_p), _v2.copy(_s), n, 0.32, 0, this.tmpPts);
-        A.add(pts, n, 0.022 + 0.012 * Math.random(), 0.9 + 0.5 * Math.random());
+        const pts = jag(_p, _s, n, 0.34, 0, this.tmpPts);
+        A.add(pts, n, 0.022 + 0.014 * Math.random(), 0.9 + 0.6 * Math.random());
       }
+      if (cr.crackles.length) this.spike = Math.max(this.spike, Math.min(0.6, 0.12 * cr.crackles.length));
+    }
+    // a discharge through its feet
+    if (this.dischargeK && M) {
+      _p.set(0, this.groundL ?? 0, 0).applyMatrix4(M);
+      this.impact(track(_p), this.dischargeK);
+      this.aura = Math.max(this.aura, 0.25 * this.dischargeK);
+      this.spike = 1;
+      this.dischargeK = 0;
+    }
+    // sparks off its feet
+    if (this.stepSparks && M) {
+      for (let i = 0; i < 3; i++) {
+        if (!(this.stepSparks & (1 << i))) continue;
+        _p.copy(this.legs[i].plant).applyMatrix4(M);
+        const n = 2 + Math.round(4 * this.charge);
+        for (let k = 0; k < n; k++) this.sparkW(_p, _v.set((Math.random() - 0.5) * 2.4, 0.8 + Math.random() * 1.8, (Math.random() - 0.5) * 2.4), 0.05 + 0.03 * Math.random(), k % 2 ? WHITE : VIOLET);
+        // (and a little lightning crawling off it over the road)
+        for (let k = 0; k < 2; k++) {
+          const a = Math.random() * TAU;
+          const pts = jag(_p, _s.copy(_p).add(_v.set(Math.cos(a), 0, Math.sin(a)).multiplyScalar(0.15 + 0.15 * Math.random())), 5, 0.3, 0.02, this.tmpPts);
+          A.add(pts, 5, 0.016, 0.9);
+        }
+      }
+      this.stepSparks = 0;
     }
     // the bolt
     if (this.zapT >= 0 && this.zapFrom) {
       const T = this.zapT;
-      const world = (q, out) => out.set(q.x, q.y, z - ((q.d ?? q.z) - dist));
       this.rejagT -= dt;
       if (this.rejagT <= 0) {
         this.newBolt();
-        this.rejagT = 0.035 + Math.random() * 0.03;
+        this.rejagT = 0.03 + Math.random() * 0.03;
       }
       const n = this.trackPts.length;
       for (let k = 0; k < n; k++) world(this.trackPts[k], this.boltPts[k]);
-      const end = ZAP.lock + ZAP.travel;
-      let bright, pulse = -1, drawn = 1;
+      const end = ZAP.lock + this.travel;
+      let bright, pulse = -1, drawn = 1, wide = 1;
       if (T < ZAP.lock) {
-        // flickering into being from its feet
-        drawn = clamp(T / (ZAP.lock * 0.7), 0.05, 1);
-        bright = 0.45 + 0.35 * Math.random();
+        // the leader: flickering out from its feet, thin
+        drawn = clamp(T / (ZAP.lock * 0.8), 0.04, 1);
+        bright = 0.5 + 0.4 * Math.random();
+        wide = 0.45;
       } else if (T < end || !this.arrived) {
-        pulse = clamp((T - ZAP.lock) / ZAP.travel, 0, 1);
-        bright = 1;
+        pulse = clamp((T - ZAP.lock) / this.travel, 0, 1);
+        bright = 1.3;
+        wide = 1.15;
       } else {
-        // fading, flickering out
-        const f = 1 - clamp((T - end) / ZAP.fade, 0, 1);
-        bright = f * f * (0.5 + 0.7 * Math.random());
+        // it strikes again, twice, and flickers out
+        const a = T - end;
+        const f = 1 - clamp(a / ZAP.fade, 0, 1);
+        const re = (a > 0.08 && a < 0.12) || (a > 0.2 && a < 0.235);
+        bright = re ? 1.3 : f * f * (0.3 + 0.7 * Math.random());
+        wide = re ? 1.1 : 0.7 + 0.3 * f;
+      }
+      if (!this.departed && T >= ZAP.lock) {
+        // gone: the bolt hits the road where it stood
+        this.departed = true;
+        this.impact(this.zapFrom, 0.9);
       }
       if (bright > 0.01) {
-        A.add(this.boltPts, n, 0.07, bright, pulse, 0.1, drawn);
-        for (const f of this.forks || []) {
-          const p0 = this.boltPts[Math.min(n - 1, f.at)];
-          const pts = jag(_v.copy(p0), _v2.copy(p0).addScaledVector(f.dir, f.len), 5, 0.25, 0, this.tmpPts);
-          if (drawn >= f.at / (n - 1)) A.add(pts, 5, 0.03, bright * 0.7);
+        A.add(this.boltPts, n, 0.12 * wide, bright, pulse, 0.07, drawn);
+        if (T >= ZAP.lock) {
+          for (let s = 0; s < this.strands.length; s++) {
+            const st = this.strands[s], sw = this.strandW[s];
+            for (let k = 0; k < st.length; k++) world(st[k], sw[k]);
+            A.add(sw, st.length, 0.045 * wide, bright * 0.65, pulse, 0.09, drawn);
+          }
         }
+        for (const f of this.forks || []) {
+          if (drawn < f.at / (n - 1)) continue;
+          const p0 = this.boltPts[Math.min(n - 1, f.at)];
+          _s.copy(p0).addScaledVector(f.dir, f.len);
+          if (f.down) _s.y = Math.max(0.01, _s.y);
+          const pts = jag(p0, _s, 7, 0.3, 0, this.tmpPts);
+          A.add(pts, 7, 0.04 * wide, bright * 0.75);
+          // (and a twig off the fork)
+          const q = pts[3 + Math.floor(Math.random() * 3)];
+          const pts2 = jag(q, _v.copy(q).add(_v2.set(Math.random() - 0.5, Math.random() - 0.6, Math.random() - 0.5).multiplyScalar(f.len * 0.5)), 5, 0.35, 0, this.tmp2);
+          A.add(pts2, 5, 0.022 * wide, bright * 0.6);
+        }
+        // the pulse: a ball of light racing along it; and the light it
+        // throws round it
+        if (pulse >= 0) {
+          const fi = pulse * (n - 1), k0 = Math.min(n - 2, Math.floor(fi));
+          _p.copy(this.boltPts[k0]).lerp(this.boltPts[k0 + 1], fi - k0);
+          Gl.add(_p, 0.3, 1.1, false, 0.9);
+        }
+        const mid = this.boltPts[n >> 1];
+        Gl.add(mid, 0.9 + 0.3 * wide, bright * 0.16, false, 0);
       }
-      // (a flash at its feet as it goes)
-      if (T >= ZAP.lock && T < ZAP.lock + 0.08) this.burst(world(this.zapFrom, _p), 0.6 * (1 - (T - ZAP.lock) / 0.08));
     }
-    // arrival: a burst of short sparks at its feet
-    for (let i = this.spikes.length - 1; i >= 0; i--) {
-      const s = this.spikes[i];
-      s.t -= dt;
-      if (s.t <= 0) {
-        this.spikes.splice(i, 1);
+    // the storm's own arcs
+    for (let i = this.fx.length - 1; i >= 0; i--) {
+      const f = this.fx[i];
+      f.t += dt;
+      if (f.t >= f.life) {
+        this.fx.splice(i, 1);
         continue;
       }
-      this.burst(_p.set(s.at.x, s.at.y + 0.02, z - (s.at.d - dist)), s.t / 0.12);
+      const u = f.t / f.life;
+      if (f.kind === 'husk') {
+        if (!this.vis || !this.podM) continue;
+        // over the husk: a bowed, crooked arc from one spot to another
+        const n = 6;
+        for (let k = 0; k < n; k++) {
+          const tt = k / (n - 1);
+          _v.copy(f.a).lerp(f.b, tt).normalize();
+          const r = 0.104 + 0.022 * Math.sin(Math.PI * tt) + (k && k < n - 1 ? (Math.random() - 0.5) * 0.02 : 0);
+          this.tmpPts[k].set(_v.x * r, _v.y * r * 0.93, _v.z * r).applyMatrix4(this.podM);
+        }
+        A.add(this.tmpPts, n, 0.014 + 0.008 * Math.random(), 1.1 * (1 - u * 0.5));
+      } else if (f.kind === 'strike') {
+        if (!this.vis || !M) continue;
+        // from a plume's tip down to the road beside it
+        cr.point(f.i, f.j, M, _p);
+        _s.copy(f.end).applyMatrix4(M);
+        const pts = jag(_p, _s, 9, 0.2, 0, this.tmpPts);
+        A.add(pts, 9, 0.03, 1.3 * (1 - u * 0.4));
+        Gl.add(_s, 0.22, 0.7 * (1 - u), true, 0.6);
+        if (f.fresh) {
+          f.fresh = false;
+          for (let k = 0; k < 7; k++) this.sparkW(_s, _v.set((Math.random() - 0.5) * 3, 1 + Math.random() * 2.2, (Math.random() - 0.5) * 3), 0.06, k % 3 ? VIOLET : WHITE);
+        }
+      } else if (f.kind === 'impact') {
+        const c = world(f.at, _bc);
+        c.y = Math.max(0.02, c.y + 0.02);
+        const k = f.k;
+        // a flash in the air, a pool of light on the road
+        if (f.t < 0.12) Gl.add(_p.copy(c).setY(c.y + 0.3), 0.55 * k, 1.1 * (1 - f.t / 0.12), false, 0.7);
+        Gl.add(c, (0.45 + 0.35 * u) * k, 0.9 * (1 - u) ** 1.5, true, 0.4);
+        // lightning crawling out over the road from it, re-forking as it goes
+        const grow = Math.min(1, u * 3.5);
+        for (const r of f.rays) {
+          _v.set(Math.cos(r.a), 0, Math.sin(r.a));
+          _s.copy(c).addScaledVector(_v, r.len * grow);
+          const pts = jag(c, _s, 6, 0.32, 0.03, this.tmpPts);
+          for (let q = 0; q < 6; q++) pts[q].y = Math.max(c.y, pts[q].y);
+          A.add(pts, 6, 0.028 * k, (1.2 - u) * (0.6 + 0.6 * Math.random()));
+          if (r.fork && u < 0.6) {
+            const q = pts[2 + Math.floor(Math.random() * 3)];
+            _v2.set(Math.cos(r.a + 0.8), 0, Math.sin(r.a + 0.8));
+            const p2 = jag(q, _v3.copy(q).addScaledVector(_v2, r.len * 0.4 * grow), 4, 0.3, 0.02, this.tmp2);
+            A.add(p2, 4, 0.016 * k, 1 - u);
+          }
+        }
+        if (f.fresh) {
+          f.fresh = false;
+          const n = Math.round(14 + 16 * k);
+          for (let q = 0; q < n; q++) {
+            const a = Math.random() * TAU, sp = 1.5 + Math.random() * 3.5 * k;
+            this.sparkW(c, _v.set(Math.cos(a) * sp, 1.2 + Math.random() * 3.2 * k, Math.sin(a) * sp), 0.07 + 0.04 * Math.random(), q % 3 ? VIOLET : WHITE);
+          }
+        }
+      }
+    }
+    // the halo round its crown as it charges, flaring with every spark
+    if (M && this.vis) {
+      const k = smooth(0.4, 1, this.charge);
+      const fl = 0.75 + 0.25 * Math.sin(this.time * 23) * Math.sin(this.time * 7.3);
+      const b = k * 0.13 * fl + Math.min(1, this.spike) * 0.2 + (this.zapT >= 0 && this.zapT < ZAP.lock ? 0.3 : 0);
+      if (b > 0.02) {
+        cr.point(0, 0, M, _p);
+        _p.y += 0.12 * SCALE;
+        Gl.add(_p, 0.32 + 0.3 * k + 0.1 * Math.min(1, this.spike), b, false, 0);
+      }
     }
     A.end();
+    Gl.end();
+    this.sparks.update(dt, this.root, z, dist);
   }
 
-  // A few short sparks leaping off a point.
-  burst(at, k) {
-    if (k <= 0) return;
-    const c = _bc.copy(at);
-    for (let i = 0; i < 4; i++) {
-      _v2.set(Math.random() - 0.5, 0.2 + Math.random() * 0.8, Math.random() - 0.5).normalize();
-      const pts = jag(_v.copy(c), _s.copy(c).addScaledVector(_v2, 0.12 + 0.2 * Math.random()), 5, 0.3, 0, this.tmpPts);
-      this.arcs.add(pts, 5, 0.035, k);
-    }
+  // A spark flung from w (world) at v (m/s, world), size m, colour.
+  sparkW(w, v, size, col) {
+    _qi.copy(this.root.quaternion).invert();
+    _sp.copy(w).sub(this.root.position).applyQuaternion(_qi);
+    _sv.copy(v).applyQuaternion(_qi);
+    this.sparks.emit(_sp, _sv, size, col);
   }
 
   // --- placing it in the world ----------------------------------------------------------
@@ -1377,6 +1670,13 @@ export class Thistle {
     this.dust.forCompile(on);
     this.crown.mesh.visible = on;
     this.arcs.mesh.visible = on;
+    this.sparks.forCompile(on);
+    this.glows.mesh.visible = on;
+    if (on) {
+      this.glows.begin();
+      this.glows.add(new THREE.Vector3(0, -50, 0), 0.01, 0.1);
+      this.glows.end();
+    }
     if (on) {
       // (something in the arcs' buffers, so their shader has work to compile)
       this.arcs.begin();

@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 import { clamp } from './rig.js';
 import { Companion } from './companion.js';
-import { ZAP } from './thistle.js';
+import { ZAP, zapTravel } from './thistle.js';
 
 // Teasel's mind: the storm thistle who runs with you (see thistle.js for its
 // body). Built on the fox's (companion.js) for everything that keeps it safe
@@ -68,13 +68,19 @@ export class Scurrier extends Companion {
   stumbled() {
     super.stumbled();
     // (jolted: some of the static leaks out of it in a crackle)
-    if (this.charge > 0.5) this.body.crown.crackleAcc += 2;
+    if (this.charge > 0.5) {
+      this.body.crown.crackleAcc += 3;
+      this.body.discharge(0.6 + 0.4 * this.charge);
+    }
     this.charge *= 0.7;
   }
 
   crashed() {
     super.crashed();
-    if (this.charge > 0.3) this.body.crown.crackleAcc += 3;
+    if (this.charge > 0.3) {
+      this.body.crown.crackleAcc += 4;
+      this.body.discharge(0.8 + 0.6 * this.charge);
+    }
     this.charge = 0;
   }
 
@@ -145,6 +151,8 @@ export class Scurrier extends Companion {
       this.gliding = 0;
       this.gNow = this.C.gravity;
       this.body.land(hit);
+      // (down from a charged glide, it earths some of it through its feet)
+      if (this.air?.glide && this.charge > 0.6) this.body.discharge(0.45);
     }
   }
 
@@ -162,7 +170,13 @@ export class Scurrier extends Companion {
     if (this.charge >= 1 && this.canZap()) {
       const behind = this.dz < this.C.zap.behind;
       if ((behind || (this.beat === 'dawdle' && this.stage === 1)) && this.tryZap()) return;
-      if (this.fullT > this.holdT && !this.beat && !this.fetching) this.startBeat('dawdle');
+      // full a moment with no need: it drops back to use it, or just goes -
+      // far up the road, often across it
+      if (this.fullT > this.holdT && !this.beat && !this.fetching) {
+        if (Math.random() < 0.5) this.startBeat('dawdle');
+        else if (this.tryZap(true)) return;
+        else this.holdT = this.fullT + 0.5;
+      }
     }
     super.think(dt);
   }
@@ -194,29 +208,33 @@ export class Scurrier extends Companion {
 
   // Where to go: a lane beside yours, a little ahead, with the road clear
   // round the spot it lands on.
-  tryZap() {
+  // far: on a whim (not to catch up) - further ahead, and more often across
+  // the road.
+  tryZap(far = false) {
     const g = this.game;
     const p = g.player;
     const Z = this.C.zap;
-    const T = ZAP.lock + ZAP.travel;
     const lane = this.laneOf(p.x);
     // (mostly the nearer lane beside you; now and then across the road)
     const lanes = [0, 1, 2].filter((l) => l !== lane).sort((a, b) => Math.abs(LANES[a] - this.x) - Math.abs(LANES[b] - this.x));
-    if (Math.random() < 0.35) lanes.reverse();
+    if (Math.random() < (far ? 0.6 : 0.35)) lanes.reverse();
     for (const l of lanes) {
-      const ahead = rand(Z.land[0], Z.land[1]);
+      const ahead = rand(...(far ? Z.far : Z.land));
+      // (how long the pulse takes depends on how far it goes: near enough)
+      const T = ZAP.lock + zapTravel(Math.hypot(LANES[l] - this.x, ahead - this.dz + g.speed * 0.3));
       const d = g.dist + g.speed * T + ahead;
       // (clear round the spot, and nothing tall just short of it to hide it
       // from you)
       if (this.blocked(LANES[l], d - 4.5, d + Math.max(g.speed, 8) * 1.1)) continue;
       const from = { x: this.x, y: this.y + (this.lift || 0), d: g.dist + this.dz };
       const to = { x: LANES[l], y: 0, d };
-      if (Math.abs(to.d - from.d) > 18) continue;
+      if (Math.abs(to.d - from.d) > Z.reach) continue;
       this.endBeat();
       this.zap = { to, lane: l, t: 0, there: false };
       this.body.zap(from, to);
       g.audio?.zap?.(clamp(from.x / 3, -1, 1));
       this.lookFor(0.6, { x: to.x, y: 0.2, dz: ahead });
+      this.zap.far = Math.abs(to.d - from.d);
       return true;
     }
     return false;
@@ -252,15 +270,18 @@ export class Scurrier extends Companion {
       b.arrive();
       this.lookFor(0.7, 'runner');
       g.audio?.zap?.(clamp(this.x / 3, -1, 1), true);
+      // (the strike lands with a jolt you feel, and a flash)
+      g.cam?.kick?.(0.42);
+      g.ui?.strike?.();
       this.cheer(1.2);
     }
-    if (Z.there && Z.t >= ZAP.lock + ZAP.travel + ZAP.loose && this.charge > 0) {
+    if (Z.there && Z.t >= ZAP.lock + b.travel + ZAP.loose && this.charge > 0) {
       // a beat later its crown falls loose: it starts building again
       this.charge = 0;
       this.holdT = rand(...this.C.zap.hold);
     }
     // (if the run's over before it gets there, it's there anyway)
-    if ((Z.there && Z.t > ZAP.lock + ZAP.travel + ZAP.loose + 0.05) || Z.t > 2) {
+    if ((Z.there && Z.t > ZAP.lock + b.travel + ZAP.loose + 0.05) || Z.t > 2) {
       if (!Z.there) {
         this.x = Z.to.x;
         this.dz = Z.to.d - g.dist;

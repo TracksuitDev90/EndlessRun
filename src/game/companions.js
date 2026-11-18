@@ -74,7 +74,7 @@ export const COMPANIONS = [
       mind: (game, def, body) => new m.Scurrier(game, def, body),
     })),
     tune: CONFIG.companion.thistle,
-    hw: 0.28,
+    hw: 0.34,
     mouth: [0.0, 0.62],
     // (how far its pod and legs reach, for tools/companion/audit.js)
     extent: { front: 0.24, back: 0.34, side: 0.29, top: 0.56 },

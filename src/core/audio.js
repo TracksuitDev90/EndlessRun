@@ -825,12 +825,15 @@ export class Ambient {
     const t = this.ctx.currentTime;
     const h = this.hush(0.6);
     if (arrive) {
-      this.tone('clack', t, 'square', 2400, 900, 0.022 * h, 0.05);
-      this.noiseShot(t, 'highpass', 0.8, 5200, 2600, 0.05 * h, 0.006, 0.12, pan, pan);
+      // the crack of it hitting the road, a deep thump under it, and a short
+      // rumble rolling away
+      this.tone('clack', t, 'square', 2600, 700, 0.03 * h, 0.06);
+      this.tone('thump', t, 'sine', 110, 38, 0.16 * h, 0.28);
+      this.noiseShot(t, 'lowpass', 0.7, 2400, 140, 0.16 * h, 0.004, 0.55, pan, pan * 0.3);
       return;
     }
-    this.tone('clack', t, 'square', 3200, 1400, 0.03 * h, 0.04);
-    this.noiseShot(t, 'bandpass', 1.4, 2200, 7000, 0.11 * h, 0.008, 0.2, pan, pan * 0.4);
+    this.tone('clack', t, 'square', 3200, 1400, 0.032 * h, 0.05);
+    this.noiseShot(t, 'bandpass', 1.4, 2200, 7000, 0.12 * h, 0.008, 0.22, pan, pan * 0.4);
   }
 
   // A tiny spark snapping in its crown: a tick of high noise, very quiet.
