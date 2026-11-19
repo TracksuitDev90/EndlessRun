@@ -3696,7 +3696,7 @@ about; picked, he waves.
 
 ## The living knot
 
-![Knotling: looking out of the opening at one end of him (his portrait), and turned round as he rolls, his eyes peeking out wherever there's a gap; a swing from the runner's camera - he bunches, feeds a ring of himself out ahead and up, it catches and pulls taut, and he swings forward under it; a hurdle - bunched low, then up and over the hedge; and a bar - slid out low and wide](docs/knot.jpg)
+![Knotling: looking out of the opening at one end of him (his portrait), and turned round as he rolls, his eyes peeking out wherever there's a gap; a swing from the runner's camera - he bunches, feeds a ring of himself out ahead and up, it catches and pulls taut, and he swings forward under it; a hurdle - bunched low, then up and over the hedge; a bar - slid out low and wide; a lobe of him reaching out to wave at the runner; and a shudder, every loop let loose and cinched tight](docs/knot.jpg)
 
 Knotling is one continuous length of thick marigold rope with a single
 indigo strand wound through it, tied over and under itself into a loose,
@@ -3730,6 +3730,16 @@ patches and the flyaways go where the rope goes:
   ones settling a beat later; the contact patch flattened and spread;
 - now and then one loop slips open or is drawn tighter, on a spring of its
   own, overshooting and settling while the others hold;
+- never quite still: slow waves run along the rope, his loops breathing in
+  and out; he's soft and heavy, his top lagging his bottom as he speeds up,
+  slows and turns, and wobbling back; and he's a knot, not a ball, so
+  whichever loop is lowest just now is what he stands on, and he bumps
+  along a little as he rolls;
+- his moods in his shape: a lobe of him drawn out to wave at you (whatever
+  rope is on that side of him is pulled out into it, so as he rolls the rope
+  runs through the lobe and the lobe stays put, wagging); let loose, every
+  loop sagging open and shivering, then cinched tight with a snap; drawn up
+  tall in a stretch; rocking side to side in a wobbly roll;
 - reshaping for what's in his way: bunched low against the road before a
   jump and pushing off with his lower loops; slid out low and wide under a
   bar, his top loops slipping out over his sides. Every change of size draws
@@ -3758,11 +3768,13 @@ still break up his outline. Each trembles on a quick spring of its own:
 when a loop pulls taut (the swing's ring catching, a slipped loop snapping
 back, a landing) they shiver on after the rope has settled.
 
-**His eyes** don't roll with him. They sit inside the knot, looking out
-toward you through whatever gap the rope leaves; when a strand rolls across
-them they wait a moment and look out through another, and now and then
-they move somewhere better on their own — anywhere on him, the back
-included. Warm ivory whites, round brown pupils, two small catchlights,
+**His eyes** don't roll with him. They sit inside the knot and travel round
+it: where they look out from wanders over a ball about him — round the back
+toward you, round to the side you're on, over his top, and now and then away
+on his far side where you can't see them — and they go there round him, a
+pair side by side that turns as they go, rather than jumping. When a strand
+rolls across them they wait a moment and look out through another gap near
+where they're headed. Warm ivory whites, round brown pupils, two small catchlights,
 lids closing from above for a blink. They look at you, with a share of the
 way turned toward the camera so you always see the pupils; every few
 seconds he glances right up at you. At a run he really does spin fast —
@@ -3790,10 +3802,16 @@ whose far end catches an invisible point in the air; the slack pulls taut,
 his weight swings down under the point and forward in an arc, and at the
 far end he lets go, draws the loop back in as he flies, lands with a squash
 and rolls straight on with the speed he carried. All of it on his own side
-of you, and only with the road clear for the whole of it. A hurdle he
-jumps, a bar he slides under, a wall he rolls round; none of it touches the
-run. On the title screen he sits by you, breathing a little; picked, he
-hops and flicks a loop.
+of you, and only with the road clear for the whole of it. Between swings he
+has ideas every few seconds (`CONFIG.companion.knot.ideas`): a wave of a
+lobe of himself at you, a run of bounces, a shudder (let loose and cinched
+tight), a stretch, his eyes sent round to look back at you or right round
+him, a wobbly roll; he drifts about in his place a little; and he copies
+you — a hop when you jump, flattening when you slide. You stumble: a
+shudder runs through him and his eyes round on you; a whole run of gems: a
+wave and a bounce. A hurdle he jumps, a bar he slides under, a wall he rolls
+round; none of it touches the run. On the title screen he sits by you,
+breathing a little; picked, he hops and waves.
 
 ## Companion abilities
 

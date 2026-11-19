@@ -82,6 +82,8 @@ const _q = new THREE.Quaternion();
 const _m = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
 const _UP = new THREE.Vector3(0, 1, 0);
+const _w = new THREE.Vector3();
+const _w2 = new THREE.Vector3();
 
 // A spring with a force on it (semi-implicit, steady at any frame time).
 class Sway {
@@ -388,6 +390,25 @@ export class Knotling {
     this.pushT = 9;
     this.landHit = 0;
     this.slips = [0, 1, 2].map(() => ({ k: 0, sign: 1, amp: new Sway(), hold: 0, on: false }));
+    // his moods in his shape (see wave, shake, stretchUp; wobble and the
+    // lean are set as he goes)
+    this.leanX = new Sway();
+    this.leanZ = new Sway();
+    this.loose = new Sway();
+    this.looseT = 0;
+    this.looseNow = 0;
+    this.tall = new Sway();
+    this.tallT = 0;
+    this.tallNow = 0;
+    this.arm = new Sway();
+    this.armT = 0;
+    this.armNow = 0;
+    this.armDir = new THREE.Vector3(1, 0, 0);
+    this.armUp = new THREE.Vector3(0, 1, 0);
+    this.wobble = 0;
+    this.ready2 = false;
+    this.orbit = { az: Math.PI, el: 0.35, azTo: Math.PI, elTo: 0.35, hold: 1.5, forced: 0, circle: 0, circleDir: 1 };
+    this.runnerSide = -1;
     this.slipT = 2;
     this.fed = 0;
     this.feedK = 0;
@@ -424,6 +445,66 @@ export class Knotling {
     if (k > 0.35) this.slipNow(Math.random() < 0.5 ? 1 : -1, 0.6 + 0.4 * Math.min(k, 1));
     this.kick(-1, 0, 0.7 * Math.min(k, 1.2));
     this.puffs(k);
+  }
+
+  // A lobe of him drawn out toward dir (world, level) and waved, for dur s.
+  wave(dir, dur = 1.4) {
+    this.armDir.copy(dir).setY(0).normalize().setY(0.35).normalize();
+    this.armUp.copy(_UP).addScaledVector(this.armDir, -this.armDir.y).normalize();
+    this.armT = dur;
+    this.slipNow(1, 0.5);
+  }
+
+  // Let loose - every loop sagging open, shivering - then cinched tight
+  // again with a snap (and the flyaways all shaken).
+  shake(dur = 0.5) {
+    this.looseT = dur;
+  }
+
+  // Drawn up tall a moment, as if stretching, then settled back down.
+  stretchUp(dur = 0.55) {
+    this.tallT = dur;
+  }
+
+  // His eyes sent round to look out from az (0 the way he's going, pi
+  // back toward you; + to his right) and el (up), for dur s.
+  peek(az, el = 0.35, dur = 1.6) {
+    const O = this.orbit;
+    O.azTo = az;
+    O.elTo = el;
+    O.hold = dur;
+    O.forced = dur;
+  }
+
+  // His eyes sent right round him, for dur s (dir: which way round).
+  circleEyes(dur = 2, dir = 1) {
+    const O = this.orbit;
+    O.circle = dur;
+    O.circleDir = dir;
+    O.hold = dur + 0.4;
+  }
+
+  // His moods in his shape, frame by frame.
+  moodStep(dt) {
+    // (each a spring that overshoots: rope gives, and comes back)
+    this.armT -= dt;
+    this.armNow = Math.max(0, this.arm.step(this.armT > 0 ? 1 : 0, 2.6, 0.45, dt));
+    const wasLoose = this.looseT > 0;
+    this.looseT -= dt;
+    this.looseNow = this.loose.step(this.looseT > 0 ? 1 : 0, this.looseT > 0 ? 3 : 4.2, this.looseT > 0 ? 0.7 : 0.22, dt);
+    if (wasLoose && this.looseT <= 0) {
+      // cinched: everything pulls taut at once
+      this.kick(-1, 0, 1.4);
+      this.sqLow.v -= 1.5;
+    }
+    this.tallT -= dt;
+    this.tallNow = this.tall.step(this.tallT > 0 ? 1 : 0, 2.2, 0.33, dt);
+    // the lean: his top lags his bottom (against his acceleration across
+    // and along), and in a wobble he rocks side to side as he rolls
+    const wob = this.wobble * 0.5 * Math.sin(this.time * 7.5);
+    const air = this.mode === 'air' ? 0.4 : 1;
+    this.leanX.step(clamp(-this.acc.x * 0.011 * air, -0.22, 0.22) + wob, 2.2, 0.3, dt);
+    this.leanZ.step(clamp(-this.acc.z * 0.008 * air, -0.16, 0.16), 2.1, 0.32, dt);
   }
 
   // A happy little loop-flick (his mind: a greeting, a fetch).
@@ -514,7 +595,8 @@ export class Knotling {
     this.lowNow = clamp(this.lowS.x, 0, 1);
     // rope drawn toward the part of him that's growing - the bunched lower
     // loops, the flattened knot under a bar, the squashed bottom
-    this.drift.step(this.crouchS.x * 0.05 + Math.max(0, this.sqLow.x) * 0.12 + this.lowNow * 0.035, 3.5, 0.7, dt);
+    this.drift.step(this.crouchS.x * 0.05 + Math.max(0, this.sqLow.x) * 0.12 + this.lowNow * 0.035 + this.tallNow * 0.03, 3.5, 0.7, dt);
+    this.moodStep(dt);
     this.roll(dt, air);
     this.slipStep(dt);
     this.build();
@@ -584,6 +666,27 @@ export class Knotling {
     }
     if (dr) out.multiplyScalar(1 + dr * (dr > 0 ? 0.13 : 0.07));
     out.multiplyScalar(this.sc).applyQuaternion(this.Q);
+    // never quite still: slow waves run along the rope, loops breathing in
+    // and out (much more so with the knot let loose), and a shiver through
+    // it as it's loosened
+    const t = this.time, lo = this.looseNow;
+    const r = out.length() || 1;
+    let wr = (0.024 * Math.sin(TAU * 3 * k - t * 2.3) + 0.017 * Math.sin(TAU * 5 * k + t * 1.7 + 1.3)) * (1 + 2.2 * lo);
+    wr += lo * (0.2 + 0.08 * Math.sin(TAU * 7 * k + t * 15) + 0.05 * Math.sin(TAU * 11 * k - t * 9));
+    out.multiplyScalar(1 + wr);
+    // a lobe of him reaching out (to wave at you): whatever rope is on that
+    // side of him is drawn out into it - as he rolls, the rope runs through
+    // the lobe and the lobe stays put - wagging, a wave running out along it
+    const A = this.armNow;
+    if (A > 0.002) {
+      const a = (out.x * this.armDir.x + out.y * this.armDir.y + out.z * this.armDir.z) / (r * (1 + wr));
+      const w = smooth(0.55, 0.97, a);
+      if (w > 0) {
+        const along = (a - 0.55) / 0.45;
+        out.addScaledVector(this.armDir, this.sc * A * w * w * 0.8);
+        out.addScaledVector(this.armUp, this.sc * A * w * 0.34 * Math.sin(t * 12 - along * 4.5));
+      }
+    }
     return this.deform(out);
   }
 
@@ -607,8 +710,17 @@ export class Knotling {
     // flying: drawn out a little along the way he's going up or down
     ys *= 1 + this.stretch;
     hs *= 1 - this.stretch * 0.5;
+    // drawn up tall (a stretch), or let loose
+    const tl = this.tallNow;
+    ys = ys * (1 + 0.3 * tl) + 0.3 * tl;
+    hs *= 1 - 0.15 * tl;
     p.x *= hs;
     p.z *= hs;
+    // soft and heavy: his top lags behind his bottom as he speeds up, slows
+    // down and turns, and wobbles back
+    const lag = t * t * Rs;
+    p.x += this.leanX.x * lag;
+    p.z += this.leanZ.x * lag;
     p.y = ys * Rs + this.cy;
     if (this.grounded && p.y < 0.006) {
       // the contact patch: flattened against the ground, spread a little
@@ -629,13 +741,21 @@ export class Knotling {
     this.stretch = air && this.pushT > 0.12 ? clamp(this.vel.y * 0.012, -0.06, 0.08) : 0;
     // his middle's height: his bottom just on the ground (sunk a little
     // under his weight)
+    // (and he's a knot, not a ball: whatever loop is lowest just now is what
+    // he stands on, so he bumps along a little as he rolls)
     this.cy = 0;
-    _v.set(0, -this.sc, 0);
     const save = this.grounded;
     this.grounded = false;
-    this.deform(_v);
+    let bot = 9;
+    for (let i = 0; i < 64; i++) {
+      this.knotPoint(i / 64, _v2);
+      if (_v2.y < bot) bot = _v2.y;
+    }
     this.grounded = save;
-    this.cy = -_v.y - (this.grounded ? 0.012 + Math.max(0, this.sqLow.x) * 0.03 : 0);
+    const want = -(bot - ROPE) - (this.grounded ? 0.012 + Math.max(0, this.sqLow.x) * 0.03 : 0);
+    this.cyS = this.cyS === undefined || !this.ready2 ? want : this.cyS + (want - this.cyS) * (1 - Math.exp(-(this.dtNow || 0.016) * 28));
+    this.ready2 = true;
+    this.cy = this.cyS;
     // where the rope runs: the material u along it to the knot's shape k
     // (the rope drawn toward the lowest part of him by drift)
     let low = 0, lowY = 9;
@@ -1179,9 +1299,14 @@ export class Knotling {
     const mid = this.mid;
     // which way is toward you, and his eyes side by side as you see them
     const toCam = (this.toCam ||= new THREE.Vector3()).copy(cam).sub(mid).normalize();
-    this.eyeSide.crossVectors(_UP, toCam).normalize();
-    // where he'd like to be looking out: toward you, a little up
-    const pref = (this.pref ||= new THREE.Vector3()).copy(toCam).multiplyScalar(0.8).add(_v.set(0, 0.35, 0)).normalize();
+    // where he'd like to be looking out from: wherever his eyes have got to
+    // on their way round him (see orbitStep)
+    const pref = this.orbitStep(dt, toCam);
+    // (side by side across the way they look out: as they go round him,
+    // you see them turn)
+    this.eyeSide.crossVectors(_UP, this.eyeDir);
+    if (this.eyeSide.lengthSq() < 0.04) this.eyeSide.crossVectors(_UP, toCam);
+    this.eyeSide.normalize();
     // where his eyes are now (they ease from spot to spot, quick)
     const k = 1 - Math.exp(-dt * 16);
     this.eyeDir.lerp(this.eyeDirTo, k).normalize();
@@ -1207,12 +1332,13 @@ export class Knotling {
     }
     const look = !fast && (this.blocked > 0.16 + Math.random() * 0.1 || this.peekT <= 0);
     if (look && this.moveT > 0.2) {
-      const anywhere = this.peekT <= 0 && Math.random() < 0.25;
+      const anywhere = false;
       this.peekT = 0.9 + Math.random() * 1.8;
       let best = null, bestS = this.blocked > 0 ? -9 : clear * 4 + this.eyeDir.dot(pref) * 0.8 + 0.15;
       for (const d of LOOKOUTS) {
         const al = d.dot(pref);
-        if (al < (anywhere ? -0.6 : 0.1)) continue;
+        // (an opening near where they're headed round him)
+        if (al < 0.5) continue;
         for (const depth of [0.66, 0.56, 0.46, 0.34]) {
           spot(d, depth, _v2);
           const c = this.clearAt(_v2, this.eyeSide, cam);
@@ -1273,6 +1399,59 @@ export class Knotling {
     this.mats.hollow.uniforms.uHollowAt.value.set(_v.x, _v.y, _v.z, EYE_R * 2.5);
   }
 
+  // Where his eyes are headed round him: a spot on a ball about him that
+  // wanders - back toward you, round to your side, over his top, now and
+  // then away on his far side (where you can't see them) - and that they
+  // travel to, round him, rather than jump to. Returns the way out to it.
+  orbitStep(dt, toCam) {
+    const O = this.orbit;
+    O.hold -= dt;
+    O.forced -= dt;
+    if (O.hold <= 0) {
+      const r = Math.random(), s = this.runnerSide;
+      if (r < 0.36) {
+        O.azTo = Math.PI + (Math.random() - 0.5) * 1.3;
+        O.elTo = 0.15 + Math.random() * 0.5;
+      } else if (r < 0.64) {
+        O.azTo = s * (Math.PI / 2 + (Math.random() - 0.3) * 0.9);
+        O.elTo = 0.1 + Math.random() * 0.45;
+      } else if (r < 0.78) {
+        O.azTo = (Math.random() - 0.5) * 1.1;
+        O.elTo = 0.2 + Math.random() * 0.3;
+      } else if (r < 0.9) {
+        O.azTo = O.az + (Math.random() - 0.5);
+        O.elTo = 1.1 + Math.random() * 0.3;
+      } else {
+        O.azTo = -s * Math.PI / 2;
+        O.elTo = 0.3;
+      }
+      O.hold = 1 + Math.random() * 2.4;
+    }
+    if (O.circle > 0) {
+      // (right round him: on, at a steady pace)
+      O.circle -= dt;
+      O.az += O.circleDir * 3.3 * dt;
+      O.azTo = O.az;
+    }
+    let d = O.azTo - O.az;
+    d -= TAU * Math.round(d / TAU);
+    O.az += clamp(d * 5 * dt, -3.4 * dt, 3.4 * dt);
+    O.el += clamp((O.elTo - O.el) * 5 * dt, -2.4 * dt, 2.4 * dt);
+    // the way he's going (sitting still: facing you)
+    const fwd = (this.fwd ||= new THREE.Vector3(0, 0, -1));
+    _w.set(this.vel.x, 0, this.vel.z);
+    if (_w.lengthSq() > 1) fwd.lerp(_w.normalize(), 1 - Math.exp(-dt * 6)).normalize();
+    else if (this.mode === 'sit') fwd.lerp(_w.set(-toCam.x, 0, -toCam.z).normalize(), 1 - Math.exp(-dt * 4)).normalize();
+    _w2.crossVectors(fwd, _UP);
+    const ce = Math.cos(O.el);
+    return (this.prefV ||= new THREE.Vector3())
+      .copy(fwd)
+      .multiplyScalar(ce * Math.cos(O.az))
+      .addScaledVector(_w2, ce * Math.sin(O.az))
+      .addScaledVector(_UP, Math.sin(O.el))
+      .normalize();
+  }
+
   // The shutter's smear of his spin: the rope a moment back, turned about
   // his middle by a share of this frame's turn, see-through.
   blur() {
@@ -1280,7 +1459,9 @@ export class Knotling {
     const k = smooth(0.12, 0.6, turn);
     // how much of his eyes shows through the spinning rope: by how fast it
     // turns (not by the frame rate: the same at 30 frames a second as at 60)
-    const see = smooth(5, 16, this.omega.length()) * 0.72;
+    // (only from the side of him they're on: round the back of him, they're
+    // hidden)
+    const see = smooth(5, 16, this.omega.length()) * 0.72 * smooth(-0.15, 0.45, this.eyeDir.dot(this.toCam || _UP));
     for (const m of this.eyeThrough) {
       m.visible = see > 0.01;
       m.material.uniforms.uEyeA.value = see;

@@ -266,6 +266,9 @@ export const CONFIG = {
       rest: [2, 4],
       fetch: { every: [9, 16], reach: [6, 24], chance: 0, mischief: 0 },
       slot: { off: 0.98, dz: -0.85, back: -1.7, edge: 2.95 },
+      // his ideas between swings (a wave, bounces, a shudder, a stretch, his
+      // eyes sent round him, a wobbly roll): every so many seconds
+      ideas: { every: [1.6, 3.8] },
       swing: { share: 0.3, time: 1.3, gap: [1.8, 6.5], clear: 1.7, gather: 0.13, hop: 0.42, length: 1.05, angle: 0.82, out: 0.08, period: 0.76, release: 0.86, back: 0.26 },
       duck: 1.0,
     },
