@@ -48,6 +48,16 @@ export class Roller extends Companion {
     this.swingIn = rand(2.5, 4);
     this.glanceT = rand(2, 5);
     this.glancing = 0;
+    // his ideas between swings (see ideas), and what he's copying of you
+    this.ideaT = rand(1.5, 3);
+    this.lastIdea = null;
+    this.hops = [];
+    this.wobbleT = 0;
+    this.copyT = 0;
+    this.lowT = 0;
+    this.wasPJ = false;
+    this.wasPS = false;
+    this.ph = [rand(0, 6.3), rand(0, 6.3), rand(0, 6.3)];
     super.reset(title);
     this.fetchT = 1e9;
     const b = this.body;
@@ -57,17 +67,28 @@ export class Roller extends Companion {
   }
 
   // --- what happens to the runner ---------------------------------------------------
+  // Picked: he hops, and waves a lobe of himself at you.
   greet() {
     if (this.grounded && !this.swing) this.jump(0.32, 'hop');
-    this.body.flick();
+    this.hops = [0.22];
+    this.body.wave(_a.copy(this.game.cam.camera.position).sub(this.body.root.position), 1.6);
+    this.body.peek(Math.PI, 0.35, 1.8);
     this.cheer(1.4);
     this.lookFor(1.4, 'camera');
   }
 
+  // You stumbled: a shudder through every loop, and his eyes round on you.
   stumbled() {
     this.mood.earsBack = 1.1;
     this.lookFor(1.2, 'runner');
     this.glancing = 0.9;
+    this.body.shake(0.3);
+    this.body.peek(this.body.runnerSide * Math.PI * 0.6, 0.3, 1.4);
+  }
+
+  revived() {
+    super.revived();
+    this.hops = [0.3, 0.2];
   }
 
   crashed() {
@@ -80,9 +101,12 @@ export class Roller extends Companion {
     super.powerBegin();
   }
 
+  // A whole run of gems: delighted - a wave, and a bounce or two.
   wholeRun() {
     this.cheer(1.4);
-    this.body.flick();
+    if (this.swing || !this.grounded) return this.body.flick();
+    this.body.wave(_a.set(this.game.player.x - this.x, 0, -0.3), 1.3);
+    if (Math.random() < 0.6) this.hops = [0.26, 0.18];
   }
 
   // --- the frame ---------------------------------------------------------------------
@@ -111,8 +135,97 @@ export class Roller extends Companion {
       return;
     }
     this.escort(dt);
+    this.ideas(dt);
     this.swingIn -= dt;
     if (this.swingIn <= 0 && this.canSwing()) this.startSwing();
+  }
+
+  // --- his ideas ---------------------------------------------------------------------------
+  // Between swings he's never just a ball rolling along: every few seconds
+  // an idea (a wave of a lobe of himself at you; a run of bounces; a
+  // shudder, every loop let loose and cinched tight again; a stretch,
+  // drawn up tall; his eyes sent round to look back at you, or right round
+  // him; a wobbly roll, rocking side to side), and he copies you - hopping
+  // when you jump, flattening when you slide.
+  ideas(dt) {
+    const g = this.game;
+    const p = g.player;
+    const b = this.body;
+    const G = this.goal;
+    // copying you
+    const pj = !p.grounded, ps = !!p.sliding;
+    if (pj && !this.wasPJ && Math.random() < 0.4) this.copyT = rand(0.08, 0.18);
+    if (ps && !this.wasPS && Math.random() < 0.55) this.lowT = rand(0.5, 0.8);
+    this.wasPJ = pj;
+    this.wasPS = ps;
+    if (this.copyT > 0 && (this.copyT -= dt) <= 0 && this.grounded && !this.windup && this.canLeap(0.9)) this.jump(0.4, 'hop');
+    if (this.lowT > 0) {
+      this.lowT -= dt;
+      G.low = 1;
+    }
+    // bouncing on, one after another
+    if (this.hops.length && this.grounded && !this.windup) {
+      if (this.canLeap(0.8)) this.jump(this.hops.shift(), 'hop');
+      else this.hops.length = 0;
+    }
+    // a wobbly roll: rocking, weaving a little across his line
+    if (this.wobbleT > 0) {
+      this.wobbleT -= dt;
+      G.x += 0.2 * Math.sin(g.time * 5.2);
+    }
+    b.wobble += ((this.wobbleT > 0 ? 1 : 0) - b.wobble) * (1 - Math.exp(-dt * 4));
+    this.ideaT -= dt;
+    if (this.ideaT > 0 || this.hops.length || !this.grounded || this.windup || G.low || this.wobbleT > 0) return;
+    const I = this.C.ideas;
+    this.ideaT = rand(I.every[0], I.every[1]);
+    const near = Math.abs(p.x - this.x) < 2.6;
+    const opts = [
+      ['wave', near ? 1 : 0.2],
+      ['bounce', this.canLeap(1.4) ? 1.1 : 0],
+      ['shake', 0.8],
+      ['stretch', 0.6],
+      ['peek', 0.9],
+      ['circle', 0.6],
+      ['wobble', this.openRoad(this.x, 2.5) ? 0.7 : 0],
+    ];
+    for (const o of opts) if (o[0] === this.lastIdea) o[1] *= 0.15;
+    let r = Math.random() * opts.reduce((a, o) => a + o[1], 0);
+    let pick = opts[0][0];
+    for (const [n, w] of opts) if ((r -= w) <= 0 && w > 0) {
+      pick = n;
+      break;
+    }
+    this.lastIdea = pick;
+    switch (pick) {
+      case 'wave':
+        b.wave(_a.set(p.x - this.x, 0, -0.35), rand(1.1, 1.7));
+        b.peek(b.runnerSide * Math.PI * 0.55, 0.35, 1.6);
+        this.lookFor(1.3, 'runner');
+        this.glancing = 1.1;
+        this.cheer(1.2);
+        break;
+      case 'bounce':
+        this.hops = Math.random() < 0.5 ? [0.24, 0.36, 0.18] : [0.3, 0.2];
+        this.cheer(1.2);
+        break;
+      case 'shake':
+        b.shake(rand(0.4, 0.65));
+        break;
+      case 'stretch':
+        b.stretchUp(rand(0.45, 0.7));
+        this.lookFor(0.9, 'camera');
+        break;
+      case 'peek':
+        b.peek(Math.PI + rand(-0.4, 0.4), rand(0.2, 0.5), rand(1.3, 2));
+        this.lookFor(1.2, 'camera');
+        break;
+      case 'circle':
+        b.circleEyes(rand(1.6, 2.4), Math.random() < 0.5 ? 1 : -1);
+        break;
+      case 'wobble':
+        this.wobbleT = rand(1.6, 2.6);
+        break;
+    }
   }
 
   // --- beside you, a little behind ------------------------------------------------------
@@ -130,8 +243,11 @@ export class Roller extends Companion {
     if (!ok(this.side)) this.side = -this.side;
     // (the other side's nearer where he is now by a good way: he takes it)
     else if (ok(-this.side) && Math.abs(at(-this.side) - this.x) < Math.abs(at(this.side) - this.x) - 0.6) this.side = -this.side;
-    G.x = at(this.side);
-    G.dz = S.dz;
+    // (never quite still in it: drifting forward and back a little,
+    // and across)
+    const t = g.time;
+    G.x = at(this.side) + 0.1 * Math.sin(t * 0.8 + this.ph[0]);
+    G.dz = S.dz + 0.24 * Math.sin(t * 0.63 + this.ph[1]) + 0.1 * Math.sin(t * 1.7 + this.ph[2]);
     G.w = 5;
     G.wz = 2;
     G.low = 0;
@@ -160,11 +276,12 @@ export class Roller extends Companion {
     const df = g.dist + this.dz;
     if (this.threat(this.x, df - 1.4, df + vf * this.C.duck + 1.2, 'H')) G.low = 1;
     // walled into your lane: he drops back behind you (below the camera's
-    // view of you) rather than dashing past you - unless he's level with you
-    // or ahead already (back would take him through you): then on ahead
+    // view of you) rather than dashing past you - unless he's ahead already,
+    // or level and on his way forward (back would take him through you):
+    // then on ahead
     const p = g.player;
     if (Math.abs(this.x - p.x) < 0.8 && this.dz < 1.4 && this.dz > -2.2) {
-      if (this.dz > -0.3) G.dz = Math.max(G.dz, 2.4);
+      if (this.dz > 0.6 || (this.dz > -0.3 && this.vdz > 0.5)) G.dz = Math.max(G.dz, 2.4);
       else {
         G.dz = Math.min(G.dz, this.C.slot.back - 0.4);
         G.wz = Math.max(G.wz, 7);
@@ -176,7 +293,7 @@ export class Roller extends Companion {
   // Clear road ahead for the whole of it, on the ground, nothing else on.
   canSwing() {
     const g = this.game;
-    if (g.state !== 'running' || !this.grounded || this.windup || this.goal.low || this.lowNowish()) return false;
+    if (g.state !== 'running' || !this.grounded || this.windup || this.goal.low || this.lowNowish() || this.hops.length || this.wobbleT > 0) return false;
     if (Math.abs(this.x - this.goal.x) > 0.5 || Math.abs(this.vx) > 2) return false;
     const S = this.C.swing;
     // (nothing anywhere near his line - a wall beside it would meet the
@@ -364,6 +481,7 @@ export class Roller extends Companion {
     if (!b.turn) _turn.set(0, 0, 0);
     // where his eyes look: you (or the camera, or whatever he's looking at)
     const pl = g.player;
+    b.runnerSide = pl.x >= this.x ? 1 : -1;
     const at = (b.gazeAt ||= new THREE.Vector3());
     if (this.lookT > 0 && this.lookAt === 'camera') at.copy(g.cam.camera.position);
     else if (this.lookT > 0 && this.lookAt && this.lookAt !== 'runner') at.set(this.lookAt.x, this.lookAt.y, this.pz - this.lookAt.dz);
