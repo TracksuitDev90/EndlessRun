@@ -989,7 +989,9 @@ body:not(.touch) .touch-only {
     max-width: 100%;
   }
   .pals.many .pal-name {
-    font-size: 13.5px;
+    /* (six to a row on a phone: the longest name - Knotling - still fits) */
+    font-size: min(13.5px, 3.05cqi);
+    letter-spacing: -0.01em;
   }
 }
 @container pals (max-width: 299px) {

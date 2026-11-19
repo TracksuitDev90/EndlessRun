@@ -5,7 +5,7 @@ import { makeMarksTexture, makeNoiseTexture } from './render/textures.js';
 import { Game, startingRunner, startingCompanion } from './game/game.js';
 import { loadRunner } from './game/runner-asset.js';
 import { CHARACTERS, characterById } from './game/characters.js';
-import { COMPANIONS, companionById } from './game/companions.js';
+import { COMPANIONS, companionById, PROCEDURAL } from './game/companions.js';
 import { WORLD_ORDER } from './world/index.js';
 import { World } from './world/world.js';
 import { compileObjects } from './game/prep.js';
@@ -53,6 +53,9 @@ async function slices(it, ms = 24) {
 const params = parseParams();
 const ui = new UI(CONFIG.title);
 
+// Whoever's model: fetched, or for a companion with none, the stand-in.
+const model = (c, bytes) => (c.asset ? loadRunner(c.asset, bytes) : Promise.resolve(PROCEDURAL));
+
 async function boot() {
   const load = ui.loader;
   // --- who's here before the title screen ----------------------------------------
@@ -85,7 +88,7 @@ async function boot() {
   const fetches = [
     twice(() => start.load()),
     ...runnersFirst.map((c) => Promise.all([twice(() => c.load()), twice(() => loadRunner(c.asset, load.bytes))]).then(([, a]) => (assets[c.id] = a))),
-    ...palsFirst.map((c) => Promise.all([twice(() => c.load()), twice(() => loadRunner(c.asset, load.bytes))]).then(([, a]) => (companionAssets[c.id] = a))),
+    ...palsFirst.map((c) => Promise.all([twice(() => c.load()), twice(() => model(c, load.bytes))]).then(([, a]) => (companionAssets[c.id] = a))),
   ];
   const names = [firstRunner, firstPal].filter(Boolean).map((c) => c.name);
   load.stage('fetch', names.length ? `fetching ${names.join(' and ')}` : 'fetching');
@@ -158,7 +161,9 @@ async function boot() {
   const remember = () => {
     if (params.runner || params.companion) return;
     const bases = [characterById(game.runnerId).asset];
-    if (game.companionId) bases.push(companionById(game.companionId).asset);
+    // (one with no model to fetch - Knotling - is remembered by name, so
+    // the page can still ask for his code early)
+    if (game.companionId) bases.push(companionById(game.companionId).asset || '#' + game.companionId);
     try {
       localStorage.setItem('er.assets', JSON.stringify(bases));
     } catch {
@@ -454,7 +459,7 @@ async function boot() {
     q.failed = false;
     if (q.runner) ui.runnerWaiting(q.c.id);
     else ui.companionWaiting(q.c.id);
-    q.asset = downloads.then(() => Promise.all([fetchTwice(() => q.c.load()), fetchTwice(() => loadRunner(q.c.asset))]).then(([, a]) => a));
+    q.asset = downloads.then(() => Promise.all([fetchTwice(() => q.c.load()), fetchTwice(() => model(q.c))]).then(([, a]) => a));
     downloads = q.asset.catch(() => {});
     line = line.then(() => letIn(q));
   };

@@ -67,7 +67,12 @@ mineral, coral branching out of his shell, eyes on stalks, one claw very
 much bigger than the other with a window of clear crystal in it — scuttles
 along beside you on eight crystal legs, tilting his head at you, and turns
 to the colours of every world he walks into (see [The giant
-crab](#the-giant-crab)).
+crab](#the-giant-crab)). Or Knotling, a living knot — one long length of
+thick marigold rope with a single indigo strand wound through it, tied over
+and under itself into a loose ball, two eyes looking out from the dark
+inside — rolls along beside you, and now and then swings, feeding a loop of
+himself out into a ring that catches on the air (see [The living
+knot](#the-living-knot)).
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -1671,7 +1676,7 @@ Append to the URL:
 | `?dream=12` | deal every world the dream of the n-th world (0–3 = none, 18+ = the deepest); each world still deals its own recipe |
 | `?seed=42` | reproducible layout |
 | `?runner=explorer` | who runs (`wayfarer`, `explorer`, `elder`, `bunny`, `skater`, `samurai`), over the one remembered — even one locked on the title screen |
-| `?companion=dragon` | who runs with you (`fox`, the default, `dragon`, `pitcher` or `thistle`), over the one remembered; `none` runs alone |
+| `?companion=dragon` | who runs with you (`fox`, the default, `dragon`, `pitcher`, `thistle`, `crab` or `knot`), over the one remembered; `none` runs alone |
 | `?god` | no collisions |
 | `?dpr=1.5` | force a pixel ratio (disables adaptive resolution) |
 | `?fps=30` | cap the frame rate (resolution still adapts) |
@@ -3689,6 +3694,107 @@ there isn't he flattens himself and scuttles under it. When you stumble he
 looks back at you, worried; on the title screen he sits by you looking
 about; picked, he waves.
 
+## The living knot
+
+![Knotling: looking out of the opening at one end of him (his portrait), and turned round as he rolls, his eyes peeking out wherever there's a gap; a swing from the runner's camera - he bunches, feeds a ring of himself out ahead and up, it catches and pulls taut, and he swings forward under it; a hurdle - bunched low, then up and over the hedge; and a bar - slid out low and wide](docs/knot.jpg)
+
+Knotling is one continuous length of thick marigold rope with a single
+indigo strand wound through it, tied over and under itself into a loose,
+roughly round knot about knee high to the runner (`RADIUS` in
+`knotling.js`), with two warm, round eyes looking out from the dark inside
+him. No abilities yet: he's the first companion with nothing to unlock
+(`powers.js` lists none for him; the Companions menu says they're still to
+come).
+
+**Tied, not sculpted.** He has no model to fetch (`asset: null` in
+`companions.js`; the loader hands his body a stand-in, and the page
+remembers him as `#knot` to fetch his code early). His shape at rest is
+worked out when his code loads (`src/game/knotshape.js`, plain arithmetic):
+a Turk's head laid over a ball — the rope four times round it, weaving up
+and down across its middle five times — so every lap crosses the others,
+alternately over and under; at each crossing the strand going over is
+lifted off the ball and the one going under pressed in, so the crossings
+have real depth; a few seeded wobbles make the loops uneven, as if tied by
+hand; then a relaxation keeps the rope evenly spaced and never through
+itself. You can see through him: there's an opening at each pole and gaps
+all round.
+
+**Laid out every frame** (`src/game/knotling.js`). His tube is rebuilt from
+that shape each frame — 288 rings round the rope's length — from where each
+bit of rope is *along* the rope, so the plies, the indigo strand, the worn
+patches and the flyaways go where the rope goes:
+
+- rolled by exactly as far as he's rolled over the ground (his middle's
+  height, squashed or not, is the radius), his lower loops meeting the road;
+- squashed by his weight on landing, the lower loops first and the upper
+  ones settling a beat later; the contact patch flattened and spread;
+- now and then one loop slips open or is drawn tighter, on a spring of its
+  own, overshooting and settling while the others hold;
+- reshaping for what's in his way: bunched low against the road before a
+  jump and pushing off with his lower loops; slid out low and wide under a
+  bar, his top loops slipping out over his sides. Every change of size draws
+  rope along itself toward the part of him that's growing — you see the
+  plies and the indigo strand slide along.
+
+**Light and shade.** Each vertex is shaded by how shut in it is (the rope
+round it, found through a coarse grid of the rings, and the hollow inside
+him) and by whether a loop over it lies between it and the light — a little
+depth map of him seen from the light, each ring laid on it as a disc, as a
+shadow map would be — so the outer loops throw their shadows on the rope
+under them. The shader (`FS_ROPE`) draws the rest: three plies laid up
+right-handed, the yarns twisted the other way in each, fibres, the indigo
+cord on its long lay dipping under a ply now and then, pale worn patches,
+a dry sheen along the fibres (stronger pulled taut), and a fuzzy outline.
+Pressed against itself the rope is smooth; out on its bends it's fuzzy. The
+fine detail fades where it would shimmer, so up close you see the yarns and
+at a distance an even golden rope.
+
+**Flyaways** are real strands: 170 short, uneven golden fibres, most on his
+sharpest bends and his worn patches, standing off whichever side of the
+rope faces out of the knot — and folded away wherever the rope's pressed
+against itself. Each is a ribbon turned to face you, never thinner than
+about a pixel (thinner, it fades but doesn't vanish), so on a phone they
+still break up his outline. Each trembles on a quick spring of its own:
+when a loop pulls taut (the swing's ring catching, a slipped loop snapping
+back, a landing) they shiver on after the rope has settled.
+
+**His eyes** don't roll with him. They sit inside the knot, looking out
+toward you through whatever gap the rope leaves; when a strand rolls across
+them they wait a moment and look out through another, and now and then
+they move somewhere better on their own — anywhere on him, the back
+included. Warm ivory whites, round brown pupils, two small catchlights,
+lids closing from above for a blink. They look at you, with a share of the
+way turned toward the camera so you always see the pupils; every few
+seconds he glances right up at you. At a run he really does spin fast —
+five to twelve turns a second — and nothing holds still long enough to look
+out of; but a cage of rope turning that fast is no more solid to the eye
+than a fan's blades, so his eyes show through the blur of it (a second,
+see-through pass of them over the rope, by how fast he spins). That blur is
+drawn too: a little of each frame's turn is smeared behind him as a
+camera's shutter would (three faint copies of the rope turned back about
+his middle, and the fine detail softened), so he reads as rolling rather
+than flickering at 30 frames a second as at 60.
+
+**His mind** (`src/game/roller.js`, built on the fox's `companion.js` for
+reading the road). He keeps one place: beside you and a little behind
+(`CONFIG.companion.knot.slot`), on whichever side of you there's room on
+the road — changing sides only when he must. If you change lanes across his
+line he holds where he is and drops further back, far enough that he's
+below the camera's view of your feet, so you're never hidden; walled into
+your lane, he falls in behind you. Rolling is his natural pace; about three
+tenths of the time (over a stretch of road, with stretches of plain rolling
+between) he swings, the way a monkey swings on a vine, except he brings his
+own: he bunches and hops, feeding part of himself out ahead and up into an
+open hoop — the rest of him drawing visibly smaller as rope leaves it —
+whose far end catches an invisible point in the air; the slack pulls taut,
+his weight swings down under the point and forward in an arc, and at the
+far end he lets go, draws the loop back in as he flies, lands with a squash
+and rolls straight on with the speed he carried. All of it on his own side
+of you, and only with the road clear for the whole of it. A hurdle he
+jumps, a bar he slides under, a wall he rolls round; none of it touches the
+run. On the title screen he sits by you, breathing a little; picked, he
+hops and flicks a loop.
+
 ## Companion abilities
 
 Your companion can be brought on, for keeps, with gems. **Bank** the gems in
@@ -3828,6 +3934,9 @@ small meshes drawn only while they're in use.
    pay no clear bonus. When it's over he shrinks back and comes back to
    your side.
 
+**Knotling, the living knot** — no abilities yet: his levels can't be
+bought until he has some (the Companions menu says they're still to come).
+
 ## Project layout
 
 ```
@@ -3897,7 +4006,11 @@ src/game/                     game loop, player (the runners' shared core:
                               its own mind, on the runner's; crab.js: Shoal's
                               body, scuttle, eyes, claws, coral and his colours
                               world to world; scuttler.js: his own mind, on the
-                              runner's); progress.js (the
+                              runner's; knotshape.js: Knotling's knot at rest;
+                              knotling.js: his rope laid out each frame -
+                              rolling, squashing, slipping, the ring he swings
+                              by, its light and shade, his flyaways and eyes;
+                              roller.js: his own mind, on the runner's); progress.js (the
                               gem bank and the companions' levels), powers.js
                               (their abilities) and powerfx.js (what the
                               abilities leave in the world: soil, water,
@@ -3931,6 +4044,9 @@ tools/runner/thistle.html     the storm thistle turned round, posed, gliding,
 tools/runner/crab.html        the giant crab turned round, posed, in any
                               world (or caught changing), ducking, smashing,
                               resonating, or as a film strip
+tools/runner/knot.html        Knotling turned round, rolling, jumping, sliding,
+                              with his ring out, at 30 or 60 frames a second,
+                              or as a film strip (no model: his code is all)
 tools/companion/audit.js      plays the game unseen, checking the companion
                               never touches an obstacle (and that one who
                               flies keeps out of your way)

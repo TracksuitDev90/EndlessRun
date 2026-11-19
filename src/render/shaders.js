@@ -10027,3 +10027,379 @@ export function makeParticleMaterial() {
     blendDst: THREE.OneMinusSrcAlphaFactor,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Knotling (game/knotling.js): one length of thick marigold rope tied into a
+// loose ball, a single indigo strand wound through it, two eyes peeking out
+// from the dark inside, and short golden flyaways. The rope's tube is laid
+// out on the CPU every frame (it rolls, slips, feeds out into a ring and
+// back), each vertex carrying where it is along the rope and round it, and
+// how shut in it is by the rope round it and in the shadow of the loops over
+// it (see Knotling.shade). Everything finer than that is drawn here.
+// ---------------------------------------------------------------------------
+const VS_ROPE = COMMON + /* glsl */ `
+attribute vec4 aRope; // x how far along the rope (m), y the angle round it, z how shut in, w in shadow
+attribute vec3 aTan;
+attribute float aWear;
+#ifdef OUTLINE
+uniform float uOutline;
+#endif
+#ifdef GHOST
+// a moment ago: the rope turned back about his middle by part of how far it
+// rolled this frame (the shutter's smear: see Knotling.blur)
+uniform mat4 uGhost;
+#endif
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec4 vRope;
+varying vec3 vTan;
+varying float vWear;
+void main() {
+  vec3 p = position;
+  #ifdef OUTLINE
+    // (thinner where the rope's pressed against itself, so the crossings
+    // don't fill with ink)
+    p += normal * uOutline * (1.0 - 0.7 * aRope.z);
+  #endif
+  vec3 nm = normal;
+  vec3 tg = aTan;
+  #ifdef GHOST
+    p = (uGhost * vec4(p, 1.0)).xyz;
+    nm = mat3(uGhost) * nm;
+    tg = mat3(uGhost) * tg;
+  #endif
+  vec3 wp = (modelMatrix * vec4(p, 1.0)).xyz;
+  vNormal = normalize(mat3(modelMatrix) * nm);
+  vTan = normalize(mat3(modelMatrix) * tg);
+  vRope = aRope;
+  vWear = aWear;
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+
+const KNOT_FN = /* glsl */ `
+uniform vec3 uRopeCol[7]; // marigold, the grooves, fibre-light, indigo, indigo deep, worn, the dark inside him
+uniform vec4 uRopeK; // x the rope's radius (m), y the plies' lay (m a turn), z the indigo strand's lay, w taut sheen
+uniform float uBlur; // 0..1: how much of the fine detail is smeared by his spin
+float kh(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float kn(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(kh(i), kh(i + vec2(1.0, 0.0)), f.x), mix(kh(i + vec2(0.0, 1.0)), kh(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+`;
+
+const FS_ROPE = FS_HEAD + KNOT_FN + /* glsl */ `
+#ifdef GHOST
+uniform float uGhostA;
+#endif
+uniform vec3 uLightDir;
+uniform vec3 uShadowTint;
+uniform vec4 uRim;
+uniform sampler2D uNoise;
+varying vec4 vRope;
+varying vec3 vTan;
+varying float vWear;
+` + CAUSTIC + /* glsl */ `
+void main() {
+  float s = vRope.x;
+  float a = vRope.y / 6.2831853;
+  float occ = clamp(vRope.z, 0.0, 1.0);
+  float shd = clamp(vRope.w, 0.0, 1.0);
+  vec3 n = normalize(vNormal);
+  vec3 T = normalize(vTan);
+  vec3 B = normalize(cross(T, n));
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  float circ = 6.2831853 * uRopeK.x;
+  // three plies laid up right-handed, each a round strand of its own: the
+  // normal tilts across each, dark in the grooves between
+  float c = 3.0 * (a + s / uRopeK.y);
+  float f = fract(c);
+  float ply = mod(floor(c), 3.0);
+  float bump = sin(3.14159265 * f);
+  // (how fine the detail can be here: none of it shimmers at a distance)
+  float fine = (1.0 - smoothstep(0.22, 0.65, fwidth(c))) * (1.0 - 0.85 * uBlur);
+  #ifdef GHOST
+    fine *= 0.3;
+  #endif
+  vec3 G = normalize(B * (3.0 / circ) + T * (3.0 / uRopeK.y));
+  vec3 nb = normalize(n - G * cos(3.14159265 * f) * (0.35 + 0.4 * fine));
+  // the yarns in each ply, twisted the other way, and the fibres in them
+  // (across each ply: along the ply's own run, a fine hatch of yarns)
+  vec2 pd = normalize(vec2(circ, -uRopeK.y));
+  float yc = (a * circ * pd.x + s * pd.y) / 0.011 + f * 1.3;
+  float yfine = (1.0 - smoothstep(0.25, 0.7, fwidth(yc))) * (1.0 - uBlur);
+  float yarn = 0.5 + 0.5 * sin(6.2831853 * yc);
+  vec2 fq = vec2(s * 220.0, a * 64.0 + f * 9.0);
+  float fz = kn(fq) * 0.65 + kn(fq * 2.7 + 3.1) * 0.35;
+  float ffine = (1.0 - smoothstep(0.3, 0.9, length(fwidth(fq)))) * (1.0 - 0.9 * uBlur);
+  // pressed against itself (the crossings) the rope's smooth; out on its
+  // bends and on the worn patches it's fuzzy
+  float fuzz = (1.0 - 0.75 * occ) * (0.55 + 0.9 * vWear);
+  // (the grooves dark only right down in them: the plies are round and full)
+  vec3 col = mix(uRopeCol[1], uRopeCol[0], smoothstep(0.0, 0.42, bump));
+  col = mix(col, uRopeCol[0] * 1.08, smoothstep(0.75, 1.0, bump) * 0.5);
+  col *= 1.0 + (ply - 1.0) * 0.045;
+  col *= mix(1.0, 0.8 + 0.3 * yarn, yfine * (0.6 + 0.3 * bump));
+  col = mix(col, uRopeCol[2], smoothstep(0.55, 0.85, fz) * 0.55 * ffine * fuzz);
+  col *= 1.0 - smoothstep(0.35, 0.05, fz) * 0.12 * ffine;
+  col = mix(col, uRopeCol[5], clamp(vWear, 0.0, 1.0) * (0.35 + 0.3 * fz));
+  // the indigo strand: a thin cord of its own wound round on a long lay,
+  // dipping under a ply now and then
+  float ab = fract(a - s / uRopeK.z + 0.13);
+  float db = min(ab, 1.0 - ab) * circ;
+  float wb = uRopeK.x * 0.2;
+  float dive = smoothstep(0.82, 0.97, sin(s * 6.2831853 / 0.47 + 1.3)) * smoothstep(0.5, 0.0, bump);
+  float bm = (1.0 - smoothstep(wb * 0.7, wb * 1.05, db)) * (1.0 - dive);
+  float bt = 0.5 + 0.5 * sin(6.2831853 * (db / wb * 0.9 - s / 0.011));
+  vec3 bc = mix(uRopeCol[4], uRopeCol[3], 0.5 + 0.5 * mix(0.5, bt, yfine));
+  col *= 1.0 - 0.3 * smoothstep(wb * 1.7, wb * 1.05, db) * (1.0 - bm);
+  col = mix(col, bc, bm);
+  nb = normalize(mix(nb, normalize(n + B * sign(0.5 - ab) * (db / wb) * 0.5), bm * 0.8));
+  // light: one broad soft shadow shape, and the shadows of the loops over it
+  float lit = smoothstep(-0.14, 0.14, dot(nb, uLightDir) + 0.15) * (1.0 - shd);
+  vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
+  // (deep in the knot it's dark, warm and dark, as in a burrow)
+  sh = mix(sh, uRopeCol[6] / max(uRopeCol[0], vec3(0.05)), occ * 0.78);
+  col *= mix(sh, vec3(1.0), lit);
+  // a dry sheen along the fibres, stronger pulled taut
+  vec3 hv = normalize(uLightDir - V);
+  float th = dot(T, hv);
+  float an = pow(max(1.0 - th * th, 0.0), 30.0) * smoothstep(0.1, 0.8, bump);
+  col += uRopeCol[2] * an * (0.08 + 0.18 * uRopeK.w) * lit * (1.0 - bm * 0.6);
+  // and its outline broken by fibre, fuzzy against whatever's behind
+  float fres = 1.0 - abs(dot(n, V));
+  float halo = smoothstep(0.5, 0.95, fres) * smoothstep(0.35, 0.8, kn(fq * 0.5 + 7.0)) * fuzz;
+  col = mix(col, uRopeCol[2] * mix(sh, vec3(1.0), max(lit, 0.35)), halo * 0.4 * (1.0 - bm));
+  float back = clamp(dot(uLightDir, V) * 0.6 + 0.4, 0.0, 1.0);
+  float rim = smoothstep(1.0 - uRim.w, 1.0 - uRim.w * 0.55, fres) * back * (1.0 - smoothstep(0.5, 0.9, n.y)) * (1.0 - occ);
+  col += uRim.rgb * uRopeCol[0] * rim * 0.45;
+  col *= 1.0 + caustic(vPos, n, dist) * 0.8;
+  col *= 1.0 + (texture2D(uNoise, gl_FragCoord.xy * GRAIN).r - 0.5) * 0.035;
+  // (a bright rope in the dark: he keeps his colour through a drain)
+  gKeep = 1.0;
+  col = atmos(col, v, dist, 0.0);
+  #ifdef GHOST
+    gl_FragColor = vec4(grade(col, uTrip), uGhostA);
+  #else
+    gl_FragColor = vec4(grade(col, uTrip), 1.0);
+  #endif
+}
+`;
+
+const FS_ROPE_INK = FS_HEAD + KNOT_FN + /* glsl */ `
+uniform vec3 uInk;
+void main() {
+  gKeep = 1.0;
+  vec3 ink = mix(uInk, uRopeCol[1] * 0.3, 0.78);
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  gl_FragColor = vec4(grade(atmos(ink, v, dist, 0.0), uTrip), 1.0);
+}
+`;
+
+// The flyaways: each a short fibre in two or three bends, its points laid
+// out on the CPU, drawn as a ribbon turned to face you - never thinner than
+// about a pixel (thinner and it just fades), so they break up his outline at
+// any distance without shimmering.
+const VS_FIBRE = COMMON + /* glsl */ `
+uniform vec2 uResolution;
+attribute vec3 aDir;
+attribute vec4 aFib; // x along it (0 root, 1 tip), y which edge, z width (m), w its tone
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec4 vFib;
+void main() {
+  vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+  vec3 d = normalize(mat3(modelMatrix) * aDir + vec3(1e-5));
+  vec3 toC = uCamPos - wp;
+  float dist = length(toC);
+  vec3 side = normalize(cross(d, toC / dist) + vec3(0.0, 1e-5, 0.0));
+  float pix = dist * 2.0 / (projectionMatrix[1][1] * uResolution.y);
+  float w = aFib.z * (1.0 - 0.7 * aFib.x);
+  float ww = max(w, pix * 0.9);
+  vFib = vec4(aFib.x, aFib.y, w / ww, aFib.w);
+  wp += side * aFib.y * ww * 0.5;
+  vNormal = normalize(cross(side, d));
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_FIBRE = FS_HEAD + KNOT_FN + /* glsl */ `
+uniform vec3 uLightDir;
+uniform vec3 uShadowTint;
+varying vec4 vFib;
+void main() {
+  if (vFib.z < 0.05) discard;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  // golden, paler toward the tip, and glowing a little with the light
+  // behind it (fibre lets it through)
+  vec3 col = mix(uRopeCol[0], uRopeCol[2], 0.35 + 0.5 * vFib.x + 0.15 * vFib.w);
+  float back = clamp(dot(uLightDir, v / dist), 0.0, 1.0);
+  vec3 sh = mix(vec3(0.84, 0.75, 0.8), uShadowTint, 0.35);
+  col *= mix(sh, vec3(1.0), 0.6 + 0.4 * vFib.w) * (1.0 + back * 0.25);
+  float edge = 1.0 - vFib.y * vFib.y;
+  // (thinner than a pixel it fades, but never quite away: they're what
+  // breaks up his outline on a phone)
+  float a = clamp(vFib.z * 1.6, 0.42, 1.0) * mix(1.0, edge, 0.5) * (1.0 - smoothstep(0.8, 1.0, vFib.x)) * step(0.05, vFib.z);
+  gKeep = 1.0;
+  gl_FragColor = vec4(grade(atmos(col, v, dist, 0.0), uTrip), a);
+}
+`;
+
+// His eyes: warm ivory, round brown pupils looking where uGaze points, small
+// catchlights, lids (the dark he's peeking out of) closing from above.
+const VS_KNOT_EYE = COMMON + /* glsl */ `
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+void main() {
+  vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_KNOT_EYE = FS_HEAD + KNOT_FN + /* glsl */ `
+uniform vec3 uLightDir;
+uniform vec4 uGaze; // xyz which way it looks, w how open (1 wide, 0 shut)
+uniform vec3 uEyeCol[4]; // the white, the iris, its rim, the pupil
+#ifdef THROUGH
+// seen through the blur of his spinning rope: how much of them shows
+uniform float uEyeA;
+#endif
+void main() {
+  vec3 n = normalize(vNormal);
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  vec3 V = v / dist;
+  vec3 up = normalize(vec3(0.0, 1.0, 0.0) - V * V.y);
+  vec3 rt = normalize(cross(up, V));
+  float ly = dot(n, up);
+  float lid = mix(-1.05, 1.05, uGaze.w);
+  vec3 col;
+  if (ly > lid) {
+    col = uRopeCol[6] * 1.4;
+  } else {
+    float cg = dot(n, normalize(uGaze.xyz));
+    col = uEyeCol[0];
+    float iris = smoothstep(0.715, 0.735, cg);
+    col = mix(col, mix(uEyeCol[2], uEyeCol[1], smoothstep(0.74, 0.86, cg)), iris);
+    col = mix(col, uEyeCol[3], smoothstep(0.905, 0.92, cg));
+    // the lid's shadow along the top of the white, a soft round shade
+    col *= 1.0 - 0.32 * smoothstep(lid - 0.55, lid, ly) - 0.12 * smoothstep(0.2, -0.9, dot(n, -V));
+    col *= 0.82 + 0.18 * clamp(dot(n, uLightDir) * 0.5 + 0.6, 0.0, 1.0);
+    // catchlights: the light's, and a small one up and to one side
+    vec3 hv = normalize(uLightDir - V);
+    float sp = smoothstep(0.972, 0.982, dot(n, hv));
+    float sp2 = smoothstep(0.962, 0.975, dot(n, normalize(-V + up * 0.42 - rt * 0.32)));
+    float sp3 = smoothstep(0.985, 0.992, dot(n, normalize(-V - up * 0.3 + rt * 0.36)));
+    col = mix(col, vec3(1.0), max(max(sp * 0.7, sp2), sp3 * 0.75));
+  }
+  gKeep = 1.0;
+  #ifdef THROUGH
+    gl_FragColor = vec4(grade(atmos(col, v, dist, 0.0), uTrip), uEyeA);
+  #else
+    gl_FragColor = vec4(grade(atmos(col, v, dist, 0.0), uTrip), 1.0);
+  #endif
+}
+`;
+
+// The dark he looks out of: a soft disc turned to you behind his eyes.
+const VS_KNOT_HOLLOW = COMMON + /* glsl */ `
+uniform vec4 uHollowAt; // xyz the middle, w its radius (m)
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying vec3 vPos;
+varying vec2 vUv;
+void main() {
+  vec3 toC = normalize(uCamPos - uHollowAt.xyz);
+  vec3 r = normalize(cross(vec3(0.0, 1.0, 0.0), toC));
+  vec3 u = cross(toC, r);
+  vec3 wp = uHollowAt.xyz + (r * position.x * 1.15 + u * position.y * 0.85) * uHollowAt.w;
+  vUv = position.xy;
+  vNormal = toC;
+  wp = bendPos(wp);
+  vPos = wp;
+  vWorld = wp;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}
+`;
+const FS_KNOT_HOLLOW = FS_HEAD + KNOT_FN + /* glsl */ `
+uniform vec4 uHollowAt;
+uniform float uHollowA;
+void main() {
+  float d = length(vUv);
+  float a = (1.0 - smoothstep(0.35, 1.0, d)) * uHollowA;
+  vec3 v = vWorld - uCamPos;
+  float dist = length(v);
+  gKeep = 1.0;
+  gl_FragColor = vec4(grade(atmos(uRopeCol[6], v, dist, 0.0), uTrip), a);
+}
+`;
+
+// Knotling's materials, lit by env: { rope, ink, fibre, eye(), hollow }.
+// k: { cols: [7 colours], eyes: [4 colours], radius, lay, blueLay, outline }.
+export function makeKnotMaterials(env, k) {
+  const knot = {
+    uRopeCol: { value: k.cols.map((c) => new THREE.Color(c)) },
+    uRopeK: { value: new THREE.Vector4(k.radius, k.lay, k.blueLay, 0) },
+    uBlur: { value: 0 },
+  };
+  const u = withShared(env, knot);
+  const rope = new THREE.ShaderMaterial({ uniforms: u, vertexShader: VS_ROPE, fragmentShader: FS_ROPE });
+  const ink = new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, u, { uOutline: { value: k.outline } }),
+    defines: { OUTLINE: '' },
+    vertexShader: VS_ROPE,
+    fragmentShader: FS_ROPE_INK,
+    side: THREE.BackSide,
+  });
+  const fibre = new THREE.ShaderMaterial({ uniforms: u, vertexShader: VS_FIBRE, fragmentShader: FS_FIBRE, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const eyeCols = { value: k.eyes.map((c) => new THREE.Color(c)) };
+  // (through: the same eye drawn again over the rope, see-through - how
+  // they show through the blur of him spinning; gaze: share the other's)
+  const eye = (through, gaze) =>
+    new THREE.ShaderMaterial({
+      uniforms: Object.assign({}, u, { uGaze: gaze || { value: new THREE.Vector4(0, 0, 1, 1) }, uEyeCol: eyeCols, uEyeA: { value: 0 } }),
+      defines: through ? { THROUGH: '' } : {},
+      vertexShader: VS_KNOT_EYE,
+      fragmentShader: FS_KNOT_EYE,
+      transparent: !!through,
+      depthTest: !through,
+      depthWrite: !through,
+    });
+  const hollow = new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, u, { uHollowAt: { value: new THREE.Vector4() }, uHollowA: { value: 0.9 } }),
+    vertexShader: VS_KNOT_HOLLOW,
+    fragmentShader: FS_KNOT_HOLLOW,
+    transparent: true,
+    depthWrite: false,
+  });
+  // the smear of his spin: the rope again, a moment back, see-through
+  const ghost = () =>
+    new THREE.ShaderMaterial({
+      uniforms: Object.assign({}, u, { uGhost: { value: new THREE.Matrix4() }, uGhostA: { value: 0 } }),
+      defines: { GHOST: '' },
+      vertexShader: VS_ROPE,
+      fragmentShader: FS_ROPE,
+      transparent: true,
+      depthWrite: false,
+    });
+  return { rope, ink, fibre, eye, hollow, ghost, uniforms: u };
+}

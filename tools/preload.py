@@ -111,15 +111,19 @@ def every_module():
 
 def cast_modules(path):
     """For each runner and companion in game/characters.js or companions.js:
-    their asset folder and the modules their load() imports."""
+    their asset folder (or '#id' for one with no model) and the modules
+    their load() imports."""
     src = read(path)
     out = {}
     for block in re.split(r'\n  \{\n', src)[1:]:
         asset = re.search(r"asset:\s*'([^']+)'", block)
-        if not asset:
+        # (a companion with no model - asset: null - goes by '#' and their id)
+        ident = re.search(r"id:\s*'([^']+)'", block)
+        key = asset.group(1) if asset else ('#' + ident.group(1) if ident and re.search(r'asset:\s*null', block) else None)
+        if not key:
             continue
         mods = [resolve(path, m) for m in DYNAMIC.findall(block)]
-        out[asset.group(1)] = mods
+        out[key] = mods
     return out
 
 
