@@ -101,7 +101,36 @@ export const COMPANIONS = [
     // (duck: how much lower he is flattened under a bar)
     extent: { front: 0.87, back: 0.46, side: 0.7, top: 1.03, duck: 0.42 },
   },
+  {
+    id: 'knot',
+    name: 'Knotling',
+    title: 'the living knot',
+    blurb: 'rolls · swings · reshapes himself',
+    // (no sculpted model: his rope is laid out afresh as he moves - see
+    // knotling.js - so there's nothing to fetch but his code)
+    asset: null,
+    face: 'assets/characters/knot-face.webp',
+    tint: ['#ffc85a', '#3a4bd0'],
+    // (a mind of his own - roller.js: beside you and a little behind,
+    // rolling, now and then swinging on a ring of himself - built on the
+    // runner's for reading the road; his own tunables over the fox's, his
+    // size, and no abilities yet)
+    load: lazy(() => Promise.all([import('./knotling.js'), import('./roller.js')]), ([b, m]) => ({
+      make: (env) => new b.Knotling(env),
+      mind: (game, def, body) => new m.Roller(game, def, body),
+    })),
+    tune: CONFIG.companion.knot,
+    hw: 0.36,
+    mouth: [0, 0.4],
+    // (how far his knot reaches, for tools/companion/audit.js; duck: how much
+    // lower he is, slid flat under a bar)
+    extent: { front: 0.36, back: 0.36, side: 0.36, top: 0.72, duck: 0.33 },
+  },
 ];
+
+// A companion's model: their sculpted asset, or for one with none (Knotling,
+// laid out as he goes) a stand-in that says so.
+export const PROCEDURAL = Object.freeze({ procedural: true });
 
 // (load(): fetch the modules once, set def.make and def.mind from them; one
 // that failed is fetched afresh next time)

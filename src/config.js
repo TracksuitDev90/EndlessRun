@@ -136,7 +136,7 @@ export const CONFIG = {
   },
 
   // The companion who runs with you (see game/companions.js): who it is by
-  // default ('fox', 'dragon', 'pitcher', 'thistle' or 'crab'; 'none' to run alone; the title screen's
+  // default ('fox', 'dragon', 'pitcher', 'thistle', 'crab' or 'knot'; 'none' to run alone; the title screen's
   // pick, then ?companion=, override it). The fox (game/companion.js): her
   // gravity (m/s²) and
   // how long she winds up before each kind of jump (s), how high she leaps
@@ -236,6 +236,38 @@ export const CONFIG = {
       // either side of his lane's middle (m), and how quickly (rad/s)
       shuffle: { dur: [2.4, 4.2], weave: 0.4, rate: 2.2 },
       duck: 1.1,
+    },
+    // The living knot (game/knotling.js, his mind game/roller.js), over the
+    // fox's: a heavy ball of rope, jumping by bunching and pushing off (a
+    // longer wind-up), never pouncing. Where he keeps: beside you, off how
+    // far to the side (m) and behind (dz, m: further back while he's going
+    // round behind you to your other side), never further out than edge (m
+    // from the middle of the road). Swinging (see Roller): the share of the
+    // time he spends at it, over a stretch of road, about how long a swing
+    // takes (s, for working out how long to roll between them) and the
+    // fewest and most seconds he rolls between two; how much clear road
+    // ahead he needs to start one (s of running); the wind-up, the hop
+    // (m, his bottom at the top of it - the ring catches there); where it
+    // catches: the rope from that point to his middle (m), how far round he
+    // swings either side of straight under it (rad), how far out to his
+    // side (m), how long a swing would take from one side to the other
+    // (s) and how far through it he lets go; how long the loop takes to
+    // draw back in (s). Under a bar he slides (duck: how far ahead he sees
+    // one coming, s).
+    knot: {
+      gravity: 22,
+      windup: { leap: 0.15, pounce: 0.2, hop: 0.1 },
+      leap: 1.0,
+      pounceEvery: 1e9,
+      ahead: 4.5,
+      behind: -2.8,
+      surge: [-6, 9],
+      lateral: { slant: 0.42, dodge: 0.7, base: 0.7, acc: 10, accDodge: 30, accAir: 5 },
+      rest: [2, 4],
+      fetch: { every: [9, 16], reach: [6, 24], chance: 0, mischief: 0 },
+      slot: { off: 0.98, dz: -0.85, back: -1.7, edge: 2.95 },
+      swing: { share: 0.3, time: 1.3, gap: [1.8, 6.5], clear: 1.7, gather: 0.13, hop: 0.42, length: 1.05, angle: 0.82, out: 0.08, period: 0.76, release: 0.86, back: 0.26 },
+      duck: 1.0,
     },
     // A companion who flies (the dragon - see game/flyer.js): the wind her
     // body streams back in (m/s: base + a share of your pace; less of it and
