@@ -955,10 +955,13 @@ export class UI {
       b.setAttribute('aria-label', `${d.name} (key ${i + 1})`);
       b.title = `${d.name} - ${d.blurb}`;
       b.innerHTML = `<span class="pw-face">${icon(d.icon)}</span><span class="pw-cd"></span><span class="pw-ring"></span><span class="pw-sec"></span><span class="pw-key">${i + 1}</span>` + (d.id === 'fold' ? '<span class="pw-dest"><i></i><span></span></span>' : '');
+      // (pressed, it's handed to the game's own swipe tracking: a swipe that
+      // starts on it is a move like any other; a tap - lifted inside it
+      // again, never having travelled - is the ability, once)
       b.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         e.preventDefault();
-        this.handlers.power?.(i);
+        this.handlers.press?.(e, () => this.handlers.power?.(i), b);
       });
       b.addEventListener('click', (e) => e.stopPropagation());
       root.appendChild(b);

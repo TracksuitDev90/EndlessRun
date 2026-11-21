@@ -18,6 +18,9 @@ export class Progress {
     this.ids = ids;
     this.bank = 0;
     this.levels = {};
+    // (the levels of anyone saved who isn't among ids just now - a companion
+    // taken out of play for a while - kept as they were, and saved again)
+    this.kept = {};
     for (const id of ids) this.levels[id] = 0;
     this.load();
   }
@@ -32,6 +35,7 @@ export class Progress {
     if (!data || typeof data !== 'object') return;
     const n = Number(data.bank);
     this.bank = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    for (const [id, l] of Object.entries(data.levels || {})) if (!this.ids.includes(id) && Number.isFinite(Number(l))) this.kept[id] = Number(l);
     for (const id of this.ids) {
       const l = Number(data.levels?.[id]);
       this.levels[id] = Number.isFinite(l) ? Math.max(0, Math.min(MAX_LEVEL, Math.floor(l))) : 0;
@@ -40,7 +44,7 @@ export class Progress {
 
   save() {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, bank: this.bank, levels: this.levels }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, bank: this.bank, levels: { ...this.kept, ...this.levels } }));
     } catch {
       /* storage unavailable (private mode) */
     }

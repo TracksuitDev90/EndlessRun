@@ -462,6 +462,10 @@ body:not(.touch) .touch-only {
   max-width: calc(100vw - var(--safe-left) - var(--safe-right));
   margin: 0 calc(-1 * var(--side)) 4px;
   overflow: hidden;
+  /* (only its sides clip - the pages slide across under them: the figure
+     standing up out of a card in the top row, picked and hopping, rises
+     clear over its top edge, head and all) */
+  overflow: clip visible;
   touch-action: pan-y;
   pointer-events: auto;
   user-select: none;
@@ -487,6 +491,13 @@ body:not(.touch) .touch-only {
   row-gap: calc(var(--w) * 0.33);
   padding: calc(var(--w) * 0.31) var(--side) 9px;
   pointer-events: none;
+}
+/* (a browser that can't clip just the sides clips the top too: room over
+   the top row for the tallest of them at the top of a hop) */
+@supports not (overflow: clip) {
+  .pick-page {
+    padding-top: calc(var(--w) * 0.5);
+  }
 }
 /* a dot for each page under them, the one showing filled in */
 .pick-dots {
@@ -1705,7 +1716,9 @@ body:not(.touch) .touch-only {
   touch-action: none;
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.25s ease;
 }
-.pw:active {
+/* (pressed: set by the gesture tracking, and let go the moment the press
+   turns out to be a swipe) */
+.pw.press {
   transform: translate(2px, 3px);
   box-shadow: 1px 1px 0 var(--ink);
 }

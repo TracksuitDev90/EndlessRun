@@ -284,7 +284,7 @@ async function boot() {
   };
   if (!game.alone) ui.setCompanions([...palsFirst, ...palsLater].sort((a, b) => COMPANIONS.indexOf(a) - COMPANIONS.indexOf(b)), game.companionId, (id) => !!game.companions[id]);
   ui.on('pal', pickPal);
-  new Input(canvas, {
+  const input = new Input(canvas, {
     onAction: (a) => {
       // (the companion menu's open: Escape closes it, nothing else gets past)
       if (ui.menuOpen) {
@@ -355,6 +355,8 @@ async function boot() {
     if (!ui.menuOpen) begin();
   });
   ui.on('power', (i) => game.action(`power${i}`));
+  // (a press on an ability's button: tracked as a gesture like any other)
+  ui.on('press', (e, tap, el) => input.press(e, tap, el));
   progress();
   ui.on('title', () => {
     audio.resume();

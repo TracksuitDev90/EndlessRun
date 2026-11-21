@@ -79,18 +79,18 @@ export const POWERS = {
     { id: 'fold', name: 'World Fold', icon: 'portal', tip: 'Skip ahead to the next world - once a run', blurb: 'Once a run: Iris opens a portal to the start of the next world. What you skip earns nothing.' },
   ],
   pitcher: [
-    { id: 'freshen', name: 'Freshen Up', icon: 'drop', tip: 'Shake off that stumble before the next hit', blurb: 'After a stumble: Nep splashes it away - the second-hit danger gone, back up to pace.' },
-    { id: 'roots', name: 'Root Reach', icon: 'roots', tip: 'Nep’s roots fetch the gems up ahead', blurb: 'Nep plants his feet and his roots fetch one cluster of gems ahead, across nearby lanes.' },
-    { id: 'shield', name: 'Pitcher Protection', icon: 'shield', tip: `${P.pitcher.shield.dur} s where nothing can hurt you`, blurb: `Nep drenches you: ${P.pitcher.shield.dur} s that nothing can hurt you.` },
+    { id: 'freshen', name: 'Freshen Up', icon: 'drop', tip: 'Shake off that stumble before the next hit', blurb: 'After a stumble: Pip splashes it away - the second-hit danger gone, back up to pace.' },
+    { id: 'roots', name: 'Root Reach', icon: 'roots', tip: 'Pip’s roots fetch the gems up ahead', blurb: 'Pip plants his feet and his roots fetch one cluster of gems ahead, across nearby lanes.' },
+    { id: 'shield', name: 'Pitcher Protection', icon: 'shield', tip: `${P.pitcher.shield.dur} s where nothing can hurt you`, blurb: `Pip drenches you: ${P.pitcher.shield.dur} s that nothing can hurt you.` },
   ],
   thistle: [
-    { id: 'bolt', name: 'Electric Bolt', icon: 'bolt', tip: 'Teasel shocks you: run faster for a while', blurb: `Teasel shocks you with a bolt from its crown: you run ${Math.round((P.thistle.bolt.mul - 1) * 100)}% faster for ${P.thistle.bolt.dur} s.` },
+    { id: 'bolt', name: 'Electric Bolt', icon: 'bolt', tip: 'Wick shocks you: run faster for a while', blurb: `Wick shocks you with a bolt from its crown: you run ${Math.round((P.thistle.bolt.mul - 1) * 100)}% faster for ${P.thistle.bolt.dur} s.` },
     { id: 'attract', name: 'Static Attraction', icon: 'magnet', tip: 'Every gem near you zooms to you', blurb: `For ${P.thistle.attract.dur} s you're charged with static: every gem nearby is drawn to you and zooms in.` },
-    { id: 'ride', name: 'Ride the Spark', icon: 'spark', tip: 'Become lightning: every gem is yours, nothing stops you', blurb: 'You and Teasel become a current of lightning racing through the world: every gem on the way is yours, and you pass straight through every obstacle.' },
+    { id: 'ride', name: 'Ride the Spark', icon: 'spark', tip: 'Become lightning: every gem is yours, nothing stops you', blurb: 'You and Wick become a current of lightning racing through the world: every gem on the way is yours, and you pass straight through every obstacle.' },
   ],
   crab: [
-    { id: 'resonance', name: 'Crystal Resonance', icon: 'crystal', tip: `Every gem counts double for ${P.crab.resonance.dur} s`, blurb: `Shoal hums and every gem hums with him: gems collected are worth double for ${P.crab.resonance.dur} s.` },
-    { id: 'dozer', name: 'Living Bulldozer', icon: 'claw', tip: 'Shoal smashes a clear road ahead of you', blurb: `Shoal charges ahead, grows, and spends ${P.crab.dozer.dur} s smashing every breakable obstacle out of your way with his huge claw.` },
+    { id: 'resonance', name: 'Crystal Resonance', icon: 'crystal', tip: `Every gem counts double for ${P.crab.resonance.dur} s`, blurb: `Otto hums and every gem hums with him: gems collected are worth double for ${P.crab.resonance.dur} s.` },
+    { id: 'dozer', name: 'Living Bulldozer', icon: 'claw', tip: 'Otto smashes a clear road ahead of you', blurb: `Otto charges ahead, grows, and spends ${P.crab.dozer.dur} s smashing every breakable obstacle out of your way with his huge claw.` },
   ],
 };
 
@@ -1129,7 +1129,7 @@ const H = {
       if (A.phase === 'doze' && A.t >= C.dur) {
         A.phase = 'back';
         A.back = 0;
-        g.ui.powerNote(`Shoal cleared ${A.smashed} ${A.smashed === 1 ? 'row' : 'rows'}`, 'crab');
+        g.ui.powerNote(`Otto cleared ${A.smashed} ${A.smashed === 1 ? 'row' : 'rows'}`, 'crab');
         c.cheer(2);
       }
       // he grows into it, and back down after
