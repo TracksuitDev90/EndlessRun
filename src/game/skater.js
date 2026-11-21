@@ -220,6 +220,15 @@ const mix = (a, b, k) => a + (b - a) * k;
 const bump = (a, b, c, d, x) => smooth(a, b, x) * (1 - smooth(c, d, x));
 const ease = (x) => x * x * (3 - 2 * x);
 
+// How the ponytail carries its weight (braidStep): heavier than the braids
+// that frame her face (heavy, on their gravity); her own jolts - a carve, a
+// take-off, a landing - reach it only in part (side, lift) and a beat late
+// (lag: how quickly, 1/s); damped most near the tie and least at the tips
+// (keepTie, keepTip: how much of its speed a joint keeps each 1/120 s); its
+// braids drawn together hard near the tie and loosely at the tips (pullTie
+// on top of pullTip); and its flutter in the wind mostly at the tips (flut).
+const TAIL = { heavy: 1.5, side: 0.45, lift: 0.4, lag: 11, keepTie: 0.95, keepTip: 0.975, pullTie: 0.045, pullTip: 0.006, flut: 0.5 };
+
 export class Skater extends Player {
   constructor(envDef, asset) {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
@@ -1596,7 +1605,9 @@ export class Skater extends Player {
         tgt0: Array.from({ length: n }, () => new THREE.Vector3()),
         hold: Array.from({ length: n }, (_, k) => hold[k] ?? 0),
         drag: (tail ? 0.6 : 0.5) * (0.75 + 0.5 * h(1)),
-        heavy: 0.92 + 0.2 * h(2),
+        // (the ponytail's a good weight of braids: it hangs heavier than
+        // the few left down to frame her face)
+        heavy: (0.92 + 0.2 * h(2)) * (tail ? TAIL.heavy : 1),
         freq: 0.75 + 0.55 * h(3),
         flut: 0.6 + 0.5 * h(4),
         // (a braid is a stiffish cord: it bends in long curves, it doesn't
@@ -1623,6 +1634,8 @@ export class Skater extends Player {
     // (this frame's, in simulation space)
     this.cols = this.braidCols.map((c) => ({ kind: c.kind, c: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(), ax: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], r: [0, 0, 0], ra: c.ra || 0, rb: c.rb || 0 }));
     this.braidH = 1 / 120;
+    // (her own jolts as the ponytail feels them: a beat behind - see TAIL)
+    this.tailAcc = new THREE.Vector3();
   }
 
   braidStep(dt, steps) {
@@ -1675,6 +1688,11 @@ export class Skater extends Player {
     const airX = -vel.x + this.breeze.x, airY = -vel.y + this.breeze.y, airZ = -vel.z + this.breeze.z;
     const airS = Math.hypot(airX, airY, airZ);
     const gx = -this.frameAcc.x, gy0 = -9.8 * this.gk, gyA = -this.frameAcc.y, gz = -this.frameAcc.z;
+    // (the ponytail, weighty as it is, takes her jolts late and in part: a
+    // carve reaches it a beat after her, a take-off or a landing barely
+    // lifts it - so it never goes weightless and stands up on end)
+    const TA = this.tailAcc.lerp(this.frameAcc, 1 - Math.exp(-dt * TAIL.lag));
+    const tgx = -TA.x * TAIL.side, tgyA = -TA.y * TAIL.lift, tgz = -TA.z * TAIL.side;
     const groundY = (this.groundY || 0) - this.y + 0.012;
     const h = dt / steps;
     const scale = h / this.braidH;
@@ -1686,7 +1704,9 @@ export class Skater extends Player {
       for (const B of this.braids) {
         const n = B.n;
         const kd = B.drag;
-        const gy = gy0 * B.heavy + gyA;
+        const tl = B.tail;
+        const bx = tl ? tgx : gx, bz = tl ? tgz : gz;
+        const gy = gy0 * B.heavy + (tl ? tgyA : gyA);
         // (the braid's own clock: its flutter runs down it as a wave)
         const tb = ts * B.freq + B.seed * 17;
         for (let k = 1; k < n; k++) {
@@ -1696,18 +1716,22 @@ export class Skater extends Player {
           // own time and to its own degree
           // (long waves down it - a joint and its neighbours pushed much the
           // same way - so it ripples rather than kinks)
-          const fk = Math.pow(k / n, 1.1) * airS * 0.17 * B.flut;
+          // (the ponytail's braids, bound together at the tie, flutter
+          // little there and freely toward their tips)
+          const fk = (tl ? TAIL.flut * Math.pow(k / n, 1.8) : Math.pow(k / n, 1.1)) * airS * 0.17 * B.flut;
           const n1 = Math.sin(tb * 7.1 - k * 0.5 + B.seed * 23) + 0.35 * Math.sin(tb * 11.7 - k * 0.75 + B.seed * 9);
           const n2 = Math.sin(tb * 6.3 - k * 0.55 + B.seed * 31) + 0.3 * Math.sin(tb * 10.3 - k * 0.8 + B.seed * 5);
           const n3 = Math.sin(tb * 4.9 - k * 0.4 + B.seed * 13);
-          const ax = gx + kd * (airX - vx) + fk * n1;
+          const ax = bx + kd * (airX - vx) + fk * n1;
           const ay = gy + kd * (airY - vy) + fk * n2 * 0.7;
-          const az = gz + kd * (airZ - vz) + fk * n3 * 0.35;
+          const az = bz + kd * (airZ - vz) + fk * n3 * 0.35;
           // (a touch of damping on top of the air's: they settle rather than
-          // whip on after every jolt)
-          const nx = p.x + (p.x - q.x) * scale * 0.982 + ax * h * h;
-          const ny = p.y + (p.y - q.y) * scale * 0.982 + ay * h * h;
-          const nz = p.z + (p.z - q.z) * scale * 0.982 + az * h * h;
+          // whip on after every jolt - the ponytail more, most near the tie,
+          // so after a landing it gives one soft settle and is still)
+          const keep = Math.pow(tl ? mix(TAIL.keepTie, TAIL.keepTip, k / (n - 1)) : 0.982, 120 * h);
+          const nx = p.x + (p.x - q.x) * scale * keep + ax * h * h;
+          const ny = p.y + (p.y - q.y) * scale * keep + ay * h * h;
+          const nz = p.z + (p.z - q.z) * scale * keep + az * h * h;
           q.copy(p);
           p.set(nx, ny, nz);
         }
@@ -1789,7 +1813,8 @@ export class Skater extends Player {
       _p.multiplyScalar(1 / m);
       // (each toward where it lies across the bundle, turned as her head is,
       // and looser toward the tips)
-      const pull = 0.011 * (1 - 0.6 * (k / n));
+      const u = 1 - k / n;
+      const pull = TAIL.pullTip + TAIL.pullTie * u * u;
       for (const B of T) if (k < B.n) B.p[k].lerp(_v.copy(B.fan[k]).applyQuaternion(Qh).add(_p), pull);
       const want = 0.0145;
       for (let i = 0; i < T.length - 1; i++) {

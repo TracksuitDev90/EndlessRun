@@ -51,28 +51,24 @@ dragon — iridescent scales, deer's antlers, a feathered mane and plume —
 flies beside you, flowing after her own head like a ribbon in the wind,
 swimming through the air, sailing over carts and slipping under beams, now
 and then loop-the-looping or corkscrewing ahead, and always keeping out of
-your way (see [The dragon](#the-dragon)). Or Nep, a little pitcher plant —
+your way (see [The dragon](#the-dragon)). Or Pip, a little pitcher plant —
 a squat lime pitcher with a coral rim, two yellow eyes peering out of the
 dark inside him from under a big floppy leaf — waddles along on his root
 feet doing his best to keep up, wobbling, the water in him sloshing over
 the rim and crumbs of soil shaking loose behind him (see [The pitcher
-plant](#the-pitcher-plant)). Or Teasel, a storm thistle — a living seedpod
+plant](#the-pitcher-plant)). Or Wick, a storm thistle — a living seedpod
 in a deep plum husk of papery leaves, two amber eyes peeking out from under
 them, a crown of silver plumes on top — scurries along on three root legs,
 building static as it runs until its crown fans out and sparks snap across
 it, and then, when it falls behind, travels to your side along a bolt of
-violet lightning (see [The storm thistle](#the-storm-thistle)). Or Shoal,
+violet lightning (see [The storm thistle](#the-storm-thistle)). Or Otto,
 a giant opal crab — a broad, gentle crab grown from translucent opalescent
 mineral, coral branching out of his shell, eyes on stalks, one claw very
 much bigger than the other with a window of clear crystal in it — scuttles
 along beside you on eight crystal legs, tilting his head at you, and turns
 to the colours of every world he walks into (see [The giant
-crab](#the-giant-crab)). Or Knotling, a living knot — one long length of
-thick marigold rope with a single indigo strand wound through it, tied over
-and under itself into a loose ball, two eyes looking out from the dark
-inside — rolls along beside you, and now and then swings, feeding a loop of
-himself out into a ring that catches on the air (see [The living
-knot](#the-living-knot)).
+crab](#the-giant-crab)). (Knotling, a living knot, is out of play for now -
+he'll be back: see [The living knot](#the-living-knot).)
 
 Built for phones first (swipe controls, portrait framing, adaptive resolution
 to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
@@ -795,6 +791,19 @@ long low moan a few seconds before it reaches the road (an obstacle's `call`).
 
 ### Blue Hour: the sea comes over the causeway
 
+**The light** is real blue hour's: the whole sky a deep, saturated cobalt,
+brightest low over the sea, everything lit blue and its shadows bluer still,
+the dark shapes keeping their outlines against the sky behind them - and no
+warmth anywhere but the lamps (the lantern, the boats, their streaks on the
+water), which glow all the brighter for it. Whatever's in your way stands
+clear of the sea mist and the haze (`clear` on its material) so it reads from
+well off against the dark stone; the rock teeth are black at the foot with
+wet tops catching the sky. Nothing at sea springs up out of the water as you
+come: the stacks and the boats loom up out of the mist, well out and no
+taller than a headland, and the rocks heaped along the causeway's sides are
+simply there (a pile a chunk long can't pop up like a prop: folded up like a
+page, it would stand on end as a tower on the horizon).
+
 The Blue Hour is a coast, and its sea is part of the road. Every time
 through, it runs in three stretches (`stretches()` in `world/coast.js`, a
 share of the world's length each, snapped to chunks):
@@ -1386,10 +1395,14 @@ chimes. The crash card tallies the run against your best. Tunables live in
 | Slide | swipe down (in the air: dive and slide on landing) | ↓ / S / Shift | drag down |
 | Change lane | swipe left / right | ← → / A D | drag left / right |
 | Pause | ⏸ button | Esc / P | ⏸ button |
-| Companion ability | its round button, bottom right | 1 / 2 / 3 | its button |
+| Companion ability | tap its round button, bottom right | 1 / 2 / 3 | its button |
 
 Swipes fire the moment your finger has travelled far enough — you don't have
-to lift it — which is what makes the controls feel instant. A jump pressed just
+to lift it — which is what makes the controls feel instant. That holds
+wherever a swipe starts, the ability buttons included (and the gaps between
+them, and a button that's still recharging): a touch on a button is only
+its ability if it's a tap — lifted again inside the same button without
+having travelled — so one touch is never both a move and an ability. A jump pressed just
 before landing is buffered. In the Red Drift the jump is a boost, which you
 can fire a second time while it hangs, and down in the air drives you down
 (see [Low gravity](#low-gravity-the-red-drift)).
@@ -2736,8 +2749,14 @@ looser toward the tips) — enough to keep it a ponytail, not so much that it
 swings as one sheet — and every braid is pushed apart from any other it would
 run into, so they part and slide past each other and swing one by one. At the
 start pace they stream back about forty degrees (some a little more, some a
-little less), toward sixty at full tilt; they fly up through a jump and slap down as she lands, and the
-face-framers blow back over her shoulders as she picks up speed. It's
+little less), toward sixty at full tilt, and the face-framers blow back over
+her shoulders as she picks up speed. The ponytail carries real weight
+(TAIL in skater.js): heavier than the face-framers, it takes her own jolts
+only in part and a beat late, so it's calm while she cruises, follows a
+carve a moment behind her, and after a landing gives one short settle
+instead of flying up on end; its braids are drawn together and damped most
+near the tie and least at the tips, so they move as one by the cuff and
+freely at their ends. It's
 simulated in a space with the world's axes and its origin at her (so a lean or
 a turn swings them rather than carrying them round), in the runner's fixed
 substeps, and each chain's bones are turned to follow it. **Her tee moves too**:
@@ -3297,9 +3316,9 @@ fetching) live in `CONFIG.companion.flyer`.
 
 ## The pitcher plant
 
-![Nep: from the front, three-quarters, behind and his left side, his eyes peering out from under his leaf; running and swerving across the road, water slopping over his rim and soil falling from his roots; tottering; shaking himself off; basking, his leaf lifted to the sky; by the runner on the title screen, and on the road beside them](docs/pitcher.jpg)
+![Pip: from the front, three-quarters, behind and his left side, his eyes peering out from under his leaf; running and swerving across the road, water slopping over his rim and soil falling from his roots; tottering; shaking himself off; basking, his leaf lifted to the sky; by the runner on the title screen, and on the road beside them](docs/pitcher.jpg)
 
-Nep is a pitcher plant, and he runs with you whoever you pick: small and
+Pip is a pitcher plant, and he runs with you whoever you pick: small and
 squat, a rounded pear of a pitcher in lime and yellow-green, hurrying to keep
 up on his root feet, wobbling. There's no face on him — his eyes, two warm yellow ovals,
 peer out of the dark hollow inside him, from under a big floppy leaf he wears
@@ -3438,10 +3457,10 @@ touches nothing.
 
 ## The storm thistle
 
-![Teasel: from the front, three-quarters, its left side and behind, fully charged, its crown fanned; the same uncharged, the plumes swept back and the longest brushing the road; its scurry from the side, the front roots reaching and planting in turn and the rear root pushing; a hop into a glide, the crown held up like a parachute; in a run, its crown lifting and fanning as the charge builds; and a spark: the bolt flickering into being, the pulse racing along it, Teasel there again beside the runner in a flash of violet](docs/thistle.jpg)
+![Wick: from the front, three-quarters, its left side and behind, fully charged, its crown fanned; the same uncharged, the plumes swept back and the longest brushing the road; its scurry from the side, the front roots reaching and planting in turn and the rear root pushing; a hop into a glide, the crown held up like a parachute; in a run, its crown lifting and fanning as the charge builds; and a spark: the bolt flickering into being, the pulse racing along it, Wick there again beside the runner in a flash of violet](docs/thistle.jpg)
 
-Teasel is a storm thistle: a living seedpod about the size of a grapefruit
-(drawn larger than life, as Nep is, so you can see its feet from behind the
+Wick is a storm thistle: a living seedpod about the size of a grapefruit
+(drawn larger than life, as Pip is, so you can see its feet from behind the
 runner: `SCALE` in `thistle.js`). Its husk is deep plum, built of
 overlapping papery leaves with fine veins, curled, dried edges and pointed
 tips; two small amber eyes peek out from under the leaves of its hood; it
@@ -3598,9 +3617,9 @@ touches nothing.
 
 ## The giant crab
 
-![Shoal: front, left side, behind and three-quarters; his colours in the Deepwood, the Blue Hour, Candy World and Hell; his scuttle from the side; and in a run - beside the runner in the Deepwood, out ahead in Candy World as the Living Bulldozer, a gumdrop he's smashed flying off the road, and humming beside you in the Blue Hour with Crystal Resonance](docs/crab.jpg)
+![Otto: front, left side, behind and three-quarters; his colours in the Deepwood, the Blue Hour, Candy World and Hell; his scuttle from the side; and in a run - beside the runner in the Deepwood, out ahead in Candy World as the Living Bulldozer, a gumdrop he's smashed flying off the road, and humming beside you in the Blue Hour with Crystal Resonance](docs/crab.jpg)
 
-Shoal is a giant crab, and a very friendly one: broad and softly rounded,
+Otto is a giant crab, and a very friendly one: broad and softly rounded,
 about half the runner's height at the crown of his shell (a little more
 with his coral; sculpted life-size and drawn smaller, `SCALE` in `crab.js`),
 everything about him grown from translucent, opalescent mineral. His shell
@@ -3695,6 +3714,12 @@ looks back at you, worried; on the title screen he sits by you looking
 about; picked, he waves.
 
 ## The living knot
+
+*Out of play for now:* he isn't offered on the title screen or loaded at all
+(`retired: true` in src/game/companions.js; delete it to bring him back). His
+code and art are all still here. Anyone who'd picked him runs with Sorrel
+instead, their banked gems and every companion's levels - his too - kept as
+they were.
 
 ![Knotling: looking out of the opening at one end of him (his portrait), and turned round as he rolls, his eyes peeking out wherever there's a gap; a swing from the runner's camera - he bunches, feeds a ring of himself out ahead and up, it catches and pulls taut, and he swings forward under it; a hurdle - bunched low, then up and over the hedge; a bar - slid out low and wide; a lobe of him reaching out to wave at the runner; and a shudder, every loop let loose and cinched tight](docs/knot.jpg)
 
@@ -3884,7 +3909,7 @@ her ideas, fetching a gem now and then — carries on around them.
    world, with its own lap and dream). The first ~3 s of the new world are
    empty road, checked, including anything that would reach into it.
 
-**Nep, the pitcher plant**
+**Pip, the pitcher plant**
 
 1. **Freshen Up** (26 s) — only after a stumble: he shakes himself and
    splashes it away. The danger of a second hit is gone, the ink clears and
@@ -3905,10 +3930,10 @@ All the durations, cooldowns and prices are starting points for tuning, in
 `CONFIG.powers`. The effects reuse what's already there: the gems'
 pick-up and toss, the sparkles, the runners' dust (one more set of it, for
 soil, water and wind), the obstacles' own instances (moved, not rebuilt),
-the doorway's effects; only the water's sheen and Nep's roots are new, a few
+the doorway's effects; only the water's sheen and Pip's roots are new, a few
 small meshes drawn only while they're in use.
 
-**Teasel, the storm thistle**
+**Wick, the storm thistle**
 
 1. **Electric Bolt** (8 s, 30 s) — a bolt from its crown strikes you: for
    8 s you run 45% faster than your pace, easing back over the last second
@@ -3919,7 +3944,7 @@ small meshes drawn only while they're in use.
    — up to 24 m ahead, across all three lanes and high in the air — is
    drawn to you one after another, zooming in along a violet spark, while a
    crackling glow hangs round you.
-3. **Ride the Spark** (up to 7 s, 120 s) — you and Teasel become a current
+3. **Ride the Spark** (up to 7 s, 120 s) — you and Wick become a current
    of lightning racing on through the world, more than three times your
    pace (58 m/s at most): you're gone, and in your place a crackling figure
    of light at the head of a crooked channel streaming back behind you,
@@ -3927,10 +3952,10 @@ small meshes drawn only while they're in use.
    it's in, and you pass straight through every obstacle. It stops short of
    the world's doorway (never closer than 70 m, and the next world is
    hurried along to be ready); you come back into yourself with a moment
-   of grace — nothing can hurt you for a second more — and Teasel arrives
+   of grace — nothing can hurt you for a second more — and Wick arrives
    beside you in a flash, as it does through a spark.
 
-**Shoal, the giant opal crab** — two abilities for now (his two levels):
+**Otto, the giant opal crab** — two abilities for now (his two levels):
 
 1. **Crystal Resonance** (10 s, 40 s) — he hums, and every crystal on the
    road hums with him: for 10 s every gem collected counts double — yours,
@@ -4015,13 +4040,13 @@ src/game/                     game loop, player (the runners' shared core:
                               gallop, poses, tail and ears; flyer.js: the
                               mind of one who flies; dragon.js: Iris's body,
                               her spine laid along her flight, swim, poses,
-                              legs, whiskers and frills; pitcher.js: Nep's
+                              legs, whiskers and frills; pitcher.js: Pip's
                               body, waddle, wobble, leaf, tendrils, sloshing
                               water and the soil off his roots; sprout.js:
                               his own mind, on the runner's; thistle.js:
-                              Teasel's body, scurry, crown of plumes, static,
+                              Wick's body, scurry, crown of plumes, static,
                               the storm round it and the bolt it travels by; scurrier.js:
-                              its own mind, on the runner's; crab.js: Shoal's
+                              its own mind, on the runner's; crab.js: Otto's
                               body, scuttle, eyes, claws, coral and his colours
                               world to world; scuttler.js: his own mind, on the
                               runner's; knotshape.js: Knotling's knot at rest;
@@ -4033,7 +4058,7 @@ src/game/                     game loop, player (the runners' shared core:
                               (their abilities) and powerfx.js (what the
                               abilities leave in the world: soil, water,
                               wind, opal glints, rubble, the water's sheen,
-                              Nep's roots)
+                              Pip's roots)
 tools/preload.py              what index.html fetches first, every file's version,
                               the gzipped models (run after changing any of them)
 tools/runner/build.py         offline sculpt of the wayfarer -> assets/runner/

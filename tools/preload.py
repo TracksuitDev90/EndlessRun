@@ -119,6 +119,9 @@ def cast_modules(path):
         asset = re.search(r"asset:\s*'([^']+)'", block)
         # (a companion with no model - asset: null - goes by '#' and their id)
         ident = re.search(r"id:\s*'([^']+)'", block)
+        # (one out of play - retired: true - isn't loaded, so nor preloaded)
+        if re.search(r'retired:\s*true', block):
+            continue
         key = asset.group(1) if asset else ('#' + ident.group(1) if ident and re.search(r'asset:\s*null', block) else None)
         if not key:
             continue

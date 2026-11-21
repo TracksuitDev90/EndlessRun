@@ -9,7 +9,7 @@ import { CONFIG } from '../config.js';
 // picks; the title screen's pick, then ?companion=, override it; 'none' runs
 // alone). Each one's body and mind are in modules of their own, fetched only
 // when they're wanted (load(), as for the runners: see characters.js).
-export const COMPANIONS = [
+export const ALL_COMPANIONS = [
   {
     id: 'fox',
     name: 'Sorrel',
@@ -38,7 +38,7 @@ export const COMPANIONS = [
   },
   {
     id: 'pitcher',
-    name: 'Nep',
+    name: 'Pip',
     title: 'the pitcher plant',
     blurb: 'wobbles · sloshes · keeps up (just)',
     asset: 'assets/pitcher/',
@@ -59,7 +59,7 @@ export const COMPANIONS = [
   },
   {
     id: 'thistle',
-    name: 'Teasel',
+    name: 'Wick',
     title: 'the storm thistle',
     blurb: 'scurries · glides · travels by spark',
     asset: 'assets/thistle/',
@@ -81,7 +81,7 @@ export const COMPANIONS = [
   },
   {
     id: 'crab',
-    name: 'Shoal',
+    name: 'Otto',
     title: 'the giant opal crab',
     blurb: 'gentle · curious · turns to every world',
     asset: 'assets/crab/',
@@ -104,6 +104,10 @@ export const COMPANIONS = [
   {
     id: 'knot',
     name: 'Knotling',
+    // (out of play for now: not offered, not loaded, not preloaded - see
+    // COMPANIONS below. His code and art stay here, ready to come back:
+    // delete this line.)
+    retired: true,
     title: 'the living knot',
     blurb: 'rolls · swings · reshapes himself',
     // (no sculpted model: his rope is laid out afresh as he moves - see
@@ -127,6 +131,12 @@ export const COMPANIONS = [
     extent: { front: 0.36, back: 0.36, side: 0.36, top: 0.72, duck: 0.33 },
   },
 ];
+
+// Who can be picked and loaded: everyone above not retired. A saved pick of
+// someone retired (er.companion) falls back to the first here, Sorrel,
+// through companionById; their banked gems and levels are kept (see
+// progress.js), for when they come back.
+export const COMPANIONS = ALL_COMPANIONS.filter((c) => !c.retired);
 
 // A companion's model: their sculpted asset, or for one with none (Knotling,
 // laid out as he goes) a stand-in that says so.

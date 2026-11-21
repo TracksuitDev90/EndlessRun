@@ -294,9 +294,11 @@ def head_prims():
     cran = ellipsoid(*CRAN)
     face = ellipsoid((0, 1.5, -0.027), (0.069, 0.078, 0.073))
     cheeks = [ellipsoid((s * 0.039, 1.487, -0.049), (0.032, 0.03, 0.031)) for s, _ in SIDES]
-    # the jaw: soft, from under the ears down to the chin
-    jaws = [round_cone((s * 0.05, 1.47, 0.002), (s * 0.016, 1.427, -0.05), 0.02, 0.014) for s, _ in SIDES]
-    chin = ellipsoid((0, 1.424, -0.054), (0.018, 0.016, 0.016))
+    # the jaw: from its angle just under the ear lobe down and forward to the
+    # chin, a clear line in profile (her sheet's: a youthful face, but a
+    # defined jaw), and a small, neat chin
+    jaws = [round_cone((s * 0.051, 1.463, 0.004), (s * 0.017, 1.425, -0.05), 0.019, 0.0135) for s, _ in SIDES]
+    chin = ellipsoid((0, 1.422, -0.055), (0.0172, 0.0152, 0.0155))
     return cran, face, cheeks, jaws, chin
 
 
@@ -305,9 +307,11 @@ def skull(p):
     d = smin(cran(p), face(p), 0.05)
     for c in cheeks:
         d = smin(d, c(p), 0.04)
+    # (blended in tightly enough that the jaw keeps its line, softly enough
+    # that it's still a young face)
     for j in jaws:
-        d = smin(d, j(p), 0.05)
-    return smin(d, chin(p), 0.03)
+        d = smin(d, j(p), 0.032)
+    return smin(d, chin(p), 0.024)
 
 
 NOSE = (0.0, 1.474, -0.098)
@@ -329,9 +333,10 @@ def g_head():
     ears = [ellipsoid((s * EAR['x'], EAR['y'], EAR['z']), (0.011, 0.025, 0.018), rot_y(s * 0.3)) for s, _ in SIDES]
     lobes = [ellipsoid((s * (EAR['x'] + 0.002), 1.471, EAR['z'] - 0.004), (0.007, 0.009, 0.008)) for s, _ in SIDES]
     # a slender neck
-    neck = round_cone((0, 1.24, 0.014), (0, 1.47, 0.008), 0.035, 0.033)
-    # (the throat runs up under the jaw)
-    throat = round_cone((0, 1.3, -0.016), (0, 1.42, -0.028), 0.024, 0.022)
+    neck = round_cone((0, 1.24, 0.014), (0, 1.47, 0.01), 0.035, 0.0305)
+    # (the throat runs up toward the jaw, but meets it well back of the
+    # chin: under the jaw it's clean, the neck set in behind)
+    throat = round_cone((0, 1.3, -0.014), (0, 1.386, -0.014), 0.023, 0.018)
 
     def field(p):
         d = skull(p)
@@ -347,8 +352,10 @@ def g_head():
             d = smin(d, e(p), 0.006)
         for e in lobes:
             d = smin(d, e(p), 0.004)
-        d = smin(d, throat(p), 0.028)
-        return smin(d, neck(p), 0.03)
+        # (tightly: the underside of the jaw runs back from the chin to its
+        # angle under the ear, and the neck rises clear of it behind)
+        d = smin(d, throat(p), 0.014)
+        return smin(d, neck(p), 0.012)
 
     head = rigid('head')
     owners = [(cran, head), (face, head), (chin, head), (bridge, head), (tip, head), (upper, head), (lower, head)]

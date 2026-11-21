@@ -56,6 +56,7 @@ const C = {
   rockLo: '#161a21',
   rock: '#323b46',
   rockHi: '#6e7d8a',
+  teethHi: '#7a8eab',
   drift: '#bdb9ab',
   driftLo: '#7d786c',
   kelp: '#33402a',
@@ -1053,7 +1054,9 @@ function teethParts(seed) {
   const n = 3;
   for (let i = 0; i < n; i++) {
     const h = 1.7 + rnd() * 1.6 + (i === 1 ? 0.8 : 0);
-    parts.push(part(rockGeo({ r: 0.5, sx: 0.85 + rnd() * 0.4, sy: h / 0.5 / 2, sz: 0.8, seed: seed * 7 + i, detail: 1, rough: 0.28 }), null, { x: -0.55 + i * 0.55 + (rnd() - 0.5) * 0.2, y: h * 0.48, z: -0.5 - (i % 2) * 0.35, rz: (rnd() - 0.5) * 0.3, rx: (rnd() - 0.5) * 0.2, grad: [C.rockLo, C.rockHi, 0, h * 1.1], mark: WET }));
+    // (black at the foot, their wet tops and edges catching the last of the
+    // sky - pale enough to stand out against the causeway's dark stone)
+    parts.push(part(rockGeo({ r: 0.5, sx: 0.85 + rnd() * 0.4, sy: h / 0.5 / 2, sz: 0.8, seed: seed * 7 + i, detail: 2, rough: 0.24 }), null, { x: -0.55 + i * 0.55 + (rnd() - 0.5) * 0.2, y: h * 0.48, z: -0.5 - (i % 2) * 0.35, rz: (rnd() - 0.5) * 0.3, rx: (rnd() - 0.5) * 0.2, grad: [C.rockLo, C.teethHi, h * 0.15, h * 1.15], mark: WET }));
   }
   parts.push(rock({ r: 0.55, sx: 1.6, sy: 0.6, sz: 1.3, seed: seed + 3 }, C.rock, { y: 0.2, z: -0.6 }));
   return parts;
@@ -1495,21 +1498,25 @@ export default {
   env: {
     // held for ever at blue hour: deep denim overhead, a pale slate glow low
     // on the horizon where the sun's gone, the first stars
-    sky: ['#1a2848', '#7189a8', '#22324a'],
-    bloom: ['#40698a', '#ffb347', '#dfe9f0'],
-    sun: { dir: [-0.55, -0.03, -1], glow: '#9fb0cf' },
+    // (the deep, saturated cobalt of real blue hour - not a grey dusk: the
+    // light's all from the sky, no warmth left in it but the lamps')
+    sky: ['#0c1a4c', '#4067b8', '#112452'],
+    bloom: ['#3a64b0', '#ffb347', '#dfe9f0'],
+    sun: { dir: [-0.55, -0.03, -1], glow: '#7d9de0' },
     stars: 0.32,
     skyFx: { rays: 0, clouds: 0.24 },
     // cool, soft light off the whole sky, bright enough to read by
-    light: { dir: [-0.35, 0.65, -0.65], shadow: [0.5, 0.58, 0.72], hi: [0.98, 1.03, 1.12], soft: 0.3, wrap: 0.4, hiAmt: 0.3, lift: 1 },
-    rim: [0.6, 0.74, 0.98, 0.3],
+    // (everything lit blue, the shadows bluer still; edges caught by the
+    // bright sky behind them, so the dark shapes keep their outlines)
+    light: { dir: [-0.35, 0.65, -0.65], shadow: [0.36, 0.45, 0.76], hi: [0.78, 0.9, 1.2], soft: 0.3, wrap: 0.4, hiAmt: 0.3, lift: 1 },
+    rim: [0.52, 0.7, 1.0, 0.42],
     // sea mist lying low over the water, never up over the road near you
-    mist: { color: '#64798f', amount: 0.24, top: -1.2, fade: 2.6, near: 55, far: 220 },
-    grade: { sat: 0.98, contrast: 1.04, vignette: 0.3, exposure: 1.1, tint: '#0e1a2e' },
-    ink: '#111925',
+    mist: { color: '#4466a8', amount: 0.24, top: -1.2, fade: 2.6, near: 55, far: 220 },
+    grade: { sat: 1.2, contrast: 1.08, vignette: 0.34, exposure: 1.1, tint: '#05113a' },
+    ink: '#0a1024',
     fog: [65, 320],
-    ground: ['#5f6266', '#4b5056', '#24282e'],
-    shadowDecal: [0.56, 0.62, 0.72],
+    ground: ['#566279', '#434e67', '#1b2236'],
+    shadowDecal: [0.48, 0.55, 0.76],
     // (the dust a footfall kicks up off wet earth and stone: dark, little)
     dustPale: 0.18,
     cast: [0.3, 0.45],
@@ -1518,7 +1525,7 @@ export default {
     // (the lighthouse's beams)
     beam: { color: '#ffd9a0', amount: 0.55 },
     // spray and seed blown inland on the wind
-    particles: { color: '#dfe8f0', size: 1.7, drift: [-1.3, 0.05, 1.0], opacity: 0.6 },
+    particles: { color: '#d2def6', size: 1.7, drift: [-1.3, 0.05, 1.0], opacity: 0.6 },
   },
 
   // Every time it comes round it's blue hour still - only a little deeper
@@ -1527,7 +1534,7 @@ export default {
   visits: [
     {
       env: {
-        sky: ['#15223f', '#6a80a0', '#1e2c44'],
+        sky: ['#0a1746', '#3a5fb0', '#0f214c'],
         stars: 0.5,
         mist: { amount: 0.55 },
         grade: { exposure: 1.06 },
@@ -1536,10 +1543,10 @@ export default {
     },
     {
       env: {
-        sky: ['#121d38', '#64799a', '#1a273e'],
+        sky: ['#091442', '#3558a8', '#0d1e48'],
         stars: 0.7,
         skyFx: { clouds: 0.3, aurora: 0.12 },
-        mist: { amount: 0.6, color: '#7389a6' },
+        mist: { amount: 0.6, color: '#4c6db0' },
         glowGain: 1.5,
       },
     },
@@ -1581,9 +1588,13 @@ export default {
     yield;
     b.toon('sideB', causewaySideGeo(11), { ...COAST, cap: 30, ink: 0.03, marks: [2, 2] });
     yield;
-    b.toon('rockPile', rockPileGeo(5), { ...COAST, cap: 70, ink: 0.04, anim: 'pop' });
+    // (no pop-up for these: each lies a whole chunk long beside the road,
+    // and folded up like a page it stood on end - a tower of rock rearing
+    // up on the horizon and swinging down. They're just there, coming up
+    // out of the dusk like the causeway's sides.)
+    b.toon('rockPile', rockPileGeo(5), { ...COAST, cap: 70, ink: 0.04 });
     yield;
-    b.toon('rockPileB', rockPileGeo(17), { ...COAST, cap: 70, ink: 0.04, anim: 'pop' });
+    b.toon('rockPileB', rockPileGeo(17), { ...COAST, cap: 70, ink: 0.04 });
     yield;
     b.toon('quay', quayGeo(4), { ...COAST, cap: 24, ink: 0.03 });
     yield;
@@ -1615,9 +1626,11 @@ export default {
     yield;
     b.toon('rockB', merge([rock({ r: 0.8, sx: 1, sy: 1.1, sz: 0.9, seed: 9 })]), { ...COAST, cap: 160, anim: 'pop', ink: 0.04 });
     yield;
-    b.toon('stack', merge(stackParts(4, 14)), { ...COAST, cap: 16, anim: 'liftFar', ink: 0.05 });
+    // (far out on the water, they loom up out of the mist as you come - no
+    // springing up out of the sea forty metres and bouncing)
+    b.toon('stack', merge(stackParts(4, 14)), { ...COAST, cap: 16, ink: 0.05 });
     yield;
-    b.toon('stackB', merge(stackParts(13, 9)), { ...COAST, cap: 16, anim: 'liftFar', ink: 0.05 });
+    b.toon('stackB', merge(stackParts(13, 9)), { ...COAST, cap: 16, ink: 0.05 });
     yield;
     b.toon('breaker', breakerGeo({ seed: 3, spray: 32 }), { cap: 50, ink: 0, side: THREE.DoubleSide, breaker: [7.5, 3.6] });
     yield;
@@ -1650,7 +1663,7 @@ export default {
     // boats: moored off the quay, and fishing offshore, rocking, lights lit
     b.toon('skiff', merge(skiffParts('#ffffff')), { ...COAST, cap: 16, anim: 'pop', ink: 0.03, turn: [0, 0.07, 1.3, 0], wobble: [0, 0.06, 1.1, 0] });
     yield;
-    b.toon('boat', merge(fishingBoatParts('#ffffff')), { ...COAST, cap: 24, anim: 'liftFar', ink: 0.035, turn: [0, 0.09, 0.9, 0], wobble: [0, 0.12, 0.8, 0] });
+    b.toon('boat', merge(fishingBoatParts('#ffffff')), { ...COAST, cap: 24, ink: 0.035, turn: [0, 0.09, 0.9, 0], wobble: [0, 0.12, 0.8, 0] });
     yield;
     b.toon('streak', merge(streakParts(5)), { cap: 30, anim: 'pop', ink: 0, wobble: [0, 0.08, 1.1, 0] });
     yield;
@@ -1669,7 +1682,10 @@ export default {
     yield;
 
     // obstacles
-    const OB = { ...COAST, anim: 'popEarly' };
+    // (whatever's in your way stands clear of the sea mist and the dusk's
+    // haze - not all the way, it's still in the world - so it reads from
+    // well off against the dark stone)
+    const OB = { ...COAST, anim: 'popEarly', clear: 0.7 };
     b.toon('wallL', merge(wallParts(1.05, 3)), { ...OB, cap: 16, ink: 0.035, marks: [2, 2] });
     yield;
     b.toon('wallLGrass', merge(wallGrassParts(1.05, 3)), { cap: 16, ink: 0, anim: 'popEarly', wind: [0.5, 0.15, 0.25] });
@@ -1776,7 +1792,9 @@ export default {
     if (ctx.continuation) return;
 
     // out at sea: stacks, boats fishing with their lights lit, gulls
-    if (rng.chance(0.16)) ctx.put(rng.chance(0.5) ? 'stack' : 'stackB', rng.float(40, 120) * (zone === 'causeway' && rng.chance(0.4) ? -1 : 1), SEA_Y, z(), { ry: rng.float(0, TAU), s: rng.float(0.8, 1.5) });
+    // (well out, and no taller than a headland: dark shapes on the water,
+    // not spires over the road)
+    if (rng.chance(0.16)) ctx.put(rng.chance(0.5) ? 'stack' : 'stackB', (70 + rng.float(40, 120) * 0.6) * (zone === 'causeway' && rng.chance(0.4) ? -1 : 1), SEA_Y, z(), { ry: rng.float(0, TAU), s: rng.float(0.8, 1.5) * 0.65 });
     if (rng.chance(0.13)) {
       const side = zone === 'causeway' && rng.chance(0.45) ? -1 : 1;
       const x = side * rng.float(34, 95);
