@@ -8294,6 +8294,7 @@ vec3 gemCentre(vec3 pivot, float phase, vec3 pick, float dz) {
 `;
 
 const VS_GEM = COMMON + GEM_MOTION + /* glsl */ `
+uniform vec4 uKindG[8]; // y: rock (see below)
 attribute vec3 fx;
 attribute vec3 edge;
 #ifdef OUTLINE
@@ -8344,8 +8345,13 @@ void main() {
   vec3 pivot = M[3].xyz;
   float aP = uCamPos.z - pivot.z;
   vec3 pick = gemCollect(at, dz);
-  // turning on its own axis with a gentle nod, spun up as it's drawn in
-  float spin = uTime * uSpin.x + phase + max(pick.x, 0.0) * 5.0;
+  // turning on its own axis with a gentle nod, spun up as it's drawn in -
+  // or, a kind that rocks (a flat shard of sea glass), never turning right
+  // round: swaying this way and that about facing you, its broad face to you
+  // all the while and the light sliding over it
+  float rock = uKindG[int(uv.x + 0.5)].y;
+  float spin = rock > 0.0 ? sin(uTime * uSpin.x + phase) * rock + sin(phase * 3.7) * 0.2 : uTime * uSpin.x + phase;
+  spin += max(pick.x, 0.0) * 5.0;
   float nod = sin(uTime * uSpin.y * 0.5 + phase * 0.7) * uSpin.w;
   vec3 lp = turn(position, spin, nod);
   vec3 ln = turn(normal, spin, nod);
@@ -8563,7 +8569,9 @@ void main() {
     // the facets' edges catch the light in fine pale lines, as in a painting
     // of a stone (fading out with distance, before they'd shimmer)
     float ed = min(vEdge.x, min(vEdge.y, vEdge.z));
-    float line = (1.0 - smoothstep(0.0, fwidth(ed) * 1.4, ed)) * (1.0 - smoothstep(9.0, 26.0, dist));
+    // (+ a hair: a facet with no edges drawn, ed 1 all over it, would have
+    // smoothstep's edges meet - undefined, a scatter of noise)
+    float line = (1.0 - smoothstep(0.0, fwidth(ed) * 1.4 + 1e-4, ed)) * (1.0 - smoothstep(9.0, 26.0, dist));
     col = mix(col, lite * 1.2, line * 0.5 * (1.0 - B.x * 0.5));
     float g = pow(max(dot(R, L), 0.0), 40.0) + pow(max(dot(R, L2), 0.0), 40.0) * 0.8;
     g *= mix(1.0, smoothstep(0.5, 0.75, vnoise(q * 5.0)) * 1.6, B.y);
@@ -8627,6 +8635,7 @@ void main() {
 // bright: gems hung high for a jump light the road less).
 const VS_GEM_GLOW = COMMON + GEM_MOTION + /* glsl */ `
 uniform vec4 uFog;
+uniform float uHaloBack;
 attribute vec4 aInst;
 varying vec2 vUv;
 varying vec3 vColor;
@@ -8648,6 +8657,10 @@ void main() {
     vec3 c = gemCentre(pivot, phase, pick, aInst.w);
     if (pick.x >= 0.0) sc *= 1.0 - pick.z;
     vec3 bp = bendPos(c);
+    // (a world of flat stones hangs it a little behind them: drawn through a
+    // stone's middle, a shard turned to one side would show its line across
+    // it, half its face lit by the halo and half not)
+    bp += normalize(bp - uCamPos) * uHaloBack;
     vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
     vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
     vec3 wp = bp + (right * position.x + up * position.y) * sc;
@@ -9688,7 +9701,9 @@ export function makePortalMaterial(mode) {
 // o.look = [self-lit, glints, facet hue spread, fire] (see FS_GEM), o.kinds
 // each stone kind's surface: { veins, veinColor, mottle, speckle, bands,
 // bandFreq, wander, rings ('round' its heart or 'nested' like its faces),
-// second, opaque, rough, metal, scale, glints, nacre }. A kind with nacre
+// second, opaque, rough, metal, scale, glints, nacre, shift, rock }. A kind
+// that rocks (rock: how far, in radians) sways about facing you instead of
+// turning right round (a flat shard keeps its broad face to you). A kind with nacre
 // lights its polished (metal) parts as pearls, its second colour the overtone
 // its orient leans toward.
 const GEM_KINDS = 8;
@@ -9708,7 +9723,7 @@ export function makeGemMaterial(env, o = {}) {
     uKindD: v4((k) => [...rgbOf(k.veinColor ?? '#ffffff'), k.veinColor ? 1 : 0]),
     uKindE: v4((k) => [k.glints ?? 1, k.wander ?? 6, k.metal ?? 0, k.nacre ?? 0]),
     uKindF: v4((k) => [...rgbOf(k.flashColor ?? '#40d8c8'), k.flash ?? 0]),
-    uKindG: v4((k) => [k.shift ?? 0, 0, 0, 0]),
+    uKindG: v4((k) => [k.shift ?? 0, k.rock ?? 0, 0, 0]),
     uGemPolish: { value: o.polish ?? 0 },
     uClear: { value: 1 },
   });
@@ -9726,6 +9741,7 @@ export function makeGemGlowMaterial(env, o = {}) {
     uAnim: { value: animVector(o.anim ?? 'popEarly') },
     uSpin: { value: new THREE.Vector4(...(o.spin || [1.2, 2, 0.07, 0.12])) },
     uGemGlow: { value: o.gain ?? 0.6 },
+    uHaloBack: { value: o.back ?? 0 },
   });
   return new THREE.ShaderMaterial({
     uniforms,

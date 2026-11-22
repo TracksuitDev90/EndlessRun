@@ -414,7 +414,7 @@ class WorldBuilder {
     this.world.addBatch('gems', new KindBatch('gems', geo, mat, makeInkMaterial(mat, spec.ink ?? 0.026), 220));
     for (const [name, gain, pool] of [['gemGlow', spec.glow, false], ['gemPool', spec.pool, true]]) {
       const g = part(quadGeo(), '#ffffff', { outline: 0 });
-      const b = new Batch(name, g, makeGemGlowMaterial(this.u, { ...o, gain, pool }), null, 220);
+      const b = new Batch(name, g, makeGemGlowMaterial(this.u, { ...o, gain, pool, back: spec.haloBack }), null, 220);
       b.renderOrder = pool ? 1 : 7;
       this.world.addBatch(name, b);
     }

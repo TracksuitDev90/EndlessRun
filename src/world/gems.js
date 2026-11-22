@@ -29,7 +29,15 @@ import { P, part } from '../render/geo.js';
 // anything else (a gold bezel, the rock a cluster grows from) is lit like any
 // prop, the shine flag marking polished metal.
 
-export const crystal = (geo, o = {}) => facetEdges(part(geo, '#ffffff', { ...o, emit: 1, tint: 1 }));
+// (o.color, or a gradient o.grad, multiplies the instance's tint: a part of
+// the stone shaded apart, its rim clearer, its thin end brighter. o.soft: no
+// fine pale lines along its facets' edges - frosted, sea-worn glass, not a cut)
+export const crystal = (geo, o = {}) => {
+  const g = part(geo, o.color ?? '#ffffff', { ...o, emit: 1, tint: 1 });
+  if (!o.soft) return facetEdges(g);
+  g.setAttribute('edge', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(1), 3));
+  return g;
+};
 export const metal = (geo, color, o = {}) => part(geo, color, { ...o, mark: 1 });
 export const stone = (geo, color, o = {}) => part(geo, color, o);
 
@@ -306,6 +314,207 @@ export function tabular({ r = 0.2, t = 0.08, bevel = 0.85, jitter = 0.05, chips 
     ...around(3, -bevel, d, Math.PI / 3),
   ];
   return cleave(planes, { box: [r * 1.3, t * 1.5, r * 1.3], jitter, chips, seed });
+}
+
+// Sea glass: a flat shard of broken glass the tide has worn smooth, built
+// face-on (x across, y up, its broad faces to +z and -z, so it needs no
+// standing up). `corners` go round its outline anticlockwise, each
+// [x, y, worn]: how much of the two sides meeting there the sea has rounded
+// away (0 a sharp break, 0.5 worn to a curve). `sag[i]`, for the side from
+// corner i to the next, bows it in (> 0, a worn hollow or a scallop) or out
+// (< 0), as a fraction of its length. thick(x, y) is its half-thickness there
+// (a wedge thins across it). Its broad faces are flat and frosted; round them
+// the edge is ground into a few narrow polished bands (bevel: how far in
+// from the outline the face begins, as a fraction of the way to its middle),
+// which flash as it turns. scoop: how deep a shallow trough is worn into the
+// front face (rings: in how many steps; its facets carry a highlight across
+// it as it rocks).
+// Returns { face, rim, inside } - the two broad faces and the edge as
+// separate geometries (to be coloured apart), and inside(x, y): whether a
+// point lies on the front face (for laying things on it).
+export function seaGlass({ corners, sag = [], thick = () => 0.06, bevel = 0.16, scoop = 0, rings = 4 } = {}) {
+  const out = [];
+  const nc = corners.length;
+  for (let i = 0; i < nc; i++) {
+    const P = corners[i];
+    const A = corners[(i + nc - 1) % nc];
+    const B = corners[(i + 1) % nc];
+    const w = P[2] || 0;
+    // the worn corner: a curve from partway down one side to partway along the next
+    const a = [P[0] + (A[0] - P[0]) * w, P[1] + (A[1] - P[1]) * w];
+    const b = [P[0] + (B[0] - P[0]) * w, P[1] + (B[1] - P[1]) * w];
+    const steps = w > 0 ? 4 : 0;
+    for (let k = 0; k <= steps; k++) {
+      const t = steps ? k / steps : 0;
+      const u = 1 - t;
+      out.push(w > 0 ? [u * u * a[0] + 2 * u * t * P[0] + t * t * b[0], u * u * a[1] + 2 * u * t * P[1] + t * t * b[1]] : [P[0], P[1]]);
+    }
+    // the side on to the next corner, bowed
+    const g = sag[i] || 0;
+    if (g) {
+      const wb = B[2] || 0;
+      const s0 = w > 0 ? b : [P[0], P[1]];
+      const s1 = [B[0] + (P[0] - B[0]) * wb, B[1] + (P[1] - B[1]) * wb];
+      const dx = s1[0] - s0[0];
+      const dy = s1[1] - s0[1];
+      const len = Math.hypot(dx, dy);
+      // (anticlockwise, so the inside is to the left)
+      const nx = -dy / len;
+      const ny = dx / len;
+      for (const t of [0.2, 0.4, 0.6, 0.8]) {
+        const d = g * len * 4 * t * (1 - t);
+        out.push([s0[0] + dx * t + nx * d, s0[1] + dy * t + ny * d]);
+      }
+    }
+  }
+  // centred on its middle, so every ring is drawn in toward it
+  let cx = 0;
+  let cy = 0;
+  for (const [x, y] of out) {
+    cx += x / out.length;
+    cy += y / out.length;
+  }
+  const ol = out.map(([x, y]) => [x - cx, y - cy]);
+  const th = (x, y) => thick(x + cx, y + cy);
+  const n = ol.length;
+  // a ring of the outline drawn in by k toward the middle, at `side` (-1..1)
+  // of the thickness there, less dip
+  const ringAt = (k, side, dip = 0) => ol.map(([x, y]) => [x * k, y * k, side * th(x * k, y * k) - dip]);
+  const band = (A, B, tris) => {
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      tris.push([A[i], A[j], B[j]], [A[i], B[j], B[i]]);
+    }
+  };
+  const fan = (A, c, tris) => {
+    for (let i = 0; i < n; i++) tris.push([A[i], A[(i + 1) % n], c]);
+  };
+  const f = 1 - bevel;
+  // the edge, back to front: the face's border, a narrow polished chamfer,
+  // the worn edge itself, a chamfer, the front face's border
+  const rimRings = [ringAt(f, -1), ringAt(1 - bevel * 0.4, -0.86), ringAt(1, -0.42), ringAt(1, 0.42), ringAt(1 - bevel * 0.4, 0.86), ringAt(f, 1)];
+  const rim = [];
+  for (let r = 0; r < rimRings.length - 1; r++) band(rimRings[r], rimRings[r + 1], rim);
+  const face = [];
+  // the back, flat
+  fan(rimRings[0], [0, 0, -th(0, 0)], face);
+  // the front, flat or worn into a shallow dish: a broad trough, curved
+  // across the shard and running up it (so as it rocks side to side the
+  // light slides across the curve), easing out toward the edge
+  let X = 0;
+  for (const [x] of ol) X = Math.max(X, Math.abs(x) * f);
+  const dish = (x, k) => scoop * Math.max(0, 1 - (x / X) ** 2) * Math.min(1, (1 - k) * 2.2);
+  let prev = rimRings[rimRings.length - 1];
+  const steps = scoop > 0 ? rings : 1;
+  for (let r = 1; r < steps; r++) {
+    const k = 1 - r / steps;
+    const ring = ol.map(([x, y]) => [x * f * k, y * f * k, th(x * f * k, y * f * k) - dish(x * f * k, k)]);
+    band(prev, ring, face);
+    prev = ring;
+  }
+  fan(prev, [0, 0, th(0, 0) - dish(0, 0)], face);
+  const fo = ringAt(f, 1).map(([x, y]) => [x + cx, y + cy]);
+  const inside = (x, y) => {
+    let c = false;
+    for (let i = 0, j = fo.length - 1; i < fo.length; j = i++) {
+      const [xi, yi] = fo[i];
+      const [xj, yj] = fo[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  const shift = (g) => g.translate(cx, cy, 0);
+  const fg = solid(face, 0);
+  // a worn trough is a curve, not a cut: its front face smooth-shaded, so
+  // the light runs across it in one sweep rather than facet by facet
+  if (scoop > 0) smoothFront(fg);
+  return { face: shift(fg), rim: shift(solid(rim, 0)), inside };
+}
+
+// Average the normals of the triangles facing +z where they meet (area
+// weighted), the rest left flat.
+function smoothFront(g) {
+  const pos = g.attributes.position.array;
+  const nor = g.attributes.normal.array;
+  const key = (i) => `${Math.round(pos[i * 3] * 1e4)},${Math.round(pos[i * 3 + 1] * 1e4)},${Math.round(pos[i * 3 + 2] * 1e4)}`;
+  const sum = new Map();
+  const front = [];
+  for (let t = 0; t < pos.length / 9; t++) {
+    if (nor[t * 9 + 2] < 0.5) continue;
+    const i = t * 3;
+    const ax = pos[i * 3], ay = pos[i * 3 + 1], az = pos[i * 3 + 2];
+    const ux = pos[i * 3 + 3] - ax, uy = pos[i * 3 + 4] - ay, uz = pos[i * 3 + 5] - az;
+    const vx = pos[i * 3 + 6] - ax, vy = pos[i * 3 + 7] - ay, vz = pos[i * 3 + 8] - az;
+    const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    for (let v = 0; v < 3; v++) {
+      const k = key(i + v);
+      const s = sum.get(k) || [0, 0, 0];
+      s[0] += n[0];
+      s[1] += n[1];
+      s[2] += n[2];
+      sum.set(k, s);
+      front.push(i + v);
+    }
+  }
+  for (const i of front) {
+    const s = sum.get(key(i));
+    const l = Math.hypot(s[0], s[1], s[2]);
+    nor[i * 3] = s[0] / l;
+    nor[i * 3 + 1] = s[1] / l;
+    nor[i * 3 + 2] = s[2] / l;
+  }
+}
+
+// A soft ridge raised along a shard's front face (sea glass's flow lines:
+// where the glass cooled in a fold): from `from`, heading `dir`, rising out
+// of the face and running on until it meets the shard's edge (inside() from
+// seaGlass), low and rounded over, full height where it breaks off there.
+// z(x, y): the face's height under it.
+export function glassRidge({ from, dir, inside, z, w = 0.026, h = 0.016, step = 0.012 } = {}) {
+  const len = Math.hypot(dir[0], dir[1]);
+  const ux = dir[0] / len;
+  const uy = dir[1] / len;
+  const pts = [];
+  let [x, y] = from;
+  for (let i = 0; i < 60 && inside(x, y); i++) {
+    pts.push([x, y]);
+    x += ux * step;
+    y += uy * step;
+  }
+  const m = pts.length;
+  if (m < 2) throw new Error('glassRidge: starts off the face');
+  const px = -uy;
+  const py = ux;
+  // its cross-section: a low rounded hump in four facets
+  const prof = [[-1, 0], [-0.55, 0.75], [0, 1], [0.55, 0.75], [1, 0]];
+  const secs = pts.map(([x, y], i) => {
+    const t = i / Math.max(m - 1, 1);
+    const rise = Math.min(1, t * 3.5);
+    const ww = w * (0.35 + 0.65 * rise);
+    const hh = h * rise;
+    const base = z(x, y) - 0.004;
+    return prof.map(([a, b]) => [x + px * ww * a, y + py * ww * a, base + hh * b]);
+  });
+  const tris = [];
+  for (let i = 0; i < m - 1; i++) {
+    for (let k = 0; k < prof.length - 1; k++) {
+      const a = secs[i][k];
+      const b = secs[i][k + 1];
+      const c = secs[i + 1][k + 1];
+      const d = secs[i + 1][k];
+      // wound to face up off the shard
+      tris.push([a, d, c], [a, c, b]);
+    }
+  }
+  // its broken-off end
+  const e = secs[m - 1];
+  for (let k = 1; k < prof.length - 1; k++) tris.push([e[0], e[k + 1], e[k]]);
+  const pos = [];
+  for (const t of tris) for (const p of t) pos.push(...p);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
 }
 
 // Topaz: a long lozenge prism (two pairs of prism faces and a pinacoid at
