@@ -1992,10 +1992,22 @@ it streams back in the headwind, swings out and lags across a lane change,
 flies up through a jump and slaps down on landing, bounces with every stride
 (it's carried with only a third of the head's bob) and sways in the breeze
 when she stands. The GPU draws it as a slab full at the crown and thinning to
-the tips, strands drawn down its length; toward its ends it parts into
-pointed locks of uneven length, each edged in ink. The bun, the fringe and the
-two face-framing locks bounce on their own springs. Her hair keeps its colour
-through Hell's drain, as his cape does.
+the tips; toward its ends it parts into pointed locks of uneven length, each
+edged in ink. Its colour is painted in overlapping locks broad enough to read
+from the chase camera on a phone (`hairLocks` in `shaders.js`): bands of
+uneven width that follow its fall, her vermilion through each lock's body and
+a deeper red-orange where it passes beneath its neighbour — deepest at the
+parting, swelling and narrowing down its length — with a soft, matte copper
+on the crowns of a few raised locks where they round a curve, lit as the rest
+of the hair is. Toward the ends the partings draw to the notches between the
+cut's points, so the colours and the points agree; one narrow lock tapers away
+beneath its neighbours and two pairs merge. The pattern lives on the sheet's
+own grid (and on the sculpted hair's rest positions), so it rides every swing,
+bounce and gust exactly. The bun is shaded the same way in three broad coils
+that curl round it with its twist, and the fringe, the face-framing locks and
+the hair drawn up into the knot carry it more lightly. The bun, the fringe and
+the two face-framing locks bounce on their own springs. Her hair keeps its
+colour through Hell's drain, as his cape does.
 
 **The backpack** rides on a bone off her chest, bouncing, nodding and swaying
 on springs with each footfall and lane change. Every so often — on a timer

@@ -6127,10 +6127,123 @@ vec3 drawFace(vec3 base, vec3 r, inout float unlit) {
   c = mix(c, mix(base, uPal[E_MOUTH], 0.4), lip * front * 0.6);
   return c;
 }
-// Strands drawn along a lock: a few darker lines that wander a little.
-float strands(float u, float v, float k) {
-  float s = u * k + 0.35 * sin(v * 7.0 + u * 13.0);
-  return lines(s, 0.07) * smoothstep(0.02, 0.18, v);
+// Her hair's locks, painted in broad bands that a phone can still read: each
+// lock her vermilion through its body, a deeper red-orange where it passes
+// beneath its neighbour (deepest right at the neighbour's edge, fading across
+// it), and on a few raised curves a soft copper (gHairHi: how much here, lit
+// in FS_CHAR's highlight pass by how far it turns to the light).
+float gHairHi = 0.0;
+// The long hair's locks: where each parting between two of them lies across
+// the sheet (u) through the body of the hair (x) and where it ends, on one of
+// the notches between the cut's points (y: see hairCut), so the colours and
+// the points agree; z which lies over which (> 0 the lock to its right, < 0
+// the one to its left) and how deep the shade it casts; w 1 where the two
+// locks merge toward their ends (the parting fades out). Uneven widths;
+// one narrow lock (between the fourth and fifth) tapers away beneath its
+// neighbours.
+const vec4 E_PART[9] = vec4[9](
+  vec4(0.07, 0.0909, 0.8, 0.0),
+  vec4(0.185, 0.1818, -0.75, 1.0),
+  vec4(0.3, 0.2727, -0.8, 0.0),
+  vec4(0.385, 0.4545, -1.0, 0.0),
+  vec4(0.455, 0.4545, 0.9, 0.0),
+  vec4(0.62, 0.5455, -1.0, 0.0),
+  vec4(0.72, 0.6364, 0.8, 1.0),
+  vec4(0.82, 0.7273, 0.9, 0.0),
+  vec4(0.92, 0.9091, 1.0, 0.0)
+);
+// the soft copper on the raised locks (by lock, left to right): x how much,
+// y where down the hair it rounds over a curve
+const vec2 E_SHEEN[10] = vec2[10](
+  vec2(0.0, 0.3), vec2(0.5, 0.6), vec2(0.3, 0.36), vec2(0.55, 0.3), vec2(0.0, 0.3),
+  vec2(1.0, 0.3), vec2(0.0, 0.3), vec2(0.7, 0.58), vec2(0.35, 0.4), vec2(0.4, 0.5)
+);
+// The long hair's locks at (u, v) on the sheet: returns how deep in a lock's
+// shade it is (0..1); sets gHairHi.
+float hairLocks(float u, float v) {
+  float aa = fwidth(u) * 0.75 + 1e-5;
+  // (the partings run straight on through the body of the hair, swaying a
+  // little with its fall, and draw to their notches toward the ends)
+  float t = smoothstep(0.42, 1.0, v);
+  float sway = 0.02 * (1.0 - t);
+  float ws = mix(0.062, 0.036, t);
+  // (out of the roots, under the bun, they open up)
+  float open = smoothstep(0.02, 0.2, v);
+  float deep = 0.0;
+  float lo = -0.04, hi = 1.04;
+  vec2 sn = E_SHEEN[0];
+  for (int k = 0; k < 9; k++) {
+    vec4 b = E_PART[k];
+    float p = mix(b.x, b.y, t) + sway * sin(v * 3.6 + float(k) * 2.1);
+    if (p <= u) {
+      lo = p;
+      sn = E_SHEEN[k + 1];
+    } else hi = min(hi, p);
+    // the shade on the lock beneath: g > 0 on its side of the parting -
+    // full for a little way from it, then fading off across the lock;
+    // swelling and narrowing down its length, as the one over it lies
+    // closer or further across it
+    float g = -(u - p) * sign(b.z);
+    float s = abs(b.z) * open * (1.0 - b.w * smoothstep(0.45, 0.92, v));
+    float wk = ws * (0.72 + 0.42 * sin(v * 4.1 + float(k) * 2.7));
+    deep = max(deep, s * (1.0 - smoothstep(wk * 0.42, wk, g)) * smoothstep(-aa, aa, g));
+  }
+  // the copper: along the crown of a raised lock where it rounds a curve
+  float w = hi - lo;
+  float x = (u - lo) / max(w, 1e-4);
+  float crown = 1.0 - smoothstep(0.1, 0.36, abs(x - 0.48));
+  float dv = (v - sn.y) / 0.13;
+  float along = exp(-dv * dv);
+  gHairHi = sn.x * crown * along * smoothstep(0.03, 0.08, w) * (1.0 - deep);
+  return deep;
+}
+// (one set of locks round the head, a lock every sp radians from s0 at
+// angle a: how deep in shade, each lying over the next on its far side; hi
+// along each one's crown)
+float hairRound(float a, float s0, float sp, out float hi) {
+  float x = fract((a - s0) / sp + 0.5);
+  hi = 1.0 - smoothstep(0.1, 0.3, abs(x - 0.6));
+  return (1.0 - smoothstep(0.0, 0.42, x)) * smoothstep(0.0, 0.06, x);
+}
+// The sculpted hair (r: where it's sculpted, so the bands ride with every
+// bounce of the bun and the fringe): the bun's knot shaded in broad bands
+// that curl round it with its twist; the fringe, the locks framing her face
+// and the hair drawn up into the knot banded as the long hair is, but
+// lightly. Returns how deep in shade; sets gHairHi.
+float hairSculpt(vec3 r) {
+  vec3 q = r - vec3(0.0, 1.372, 0.014);
+  // the bun: three broad coils climbing round it the way its locks twist,
+  // each tucked under the one above
+  vec3 bq = r - vec3(0.0, 1.538, 0.042);
+  float bun = (1.0 - smoothstep(0.062, 0.085, length(bq.xz))) * smoothstep(1.47, 1.5, r.y);
+  float tw = atan(bq.z, bq.x) - 24.0 * bq.y;
+  float bx = fract(tw * 0.4775 + 0.15);
+  float bDeep = min(1.0, (1.0 - smoothstep(0.0, 0.38, bx)) + (1.0 - smoothstep(0.0, 0.05, 1.0 - bx)));
+  // (their crowns catch a soft copper, more toward the top)
+  float bHi = (1.0 - smoothstep(0.12, 0.3, abs(bx - 0.62))) * smoothstep(-0.03, 0.02, bq.y);
+  // round the head: the fringe's locks close together across the front
+  // (drawing a little closer as they fall), the locks framing her face at
+  // the temples, and broad ones drawn up from the nape into the knot behind
+  float az = atan(q.x, -q.z);
+  float side = abs(az);
+  float e = q.y / 0.124;
+  float fall = mix(0.9, 1.0, smoothstep(1.34, 1.46, r.y));
+  float fHi, tHi, nHi;
+  float fDeep = hairRound(az, -0.64 * fall, 0.2433 * fall, fHi);
+  float tDeep = hairRound(side, 1.06, 0.18, tHi);
+  float nDeep = hairRound(atan(q.x, q.z), 0.0, 0.75, nHi);
+  // (the copper: where the fringe rounds over her brow, where the framing
+  // locks leave the temples, and on the hair drawn up behind near the knot)
+  fHi *= smoothstep(0.3, 0.55, e) * (1.0 - smoothstep(0.75, 0.95, e)) * 0.55;
+  tHi *= smoothstep(1.24, 1.3, r.y) * (1.0 - smoothstep(1.33, 1.37, r.y)) * 0.4;
+  nHi *= smoothstep(0.55, 0.85, e) * 0.35;
+  float wF = 1.0 - smoothstep(0.78, 0.95, side);
+  float wT = (1.0 - wF) * (1.0 - smoothstep(1.5, 1.65, side)) * (1.0 - smoothstep(1.36, 1.42, r.y));
+  float wN = 1.0 - wF - wT;
+  float lDeep = fDeep * wF * 0.4 + tDeep * wT * 0.42 + nDeep * wN * 0.32;
+  float lHi = fHi * wF + tHi * wT + nHi * wN;
+  gHairHi = mix(lHi, bHi * 0.75, bun);
+  return mix(lDeep, bDeep * 0.9, bun);
 }
 vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
   vec3 c = base;
@@ -6216,11 +6329,19 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     // webbing straps, a ridge down them; plastic buckles a shade lighter
     c = mix(c, c * 1.3, d.x);
   } else if (m == 10) {
-    // the long hair (d: x across, y down, w the inside): strands down its
-    // length, deeper toward the tips and on the inside
-    c = mix(c, uPal[E_HAIR_DEEP], strands(d.x, d.y, 26.0) * 0.45);
-    c = mix(c, uPal[E_HAIR_DEEP], smoothstep(0.55, 1.0, d.y) * 0.25);
-    c = mix(c, uPal[E_HAIR_IN], step(0.5, d.w) * 0.8);
+    // the long hair (d: x across, y down, w the inside): overlapping locks,
+    // a deeper red-orange where each passes beneath the next (deepest at
+    // the parting) - a little deeper toward the tips, and on the inside
+    float deep = hairLocks(d.x, d.y);
+    float inside = step(0.5, d.w);
+    c = mix(c, uPal[E_HAIR_DEEP], smoothstep(0.55, 1.0, d.y) * 0.2);
+    c = mix(c, mix(uPal[E_HAIR_DEEP], uPal[E_HAIR_IN], smoothstep(0.35, 0.85, deep)), deep * 0.92);
+    c = mix(c, uPal[E_HAIR_IN] * mix(1.0, 0.85, deep), inside * 0.8);
+    gHairHi *= 1.0 - inside;
+  } else if (m == 2) {
+    // the bun, the fringe and the locks framing her face (r: as sculpted)
+    float deep = hairSculpt(r);
+    c = mix(c, mix(uPal[E_HAIR_DEEP], uPal[E_HAIR_IN], smoothstep(0.6, 0.95, deep)), deep * 0.85);
   }
   return c;
 }
@@ -6478,7 +6599,15 @@ void main() {
   #else
   if (m == 2) {
   #endif
-  #if !defined(FOX)
+  #if defined(EXPLORER)
+    // her hair: a soft copper on the raised curves of its locks (gHairHi,
+    // see charDetail) - painted on, lit as the rest of the hair is, fuller
+    // where they turn toward the light but never gone in its shade; matte,
+    // no shine
+    float hl = gHairHi * mix(0.55, 1.0, smoothstep(-0.25, 0.5, dot(n, uLightDir)));
+    col = mix(col, uPal[30] * mix(sh, vec3(1.0), lit), hl * 0.75);
+  }
+  #elif !defined(FOX)
     // one restrained lighter tone where the curls face the light from above
     float hl = smoothstep(0.58, 0.64, dot(n, uLightDir)) * smoothstep(0.25, 0.5, n.y);
     col = mix(col, uPal[30], hl * 0.8);
