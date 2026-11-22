@@ -1228,7 +1228,7 @@ four cousins found alongside it, mostly rough, as they come out of the rock:
 | Gallery of Hours | **Moonstone** white | cool, pale stones against warm ivory and brass, with a cool blue halo | moonstone, a milky pebble with a blue sheen · white opal, flecked with green-blue fire · clear quartz, a double-terminated point · selenite, a satin striated blade · diamond, a natural octahedron · a pair of pearls, lit as polished rather than faceted | a great diamond held in a brass ring like a watch glass |
 | Frostbound Pass | **Alexandrite** plum and **labradorite** slate | stones that change as you look at them: plum shifting to teal under a restrained pink-violet glow, and dark slate flashing blue-green, against the white-and-blue canyon | alexandrite, a stubby twinned six-sided crystal · cut alexandrite, a step-cut stone · labradorite, a cleaved slab flashing blue-green · a polished labradorite pebble, flashing blue | a great cut alexandrite in a ring of labradorite shards |
 | Red Drift | **Moldavite** green | the only green under all that red, and every stone of it fell from the sky | moldavite, wrinkled bottle-green glass flung up by a meteorite strike · peridot, an eight-sided bipyramid · pallasite, meteorite iron studded with olivine · tektite, green glass beads grown together | a fallen star: five points of moldavite |
-| Blue Hour | **Amber** and sea glass | the one warm thing you can pick up off a blue shore, a small glow like the lantern's; with sea glass frosted by the waves | honey amber, a rough pebble · cherry amber, darker and redder · a clear golden drop · sea glass, a frosted aqua shard · cobalt sea glass | a drop of amber in a ring of sea glass |
+| Blue Hour | **Sea glass** | the shore's own pickings, frosted by the tide, pale against the slate and denim; the one warm thing is the crown's amber, a small glow like the lantern's | seafoam glass, a flattened, lopsided triangle with one corner worn blunt and one side hollowed, cloudy mint with a clear aqua rim · milk glass, an uneven ivory fan with a shallow scallop off to one side and two soft ridges running across it · deep-green glass, a thick wedge with a sloping top and one corner clipped, forest green at its foot and lime at its thin end, a shallow trough worn into its face | a drop of amber in a ring of sea glass |
 | Kelp Deep | **Pearls**, iridescent, in every shade | lustrous and soft against all that teal and green, and the one gem the sea makes itself; the counter wears a pearl here | Akoya, white with a rosé glow · golden South Sea · pink freshwater, a button pearl with a blue-lavender sheen · Tahitian, peacock black shot with green and blue · a silver-grey drop · a cream baroque · a circled champagne pearl (see [Pearls](#pearls)) | a great pearl in an open scallop shell |
 
 ### Pearls
@@ -1275,6 +1275,16 @@ duller glints, and pyrite is lit as brassy metal. Up close, fine pale lines
 pick out the edges where a crystal's faces meet, fading out with distance so a
 far run stays clean. Every gem is also picked from a few close shades and
 scaled a touch either way.
+
+The Blue Hour's sea glass is made differently: each piece is a flat shard,
+its silhouette drawn as an outline (corners worn round by how long the tide
+has had them, sides bowed in where a chip's been worn smooth) and given
+thickness. Its broad faces are flat and frosted, with no lines at the facet
+edges, and its rim is ground into a few narrow polished bands that flash as
+it moves. A shard doesn't spin all the way round. It rocks back and forth
+while facing you, so you always see its broad face (a kind's `rock`, in
+radians). Its halo hangs just behind it (`haloBack`), so the glow doesn't
+light half of a tilted face.
 
 Each turns slowly and bobs where it hangs, at its own world's pace (the
 amethysts drift like the fireflies; the aquamarines ride the biggest swells;

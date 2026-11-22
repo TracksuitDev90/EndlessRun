@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { P, part, merge, moved, rod, gateFrameParts, gateTop, leafParts } from './shapes.js';
-import { crystal, stone, nugget, tabular, barrel } from './gems.js';
+import { crystal, stone, nugget, barrel, seaGlass, glassRidge } from './gems.js';
 import { CONFIG } from '../config.js';
 
 // XI · Blue Hour — a lonely, windswept coast held for ever at blue hour.
@@ -269,50 +269,94 @@ function hullParts({ len = 3, beam = 1.2, depth = 0.6, color = C.boatBlue, insid
 }
 
 // --- gems -------------------------------------------------------------------------
-// Amber, washed up on the shore: the one warm thing you can pick up off it -
-// honey and butterscotch pebbles, a dark cherry amber, a clear golden drop -
-// and with them sea glass, frosted by the waves, in aqua and old cobalt.
-// The crown: a drop of amber with a ring of sea glass round it.
+// Sea glass, washed up on the shore: broken glass the tide has tumbled for
+// years till every break is worn soft and its faces are frosted. Three
+// shards, each its own shape so a line of them reads as fragments picked up
+// one by one: a pale seafoam chip, a piece of old milk glass and a thick
+// wedge of bottle green. Flat as they are, they rock rather than turn, their
+// broad faces to you and the light sliding over them. The crown: a drop of
+// amber with a ring of sea glass round it - the one warm thing on this shore.
 const AMBER = { opaque: 0.35, mottle: 0.4, second: '#ffd27a', rough: 0.3, speckle: 0.08, glints: 0.6, scale: 5 };
-const GLASS = { opaque: 0.6, mottle: 0.25, second: '#dff6f2', rough: 0.85, speckle: 0.05, glints: 0.2, scale: 4 };
+// frosted faces, cloudy in the middle, with a little grit in the frost
+const GLASS = { opaque: 0.6, mottle: 0.45, rough: 0.55, speckle: 0.03, glints: 0.5, scale: 4, rock: 0.7 };
+
+// Seafoam glass: a flattened, lopsided triangle, one corner worn blunt and
+// the side opposite its longest edge hollowed by a chip worn smooth; a
+// narrow rim of clearer aqua round its cloudy middle, catching the light all
+// along the long straight edge.
+function seafoamShard() {
+  const g = seaGlass({
+    corners: [[-0.28, -0.12, 0.16], [0.25, -0.17, 0.42], [-0.03, 0.2, 0.2]],
+    sag: [0, 0, 0.09],
+    thick: (x) => 0.052 + x * 0.02,
+    bevel: 0.15,
+  });
+  return [crystal(g.face, { rz: 0.12, soft: true }), crystal(g.rim, { color: '#78d6ee', rz: 0.12 })];
+}
+
+// Milk glass: an uneven fan of warm ivory, narrow at its foot and wide across
+// the broken edge, a shallow scallop bitten out of that edge off to one side;
+// two soft ridges run slantwise across its face and break off at the edge,
+// a cool pearly sheen along them.
+function milkShard() {
+  const thick = (x, y) => 0.05 + y * 0.012;
+  const g = seaGlass({
+    corners: [[-0.06, -0.23, 0.3], [0.23, -0.03, 0.22], [0.07, 0.21, 0.12], [-0.22, 0.15, 0.26]],
+    sag: [0.02, -0.12, 0.13, 0.03],
+    thick,
+    bevel: 0.15,
+  });
+  const z = (x, y) => thick(x, y);
+  const ridges = [
+    glassRidge({ from: [-0.07, -0.07], dir: [0.4, 1], inside: g.inside, z, w: 0.034, h: 0.014 }),
+    glassRidge({ from: [0.03, -0.09], dir: [0.8, 1], inside: g.inside, z, w: 0.028, h: 0.012 }),
+  ];
+  // (the ridges cooler than the body: a pearly sheen along them)
+  return [crystal(g.face, { soft: true }), crystal(g.rim), ...ridges.map((r) => crystal(r, { color: '#eef2ff', soft: true }))];
+}
+
+// Deep-green glass: a thick, sea-worn wedge, its top sloping off and one
+// corner clipped away; forest green through the thick foot, the thin end
+// catching a brighter lime, and a broad shallow trough worn into its face for a
+// curved highlight to travel across as it rocks.
+function greenShard() {
+  const g = seaGlass({
+    corners: [[-0.17, -0.2, 0.22], [0.18, -0.2, 0.22], [0.19, 0.03, 0.12], [0.1, 0.13, 0.16], [-0.17, 0.22, 0.22]],
+    sag: [0, 0, 0, 0.02, 0],
+    thick: (x, y) => 0.072 - y * 0.1,
+    bevel: 0.14,
+    scoop: 0.026,
+    rings: 9,
+  });
+  // (the shade runs up it: dark where it's thick, the tint itself, lime, at the thin end)
+  const grad = ['#163a22', '#ffffff', -0.17, 0.15];
+  return [crystal(g.face, { grad, rz: -0.08, soft: true }), crystal(g.rim, { grad: ['#163a22', '#f4ffe2', -0.17, 0.15], rz: -0.08 })];
+}
+
 const GEM = {
-  name: 'amber',
-  color: '#ffb347',
+  name: 'sea glass',
+  color: '#a8e6d2',
   stones: [
     {
-      name: 'honey amber',
-      weight: 3,
-      tints: ['#f2a03a', '#f6b04a', '#e8922e'],
-      parts: () => [crystal(nugget({ r: [0.22, 0.17, 0.19], faces: 18, spread: 0.07, chips: 1, seed: 31 }), { rz: 0.3 })],
-      texture: AMBER,
-    },
-    {
-      name: 'cherry amber',
-      weight: 1.3,
-      tints: ['#b8481e', '#a63c1a'],
-      parts: () => [crystal(nugget({ r: [0.19, 0.16, 0.21], faces: 16, spread: 0.1, chips: 2, seed: 7 }), { rx: 0.4 })],
-      texture: { ...AMBER, second: '#ff8a4a', opaque: 0.45 },
-    },
-    {
-      name: 'golden drop',
+      name: 'seafoam glass',
       weight: 1.4,
-      tints: ['#ffc65a', '#ffd06a'],
-      parts: () => [crystal(barrel({ r: 0.15, h: 0.3, taper: 0.5, seed: 12 }), { rz: 0.5 })],
-      texture: { ...AMBER, opaque: 0.2, glints: 1.2 },
+      tints: ['#b8ecbe', '#b0e8b6', '#c0f0c6'],
+      parts: seafoamShard,
+      texture: { ...GLASS, mottle: 0.6, second: '#eef8f1' },
     },
     {
-      name: 'sea glass',
-      weight: 1.2,
-      tints: ['#8fd6c8', '#a6e2d4', '#7cc4c8'],
-      parts: () => [crystal(tabular({ r: 0.2, t: 0.08, bevel: 0.6, seed: 9 }), { rx: Math.PI / 2, rz: 0.4 })],
-      texture: GLASS,
+      name: 'milk glass',
+      weight: 1.0,
+      tints: ['#ead5ab', '#e5cea2'],
+      parts: milkShard,
+      texture: { ...GLASS, opaque: 0.85, mottle: 0.25, second: '#f4ecdc', rough: 0.45, glints: 0.35 },
     },
     {
-      name: 'cobalt sea glass',
-      weight: 0.8,
-      tints: ['#3b62b8', '#3557a8'],
-      parts: () => [crystal(tabular({ r: 0.17, t: 0.07, bevel: 0.55, seed: 21 }), { rx: Math.PI / 2, rz: -0.3 })],
-      texture: { ...GLASS, second: '#9ab8ff' },
+      name: 'deep-green glass',
+      weight: 1.1,
+      tints: ['#a4dc50', '#9ad84a'],
+      parts: greenShard,
+      texture: { ...GLASS, opaque: 0.35, mottle: 0.2, second: '#d0f27e', rough: 0.4, speckle: 0.02, glints: 0.65 },
     },
   ],
   crown: {
@@ -332,6 +376,8 @@ const GEM = {
   look: [0.8, 1.2, 0.3, 0.35],
   glow: 0.65,
   pool: 0.35,
+  // (the halo hung just behind the shards, clear of their faces as they rock)
+  haloBack: 0.32,
 };
 
 // --- the stretches ---------------------------------------------------------------
