@@ -5,7 +5,6 @@ import { palette } from './kit.js';
 import { Player, C, mirror } from './player.js';
 import { CONFIG } from '../config.js';
 import { Dust } from './dust.js';
-import { Ribbons } from './ribbon.js';
 
 // The samurai: Birch, a tall, heavily muscled white tiger with a cheetah's
 // long build, in a near-black training kimono, a reddish-brown obi and loose
@@ -25,15 +24,19 @@ import { Ribbons } from './ribbon.js';
 //     duck, too;
 //   - every move is a water bender's - flowing, then brutally fast: a lane
 //     change is a flash step (a low, wide lunge across, the leading arm
-//     sweeping through in a whip of water - or, drawn, a cut); four jumps, a
-//     whirl (a spin about himself, arms whipping out - drawn, a full circle
-//     of the blade), a tucked front flip coming down in an overhead cut, a
-//     flying lunge (front knee high, the back leg trailing long, one palm
-//     pushing the water ahead of him - drawn, the sword raised in both hands
-//     and brought down as he lands), and a butterfly twist, laid out flat and
-//     spinning; his duck an iai crouch, low on one knee, his hand on the hilt;
-//   - the water itself (ribbon.js): ribbons of it whipping off his hands and
-//     the point of his blade, drops flung off them;
+//     sweeping through - or, drawn, a cut); four jumps, a whirl (a spin about
+//     himself, arms whipping out - drawn, a full circle of the blade), a
+//     tucked front flip coming down in an overhead cut, a flying lunge (front
+//     knee high, the back leg trailing long, one palm pushed out ahead of him
+//     - drawn, the sword raised in both hands and brought down as he lands),
+//     and a butterfly twist, laid out flat and spinning; his duck an iai
+//     crouch, low on one knee, his hand on the hilt;
+//   - and he moves between them as deliberately: setting off, he drops into
+//     a low, coiled start and explodes out of it; out of a flash step he
+//     comes up through a recovery step, the trailing leg swinging back under
+//     him; out of the duck he drives forward into his first stride rather
+//     than standing up; and a spin in the air lands where it ends, facing
+//     down the road, never turning back the way it came;
 //   - his long tail and the obi's hanging ends swing on chains of particles
 //     (ropeStep), the tail held in a hunting cat's curve, streaming out and
 //     lashing as he dashes; his ears twitch; his whiskers.
@@ -183,6 +186,9 @@ const AZ = new THREE.Vector3(0, 0, 1);
 
 const mix = (a, b, k) => a + (b - a) * k;
 const ease = (x) => x * x * (3 - 2 * x);
+// (an angle brought into -pi..pi: a spin that's gone the whole way round is
+// back where it started)
+const wrapAngle = (a) => a - TAU * Math.floor((a + Math.PI) / TAU);
 const bump = (a, b, c, d, x) => smooth(a, b, x) * (1 - smooth(c, d, x));
 // (a fast snap: most of the way there early, the rest eased in)
 const snap = (a, b, x) => {
@@ -263,7 +269,6 @@ export class Samurai extends Player {
     this.buildBody();
     this.buildWhiskers();
     this.dust = new Dust(this.u);
-    this.ribbons = new Ribbons(this.u);
     this.buildSword();
   }
 
@@ -348,12 +353,11 @@ export class Samurai extends Player {
   }
 
   get objects() {
-    return [this.root, this.shadow, this.dust.points, this.ribbons.mesh];
+    return [this.root, this.shadow, this.dust.points];
   }
 
   forCompile(on) {
     this.dust.forCompile(on);
-    this.ribbons.forCompile(on);
   }
 
   // --- state ------------------------------------------------------------------------
@@ -407,6 +411,8 @@ export class Samurai extends Player {
     this.dodgeT = 9;
     this.dodgeDir = 1;
     this.greetT = 9;
+    this.offT = 9;
+    this.wasRunning = false;
     this.tilt = 0;
     this.yawSpin = 0;
     this.rollSpin = 0;
@@ -415,11 +421,10 @@ export class Samurai extends Player {
     this.twitchT = 1 + 3 * Math.random();
     this.stepDust = 0;
     // the sword: in its scabbard ('in'), drawing, out, sheathing
-    this.sword = { state: 'in', t: 0, next: SWORD.first[0] + SWORD.first[1] * Math.random(), drawnK: 0, slide: 0, hold: 0, rib: null };
+    this.sword = { state: 'in', t: 0, next: SWORD.first[0] + SWORD.first[1] * Math.random(), drawnK: 0, slide: 0, hold: 0 };
     if (this.earS) for (const s of Object.values(this.earS)) s.reset();
     if (this.lash) this.lash.reset();
     for (const r of this.ropes || []) r.ready = false;
-    this.ribbons?.clear();
     this.dust?.clear();
     this.slidePlan = null;
   }
@@ -429,6 +434,11 @@ export class Samurai extends Player {
     this.swordStep(dt);
     this.dodgeT += dt;
     this.greetT += dt;
+    // (setting off from a standstill: see setOffOverlay)
+    const running = this.mode === 'run';
+    if (running && !this.wasRunning) this.offT = 0;
+    this.wasRunning = running;
+    this.offT += dt;
     super.update(dt, speed, groundAt);
     // rising out of a duck, now and then, he draws
     const P = this.slidePlan;
@@ -447,9 +457,7 @@ export class Samurai extends Player {
 
   place(z, dist = 0) {
     super.place(z);
-    const vel = _dv.set(this.vx, this.grounded ? 0 : this.vy, -this.speed);
     this.dust.update(this.lastDt, this.root, z, dist);
-    this.ribbons.update(this.lastDt, this.root, z, dist, vel);
     this.lastDt = 0;
   }
 
@@ -492,15 +500,12 @@ export class Samurai extends Player {
     const S = this.sword;
     S.state = 'drawing';
     S.t = 0;
-    // (the point of the blade whips out in a ribbon of water)
-    S.rib = this.ribbons.start((o) => this.tipOf(o), SWORD.draw * 1.2, 0.11, 0.3, 0.93);
   }
 
   sheathe() {
     const S = this.sword;
     S.state = 'sheathing';
     S.t = 0;
-    this.ribbons.start((o) => (this.sword.t < SWORD.sheathe * 0.32 ? this.tipOf(o) : false), SWORD.sheathe * 0.32, 0.08, 0.24, 0.93);
   }
 
   // Keep the sword drawn ('out') or sheathed ('in') from now on (the viewer:
@@ -511,27 +516,6 @@ export class Samurai extends Player {
     S.t = 0;
     S.next = Infinity;
     S.drawnK = S.state === 'out' ? 1 : 0;
-  }
-
-  // Where the point of the blade is (runner space), if it's out to see.
-  tipOf(out) {
-    const S = this.sword;
-    if (S.state === 'in') return false;
-    // (not while the point's still in the scabbard)
-    if ((S.state === 'drawing' || S.state === 'sheathing' || S.state === 'greet') && S.slide > 0.02 && S.slide < SLIDE - 0.02) return false;
-    // (the sword's frame is in his own space already)
-    out.set(0, this.rig.katana.tip, 0).applyMatrix4(this.swordF);
-    return true;
-  }
-
-  // Where a point on a bone is (runner space), for a ribbon to flow from.
-  pointOn(bone, x, y, z) {
-    // (between update and place, the bones' matrices are still in his own
-    // space: see secondary)
-    return (out) => {
-      out.set(x, y, z).applyMatrix4(this.b[bone].matrixWorld);
-      return true;
-    };
   }
 
   // --- moves ------------------------------------------------------------------------
@@ -555,26 +539,6 @@ export class Samurai extends Player {
     this.jumpSide = this.nextSide || (Math.random() < 0.5 ? -1 : 1);
     this.nextSide = 0;
     this.lash.v += 6;
-    this.jumpRibbons();
-  }
-
-  // The water off him through a jump: off his hands (or the point of his
-  // blade, out) as he whirls, flips, leaps or twists.
-  jumpRibbons() {
-    const T = CONFIG.jump.time;
-    const drawn = this.sword.state === 'out' || this.sword.state === 'drawing';
-    const tip = (o) => this.tipOf(o);
-    const handL = this.pointOn('handL', 0, -0.08, 0);
-    const handR = this.pointOn('handR', 0, -0.08, 0);
-    const tr = this.trick;
-    if (drawn) {
-      this.ribbons.start(tip, T * 0.85, 0.12, 0.34, 0.95);
-      if (tr === 'leap' || tr === 'flip') this.ribbons.start(handL, T * 0.6, 0.06, 0.24, 0.8);
-    } else {
-      const w = tr === 'leap' ? 0.1 : 0.085;
-      this.ribbons.start(handR, T * 0.85, w, 0.32, 0.9);
-      this.ribbons.start(handL, T * 0.85, w * 0.85, 0.3, 0.9);
-    }
   }
 
   onLand(hit) {
@@ -593,28 +557,14 @@ export class Samurai extends Player {
     super.startSlide();
     if (!fresh) return;
     this.slidePlan = { decided: false };
-    const drawn = this.sword.state === 'out';
-    // (a low cut forward as he goes down, drawn; else his palm skims the
-    // road, a ribbon of water off it)
-    if (drawn) this.ribbons.start((o) => this.tipOf(o), CONFIG.slide.time * 0.55, 0.1, 0.3, 0.9);
-    else this.ribbons.start(this.pointOn('handR', 0, -0.08, 0), CONFIG.slide.time * 0.4, 0.07, 0.26, 0.75);
   }
 
   onDodge(dir) {
     this.dodgeT = 0;
     this.dodgeDir = dir;
     this.lash.v += 3;
-    // the flash step's water: a whip off the leading hand - or, drawn, the
-    // blade cutting across
     if (this.mode !== 'run' || this.crashed) return;
-    if (this.sword.state === 'out') this.ribbons.start((o) => this.tipOf(o), 0.2, 0.11, 0.28, 0.9);
-    else this.ribbons.start(this.pointOn(dir > 0 ? 'handR' : 'handL', 0, -0.08, 0), 0.22, 0.085, 0.26, 0.8);
     if (this.grounded && !this.wet) this.dashDust(dir);
-  }
-
-  crash() {
-    super.crash();
-    this.ribbons.release();
   }
 
   revive() {
@@ -634,7 +584,6 @@ export class Samurai extends Player {
     const S = this.sword;
     S.state = 'greet';
     S.t = 0;
-    this.ribbons.start((o) => (this.greetT < 0.7 ? this.tipOf(o) : false), 0.7, 0.11, 0.34, 0);
   }
 
   // --- poses --------------------------------------------------------------------------
@@ -906,21 +855,25 @@ export class Samurai extends Player {
     if (this.slideT > 0) this.slideU = 1 - clamp(this.slideT / CONFIG.slide.time, 0, 1);
     const u = this.slideU ?? 1;
     const k = snap(0.0, 0.14, u) * (1 - smooth(0.74, 0.98, u));
+    // (and out of it not by standing up but driving forward, low, into his
+    // first stride - the back leg swinging through, the front pushing off -
+    // so the run takes over from a stride, not from a standstill)
+    const out = smooth(0.72, 1.0, u);
     s.fill(0);
     s[C.sq] = 1;
-    s[C.hipY] = mix(this.HIP_Y - 0.08, 0.5, k);
+    s[C.hipY] = mix(this.HIP_Y - 0.08, 0.5, k) - 0.02 * out;
     s[C.hipPitch] = 0.2 * k;
     s[C.hipYaw] = -0.12 * k;
-    s[C.spLean] = 0.62 * k + 0.08;
+    s[C.spLean] = 0.62 * k + 0.08 + 0.22 * out;
     s[C.chLean] = 0.12 * k;
     s[C.spTwist] = 0.1 * k;
     // (his chin up, his eyes on what's ahead)
-    s[C.hdPitch] = 0.62 * k;
+    s[C.hdPitch] = 0.62 * k + 0.18 * out;
     // his feet: the front (left) planted well forward, the back (right) up
     // on its toes behind, its knee all but on the road
     const A = this.ANKLE_H;
-    this.plantFoot(s, 0, mix(-0.1, -0.13, k), A, mix(-0.12, -0.5, k), 0);
-    this.plantFoot(s, 1, mix(0.1, 0.13, k), mix(A, 0.16, k), mix(0.05, 0.5, k), -1.1 * k);
+    this.plantFoot(s, 0, mix(-0.1, -0.13, k), A, mix(mix(-0.12, -0.5, k), 0.22, out), 0);
+    this.plantFoot(s, 1, mix(0.1, 0.13, k), mix(mix(A, 0.16, k), A + 0.12, out), mix(mix(0.05, 0.5, k), -0.2, out), mix(-1.1 * k, 0.3, out));
     s[C.toR] = 1.0 * k;
     // the arms: at the sword (sheathed: solved onto the hilt and scabbard)
     s[C.shLx] = 0.35;
@@ -1004,15 +957,52 @@ export class Samurai extends Player {
     }
     Pz[C.chTwist] -= 0.25 * e * d;
     this.dashK = e;
+    // and up out of the lunge through a recovery step: the trailing leg
+    // swinging back in under him, his body rising tall and settling back
+    // the other way a little before the stride takes him on
+    const rec = (x < 1.6 ? bump(0.5, 0.78, 0.92, 1.55, x) : 0) * w;
+    if (rec > 0) {
+      Pz[C.hipY] += 0.02 * rec;
+      Pz[d > 0 ? C.thLx : C.thRx] += 0.45 * rec;
+      Pz[d > 0 ? C.knL : C.knR] += 0.55 * rec;
+      Pz[d > 0 ? C.thLz : C.thRz] -= 0.08 * rec;
+      Pz[C.spSide] += 0.05 * d * rec;
+      Pz[C.hdRoll] -= 0.08 * d * rec;
+      Pz[C.chTwist] += 0.08 * d * rec;
+    }
   }
 
   // (however a landing or a cut swings his arms, an elbow never bends
   // backward)
   applyPose(Pz, roll) {
+    this.setOffOverlay(Pz);
     Pz[C.elL] = Math.max(0, Pz[C.elL]);
     Pz[C.elR] = Math.max(0, Pz[C.elR]);
     this.swordArm(Pz);
     super.applyPose(Pz, roll);
+  }
+
+  // Setting off from a standstill: down into a low, coiled start - a big cat
+  // gathering itself, hips dropped, knees deep, leaning out over his feet,
+  // chin up and eyes down the road, his right arm drawn back - then
+  // exploding up out of it into his first long, driving strides.
+  setOffOverlay(Pz) {
+    const t = this.offT;
+    if (t > 1.1 || this.crashed) return;
+    const a = bump(0.0, 0.1, 0.24, 0.8, t);
+    const drive = bump(0.16, 0.34, 0.6, 1.1, t);
+    Pz[C.hipY] -= 0.09 * a;
+    Pz[C.knL] += 0.52 * a;
+    Pz[C.knR] += 0.52 * a;
+    Pz[C.thLx] += 0.31 * a;
+    Pz[C.thRx] += 0.31 * a;
+    Pz[C.anL] += 0.21 * a;
+    Pz[C.anR] += 0.21 * a;
+    Pz[C.spLean] += 0.4 * a + 0.16 * drive;
+    Pz[C.chLean] += 0.08 * a;
+    Pz[C.hdPitch] += 0.3 * a + 0.1 * drive;
+    Pz[C.shRx] -= 0.55 * a;
+    Pz[C.elR] += 0.35 * a;
   }
 
   // The sword arm's own poses, laid over everything else without the
@@ -1064,10 +1054,14 @@ export class Samurai extends Player {
     const live = 1 - cw;
     const b = this.body;
     const wj = this.w.jump * live;
+    // (each spin taken the short way round to where it's got to: one that's
+    // come the whole way round is back to nothing, so as the jump's pose
+    // eases out on landing he stays facing down the road rather than
+    // spinning back round the way he came)
     if (this.tilt !== 0) turnAbout(b, _q.setFromAxisAngle(AX, this.tilt * wj), MID);
-    if (this.pitchSpin !== 0) turnAbout(b, _q.setFromAxisAngle(AX, this.pitchSpin * wj), MID);
-    if (this.rollSpin !== 0) turnAbout(b, _q.setFromAxisAngle(AZ, this.rollSpin * wj), MID);
-    if (this.yawSpin !== 0) turnAbout(b, _q.setFromAxisAngle(AY, this.yawSpin * wj), MID);
+    if (this.pitchSpin !== 0) turnAbout(b, _q.setFromAxisAngle(AX, wrapAngle(this.pitchSpin) * wj), MID);
+    if (this.rollSpin !== 0) turnAbout(b, _q.setFromAxisAngle(AZ, wrapAngle(this.rollSpin) * wj), MID);
+    if (this.yawSpin !== 0) turnAbout(b, _q.setFromAxisAngle(AY, wrapAngle(this.yawSpin) * wj), MID);
     // (rising off the road for the butterfly: his middle up where he's laid
     // out flat, so his head and feet clear it)
     this.root.matrixWorld.identity();

@@ -5091,7 +5091,7 @@ vec3 charDetail(int m, vec3 base, vec3 r, vec4 d, inout float unlit) {
     c = mix(c, c * 2.4 + 0.05, pocket * 0.6);
     c = mix(c, uPal[K_PIPE], pipe);
   } else if (m == 7) {
-    // chunky skate shoes: a thick white cupsole, its wall grooved all
+    // skate shoes: a white cupsole, its wall grooved all
     // round, a tread line along its top; light grey suede over the toe cap
     // and the heel; laces criss-crossing up the front; a padded collar
     float side = r.x < 0.0 ? -1.0 : 1.0;
@@ -5566,8 +5566,9 @@ vec3 drawFace(vec3 base, vec3 r, inout float unlit) {
   float frk = fill(length(fract(fq) - 0.5 - fo * 0.5) - (0.12 + 0.12 * fh)) * step(0.55, fh) * fz;
   c = mix(c, uPal[R_FRECKLE], 0.65 * frk * front);
   // the smudge on his left cheek (and a fainter one on his jaw)
-  float sm = rdSmudge(r, vec3(-0.062, ey - 0.046, -0.07), vec3(0.016, 0.009, 0.03), 3.0) * 0.55 + rdSmudge(r, vec3(-0.052, ey - 0.069, -0.07), vec3(0.008, 0.005, 0.03), 9.0) * 0.35;
-  c = mix(c, uPal[R_DIRT], sm * front);
+  // (light and warm: at the game's distance a heavier one reads as a bruise)
+  float sm = rdSmudge(r, vec3(-0.062, ey - 0.046, -0.07), vec3(0.016, 0.009, 0.03), 3.0) * 0.3 + rdSmudge(r, vec3(-0.052, ey - 0.069, -0.07), vec3(0.008, 0.005, 0.03), 9.0) * 0.18;
+  c = mix(c, mix(uPal[R_DIRT], uPal[R_SKIN_DEEP], 0.4), sm * front);
   if (front <= 0.0) return c;
   // the eyes: big and round, a little taller than wide
   vec2 E = uRig[0].xy;
@@ -6499,7 +6500,9 @@ void main() {
     // (scales a little crisper than fur; feathers soft)
     float soft = (m == 2 || m == 7 || m == 9) ? 0.12 : 0.075;
   #elif defined(EXPLORER)
-    float soft = m == 10 ? 0.12 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
+    // (her face takes the light softly: a crisp step across it draws hard
+    // shapes over her cheeks and nose)
+    float soft = m == 10 ? 0.12 : m == 1 ? 0.13 : m == 2 ? 0.07 : m == 3 ? 0.06 : 0.045;
   #elif defined(ELDER)
     float soft = (m == 10 || m == 14) ? 0.15 : m == 13 ? 0.13 : m == 2 ? 0.08 : (m == 3 || m == 4 || m == 9) ? 0.09 : 0.05;
   #elif defined(BUNNY) && defined(PROPS)
@@ -7520,60 +7523,6 @@ void main() {
   float dist = length(v);
   col = atmos(col, v, dist, 0.0);
   gl_FragColor = vec4(grade(col, uTrip), alpha);
-}
-`;
-
-// ---------------------------------------------------------------------------
-// Ribbons of water whipping off the samurai (game/ribbon.js): trails of
-// points written by the CPU, each stretch turned to face you and widened
-// to its width there; drawn as a water bender's water - a bright, glassy
-// white heart, a cool teal toward its edges, streaks running down it as it
-// flows, thinning and breaking up toward its tail. Lit, fogged and graded
-// with the world.
-// ---------------------------------------------------------------------------
-const VS_RIBBON = COMMON + /* glsl */ `
-attribute vec3 aTan;
-attribute vec4 aRib; // x side (-1 / +1), y how far down it (+ its seed), z how much of it is left, w half its width (m)
-varying vec4 vRib;
-varying vec3 vWorld;
-varying vec3 vPos;
-void main() {
-  vec3 view = normalize(position - uCamPos);
-  vec3 side = cross(aTan, view);
-  float l = length(side);
-  side = l > 1e-4 ? side / l : vec3(0.0, 1.0, 0.0);
-  vec3 wp = position + side * aRib.x * aRib.w;
-  wp = bendPos(wp);
-  vPos = wp;
-  vWorld = wp;
-  vRib = aRib;
-  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
-}
-`;
-const FS_RIBBON = FS_HEAD + /* glsl */ `
-uniform vec3 uShadowTint;
-varying vec4 vRib;
-void main() {
-  float e = abs(vRib.x);
-  float u = fract(vRib.y);
-  float left = vRib.z;
-  if (left <= 0.0) discard;
-  // streaks running down it as it flows, breaking it up toward its tail
-  float flow = sin(vRib.y * 46.0 - uTime * 26.0 + vRib.x * 2.2) * 0.5 + 0.5;
-  float flow2 = sin(vRib.y * 97.0 - uTime * 41.0 - vRib.x * 3.1) * 0.5 + 0.5;
-  float body = smoothstep(1.0, 0.6 - 0.2 * flow, e);
-  float tail = smoothstep(0.0, 0.25, left);
-  float alpha = body * tail * (0.78 + 0.22 * flow) * mix(1.0, step(0.35, flow2), smoothstep(0.4, 0.85, u));
-  if (alpha < 0.02) discard;
-  // a white heart, a cool teal only at its very edges, brighter streaks
-  // running through it
-  vec3 teal = vec3(0.45, 0.8, 0.88);
-  vec3 col = mix(vec3(0.98, 1.0, 1.0), teal, smoothstep(0.45, 1.0, e) * 0.8);
-  col = mix(col, vec3(0.86, 0.95, 0.98), (1.0 - flow) * 0.35 * (1.0 - e));
-  vec3 v = vWorld - uCamPos;
-  float dist = length(v);
-  col = atmos(col, v, dist, 0.0);
-  gl_FragColor = vec4(grade(col, uTrip), alpha * 0.9);
 }
 `;
 
@@ -10014,18 +9963,6 @@ export function makeRootMaterial(env) {
     uniforms: withShared(env, { uRoot: { value: new THREE.Vector4() } }),
     vertexShader: VS_ROOT,
     fragmentShader: FS_ROOT,
-  });
-}
-
-// The samurai's ribbons of water (game/ribbon.js), lit by env.
-export function makeRibbonMaterial(env) {
-  return new THREE.ShaderMaterial({
-    uniforms: withShared(env, {}),
-    vertexShader: VS_RIBBON,
-    fragmentShader: FS_RIBBON,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
   });
 }
 

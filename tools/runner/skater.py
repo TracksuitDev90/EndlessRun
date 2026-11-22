@@ -292,13 +292,15 @@ def head_prims():
     # (No sockets cut for the eyes: the shader draws them, big, on a smooth
     # face - creases there catch the ink and read as lines down the cheeks.)
     cran = ellipsoid(*CRAN)
-    face = ellipsoid((0, 1.5, -0.027), (0.069, 0.078, 0.073))
-    cheeks = [ellipsoid((s * 0.039, 1.487, -0.049), (0.032, 0.03, 0.031)) for s, _ in SIDES]
-    # the jaw: from its angle just under the ear lobe down and forward to the
-    # chin, a clear line in profile (her sheet's: a youthful face, but a
-    # defined jaw), and a small, neat chin
-    jaws = [round_cone((s * 0.051, 1.463, 0.004), (s * 0.017, 1.425, -0.05), 0.019, 0.0135) for s, _ in SIDES]
-    chin = ellipsoid((0, 1.422, -0.055), (0.0172, 0.0152, 0.0155))
+    face = ellipsoid((0, 1.5, -0.026), (0.066, 0.077, 0.069))
+    cheeks = [ellipsoid((s * 0.035, 1.489, -0.05), (0.03, 0.027, 0.028)) for s, _ in SIDES]
+    # the jaw: a rounded U from under each ear down to the chin - full enough
+    # through the mouth that the face is a soft oval (her sheet's), never a
+    # V, and no angle flaring out under the ear (young and smooth, not
+    # square) - and a small, neat chin. (Each side its own volume, meeting
+    # under the chin.)
+    jaws = [ellipsoid((s * 0.012, 1.455, -0.023), (0.036, 0.034, 0.046)) for s, _ in SIDES]
+    chin = ellipsoid((0, 1.422, -0.054), (0.0165, 0.016, 0.016))
     return cran, face, cheeks, jaws, chin
 
 
@@ -306,11 +308,10 @@ def skull(p):
     cran, face, cheeks, jaws, chin = head_prims()
     d = smin(cran(p), face(p), 0.05)
     for c in cheeks:
-        d = smin(d, c(p), 0.04)
-    # (blended in tightly enough that the jaw keeps its line, softly enough
-    # that it's still a young face)
+        d = smin(d, c(p), 0.035)
+    # (blended in softly: the cheek runs down into the jaw in one curve)
     for j in jaws:
-        d = smin(d, j(p), 0.032)
+        d = smin(d, j(p), 0.04)
     return smin(d, chin(p), 0.024)
 
 
@@ -326,8 +327,10 @@ def g_head():
     wings = [ellipsoid((s * 0.0112, 1.4685, -0.09), (0.0082, 0.0072, 0.0075)) for s, _ in SIDES]
     # full lips in low relief (the shader draws them): the upper with its
     # bow, the fuller lower one
-    upper = ellipsoid((0, LIPS['y'] + 0.0058, LIPS['z'] - 0.0012), (0.021, 0.0058, 0.0085))
-    lower = ellipsoid((0, LIPS['y'] - 0.0058, LIPS['z'] - 0.0004), (0.019, 0.0072, 0.009))
+    # (set back close over the face: in profile they're full, but they sit
+    # only a little proud of the chin rather than jutting past it)
+    upper = ellipsoid((0, LIPS['y'] + 0.0058, LIPS['z'] + 0.0018), (0.0205, 0.0056, 0.0078))
+    lower = ellipsoid((0, LIPS['y'] - 0.0058, LIPS['z'] + 0.0024), (0.0185, 0.0068, 0.0082))
     # a soft brow ridge over each eye
     brows = [ellipsoid((s * 0.035, 1.536, -0.078), (0.03, 0.01, 0.012)) for s, _ in SIDES]
     ears = [ellipsoid((s * EAR['x'], EAR['y'], EAR['z']), (0.011, 0.025, 0.018), rot_y(s * 0.3)) for s, _ in SIDES]
@@ -371,7 +374,7 @@ def g_head():
 
     # (a thinner ink line round the face than the rest of her: it's the
     # part of her you look at, and a fine line keeps it delicate)
-    return Garment('head', MAT['face'], 0.0018, (-0.105, 1.2, -0.125), (0.105, 1.67, 0.13), field, owners, 4200, details=details, outline=0.6)
+    return Garment('head', MAT['face'], 0.0013, (-0.105, 1.2, -0.125), (0.105, 1.67, 0.13), field, owners, 6400, details=details, outline=0.6)
 
 
 def on_cran(theta, elev, lift=0.0):
@@ -685,12 +688,12 @@ def g_gold():
 # arm, the shoulder seam just off the shoulder.)
 TEE = dict(
     chest=((0, 1.162, 0.012), (0.131, 0.128, 0.085)),
-    yoke=((0, 1.254, 0.01), (0.143, 0.05, 0.072)),
+    yoke=((0, 1.254, 0.01), (0.138, 0.048, 0.07)),
     belly=((0, 0.95, 0.014), (0.138, 0.19, 0.09)),
     # (a little over her hips, as her sheet has it: oversized, not a dress)
     hem=0.77,
     drop=0.028,  # the shoulder seams drop this far down the arm
-    sleeve=(0.06, 0.052),  # the sleeve's radius at the shoulder, at its end
+    sleeve=(0.051, 0.048),  # the sleeve's radius at the shoulder, at its end
     end=0.205,  # how far down the arm the sleeve reaches (just over the elbow)
 )
 
@@ -751,7 +754,9 @@ def g_tee():
             u = (p - sl['S']) @ sl['d']
             s = s + 0.0028 * np.sin(u * 55 + p[:, 2] * 40) * smooth(0.06, 0.16, u)
             s = smax(s, -sl['hole'](p), 0.006)
-            t = smin(t, s, 0.055)
+            # (joined without a puff: the shoulder line runs on down the
+            # sleeve, an oversized tee's dropped seam, not a balloon)
+            t = smin(t, s, 0.03)
         return t
 
     torso = by_y([(0.86, 'hips'), (0.98, 'spine'), (1.08, 'spine'), (1.17, 'chest')])
@@ -842,7 +847,7 @@ def g_shorts():
 SOCK_TOP = 0.285
 SHOE_X = 0.084
 SOLE_H = 0.026
-SHOE_COLLAR = 0.146
+SHOE_COLLAR = 0.13
 # the shoe's heel and toe along it (z, from the ankle): a slim skate shoe her
 # size (~26.5 cm) - a flat vulcanised-looking sole, not a platform; the heel just
 # behind the ankle, the toe well out in front
@@ -861,7 +866,7 @@ def g_legs():
         calf = round_cone((x + s * 0.004, kn - 0.01, 0.006), (x + s * 0.006, 0.3, 0.015), 0.038, 0.04)
         shin = round_cone((x + s * 0.006, 0.3, 0.011), (x + s * 0.007, 0.15, 0.004), 0.039, 0.028)
         # the crew sock, a touch fuller than the leg, ribbed at its top
-        sock = round_cone((x + s * 0.007, 0.13, 0.006), (x + s * 0.007, SOCK_TOP - 0.006, 0.012), 0.033, 0.041)
+        sock = round_cone((x + s * 0.007, 0.13, 0.006), (x + s * 0.007, SOCK_TOP - 0.006, 0.012), 0.03, 0.04)
         cuff = torus_y((x + s * 0.007, SOCK_TOP - 0.012, 0.012), 0.038, 0.006)
         prims.append((thigh, knee, calf, shin, sock, cuff))
         owners += [(q, w) for q in (thigh, knee, calf, shin, sock, cuff)]
@@ -885,8 +890,8 @@ def g_legs():
 
 
 def g_shoes():
-    """Chunky skate shoes: a thick platform cupsole with a textured wall,
-    a wide rounded toe box under a reinforced toe cap, a padded collar and
+    """Skate shoes: a cupsole with a textured wall, a rounded toe box
+    under a reinforced toe cap (sleek, not a clumpy platform), a padded collar and
     tongue, laces up the front (the shader draws them, the panels, the
     sole's tread)."""
     parts, owners = [], []
@@ -896,7 +901,7 @@ def g_shoes():
         def sole_fn(p, bx=bx):
             x, y, z = p[:, 0] - bx, p[:, 1], p[:, 2]
             # (narrower at the heel than across the ball of the foot)
-            r1, r2 = 0.037, 0.045
+            r1, r2 = 0.035, 0.043
             h = (SHOE_HEEL - r1) - (SHOE_TOE + r2)
             px, py = np.abs(x), (SHOE_HEEL - r1) - z
             b = (r1 - r2) / h
@@ -911,14 +916,16 @@ def g_shoes():
         sole = Prim(sole_fn, (bx - 0.055, -0.01, SHOE_TOE - 0.01), (bx + 0.055, 0.05, SHOE_HEEL + 0.01))
         # the upper: low over the toes, rising up the instep to a padded
         # collar round the ankle - close round her foot, not a boot
-        foot = round_cone((bx, 0.066, 0.012), (bx, 0.054, -0.11), 0.037, 0.032)
-        toebox = ellipsoid((bx, 0.047, -0.15), (0.039, 0.022, 0.044))
-        instep = round_cone((bx, 0.068, -0.095), (bx, 0.114, -0.03), 0.03, 0.03)
-        heel = ellipsoid((bx, 0.078, 0.026), (0.035, 0.045, 0.028))
-        ankle = round_cone((bx, 0.075, 0.008), (bx, 0.118, 0.01), 0.039, 0.035)
-        collar = torus_y((bx, SHOE_COLLAR - 0.006, 0.01), 0.034, 0.0095, 1.12)
-        tongue = round_box((bx, 0.138, -0.034), (0.019, 0.024, 0.007), 0.007, rot_x(-0.35))
-        hole = round_cone((bx, 0.106, 0.008), (bx, 0.26, 0.008), 0.028, 0.028)
+        # (slim and low: the toe box tapers down to the sole, the instep
+        # rises gently, the collar sits close round her ankle)
+        foot = round_cone((bx, 0.064, 0.012), (bx, 0.052, -0.11), 0.034, 0.029)
+        toebox = ellipsoid((bx, 0.044, -0.15), (0.036, 0.019, 0.043))
+        instep = round_cone((bx, 0.064, -0.095), (bx, 0.098, -0.032), 0.027, 0.028)
+        heel = ellipsoid((bx, 0.072, 0.026), (0.032, 0.039, 0.027))
+        ankle = round_cone((bx, 0.07, 0.008), (bx, 0.103, 0.01), 0.035, 0.032)
+        collar = torus_y((bx, SHOE_COLLAR - 0.006, 0.01), 0.032, 0.0082, 1.1)
+        tongue = round_box((bx, 0.123, -0.034), (0.018, 0.022, 0.0065), 0.0065, rot_x(-0.35))
+        hole = round_cone((bx, 0.094, 0.008), (bx, 0.26, 0.008), 0.028, 0.028)
         parts.append((sole, foot, toebox, instep, heel, ankle, collar, tongue, hole))
         low = along(lambda p: p[:, 2], [(-0.12, 'toe' + L), (-0.075, 'foot' + L)])
         owners += [(sole, low), (foot, low), (toebox, low), (instep, low), (heel, rigid('foot' + L)), (ankle, rigid('foot' + L)), (collar, rigid('foot' + L)), (tongue, rigid('foot' + L))]
@@ -927,10 +934,10 @@ def g_shoes():
         out = np.full(len(p), 1.0)
         for sole, foot, toebox, instep, heel, ankle, collar, tongue, hole in parts:
             d = smin(sole(p), foot(p), 0.014)
-            d = smin(d, toebox(p), 0.02)
-            d = smin(d, instep(p), 0.026)
-            d = smin(d, heel(p), 0.02)
-            d = smin(d, ankle(p), 0.026)
+            d = smin(d, toebox(p), 0.018)
+            d = smin(d, instep(p), 0.022)
+            d = smin(d, heel(p), 0.018)
+            d = smin(d, ankle(p), 0.022)
             d = smin(d, collar(p), 0.01)
             d = smin(d, tongue(p), 0.01)
             d = smax(d, -hole(p), 0.006)

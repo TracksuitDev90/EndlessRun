@@ -150,7 +150,9 @@ def g_head():
 
     def field(p):
         d = skull(p)
-        d = smin(d, nose(p), 0.01)
+        # (blended softly, and a finer ink line round the face, as the
+        # others have: a crisp little bump catches the ink as a V round it)
+        d = smin(d, nose(p), 0.016)
         for e in ears:
             d = smin(d, e(p), 0.007)
         return smin(d, neck(p), 0.03)
@@ -162,7 +164,7 @@ def g_head():
     def details(p, n, own):
         return np.concatenate([p, np.zeros((len(p), 1))], 1)
 
-    return Garment('head', MAT['face'], 0.0024, (-0.15, 0.98, -0.14), (0.15, 1.51, 0.15), field, owners, 2500, details=details)
+    return Garment('head', MAT['face'], 0.0017, (-0.15, 0.98, -0.14), (0.15, 1.51, 0.15), field, owners, 5200, details=details, outline=0.6)
 
 
 def on_cran(theta, elev, lift=0.0):
@@ -184,11 +186,32 @@ def lock(pts, r0, r1=None, taper=(1.0, 0.9, 0.7, 0.45, 0.18)):
     return stroke([V(*q) for q in pts], radii)
 
 
+def fringe_locks():
+    """The fringe's locks (a garment of their own: see g_fringe)."""
+    rnd = np.random.default_rng(11)
+    fringe = []
+
+    # the fringe: fine locks from the crown's front, swept a little to her
+    # left, falling over the forehead to her brows in uneven points with the
+    # forehead showing between them (none further: a point over her eyes
+    # reads, at the game's distance, as a scratch across her face)
+    for th, tip, sweep, r0 in [
+        (-0.64, 1.338, 0.004, 0.013), (-0.42, 1.32, 0.01, 0.014), (-0.2, 1.314, 0.014, 0.012),
+        (0.12, 1.322, 0.008, 0.014), (0.34, 1.33, 0.0, 0.013), (0.58, 1.342, -0.008, 0.012),
+    ]:
+        a, _ = on_cran(th, 1.0, 0.006)
+        b, _ = on_cran(th * 0.95 + sweep * 2, 0.62, 0.013)
+        c, _ = on_cran(th * 0.9 + sweep * 4, 0.36, 0.017)
+        d = V(c[0] * 0.97 + sweep + rnd.uniform(-0.004, 0.004), tip + rnd.uniform(-0.004, 0.004), c[2] - 0.004)
+        fringe.append(lock([a, b, c, d], r0, taper=(1.0, 0.95, 0.75, 0.2)))
+    return fringe
+
+
 def g_hair():
     """The sculpted part of her hair: a close cap over the skull (the long
     hair, simulated in the game, lies on it and grows out from under the
-    bun), the long fringe falling to her brows in points, a lock on either side
-    framing the face, and the messy bun on the crown with wisps escaping."""
+    bun), a lock on either side framing the face, and the messy bun on the
+    crown with wisps escaping. (The fringe is a garment of its own: g_fringe.)"""
 
     def cap(p):
         y = p[:, 1]
@@ -202,24 +225,7 @@ def g_hair():
         return np.interp(th, [0, 0.6, 1.0, 1.25, 1.45, 1.75, 2.2, 2.7, math.pi], [1.405, 1.39, 1.35, 1.31, 1.33, 1.3, 1.22, 1.18, 1.17])
 
     base = Prim(cap, (-0.15, 1.15, -0.15), (0.15, 1.53, 0.16))
-    rnd = np.random.default_rng(11)
-    fringe, lockL, lockR, bun, top = [], [], [], [], []
-
-    # the fringe: fine locks from the crown's front, swept a little to her
-    # left, falling over the forehead to the brows in uneven points with the
-    # forehead showing between them, one short one straying between the eyes
-    for th, tip, sweep, r0 in [
-        (-0.64, 1.335, 0.004, 0.013), (-0.42, 1.31, 0.01, 0.014), (-0.2, 1.298, 0.014, 0.012),
-        (0.12, 1.316, 0.008, 0.014), (0.34, 1.326, 0.0, 0.013), (0.58, 1.34, -0.008, 0.012),
-    ]:
-        a, _ = on_cran(th, 1.0, 0.006)
-        b, _ = on_cran(th * 0.95 + sweep * 2, 0.62, 0.013)
-        c, _ = on_cran(th * 0.9 + sweep * 4, 0.36, 0.017)
-        d = V(c[0] * 0.97 + sweep + rnd.uniform(-0.004, 0.004), tip + rnd.uniform(-0.004, 0.004), c[2] - 0.004)
-        fringe.append(lock([a, b, c, d], r0, taper=(1.0, 0.95, 0.75, 0.12)))
-    a, _ = on_cran(0.02, 0.9, 0.008)
-    b, _ = on_cran(0.06, 0.42, 0.018)
-    fringe.append(lock([a, b, V(b[0] + 0.004, 1.286, b[2] - 0.004)], 0.009, taper=(1.0, 0.8, 0.12)))
+    lockL, lockR, bun, top = [], [], [], []
 
     # locks framing the face: from the temples down past the cheeks to the
     # jaw, curving out a little at the ends
@@ -263,14 +269,13 @@ def g_hair():
             d = smin(d, q(p), 0.012)
         for q in bun:
             d = smin(d, q(p), 0.008)
-        for q in fringe + lockL + lockR:
+        for q in lockL + lockR:
             d = smin(d, q(p), 0.006)
         return d
 
     head = rigid('head')
     owners = [(base, head)] + [(q, head) for q in top]
     owners += [(q, by_y([(1.5, 'head'), (1.515, 'bun')])) for q in bun]
-    owners += [(q, by_y([(1.31, 'fringe'), (1.42, 'head')])) for q in fringe]
     owners += [(q, by_y([(1.25, 'lockL'), (1.36, 'head')])) for q in lockL]
     owners += [(q, by_y([(1.25, 'lockR'), (1.36, 'head')])) for q in lockR]
 
@@ -279,6 +284,27 @@ def g_hair():
         return np.stack([1 - own[:, 0], np.zeros(len(p)), np.zeros(len(p)), np.zeros(len(p))], 1)
 
     return Garment('hair', MAT['hair'], 0.0024, (-0.19, 1.07, -0.17), (0.19, 1.65, 0.17), field, owners, 3600, tau=0.008, details=details)
+
+
+def g_fringe():
+    """The fringe on its own, rooted under the cap of hair: drawn with a finer
+    ink line than the rest of her hair, so its points lie light over her
+    forehead rather than scratching dark lines down it."""
+    fringe = fringe_locks()
+
+    def field(p):
+        d = np.full(len(p), 1.0)
+        for q in fringe:
+            d = smin(d, q(p), 0.006)
+        return d
+
+    owners = [(q, by_y([(1.31, 'fringe'), (1.42, 'head')])) for q in fringe]
+
+    def details(p, n, own):
+        # x: on a lock (strands are drawn along it)
+        return np.stack([np.ones(len(p)), np.zeros(len(p)), np.zeros(len(p)), np.zeros(len(p))], 1)
+
+    return Garment('fringe', MAT['hair'], 0.0017, (-0.12, 1.27, -0.16), (0.12, 1.56, 0.1), field, owners, 2400, tau=0.008, details=details, outline=0.5)
 
 
 # --------------------------------------------------------------------------------
@@ -709,7 +735,7 @@ def hair_colliders():
 def build():
     t0 = time.time()
     build_rig()
-    garments = [g_head(), g_hair(), g_tee(), g_sweater(), g_shorts(), g_legs(), g_shoes(), g_hands(), g_pack(), g_straps(), g_book()]
+    garments = [g_head(), g_hair(), g_fringe(), g_tee(), g_sweater(), g_shorts(), g_legs(), g_shoes(), g_hands(), g_pack(), g_straps(), g_book()]
     rig = dict(
         hipY=HIP_Y, hipJoint=list(HIP_JOINT), thigh=THIGH, shin=SHIN, toe=list(TOE), chestY=CHEST_Y, headY=HEAD_Y,
         shoulder=list(SHOULDER), upperArm=UPPER_ARM, forearm=FOREARM, armRest=ARM_REST,
