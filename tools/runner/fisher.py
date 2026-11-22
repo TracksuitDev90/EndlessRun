@@ -484,7 +484,7 @@ MAT = dict(face=1, hair=2, tee=3, jacket=4, trousers=5, boot=6, hand=7, strap=8,
 
 BODY = dict(
     y=[0.7, 0.76, 0.84, 0.92, 0.99, 1.06, 1.13, 1.2, 1.25, 1.29, 1.32, 1.345, 1.362],
-    rx=[0.11, 0.142, 0.152, 0.145, 0.13, 0.128, 0.134, 0.141, 0.145, 0.142, 0.126, 0.092, 0.058],
+    rx=[0.11, 0.142, 0.152, 0.145, 0.13, 0.128, 0.133, 0.138, 0.14, 0.135, 0.118, 0.088, 0.058],
     rz=[0.085, 0.1, 0.104, 0.097, 0.088, 0.087, 0.092, 0.097, 0.095, 0.087, 0.075, 0.061, 0.05],
     cz=[0.02, 0.02, 0.018, 0.012, 0.006, 0.002, 0.0, 0.0, 0.004, 0.008, 0.012, 0.012, 0.012],
 )
@@ -541,13 +541,14 @@ MOUTH = (1.424, -0.088)  # (y, z)
 
 def head_prims():
     # a round boy's face, its eyes at the middle of his head: full cheeks
-    # low and forward, a soft jaw running back to under the ears, a small
+    # low and forward - but inside the line of his face, not bulging past
+    # it - a soft jaw in one rounded U from under each ear to a small
     # rounded chin; a big round cranium over it
     cran = ellipsoid(*CRAN)
-    face = ellipsoid((0, 1.467, -0.03), (0.084, 0.08, 0.076))
-    cheeks = [ellipsoid((s * 0.049, 1.443, -0.047), (0.043, 0.037, 0.038)) for s, _ in SIDES]
-    jaws = [round_cone((s * 0.058, 1.46, 0.002), (s * 0.024, 1.41, -0.046), 0.031, 0.025) for s, _ in SIDES]
-    chin = ellipsoid((0, 1.4, -0.05), (0.029, 0.02, 0.021))
+    face = ellipsoid((0, 1.468, -0.03), (0.082, 0.08, 0.075))
+    cheeks = [ellipsoid((s * 0.045, 1.446, -0.05), (0.036, 0.032, 0.034)) for s, _ in SIDES]
+    jaws = [ellipsoid((s * 0.018, 1.43, -0.03), (0.049, 0.042, 0.046)) for s, _ in SIDES]
+    chin = ellipsoid((0, 1.4, -0.05), (0.024, 0.019, 0.02))
     return cran, face, cheeks, jaws, chin
 
 
@@ -557,7 +558,7 @@ def skull(p):
     for c in cheeks:
         d = smin(d, c(p), 0.035)
     for j in jaws:
-        d = smin(d, j(p), 0.04)
+        d = smin(d, j(p), 0.045)
     return smin(d, chin(p), 0.03)
 
 
@@ -570,7 +571,7 @@ def g_head():
     ears = [ellipsoid((s * 0.095, 1.478, 0.01), (0.013, 0.027, 0.02), rot_y(s * 0.3)) for s, _ in SIDES]
     # the neck: short and sturdy, flowing up into the jaw and the back of the
     # skull and out into the slope of his shoulders (under the collar)
-    neck = yloft([1.26, 1.32, 1.37, 1.41, 1.45], [0.068, 0.054, 0.049, 0.05, 0.06], [0.06, 0.05, 0.047, 0.05, 0.062],
+    neck = yloft([1.26, 1.32, 1.37, 1.41, 1.45], [0.064, 0.05, 0.045, 0.047, 0.057], [0.058, 0.048, 0.045, 0.048, 0.06],
                  cz=[0.012, 0.012, 0.014, 0.018, 0.02], bottom=0.01, top=0.02)
 
     def field(p):
@@ -597,7 +598,7 @@ def g_head():
         ear = own[:, n_ear] + own[:, n_ear + 1]
         return np.stack([ear, np.zeros(len(p)), np.zeros(len(p)), np.zeros(len(p))], 1)
 
-    return Garment('head', MAT['face'], 0.0019, (-0.12, 1.24, -0.13), (0.12, 1.64, 0.13), field, owners, 4600, details=details, outline=0.55)
+    return Garment('head', MAT['face'], 0.0014, (-0.12, 1.24, -0.13), (0.12, 1.64, 0.13), field, owners, 6800, details=details, outline=0.55)
 
 
 def on_cran(theta, elev, lift=0.0):
@@ -843,15 +844,16 @@ def cran_free_onto(prim, p, lift, steps=8):
 
 JACKET = dict(
     y=[0.745, 0.8, 0.88, 0.96, 1.04, 1.12, 1.2, 1.26, 1.3, 1.325, 1.348, 1.366, 1.38],
-    rx=[0.183, 0.18, 0.172, 0.162, 0.154, 0.152, 0.156, 0.16, 0.156, 0.144, 0.115, 0.084, 0.064],
+    rx=[0.183, 0.18, 0.172, 0.162, 0.154, 0.151, 0.153, 0.154, 0.148, 0.134, 0.108, 0.082, 0.064],
     rz=[0.136, 0.133, 0.127, 0.12, 0.115, 0.113, 0.114, 0.111, 0.102, 0.091, 0.075, 0.063, 0.057],
     cz=[0.008, 0.008, 0.008, 0.007, 0.006, 0.005, 0.005, 0.008, 0.011, 0.012, 0.012, 0.012, 0.012],
     hem=0.745,
     shell=0.0065,
 )
 # the sleeve's radius down the arm (it starts small up at the shoulder so
-# it runs on down the slope of it rather than bulging over it)
-SLEEVE = ([0.025, 0.06, 0.12, 0.2, UPPER_ARM, 0.38, UPPER_ARM + FOREARM - 0.035], [0.04, 0.049, 0.0505, 0.0495, 0.048, 0.0455, 0.0445])
+# it runs on down the slope of it rather than bulging over it - a sloped
+# shoulder, not a squared-off pad)
+SLEEVE = ([0.025, 0.06, 0.12, 0.2, UPPER_ARM, 0.38, UPPER_ARM + FOREARM - 0.035], [0.035, 0.042, 0.045, 0.0455, 0.0448, 0.043, 0.0422])
 CUFF_U = UPPER_ARM + FOREARM - 0.045  # the turned-back cuff, down the arm
 # how wide the fronts hang open (half the gap, by height)
 OPEN = ([0.74, 0.9, 1.1, 1.2, 1.28, 1.33, 1.4], [0.082, 0.08, 0.078, 0.076, 0.066, 0.052, 0.046])
@@ -1120,9 +1122,9 @@ def g_trousers():
 # high its upper rises over the road - the heel counter up into the shaft,
 # the instep sloping down into a modest rounded toe.
 BOOT_PLAN = dict(z=[0.074, 0.06, 0.03, -0.02, -0.07, -0.11, -0.15, -0.18, -0.198, -0.207],
-                 w=[0.028, 0.042, 0.047, 0.048, 0.053, 0.055, 0.052, 0.044, 0.031, 0.018],
-                 top=[0.095, 0.12, 0.15, 0.152, 0.124, 0.1, 0.082, 0.07, 0.058, 0.045])
-BOOT_SHAFT = dict(y=[0.08, 0.12, 0.17, 0.22, 0.27, BOOT_TOP], rx=[0.048, 0.046, 0.048, 0.052, 0.056, 0.058], rz=[0.062, 0.054, 0.058, 0.062, 0.065, 0.066], cz=[0.016, 0.012, 0.01, 0.009, 0.008, 0.008])
+                 w=[0.026, 0.039, 0.044, 0.045, 0.049, 0.051, 0.048, 0.041, 0.029, 0.017],
+                 top=[0.093, 0.118, 0.145, 0.146, 0.12, 0.097, 0.08, 0.068, 0.057, 0.044])
+BOOT_SHAFT = dict(y=[0.08, 0.12, 0.17, 0.22, 0.27, BOOT_TOP], rx=[0.046, 0.044, 0.046, 0.05, 0.053, 0.055], rz=[0.06, 0.052, 0.056, 0.059, 0.062, 0.063], cz=[0.016, 0.012, 0.01, 0.009, 0.008, 0.008])
 
 
 def toe_lift(z):
@@ -1166,7 +1168,7 @@ def g_boots():
         S_ = BOOT_SHAFT
         shaft = yloft(S_['y'], S_['rx'], S_['rz'], cx=[bx] * len(S_['y']), cz=S_['cz'], bottom=None, top=0.004)
         inside = yloft([0.16, 0.24, BOOT_TOP + 0.05], [0.04, 0.047, 0.051], [0.047, 0.055, 0.059], cx=[bx] * 3, cz=[0.008] * 3, bottom=0.02, top=None)
-        rim = torus_y((bx, BOOT_TOP - 0.003, 0.008), 0.0548, 0.0042, 1.14)
+        rim = torus_y((bx, BOOT_TOP - 0.003, 0.008), 0.052, 0.0042, 1.14)
         parts.append((foot, sole, shaft, inside, rim))
         low = along(lambda p: p[:, 2], [(-0.14, 'toe' + L), (-0.09, 'foot' + L)])
         high = by_y([(0.16, 'foot' + L), (0.23, 'shin' + L)])

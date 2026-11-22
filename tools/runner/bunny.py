@@ -91,10 +91,13 @@ def rotate(v, axis, a):
 
 
 # --------------------------------------------------------------------------------
-# the ears: big, pink inside. His right stands up (bending a little toward its
-# tip); his left rises, then bends right over partway up and flops out and
-# down to the side. Each is a leaf of flattened volumes along its length with
-# a dish hollowed out of its front.
+# the ears: big, pink inside. His right stands up, bending back a little
+# toward its tip; his left rises, then droops softly over partway up - not
+# folded at a hinge but curving through a long, easy arc, as a soft ear does
+# under its own weight - and hangs out and down to the side, its tip curling
+# under a little. Each is lofted along its own curve: a flattened leaf of a
+# cross-section, as wide and as thick hanging as it is rising, running
+# smoothly from root to tip, with a dish hollowed out of its front.
 # --------------------------------------------------------------------------------
 
 
@@ -105,150 +108,179 @@ def frame(u, w_hint):
     return u, v, w
 
 
-EAR_R = dict(root=V(0.044, 0.995, 0.0), u=unit(0.13, 1, 0.12), w=unit(0.3, 0, -1), L=0.345, mid=0.18)
-_u1, _v1, _w1 = frame(unit(-0.32, 1, 0.05), unit(-1, 0, -0.2))
-# (the left ear faces forward at its root, like the right, and turns out to
-# face his left by the bend, so that the fold flops it out to that side)
+def smoother(x):
+    x = np.clip(x, 0.0, 1.0)
+    return x * x * x * (x * (6 * x - 15) + 10)
+
+
+def ell2(x, z, rx, rz):
+    """Approximate signed distance to the ellipse of half-widths rx, rz."""
+    ex, ez = x / rx, z / rz
+    k0 = np.sqrt(ex * ex + ez * ez)
+    k1 = np.sqrt((ex / rx) ** 2 + (ez / rz) ** 2)
+    return k0 * (k0 - 1) / np.maximum(k1, 1e-9)
+
+
+class Ear:
+    """An ear lofted along a curve from its root: its frame (u along it, v
+    across it, w out of its pink front) at every arc length s - turned about
+    u by twist(s) -> (v, w), then bent over about `axis` by bend(s) radians,
+    then rolled about itself by roll(s) - and its half-width and half-thickness there, from prof [(s / L, half-width,
+    half-thickness), ...]."""
+
+    DISH = 0.0068  # how far toward the front the dish is centred
+
+    def __init__(self, root, u, w_hint, L, prof, axis=None, bend=None, twist=None, roll=None, step=0.0015):
+        from scipy.spatial import cKDTree
+        self.L = L
+        n = int(round(L / step)) + 1
+        self.S = np.linspace(0.0, L, n)
+        self.ds = self.S[1] - self.S[0]
+        u0, v0, w0 = frame(u, w_hint)
+        U, Vv, W, C = [], [], [], []
+        c = V(*root)
+        for i, s in enumerate(self.S):
+            v, w = twist(s) if twist is not None else (v0, w0)
+            uu = u0
+            a = bend(s) if bend is not None else 0.0
+            if a:
+                uu, v, w = rotate(uu, axis, a), rotate(v, axis, a), rotate(w, axis, a)
+            # (and rolled about itself as it goes, as a hanging ear turns)
+            r = roll(s) if roll is not None else 0.0
+            if r:
+                v, w = rotate(v, uu, r), rotate(w, uu, r)
+            if i:
+                c = c + self.ds * 0.5 * (uu + U[-1])
+            U.append(uu), Vv.append(v), W.append(w), C.append(c.copy())
+        self.U, self.V, self.W, self.C = (np.array(a) for a in (U, Vv, W, C))
+        t = self.S / L
+        self.RA = np.interp(t, [q[0] for q in prof], [q[1] for q in prof])
+        self.RT = np.interp(t, [q[0] for q in prof], [q[2] for q in prof])
+        # (the dish: in from the root and the tip, sliding out of the ear
+        # where it's not, so it fades rather than ending in a step)
+        win = smooth(0.05, 0.2, t) * smooth(0.93, 0.8, t)
+        self.ZC = self.DISH + (1 - win) * 0.03
+        self.tree = cKDTree(self.C)
+        m = self.RA.max() + 0.02
+        self.lo, self.hi = self.C.min(0) - m, self.C.max(0) + m
+
+    def at(self, p):
+        """Where points lie by the ear: arc length s, across (x), out of its
+        front (z), how far past its tip or root (beyond), and its frame, half-
+        width and half-thickness there."""
+        _, j = self.tree.query(p)
+        along = ((p - self.C[j]) * self.U[j]).sum(1)
+        n = len(self.S)
+        f = np.clip(j + along / self.ds, 0, n - 1)
+        i0 = np.minimum(np.floor(f).astype(int), n - 2)
+        k = (f - i0)[:, None]
+        lerp = lambda A: A[i0] * (1 - k) + A[i0 + 1] * k  # noqa: E731
+        c, u, v, w = lerp(self.C), lerp(self.U), lerp(self.V), lerp(self.W)
+        v /= np.linalg.norm(v, axis=1, keepdims=True)
+        w /= np.linalg.norm(w, axis=1, keepdims=True)
+        q = p - c
+        k = k[:, 0]
+        ra = self.RA[i0] * (1 - k) + self.RA[i0 + 1] * k
+        rt = self.RT[i0] * (1 - k) + self.RT[i0 + 1] * k
+        zc = self.ZC[i0] * (1 - k) + self.ZC[i0 + 1] * k
+        s = self.S[i0] * (1 - k) + self.S[i0 + 1] * k
+        beyond = np.where(j == n - 1, np.maximum(along, 0), 0) + np.where(j == 0, np.maximum(-along, 0), 0)
+        return dict(s=s, x=(q * v).sum(1), z=(q * w).sum(1), beyond=beyond, w=w, ra=ra, rt=rt, zc=zc)
+
+    def field(self, p):
+        e = self.at(p)
+        d = ell2(e['x'], e['z'], e['ra'], e['rt'])
+        # (past the tip: rounded off over its last, small cross-section)
+        d = np.where(e['beyond'] > 0, np.sqrt(np.maximum(d, 0) ** 2 + e['beyond'] ** 2), d)
+        dish = ell2(e['x'], e['z'] - e['zc'], e['ra'] * 0.72, e['rt'] * 0.62)
+        return smax(d, -dish, 0.004)
+
+    def prim(self):
+        return Prim(self.field, self.lo, self.hi)
+
+    def point(self, s):
+        return self.C[int(round(s / self.ds))].copy()
+
+    def dir(self, s):
+        return self.U[int(round(s / self.ds))].copy()
+
+
+# his right ear: up, leaning a touch out and back, the tip bending back
+_uR, _vR, _wR = frame(unit(0.13, 1, 0.12), unit(0.3, 0, -1))
+EAR_R_PROF = [(0.0, 0.026, 0.0135), (0.06, 0.03, 0.0135), (0.24, 0.045, 0.013), (0.46, 0.053, 0.0123), (0.68, 0.051, 0.0112), (0.86, 0.04, 0.0098), (0.95, 0.025, 0.0084), (1.0, 0.008, 0.006)]
+EAR_R_LEN = 0.385
+_earR = Ear(V(0.044, 0.995, 0.0), _uR, unit(0.3, 0, -1), EAR_R_LEN, EAR_R_PROF, axis=_vR, bend=lambda s: -0.22 * float(smoother((s - 0.17) / 0.2)))
+EAR_R = dict(root=V(0.044, 0.995, 0.0), u=_uR, L=EAR_R_LEN, mid=0.2)
+
+# his left ear: up and out, turning as it rises from facing forward at its
+# root to facing half out to his left, then drooping over about its width,
+# out and a little forward - the curve gathering, easing and running on into
+# a little curl at its tip - so that, as in his sheet, the hanging part shows
+# its broad back to you from the front (and its pink from behind), never
+# just its edge
+_u1, _v1, _w1 = frame(unit(-0.32, 1, 0.05), unit(-0.8, 0, -0.6))
 _wroot = frame(_u1, unit(-0.3, 0, -1))[2]
+EAR_L_LEN = 0.42
+EAR_L_BEND = (0.14, 0.29)  # where along it the droop runs (m)
+_FOLD, _CURL = 2.1, 0.3
 
 
-def twist_l(t):
-    w = unit(_wroot + (_w1 - _wroot) * float(smooth(0.05, 0.95, t)))
+def twist_l(s):
+    w = unit(_wroot + (_w1 - _wroot) * float(smooth(0.005, EAR_L_BEND[0], s)))
     return unit(np.cross(_u1, w)), w
-# (the fold: about the ear's width, so that its tip swings out and down)
-_FOLD = 2.15
-_u2a = rotate(_u1, _v1, _FOLD)
-_SG = 1 if _u2a[0] < rotate(_u1, _v1, -_FOLD)[0] else -1
-EAR_L = dict(root=V(-0.044, 0.995, 0.0), u1=_u1, v1=_v1, w1=_w1, L1=0.185, u2=rotate(_u1, _v1, _SG * _FOLD), w2=rotate(_w1, _v1, _SG * _FOLD), L2=0.17)
-EAR_L['bend'] = EAR_L['root'] + EAR_L['L1'] * EAR_L['u1']
-
-# lobes along a straight stretch of ear: (how far along, half-width across,
-# half-length along, half-thickness)
-EAR_PROF = [(0.06, 0.026, 0.045, 0.012), (0.24, 0.04, 0.07, 0.0115), (0.46, 0.047, 0.075, 0.011), (0.68, 0.045, 0.07, 0.0098), (0.86, 0.034, 0.05, 0.0086), (0.96, 0.019, 0.025, 0.0072)]
-EAR_PROF1 = [(0.1, 0.026, 0.05, 0.012), (0.38, 0.04, 0.065, 0.0115), (0.7, 0.046, 0.06, 0.011), (0.95, 0.047, 0.04, 0.0105)]
-EAR_PROF2 = [(0.08, 0.047, 0.045, 0.0102), (0.36, 0.046, 0.065, 0.0096), (0.64, 0.04, 0.06, 0.0088), (0.86, 0.03, 0.045, 0.0078), (0.97, 0.016, 0.02, 0.0068)]
 
 
-def lobes(P0, u, v, w, L, prof, bowl_from=0.22, bowl_to=0.86, twist=None):
-    """twist(t) -> (v, w): the ear's frame along its length, if it turns."""
-    out, bowls = [], []
-    for t, ra, rl, rt in prof:
-        if twist:
-            v, w = twist(t)
-        R = np.stack([v, u, w], 1)
-        c = P0 + t * L * u
-        out.append(ellipsoid(c, (ra, rl, rt), R))
-        if bowl_from <= t <= bowl_to:
-            bowls.append(ellipsoid(c + 0.0062 * w, (ra * 0.72, rl * 1.3, rt * 0.62), R))
-    return out, bowls
-
-
-def ear_parts():
-    E = EAR_R
-    u, v, w = frame(E['u'], E['w'])
-    rl, rb = lobes(E['root'], u, v, w, E['L'], EAR_PROF)
-    L = EAR_L
-    l1, b1 = lobes(L['root'], L['u1'], L['v1'], L['w1'], L['L1'], EAR_PROF1, 0.3, 0.9, twist_l)
-    l2, b2 = lobes(L['bend'], L['u2'], L['v1'], L['w2'], L['L2'], EAR_PROF2, 0.2, 0.8)
-    # the fold itself, rounded over
-    um = unit(L['u1'] + L['u2'])
-    wm = unit(np.cross(L['v1'], um))
-    fold = ellipsoid(L['bend'] + 0.005 * wm, (0.047, 0.027, 0.0115), np.stack([L['v1'], um, wm], 1))
-    return dict(R=(rl, rb), L1=(l1, b1), L2=(l2, b2), fold=fold)
-
-
-def soft_union(ps, p, k):
-    d = ps[0](p)
-    for q in ps[1:]:
-        d = smin(d, q(p), k)
-    return d
-
-
-def ear_field(lob, bowls):
-    # (the dish is hollowed out in one smooth scoop, not lobe by lobe)
-    def f(p):
-        return smax(soft_union(lob, p, 0.025), -soft_union(bowls, p, 0.03), 0.004)
-
-    return f
+# (which way about its width it bends over: out to his side, not across him)
+_SG = 1 if rotate(_u1, _v1, _FOLD)[0] < rotate(_u1, _v1, -_FOLD)[0] else -1
+# (spreading a little as it hangs, as a soft ear does)
+EAR_L_PROF = [(0.0, 0.026, 0.013), (0.06, 0.03, 0.013), (0.2, 0.043, 0.0128), (0.4, 0.052, 0.0124), (0.6, 0.056, 0.0121), (0.78, 0.055, 0.0116), (0.9, 0.046, 0.0107), (0.96, 0.032, 0.0094), (1.0, 0.009, 0.006)]
+# (the hanging part rolls a little about itself, turning its breadth across
+# your view - its brown back to the front, its pink inside to behind)
+_ROLL = 0.55
+_earL = Ear(V(-0.044, 0.995, 0.0), _u1, unit(-1, 0, -0.2), EAR_L_LEN, EAR_L_PROF, axis=_v1, twist=twist_l,
+            bend=lambda s: _SG * (_FOLD * float(smoother((s - EAR_L_BEND[0]) / (EAR_L_BEND[1] - EAR_L_BEND[0]))) + _CURL * float(smoother((s - EAR_L_BEND[1]) / (EAR_L_LEN - EAR_L_BEND[1])))),
+            roll=lambda s: _ROLL * float(smoother((s - EAR_L_BEND[0]) / (EAR_L_LEN - EAR_L_BEND[0]))))
+# (the tip's bone pivots where the droop begins; u2: the way the hanging
+# part runs, from there to the tip)
+EAR_L = dict(root=V(-0.044, 0.995, 0.0), u1=_u1, v1=_v1, w1=_w1, L=EAR_L_LEN,
+             bend=_earL.point(EAR_L_BEND[0] + 0.02), u2=unit(_earL.point(EAR_L_LEN) - _earL.point(EAR_L_BEND[0] + 0.02)))
 
 
 def g_ears():
-    P = ear_parts()
-    rl, rb = P['R']
-    l1, b1 = P['L1']
-    l2, b2 = P['L2']
-    fR = ear_field(rl, rb)
-    # (the left ear's two stretches and the fold between them blend into one)
-    allL = l1 + [P['fold']] + l2
-
-    def fL(p):
-        d = soft_union(allL, p, 0.02)
-        return smax(d, -np.minimum(soft_union(b1, p, 0.03), soft_union(b2, p, 0.03)), 0.004)
-
+    pR, pL = _earR.prim(), _earL.prim()
     # the roots sink into the head under the hat
-    rootR = round_cone(EAR_R['root'] - 0.03 * EAR_R['u'], EAR_R['root'] + 0.03 * EAR_R['u'], 0.016, 0.015)
-    rootL = round_cone(EAR_L['root'] - 0.03 * EAR_L['u1'], EAR_L['root'] + 0.03 * EAR_L['u1'], 0.016, 0.015)
+    rootR = round_cone(EAR_R['root'] - 0.03 * EAR_R['u'], EAR_R['root'] + 0.03 * EAR_R['u'], 0.017, 0.016)
+    rootL = round_cone(EAR_L['root'] - 0.03 * EAR_L['u1'], EAR_L['root'] + 0.03 * EAR_L['u1'], 0.017, 0.016)
 
     def field(p):
-        return np.minimum(smin(fR(p), rootR(p), 0.012), smin(fL(p), rootL(p), 0.012))
+        return np.minimum(smin(pR(p), rootR(p), 0.012), smin(pL(p), rootL(p), 0.012))
 
-    R0, uR = EAR_R['root'], unit(EAR_R['u'])
-    wR = along(lambda p: (p - R0) @ uR, [(0.015, 'head'), (0.05, 'earR'), (0.14, 'earR'), (0.22, 'earRtip')])
-    L0, u1 = EAR_L['root'], EAR_L['u1']
-    wL = along(lambda p: (p - L0) @ u1, [(0.015, 'head'), (0.05, 'earL'), (0.15, 'earL'), (0.2, 'earLtip')])
-
-    def half(p):
-        return [(IDX['earL'], np.full(len(p), 0.5)), (IDX['earLtip'], np.full(len(p), 0.5))]
-
-    owners = [(q, wR) for q in rl] + [(rootR, wR)]
-    nR = len(owners)
-    owners += [(q, wL) for q in l1] + [(rootL, wL), (P['fold'], half)] + [(q, rigid('earLtip')) for q in l2]
-    n2 = len(l2)
+    # (skinned by how far along each it is: the right's tip from halfway up;
+    # the left's tip bone taking over through the droop, so when it flops it
+    # bends all along that curve, not at a crease)
+    wR = along(lambda p: _earR.at(p)['s'], [(0.015, 'head'), (0.055, 'earR'), (0.16, 'earR'), (0.25, 'earRtip')])
+    b0 = EAR_L_BEND[0]
+    wL = along(lambda p: _earL.at(p)['s'], [(0.015, 'head'), (0.05, 'earL'), (b0 - 0.01, 'earL'), (b0 + 0.11, 'earLtip')])
+    owners = [(pR, wR), (rootR, wR), (pL, wL), (rootL, wL)]
 
     def details(p, n, own):
         # x: how far inside the pink of the ear (0 on the fur, 1 well inside);
         # y: how far along it (0 the root .. 1 the tip); z: across it (-1..1)
-        right = own[:, :nR].sum(1) > 0.5
+        right = own[:, :2].sum(1) > 0.5
+        eR, eL = _earR.at(p), _earL.at(p)
+        al = np.where(right, eR['s'] / _earR.L, eL['s'] / _earL.L)
+        ac = np.where(right, eR['x'] / np.maximum(eR['ra'], 1e-3), eL['x'] / np.maximum(eL['ra'], 1e-3))
+        fn = np.where(right, (n * eR['w']).sum(1), (n * eL['w']).sum(1))
         out = np.zeros((len(p), 4))
-        # right ear
-        u, v, w = frame(EAR_R['u'], EAR_R['w'])
-        q = p - EAR_R['root']
-        a = np.clip(q @ u / EAR_R['L'], 0, 1)
-        hw = np.interp(a, [t for t, *_ in EAR_PROF], [r for _, r, *_ in EAR_PROF])
-        acR = (q @ v) / np.maximum(hw, 1e-3)
-        fnR = n @ w
-        # left ear: by whichever stretch is nearer
-        q1 = p - EAR_L['root']
-        a1 = q1 @ EAR_L['u1']
-        q2 = p - EAR_L['bend']
-        a2 = np.maximum(q2 @ EAR_L['u2'], 0)
-        # (which stretch: by the volumes that own the point - past the fold
-        # both project back along the other)
-        on2 = own[:, -n2:].sum(1) + 0.5 * own[:, -n2 - 1] > 0.5
-        aL = np.where(on2, (EAR_L['L1'] + a2) / (EAR_L['L1'] + EAR_L['L2']), a1 / (EAR_L['L1'] + EAR_L['L2']))
-        aL = np.clip(aL, 0, 1)
-        hw1 = np.interp(np.clip(a1 / EAR_L['L1'], 0, 1), [t for t, *_ in EAR_PROF1], [r for _, r, *_ in EAR_PROF1])
-        hw2 = np.interp(np.clip(a2 / EAR_L['L2'], 0, 1), [t for t, *_ in EAR_PROF2], [r for _, r, *_ in EAR_PROF2])
-        # (seg 1 turns along its length: its frame where each point is)
-        tw = smooth(0.05, 0.95, np.clip(a1 / EAR_L['L1'], 0, 1))[:, None]
-        w1 = _wroot[None] + (_w1 - _wroot)[None] * tw
-        w1 /= np.linalg.norm(w1, axis=1, keepdims=True)
-        v1 = np.cross(EAR_L['u1'][None], w1)
-        v1 /= np.linalg.norm(v1, axis=1, keepdims=True)
-        acL = np.where(on2, (q2 @ EAR_L['v1']) / np.maximum(hw2, 1e-3), (q1 * v1).sum(1) / np.maximum(hw1, 1e-3))
-        fnL = np.where(on2, n @ EAR_L['w2'], (n * w1).sum(1))
-        al = np.where(right, a, aL)
-        ac = np.where(right, acR, acL)
-        fn = np.where(right, fnR, fnL)
-        pink = smooth(0.15, 0.55, fn) * smooth(0.92, 0.62, np.abs(ac)) * smooth(0.06, 0.16, al) * smooth(0.99, 0.9, al)
-        out[:, 0] = pink
+        out[:, 0] = smooth(0.15, 0.55, fn) * smooth(0.92, 0.62, np.abs(ac)) * smooth(0.06, 0.16, al) * smooth(0.99, 0.9, al)
         out[:, 1] = al
-        out[:, 2] = ac
+        out[:, 2] = np.clip(ac, -1, 1)
         return out
 
-    lo = np.array([-0.27, 0.93, -0.1])
-    hi = np.array([0.16, 1.39, 0.1])
-    return Garment('ears', MAT['ear'], 0.0016, lo, hi, field, owners, 2800, tau=0.008, outline=0.6, details=details)
+    lo = np.minimum(_earR.lo, _earL.lo) - 0.01
+    hi = np.maximum(_earR.hi, _earL.hi) + 0.01
+    lo[1] = min(lo[1], 0.93)
+    return Garment('ears', MAT['ear'], 0.0015, lo, hi, field, owners, 3600, tau=0.008, outline=0.6, details=details)
 
 
 # --------------------------------------------------------------------------------
