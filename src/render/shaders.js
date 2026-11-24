@@ -32,6 +32,11 @@ export const shared = {
   uBloomCol: { value: [new THREE.Color(), new THREE.Color(), new THREE.Color()] },
   // the runner's chest: a collected gem flies into it (see VS_GEM)
   uGemAt: { value: new THREE.Vector3() },
+  // the true time, by the clock of whoever's playing (the Gallery's clocks
+  // keep it until time comes unstuck - see WONKY): x seconds into the
+  // minute, y minutes into the hour, z hours on the dial (0..12), each with
+  // its fraction, so none loses its precision
+  uHours: { value: new THREE.Vector4() },
   // how far the road moves under the runner while a frame is shown, times the
   // shutter (CONFIG.motionBlur): the ground's patterns blur along the run by
   // this much (see runBlur)
@@ -471,10 +476,16 @@ attribute vec3 onrm;
 attribute vec4 aInst;
 #endif
 #ifdef WONKY
-// Time coming unstuck (env.wonk, see game.js): 0 every hand keeps its own
-// steady pace; higher, they lurch, stall, race and tick back and forth. A
-// clock's hands are one batch: role 0 the minute hand, 1 the hour hand.
+// A clock's hands are one batch: role 0 the minute hand, 1 the hour hand, 2
+// the second hand. Until time comes unstuck they keep the true time (every
+// clock in the gallery agrees: uHours). Then (see game.js) uUnstuck.x how
+// far it has come unstuck (0 true, 1 every hand its own pace, either way
+// round), uUnstuck.y for how long, in seconds, weighed by how far (so each
+// hand eases off true time rather than leaping); and uWonk how wildly:
+// higher, they lurch, stall, race and tick back and forth.
 uniform float uWonk;
+uniform vec4 uUnstuck;
+uniform vec4 uHours;
 #endif
 #if defined(SAND) || defined(WONKY) || defined(JELLY) || defined(THREAD) || defined(LID) || defined(SWIM) || defined(WATCH) || defined(SURGE) || defined(WASH) || defined(BREAKER)
 attribute float role;
@@ -859,17 +870,27 @@ void main() {
       // only swings, like a pendulum, still hangs straight down)
       float a = uTurn.x * uTime + (uTurn.x != 0.0 ? phase * 6.2831 : 0.0);
       #ifdef WONKY
-        // each hand its own pace, either way round; then, the more time comes
-        // unstuck, lurching back and forth, racing and stalling, and ticking
-        // in jerks that snap forward and back
-        float hp = phase + role * 3.17;
-        float h1 = fract(hp * 0.731 + 0.13);
-        float h2 = fract(hp * 1.37 + 0.71);
-        float h3 = fract(hp * 2.11 + 0.37);
-        a = uTurn.x * (1.0 - 0.76 * role) * uTime * (0.5 + 1.6 * h1) * (h3 < 0.38 ? -1.0 : 1.0) + hp * 6.2831;
-        a += uWonk * (2.4 * sin(uTime * (0.45 + h2 * 1.3) + h3 * 6.28) + 1.2 * sin(uTime * (1.8 + h1 * 2.6) + h2 * 6.28));
-        float tk = uTime * (1.1 + h2 * 2.2) + h1 * 5.0;
-        a += uWonk * 0.6 * sin(floor(tk) * 2.39 + h3 * 9.0) * smoothstep(0.0, 0.1, fract(tk));
+        // the true time, clockwise (seen from the face, +z): the minute and
+        // hour hands sweep, the second hand ticks - a snap onto each second
+        // and a little recoil as it settles
+        float fs = fract(uHours.x);
+        float tick = floor(uHours.x) + 1.0 - exp(-fs * 38.0) * cos(fs * 58.0);
+        float turns = role < 0.5 ? uHours.y / 60.0 : role < 1.5 ? uHours.z / 12.0 : tick / 60.0;
+        a = -6.2831853 * turns;
+        if (uUnstuck.x > 0.0) {
+          // coming unstuck: each hand its own pace, either way round; then,
+          // the wonkier it gets, lurching back and forth, racing and
+          // stalling, and ticking in jerks that snap forward and back
+          float hp = phase + role * 3.17;
+          float h1 = fract(hp * 0.731 + 0.13);
+          float h2 = fract(hp * 1.37 + 0.71);
+          float h3 = fract(hp * 2.11 + 0.37);
+          float pace = role < 0.5 ? 1.0 : role < 1.5 ? 0.24 : 2.6;
+          a += uTurn.x * pace * uUnstuck.y * (0.5 + 1.6 * h1) * (h3 < 0.38 ? -1.0 : 1.0) + uUnstuck.x * hp * 6.2831;
+          a += uWonk * (2.4 * sin(uTime * (0.45 + h2 * 1.3) + h3 * 6.28) + 1.2 * sin(uTime * (1.8 + h1 * 2.6) + h2 * 6.28));
+          float tk = uTime * (1.1 + h2 * 2.2) + h1 * 5.0;
+          a += uWonk * 0.6 * sin(floor(tk) * 2.39 + h3 * 9.0) * smoothstep(0.0, 0.1, fract(tk));
+        }
       #endif
       float c = cos(a), sn = sin(a);
       lp.xy = vec2(lp.x * c - lp.y * sn, lp.x * sn + lp.y * c);
@@ -885,10 +906,14 @@ void main() {
       #ifdef OUTLINE
         lo.yz = vec2(lo.y * c - lo.z * sn, lo.y * sn + lo.z * c);
       #endif
-      lp = rotY(lp, uTurn.w * uTime + phase);
-      ln = rotY(ln, uTurn.w * uTime + phase);
+      // (as with the spin about z, the phase only starts something that
+      // turns about y at its own angle: a clock's hands, a gear or a
+      // pendulum that doesn't is never yawed out of its own plane by it)
+      float yw = uTurn.w * uTime + (uTurn.w != 0.0 ? phase : 0.0);
+      lp = rotY(lp, yw);
+      ln = rotY(ln, yw);
       #ifdef OUTLINE
-        lo = rotY(lo, uTurn.w * uTime + phase);
+        lo = rotY(lo, yw);
       #endif
     }
   #endif
@@ -9120,7 +9145,7 @@ export function makeEnvUniforms(env) {
     uInk: c(), uFog: v4(), uMist: v4(), uMistH: v4(), uGrade: v4(), uVignette: c(), uTrip: v4(),
     uGroundA: c(), uGroundB: c(), uGroundC: c(),
     uShadowColor: c(), uGlass: v4(), uGlowGain: { value: 1 },
-    uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uEclipse: v4(), uVigShape: v4(),
+    uBeam: v4(), uPool: c(), uDrain: v4(), uWonk: { value: 0 }, uUnstuck: v40(), uEclipse: v4(), uVigShape: v4(),
     // which way shadows fall (env.cast: m of shadow per m of height, x
     // sideways, y toward the camera) - the runner's and the companion's
     // silhouettes are laid on the ground along it (see render/caster.js)

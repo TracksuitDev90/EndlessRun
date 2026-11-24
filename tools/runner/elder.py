@@ -35,6 +35,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 import build as B  # noqa: E402
+import hands  # noqa: E402
 from build import V, smin, smax, smooth, clamp, ellipsoid, round_cone, stroke, round_box, torus_y, Prim, rot_x, rot_y, rot_z, Garment, rigid, by_y, by_axis, along  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'elder')
@@ -98,12 +99,19 @@ def arm_frame(s):
 FW = V(0, 0, -1)
 
 
+# His hands (tools/runner/hands.py): long and bony, big-knuckled.
+HAND_SIZE = 0.172
+HAND_LOOK = dict(slim=0.86, knuckles=1.9, palm=0.82, wrist=1.05)
+HANDS = {}
+
+
 def grip_frame():
-    """The right fist round the stick: where the shaft passes through it and
-    which way (the knob end toward the thumb, which points forward with the
-    arm hanging)."""
+    """The right fist round the stick: where the shaft lies across his palm
+    (just in from the knuckles, against the palm, the fingers closed round
+    it) and which way (the knob end toward the thumb, which points forward
+    with the arm hanging)."""
     S, E, W, dn, out = arm_frame(1)
-    A = W + 0.058 * dn + 0.004 * out
+    A = W + 0.074 * dn - 0.031 * out
     return A, FW
 
 
@@ -139,6 +147,37 @@ def build_rig():
     bone('sim', None, (0, 0, 0))
     R, tip = staff_bind()
     bone('staff', 'sim', tip, (1, 0, 0), -math.pi / 2)
+    for H in make_hands().values():
+        H.add_bones()
+
+
+def make_hands():
+    """The left hangs open and loose; the right is shut round his stick, each
+    finger closed round the shaft and the thumb over them."""
+    for s, L in SIDES:
+        S, E, W, dn, out = arm_frame(s)
+        if s > 0:
+            A, up = grip_frame()
+            args = (s, L, W, dn, out, FW, HAND_SIZE)
+            pose = hands.wrap(args, A, up, STAFF['r1'], **HAND_LOOK)
+            r = STAFF['r1']
+
+            def inside(p, A=A, up=up, r=r):
+                v = p - A
+                v = v - np.outer(v @ up, up)
+                return r - np.linalg.norm(v, axis=1)
+
+            # (the thumb's tip over the middle finger's middle bone, round the
+            # far side of the shaft from the palm)
+            Hw = hands.Hand(*args, pose=pose, **HAND_LOOK)
+            mid = Hw.digits[1]['pts']
+            target = mid[1] + 0.55 * (mid[2] - mid[1]) + (FW * 0.012) - out * 0.012
+            pose = hands.clasp(args, pose, inside, target, **HAND_LOOK)
+            print('  grip', [[round(x, 2) for x in f] for f in pose['fingers']], 'thumb', [round(x, 2) for x in pose['thumb']])
+            HANDS[L] = hands.Hand(*args, pose=pose, **HAND_LOOK)
+        else:
+            HANDS[L] = hands.Hand(s, L, W, dn, out, FW, HAND_SIZE, **HAND_LOOK)
+    return HANDS
 
 
 MAT = dict(face=1, hair=2, robe=3, under=4, legs=5, sash=6, boot=7, hand=8, hood=9, skirt=10, staff=11, glasses=12, beard=13)
@@ -759,47 +798,31 @@ def g_boots():
     return Garment('boots', MAT['boot'], 0.0032, (-0.16, -0.012, -0.24), (0.16, 0.22, 0.13), field, owners, 2400, tau=0.012, details=details)
 
 
-def g_hands():
-    """Long, bony old hands out of the bell sleeves: thin wrists, big
-    knuckles. The left hangs open and loose; the right is a fist round the
-    stick (the stick passes through it: grip_frame)."""
-    parts, owners = [], []
-    for s, L in SIDES:
-        S, E, W, dn, out = arm_frame(s)
-        R = np.stack([out, dn, FW], 1)
-        fore = round_cone(E + 0.12 * dn, W, 0.027, 0.02)
-        hand = rigid('hand' + L)
-        if s < 0:
-            palm = round_box(W + 0.05 * dn, (0.014, 0.042, 0.037), 0.012, R)
-            # long fingers, gently curled
-            fingers = stroke([W + 0.088 * dn, W + 0.13 * dn - 0.008 * out, W + 0.152 * dn - 0.024 * out], [0.019, 0.016, 0.012])
-            thumb = stroke([W + 0.03 * dn - 0.012 * out - 0.03 * FW, W + 0.07 * dn - 0.02 * out - 0.034 * FW, W + 0.095 * dn - 0.026 * out - 0.03 * FW], [0.012, 0.01, 0.008])
-            knuckles = ellipsoid(W + 0.088 * dn, (0.016, 0.012, 0.036), R)
-            ps = (fore, palm, fingers, thumb, knuckles)
-        else:
-            A, up = grip_frame()
-            # the fist: fingers wrapped round the shaft, the thumb over them
-            grip = round_cone(A - 0.034 * up, A + 0.03 * up, 0.031, 0.029)
-            palm = round_box(W + 0.035 * dn - 0.006 * out, (0.016, 0.03, 0.036), 0.012, R)
-            knuckles = round_cone(A + 0.022 * out - 0.03 * up + 0.012 * dn, A + 0.022 * out + 0.028 * up + 0.012 * dn, 0.014, 0.014)
-            thumb = stroke([W + 0.03 * dn - 0.016 * out + 0.03 * up, A - 0.016 * out + 0.034 * up, A + 0.01 * out + 0.038 * up], [0.012, 0.011, 0.009])
-            ps = (fore, palm, grip, thumb, knuckles)
-        parts.append(ps)
-        owners += [(ps[0], by_axis(W, dn, [(-0.03, 'fore' + L), (0.01, 'hand' + L)]))] + [(q, hand) for q in ps[1:]]
+def g_hand(s, L):
+    """A long, bony old hand out of the bell sleeve, and its thin forearm:
+    the left hanging loose, the right shut round the stick (one garment
+    each, meshed finely enough for the fingers)."""
+    S, E, W, dn, out = arm_frame(s)
+    H = HANDS[L]
+    fore = round_cone(E + 0.12 * dn, W - 0.004 * dn, 0.027, 0.0195)
+    owners = [(fore, by_axis(W, dn, [(-0.03, 'fore' + L), (0.01, 'hand' + L)]))] + H.parts()
+    hole = None
+    if s > 0:
+        # (the stick's way through the fist: the fingers' pads pressed flat
+        # where they close round it)
+        A, up = grip_frame()
+        hole = round_cone(A - 0.09 * up, A + 0.09 * up, STAFF['r1'] + 0.0008, STAFF['r1'] + 0.0008)
 
     def field(p):
-        out = np.full(len(p), 1.0)
-        for ps in parts:
-            d = smin(ps[0](p), ps[1](p), 0.014)
-            for q in ps[2:]:
-                d = smin(d, q(p), 0.01)
-            out = np.minimum(out, d)
-        A, up = grip_frame()
-        # (the stick's way through the fist)
-        hole = round_cone(A - 0.08 * up, A + 0.08 * up, STAFF['r1'] + 0.001, STAFF['r1'] + 0.001)
-        return smax(out, -hole(p), 0.003)
+        d = smin(fore(p), H.field(p), 0.012)
+        return smax(d, -hole(p), 0.002) if hole else d
 
-    return Garment('hands', MAT['hand'], 0.0022, (-0.5, 0.75, -0.16), (0.5, 1.3, 0.1), field, owners, 1900, tau=0.008)
+    lo, hi = H.box()
+    lo = np.minimum(lo, np.minimum(E + 0.12 * dn, W) - 0.05)
+    hi = np.maximum(hi, np.maximum(E + 0.12 * dn, W) + 0.05)
+    g = Garment('hand' + L, MAT['hand'], 0.0013, lo, hi, field, owners, 3600, tau=0.0009, outline=0.65)
+    g.sparse = True
+    return g
 
 
 # --------------------------------------------------------------------------------
@@ -913,7 +936,7 @@ def skirt_colliders():
 def build():
     t0 = time.time()
     build_rig()
-    garments = [g_head(), g_hair(), g_beard(), g_glasses(), g_robe(), g_hood(), g_sash(), g_legs(), g_boots(), g_hands(), g_staff()]
+    garments = [g_head(), g_hair(), g_beard(), g_glasses(), g_robe(), g_hood(), g_sash(), g_legs(), g_boots(), g_hand(-1, 'L'), g_hand(1, 'R'), g_staff()]
     S, E, W, dn, out = arm_frame(1)
     A, up = grip_frame()
     rig = dict(
@@ -928,6 +951,7 @@ def build():
         # the skirt: hung from round his waist, under the sash
         skirt=dict(y=SKIRT_TOP, w=0.142, back=0.118, front=0.15, z=-0.01, colliders=skirt_colliders()),
         staff=dict(STAFF, gripAt=[round(float(x), 5) for x in A]),
+        hands=[HANDS['L'].rig(), HANDS['R'].rig()],
         bootX=BOOT_X, bootCuff=BOOT_CUFF, soleH=SOLE_H, sashY=SASH_Y, glasses=dict(GLASSES, half=list(GLASSES['half'])),
     )
     B.export(garments, OUT, MAT, rig, 'elder', 'elder.py')

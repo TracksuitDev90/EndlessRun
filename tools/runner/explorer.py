@@ -34,6 +34,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 import build as B  # noqa: E402
+import hands  # noqa: E402
 from build import V, smin, smax, smooth, clamp, ellipsoid, round_cone, stroke, round_box, torus_y, Prim, rot_x, rot_y, rot_z, Garment, rigid, by_y, by_axis, along  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'explorer')
@@ -104,6 +105,51 @@ def build_rig():
     bone('pack', 'chest', V(*PACK_PIVOT) - V(0, CHEST_Y, 0))
     bone('packLid', 'pack', V(*LID_PIVOT) - V(*PACK_PIVOT))
     bone('sim', None, (0, 0, 0))
+    for H in make_hands().values():
+        H.add_bones()
+
+
+# Her hands (tools/runner/hands.py): small, slender. The left hangs relaxed;
+# the right holds her sketchbook by its top outer corner - turned palm
+# forward behind it, the fingers laid down its back cover and the thumb
+# round its outer edge onto the front.
+HAND_SIZE = 0.124
+HANDS = {}
+BOOK_GRIP = dict(
+    fingers=[(0.05, 0.03, 0.05, 0.04), (0.01, 0.02, 0.04, 0.04), (-0.03, 0.03, 0.05, 0.05), (-0.05, 0.05, 0.06, 0.06)],
+    thumb=(1.05, 0.35, 0.35, 0.3),
+)
+
+
+def book_grip():
+    """Her right hand's bind shape: the fingers down the back cover, and the
+    thumb found round the outer edge to lie on the front, near the corner."""
+    S, E, W, dn, out = arm_frame(1)
+    fw = V(0, 0, -1)
+    c, R = book_frame()
+    h = BOOK['half']
+    args = (1, 'R', W, dn, -fw, out, HAND_SIZE)
+    # (the front cover, a little in from the outer edge and down from the top)
+    target = c + R @ V(-h[0] + 0.009, -h[1] + 0.045, h[2] + 0.005)
+
+    def inside(p):
+        q = (p - c) @ R
+        return np.min(np.stack([h[0] - np.abs(q[:, 0]), h[1] - np.abs(q[:, 1]), h[2] - np.abs(q[:, 2])], 1), 1)
+
+    return hands.clasp(args, BOOK_GRIP, inside, target, slim=0.95, wrist=1.25)
+
+
+def make_hands():
+    fw = V(0, 0, -1)
+    for s, L in SIDES:
+        S, E, W, dn, out = arm_frame(s)
+        if s > 0:
+            pose = book_grip()
+            print('  book grip thumb', [round(x, 2) for x in pose['thumb']])
+            HANDS[L] = hands.Hand(s, L, W, dn, -fw, out, HAND_SIZE, pose=pose, slim=0.95, wrist=1.25)
+        else:
+            HANDS[L] = hands.Hand(s, L, W, dn, out, fw, HAND_SIZE, slim=0.95, wrist=1.25)
+    return HANDS
 
 
 def arm_frame(s):
@@ -542,32 +588,24 @@ def g_shoes():
     return Garment('shoes', MAT['shoe'], 0.0032, (-0.15, -0.012, -0.21), (0.15, 0.19, 0.13), field, owners, 2600, tau=0.012)
 
 
-def g_hands():
-    """Bare forearms out of the bunched sleeves, and small hands."""
-    parts, owners = [], []
-    fw = V(0, 0, -1)
-    for s, L in SIDES:
-        S, E, W, dn, out = arm_frame(s)
-        R = np.stack([out, dn, fw], 1)
-        B0 = S + BUNCH_U * dn
-        fore = round_cone(B0 - 0.01 * dn, W, 0.024, 0.018)
-        palm = round_box(W + 0.04 * dn, (0.017, 0.037, 0.032), 0.013, R)
-        c = W + 0.078 * dn - 0.008 * out
-        fingers = round_cone(c - 0.024 * fw, c + 0.024 * fw, 0.017, 0.016)
-        thumb = round_cone(W + 0.032 * dn - 0.01 * out + 0.028 * fw, W + 0.07 * dn - 0.02 * out + 0.02 * fw, 0.012, 0.0095)
-        parts.append((fore, palm, fingers, thumb))
-        owners += [(fore, by_axis(W, dn, [(-0.03, 'fore' + L), (0.01, 'hand' + L)])), (palm, rigid('hand' + L)), (fingers, rigid('hand' + L)), (thumb, rigid('hand' + L))]
+def g_hand(s, L):
+    """A bare forearm out of the bunched sleeve, and her hand (one garment
+    each side, meshed finely enough for its fingers)."""
+    S, E, W, dn, out = arm_frame(s)
+    H = HANDS[L]
+    B0 = S + BUNCH_U * dn
+    fore = round_cone(B0 - 0.01 * dn, W - 0.004 * dn, 0.024, 0.0175)
+    owners = [(fore, by_axis(W, dn, [(-0.03, 'fore' + L), (0.01, 'hand' + L)]))] + H.parts()
 
     def field(p):
-        out = np.full(len(p), 1.0)
-        for fore, palm, fingers, thumb in parts:
-            d = smin(fore(p), palm(p), 0.014)
-            d = smin(d, fingers(p), 0.01)
-            d = smin(d, thumb(p), 0.009)
-            out = np.minimum(out, d)
-        return out
+        return smin(fore(p), H.field(p), 0.012)
 
-    return Garment('hands', MAT['hand'], 0.0024, (-0.38, 0.5, -0.07), (0.38, 0.98, 0.07), field, owners, 1400)
+    lo, hi = H.box()
+    lo = np.minimum(lo, np.minimum(B0, W) - 0.045)
+    hi = np.maximum(hi, np.maximum(B0, W) + 0.045)
+    g = Garment('hand' + L, MAT['hand'], 0.0011, lo, hi, field, owners, 3400, tau=0.0009, outline=0.6)
+    g.sparse = True
+    return g
 
 
 # --------------------------------------------------------------------------------
@@ -667,7 +705,9 @@ def book_frame():
     ax = -out
     ay = dn
     az = fw
-    c = W + 0.072 * dn - 0.052 * out + 0.006 * fw
+    # (its back cover against her palm and fingers, its outer edge just
+    # past them for her thumb to close round)
+    c = W + 0.072 * dn - 0.043 * out + 0.0205 * fw
     return c, np.stack([ax, ay, az], 1)
 
 
@@ -735,7 +775,7 @@ def hair_colliders():
 def build():
     t0 = time.time()
     build_rig()
-    garments = [g_head(), g_hair(), g_fringe(), g_tee(), g_sweater(), g_shorts(), g_legs(), g_shoes(), g_hands(), g_pack(), g_straps(), g_book()]
+    garments = [g_head(), g_hair(), g_fringe(), g_tee(), g_sweater(), g_shorts(), g_legs(), g_shoes(), g_hand(-1, 'L'), g_hand(1, 'R'), g_pack(), g_straps(), g_book()]
     rig = dict(
         hipY=HIP_Y, hipJoint=list(HIP_JOINT), thigh=THIGH, shin=SHIN, toe=list(TOE), chestY=CHEST_Y, headY=HEAD_Y,
         shoulder=list(SHOULDER), upperArm=UPPER_ARM, forearm=FOREARM, armRest=ARM_REST,
@@ -745,6 +785,7 @@ def build():
         pack=dict(c=list(PACK['c']), half=list(PACK['half']), pivot=list(PACK_PIVOT), lid=list(LID_PIVOT)),
         sockTop=SOCK_TOP, shortsHem=SHORTS_HEM, shoeX=SHOE_X, shoeCollar=list(SHOE_COLLAR), soleH=SOLE_H,
         stripe=list(STRIPE), bunchU=BUNCH_U, kneeY=KNEE_Y, hem=SWEATER['hem'], book=BOOK['half'],
+        hands=[HANDS['L'].rig(), HANDS['R'].rig()],
     )
     B.export(garments, OUT, MAT, rig, 'explorer', 'explorer.py')
     print(f'explorer: {time.time() - t0:.1f}s')

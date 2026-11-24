@@ -5,6 +5,7 @@ import { TAU, damp, clamp, smooth, Spring } from './rig.js';
 import { bodyGeometry } from './kit.js';
 import { boostStep } from './drift.js';
 import { CastShadow } from '../render/caster.js';
+import { Hands } from './hands.js';
 
 // A runner: what every character shares, whoever they are. The body and
 // clothes are sculpted offline (tools/runner/, loaded by runner-asset.js) as
@@ -109,6 +110,13 @@ export const GAIT = {
   spTwist: 0.17,
   chTwist: 0.13,
 };
+
+// Which hand shape is which for a character (see Player.handShapes and
+// hands.js): standing, running, in the air, sliding, crashing; how much the
+// run's fist tightens and eases with the arm's swing, how much a landing
+// spreads the fingers, and how far a lane change flings them open. hold:
+// { L, R } a hand that holds what it was sculpted holding.
+export const HAND_KIT = { idle: 'relaxed', run: 'loose', jump: 'open', slide: 'claw', crash: 'claw', pump: 0.35, land: 0.4, lane: 0.5, hold: null };
 
 // How a character handles: the lanes' spring (1/s; see update), how far they
 // lean and turn into a lane change, and their jump (apex height, airtime).
@@ -299,6 +307,9 @@ export class Player {
     this.skeleton = new THREE.Skeleton(bones);
     this.bindPos = {};
     for (const b of bones) this.bindPos[b.name] = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);
+    // fingers, for those who have them (see hands.js)
+    this.hands = this.rig.hands ? new Hands(this) : null;
+    this.fidget = { t: 3 + 4 * Math.random(), side: 0, k: 0 };
   }
 
   // --- the model ------------------------------------------------------------------
@@ -1268,6 +1279,10 @@ export class Player {
 
     this.applyPose(Pz, roll);
     this.afterPose(dt, cw);
+    if (this.hands) {
+      this.handShapes(dt);
+      this.hands.update(dt);
+    }
 
     // lean into lane changes
     const L = this.feel.lean, T = this.feel.turn;
@@ -1317,6 +1332,75 @@ export class Player {
 
   // After the pose is on the bones, before the secondary motion reads them.
   afterPose() {}
+
+  // --- hands ------------------------------------------------------------------------
+  // What each hand is doing this frame (see hands.js): shapes laid on by how
+  // much of each thing the body is doing - hanging relaxed as they stand
+  // about, a loose fist on the run (closing as the arm drives forward and
+  // easing open as it swings back), flung open through a jump, bracing on a
+  // slide, grasping at the air in a crash, spread wide as they land and as
+  // they throw themselves across a lane. handKit says which shape
+  // is which for a character; a hand sculpted holding something (hold.L or
+  // hold.R: 'bound') goes on holding it, and handHeld(side, H) may squeeze
+  // or shift it. A character can lay more on top (handMore).
+  handShapes(dt) {
+    const H = this.hands;
+    const K = this.handKit || HAND_KIT;
+    const W = this.w;
+    const tot = W.run + W.jump + W.slide + W.idle || 1;
+    const land = this.crashed ? 0 : clamp(this.landHit * this.landCurve(this.landClock), 0, 1);
+    // now and then, standing about, a hand fidgets: the fingers stretch out
+    // and curl back in
+    const F = this.fidget;
+    F.t -= dt;
+    if (F.t <= 0) {
+      F.t = 4 + 6 * Math.random();
+      F.side = Math.random() < 0.5 ? 0 : 1;
+      F.k = 1;
+    }
+    F.k = Math.max(0, F.k - dt / 1.1);
+    const fidget = Math.sin(Math.PI * F.k) * (W.idle / tot);
+    for (let i = 0; i < H.sides.length; i++) {
+      const side = H.sides[i];
+      const L = side.name === 'L';
+      H.clear(side);
+      const held = K.hold && K.hold[side.name];
+      if (held) {
+        H.add(side, held, 1);
+        H.done(side);
+        this.handHeld(side, H, dt);
+        continue;
+      }
+      if (this.crashed) H.add(side, K.crash, 1);
+      else {
+        H.add(side, K.idle, W.idle / tot);
+        H.add(side, K.run, W.run / tot);
+        H.add(side, K.jump, W.jump / tot);
+        H.add(side, K.slide, W.slide / tot);
+      }
+      H.done(side);
+      // the run: a fist that tightens as the arm drives forward and eases on
+      // the back swing; a hard swing flings the fingers open a little
+      if (!this.crashed && W.run > 0.01) {
+        const sw = this.pose[L ? C.shLx : C.shRx];
+        H.curl(side, (W.run / tot) * K.pump * clamp(sw, -0.6, 0.6), 0, 4);
+      }
+      // landing: the fingers spread as the weight comes down; and thrown
+      // across a lane, the hands fly open for balance
+      if (land > 0.01) H.mix(side, 'open', land * K.land);
+      if (!this.crashed) H.mix(side, 'open', K.lane * clamp(Math.abs(this.vx) / 7, 0, 1) * (1 - W.jump / tot));
+      if (fidget > 0.01 && F.side === i && !this.crashed) H.curl(side, -0.35 * fidget, 0, 5);
+      // (and a slow breath through them as they stand)
+      H.curl(side, (W.idle / tot) * 0.05 * Math.sin(this.time * 0.9 + i * 2.1), 0, 4);
+      this.handMore(side, H, dt);
+    }
+  }
+
+  // a hand that holds something (see handShapes)
+  handHeld() {}
+
+  // anything a character lays on a free hand after the rest (see handShapes)
+  handMore() {}
 
   // The pelvis's change of velocity this frame in the runner's frame (x
   // right, y up, z back), split into the root's own motion (pelvisD) and the

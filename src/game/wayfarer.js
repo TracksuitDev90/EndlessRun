@@ -4,7 +4,7 @@ import { clamp, Spring } from './rig.js';
 import { Cloth } from './cloth.js';
 import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
 import { COL, CAPE, capeBind, capeColliders } from './outfit.js';
-import { Player, C, mirror, cyc } from './player.js';
+import { Player, C, mirror, cyc, HAND_KIT } from './player.js';
 import { Dust } from './dust.js';
 
 // The wayfarer: a young wayfarer in a hooded cape (outfit.js), steady and
@@ -76,7 +76,15 @@ const FEEL = {
   land: { freq: 3.3, zeta: 0.42, thud: 0.05 },
 };
 
+// His hands: big fists on the charge, flung wide open like wings through
+// his stride leap, braced and grasping as he slides.
+const HANDS = { ...HAND_KIT, run: 'fist', pump: 0.18, jump: 'open', slide: 'claw' };
+
 export class Wayfarer extends Player {
+  get handKit() {
+    return HANDS;
+  }
+
   constructor(envDef, asset) {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
   }

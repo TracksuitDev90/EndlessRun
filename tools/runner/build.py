@@ -327,6 +327,19 @@ def stretch_rig():
     return new
 
 
+def refresh_world():
+    """Work every bone's bind matrix out again from its local position and
+    turn (after stretch_rig has moved them), so what's added after the
+    stretch - his fingers - is laid out on the skeleton as it now is."""
+    for b in BONES:
+        x, y, z, w = b['q']
+        R = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)], [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)], [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+        M = np.eye(4)
+        M[:3, :3] = R
+        M[:3, 3] = b['p']
+        b['world'] = BONES[IDX[b['parent']]]['world'] @ M if b['parent'] else M
+
+
 def stretch_colliders(cs):
     out = []
     for c in cs:
@@ -873,31 +886,45 @@ def g_boots():
     return Garment('boots', MAT['boot'], 0.0035, (-0.16, -0.012, -0.235), (0.16, 0.26, 0.13), field, owners, 2800, tau=0.012)
 
 
-def g_hands():
-    parts, owners = [], []
+# His hands (tools/runner/hands.py): big and blunt-fingered, a bruiser's.
+# They're sculpted after the stretch, where the stretched wrists are, so
+# they keep their shape rather than being drawn out long with his arms.
+# (seated a little way out of his big puffer cuffs, which come down over
+# the wrist, so the backs of his hands and his knuckles show below them)
+HAND_SIZE = 0.16
+HAND_OUT = 0.03
+HAND_LOOK = dict(slim=1.14, knuckles=1.4, palm=1.18, wrist=1.3)
+HANDS = {}
+
+
+def make_hands():
+    import hands
     fw = V(0, 0, -1)
     for s, L in SIDES:
         S, E, W, dn, out = arm_frame(s)
-        R = np.stack([out, dn, fw], 1)  # columns: local axes in world
-        palm = round_box(W + 0.046 * dn, (0.021, 0.045, 0.04), 0.015, R)
-        c = W + 0.092 * dn - 0.009 * out
-        fingers = round_cone(c - 0.029 * fw, c + 0.029 * fw, 0.021, 0.02)
-        thumb = round_cone(W + 0.038 * dn - 0.011 * out + 0.034 * fw, W + 0.084 * dn - 0.025 * out + 0.025 * fw, 0.015, 0.0115)
-        wrist = round_cone(W - 0.03 * dn, W + 0.02 * dn, 0.03, 0.028)
-        parts.append((palm, fingers, thumb, wrist))
-        hand = rigid('hand' + L)
-        owners += [(palm, hand), (fingers, hand), (thumb, hand), (wrist, by_axis(W, dn, [(-0.01, 'fore' + L), (0.015, 'hand' + L)]))]
+        Ws, Es = stretch_p(W), stretch_p(E)
+        a = (Ws - Es) / np.linalg.norm(Ws - Es)
+        d = np.cross(fw, a) * -s
+        HANDS[L] = hands.Hand(s, L, Ws + HAND_OUT * a, a, d, fw, HAND_SIZE, **HAND_LOOK)
+    return HANDS
+
+
+def g_hand(s, L):
+    """A hand and its wrist, up into the cuff of the sleeve (stretched space:
+    see make_hands)."""
+    H = HANDS[L]
+    wrist = round_cone(H.W - (0.04 + HAND_OUT) * H.a, H.W - 0.004 * H.a, 0.031, 0.028)
+    owners = [(wrist, by_axis(H.W, H.a, [(-0.012 - HAND_OUT, 'fore' + L), (0.014 - HAND_OUT, 'hand' + L)]))] + H.parts()
 
     def field(p):
-        out = np.full(len(p), 1.0)
-        for palm, fingers, thumb, wrist in parts:
-            d = smin(palm(p), fingers(p), 0.012)
-            d = smin(d, thumb(p), 0.01)
-            d = smin(d, wrist(p), 0.015)
-            out = np.minimum(out, d)
-        return out
+        return smin(wrist(p), H.field(p), 0.012)
 
-    return Garment('hands', MAT['hand'], 0.0025, (-0.5, 0.64, -0.08), (0.5, 0.9, 0.08), field, owners, 1200)
+    lo, hi = H.box()
+    lo = np.minimum(lo, H.W - 0.08)
+    hi = np.maximum(hi, H.W + 0.08)
+    g = Garment('hand' + L, MAT['hand'], 0.0013, lo, hi, field, owners, 3400, tau=0.0009, outline=0.75)
+    g.sparse = True
+    return g
 
 
 def g_hood():
@@ -1035,11 +1062,48 @@ def gradient(field, p, e=5e-4):
     return g / np.maximum(norm(g), 1e-9)[:, None]
 
 
+def sparse_volume(field, axes, h, step=4):
+    """The field on the grid, but only worked out near the surface: sampled
+    first every `step` cells, and then finely only in the coarse cells the
+    surface could pass through (the rest take the sign of the coarse sample
+    nearest them, which is all marching cubes needs of them). For fine
+    things - fingers - in a big box."""
+    n = [len(x) for x in axes]
+    cax = [x[::step] for x in axes]
+    cgrid = np.stack(np.meshgrid(*cax, indexing='ij'), -1).reshape(-1, 3)
+    cv = sample(field, cgrid).reshape([len(x) for x in cax])
+    # a coarse cell is live if the surface may cross it: any corner within
+    # a cell's diagonal of it (with room to spare, the fields being near
+    # enough distances)
+    near = np.abs(cv) < 1.8 * step * h
+    nc = near.shape
+    # (each coarse cell runs from its coarse point to the next: live if any
+    # of its eight corners is near)
+    nearp = np.pad(near, ((0, 1), (0, 1), (0, 1)), mode='edge')
+    cell = np.zeros(nc, bool)
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                cell |= nearp[dx : dx + nc[0], dy : dy + nc[1], dz : dz + nc[2]]
+    rep = lambda x: np.repeat(np.repeat(np.repeat(x, step, 0), step, 1), step, 2)[: n[0], : n[1], : n[2]]
+    # (away from the surface, the coarse sample at the start of its cell:
+    # far enough from zero that no triangle is ever made there)
+    vol = rep(cv).copy()
+    fine = rep(cell)
+    idx = np.nonzero(fine)
+    pts = np.stack([axes[0][idx[0]], axes[1][idx[1]], axes[2][idx[2]]], -1)
+    vol[idx] = sample(field, pts)
+    return vol
+
+
 def polygonise(g):
     h = g.h
     axes = [np.arange(g.lo[k], g.hi[k] + h, h) for k in range(3)]
-    grid = np.stack(np.meshgrid(*axes, indexing='ij'), -1).reshape(-1, 3)
-    vol = sample(g.field, grid).reshape(len(axes[0]), len(axes[1]), len(axes[2]))
+    if getattr(g, 'sparse', False):
+        vol = sparse_volume(g.field, axes, h)
+    else:
+        grid = np.stack(np.meshgrid(*axes, indexing='ij'), -1).reshape(-1, 3)
+        vol = sample(g.field, grid).reshape(len(axes[0]), len(axes[1]), len(axes[2]))
     edge = np.concatenate([vol[0].ravel(), vol[-1].ravel(), vol[:, 0].ravel(), vol[:, -1].ravel(), vol[:, :, 0].ravel(), vol[:, :, -1].ravel()])
     if (edge <= 0).any():
         print(f'  warning: {g.name} touches its box', file=sys.stderr)
@@ -1130,7 +1194,11 @@ def export(garments, out_dir, mat_ids, rig, label='runner', script='build.py'):
 def build():
     build_rig()
     J = stretch_rig()
-    garments = [stretched(g) for g in (g_head(), g_hair(), g_tee(), g_jacket(), g_shorts(), g_legs(), g_boots(), g_hands(), g_hood(), g_pouch())]
+    refresh_world()
+    for H in make_hands().values():
+        H.add_bones()
+    garments = [stretched(g) for g in (g_head(), g_hair(), g_tee(), g_jacket(), g_shorts(), g_legs(), g_boots(), g_hood(), g_pouch())]
+    garments[7:7] = [g_hand(s, L) for s, L in SIDES]
     knee, ankle = HIP_JOINT[1] - THIGH, HIP_JOINT[1] - THIGH - SHIN
     r5 = lambda x: round(float(x), 5)
     collar = dict(COLLAR, c=[r5(x) for x in stretch_p(COLLAR['c'])])
@@ -1146,10 +1214,14 @@ def build():
         # sculpt height -> stretched height, for what the game lays out by
         # the sculpt's heights (the cape's drape: outfit.js)
         stretch=[[r5(y), r5(sy(y))] for y in np.arange(0, 2.0001, 0.02)],
+        hands=[HANDS['L'].rig(), HANDS['R'].rig()],
     )
     print(f'  stretched: hip joint {HIP_JOINT[1]} -> {rig["hipJoint"][1]} m, thigh {THIGH} -> {rig["thigh"]}, shin {SHIN} -> {rig["shin"]}, shoulder {SHOULDER[1]} -> {rig["shoulder"][1]}')
     export(garments, OUT, MAT, rig)
 
 
 if __name__ == '__main__':
+    # (hands.py imports this module as `build`: let it find this one, not
+    # load a second copy with a skeleton of its own)
+    sys.modules.setdefault('build', sys.modules['__main__'])
     build()

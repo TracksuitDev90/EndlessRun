@@ -50,6 +50,13 @@
       if (q.get('style') && runner.holdStyle) runner.holdStyle(q.get('style'));
       // (&sword=out|in: the samurai keeps his sword drawn, or sheathed)
       if (q.get('sword') && runner.holdSword) runner.holdSword(q.get('sword'));
+      // (&hands=fist|open|loose|relaxed|claw|hook|flat: both hands held in
+      // that shape whatever they're doing - see src/game/hands.js)
+      if (q.get('hands') && runner.hands) {
+        const k = q.get('hands');
+        Object.defineProperty(runner, 'handKit', { value: { ...runner.handKit, idle: k, run: k, jump: k, slide: k, crash: k, pump: 0, land: 0, lane: 0, hold: null } });
+        runner.fidget.t = 1e9;
+      }
       runner.mode = pose === 'idle' || pose === 'bind' ? 'idle' : 'run';
       const scene = new THREE.Scene();
       scene.add(runner.root);
@@ -95,6 +102,8 @@
       }
       runner.place(0, 0);
       runner.shadow.visible = false;
+      // (&ink=0: without the ink outline)
+      if (q.get('ink') === '0' && runner.inkMesh) runner.inkMesh.visible = false;
       // (&follow=1: the cameras rise with them, up through a jump)
       const lift = q.get('follow') ? runner.y : 0;
       // the ground, and a mark every 10 cm up a pole beside them
@@ -111,11 +120,18 @@
       const w = innerWidth / views.length;
       renderer.setClearColor(0xf6efe4, 1);
       renderer.clear();
+      // (&at=handR: the cameras look at that bone instead - a hand, close
+      // up with &zoom=)
+      const at = new THREE.Vector3(0, focusY + lift, 0);
+      if (q.get('at') && runner.b[q.get('at')]) {
+        runner.root.updateMatrixWorld(true);
+        runner.b[q.get('at')].getWorldPosition(at);
+      }
       views.forEach((v, i) => {
         const a = yaws[v] ?? 0;
         const d = 7.2;
-        cam.position.set(Math.sin(a) * d, focusY + lift + Number(q.get('up') || 0.1), -Math.cos(a) * d);
-        cam.lookAt(0, focusY + lift, 0);
+        cam.position.set(at.x + Math.sin(a) * d, at.y + Number(q.get('up') || 0.1), at.z - Math.cos(a) * d);
+        cam.lookAt(at);
         shared.uCamPos.value.copy(cam.position);
         renderer.setViewport(i * w, 0, w, innerHeight);
         renderer.setScissor(i * w, 0, w, innerHeight);

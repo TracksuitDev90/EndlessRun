@@ -12,12 +12,15 @@ import { CONFIG } from '../config.js';
 // length of the gallery (see WORKS) — and beyond it all a pale, heavenly sky
 // of cloud with more dials adrift high in it.
 //
-// And time has come unstuck here. Every clock hand — on the great clocks up
-// on the arches, the dials adrift in the sky, the grandfather clocks, the
-// pocket watches dangling on their chains, the clock over the doorway out —
-// turns at its own pace, either way round; and the further you run, the
-// wonkier they get (env.wonk, see game.js): lurching back and forth, racing,
-// stalling, ticking in jerks — on purpose, to set you off balance. The
+// And time comes unstuck here. The first two times round, every clock — the
+// great clocks up on the arches, the dials adrift in the sky, the
+// grandfather clocks, the pocket watches dangling on their chains, the clock
+// over the doorway out — keeps the true time, the player's own, all of them
+// agreeing, their second hands ticking. The third time, early on, they come
+// unstuck: every hand eases off onto its own pace, either way round; and the
+// further you run, the wonkier they get (env.wonk, see game.js): lurching
+// back and forth, racing, stalling, ticking in jerks — on purpose, to set
+// you off balance. The
 // hourglasses work: their sand runs from the top bulb into the bottom one,
 // and when it has run through, the whole glass turns over on its waist and
 // starts again. Pocket watches dangle out of the sky, hourglasses drift and
@@ -1096,13 +1099,30 @@ function clockLeaf({ W, H, z, f }) {
   return out;
 }
 
-// A batch of a clock's two hands (the minute hand, then the hour hand,
-// marked role 1), turning - wonky as time comes unstuck.
+// A clock's second hand: a long thin needle in red with a round
+// counterweight on its tail, and a red cap over the arbor.
+function secondParts({ len, w, z }) {
+  const red = '#b5362a';
+  return [
+    part(P.box(w, len * 0.98, 0.035), red, { y: len * 0.37, z, outline: 0.35 }),
+    part(P.cyl(w * 2.6, w * 2.6, 0.035, 12), red, { y: -len * 0.2, z, rx: Math.PI / 2, outline: 0.35 }),
+    part(P.cyl(w * 1.7, w * 1.7, 0.05, 12), red, { z: z + 0.01, rx: Math.PI / 2, outline: 0.35 }),
+  ];
+}
+
+// A batch of a clock's hands (the minute hand, then the hour hand, marked
+// role 1, then the second hand over them both, role 2), keeping the true
+// time - and wonky once time comes unstuck.
 function handsBatch(b) {
+  const roled = (parts, r) => {
+    const g = merge(parts);
+    g.setAttribute('role', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(r), 1));
+    return g;
+  };
   return (name, [len, w, z], [hLen, hW, hZ], o) => {
-    const hour = merge(handParts({ len: hLen, w: hW, z: hZ }));
-    hour.setAttribute('role', new THREE.BufferAttribute(new Float32Array(hour.attributes.position.count).fill(1), 1));
-    b.toon(name, merge([...handParts({ len, w, z }), hour]), { ink: 0.03, wonky: true, ...o, turn: [-0.6, 0, 0, 0] });
+    const hour = roled(handParts({ len: hLen, w: hW, z: hZ }), 1);
+    const second = roled(secondParts({ len: len * 1.08, w: w * 0.3, z: Math.max(z, hZ) + 0.05 }), 2);
+    b.toon(name, merge([...handParts({ len, w, z }), hour, second]), { ink: 0.03, wonky: true, ...o, turn: [-0.6, 0, 0, 0] });
   };
 }
 
@@ -1257,8 +1277,10 @@ export default {
     },
   },
   env: {
-    // how unstuck time is as you come in, and by the doorway out (see game.js)
-    wonk: [0.15, 1.6],
+    // how unstuck time is as you come in, and by the doorway out, once it
+    // has come unstuck - and how many times the gallery comes round keeping
+    // the true time first (see game.js)
+    wonk: [0.15, 1.6, 2],
     sky: ['#9ec2ec', '#fff4dc', '#f0e2c8'],
     bloom: ['#ffe2a0', '#cfe0ff', '#ffffff'],
     sun: { dir: [0.2, 0.55, -1], glow: '#fff0c8', disc: '#ffffff', size: 0.05 },
@@ -1326,10 +1348,11 @@ export default {
   ],
 
   *build(b) {
-    // every hand turns at its own pace, either way round, and wonkier the
-    // further you run (wonky: see WONKY in the shaders)
-    // (a clock's two hands are one batch: the minute hand, then the hour hand
-    // marked with role 1, which turns at its own, slower pace)
+    // every clock keeps the true time, until time comes unstuck: then every
+    // hand turns at its own pace, either way round, and wonkier the further
+    // you run (wonky: see WONKY in the shaders)
+    // (a clock's hands are one batch: the minute hand, then the hour hand
+    // marked with role 1, then the second hand, role 2)
     const hands = handsBatch(b);
     const SKY = { anim: 'liftFar', wobble: [0, 0.8, 0.25, 0] };
     const WATCH = { anim: 'liftFar', wobble: [0, 0.6, 0.4, 0] };

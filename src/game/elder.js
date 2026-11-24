@@ -3,7 +3,7 @@ import { makeCharacterMaterials } from '../render/shaders.js';
 import { TAU, clamp, smooth, Spring } from './rig.js';
 import { Cloth } from './cloth.js';
 import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
-import { Player, C, hermite } from './player.js';
+import { Player, C, hermite, HAND_KIT } from './player.js';
 import { CONFIG } from '../config.js';
 import { Dust } from './dust.js';
 import { Sparks } from './sparks.js';
@@ -320,7 +320,17 @@ const LEG_L = ['thLx', 'thLy', 'thLz', 'knL', 'anL', 'toL'].map((n) => C[n]);
 // ahead of him), how much road it can stay planted for, how high it swings.
 const STICK = { x: 0.3, z: -0.22, reach: 0.85, lift: 0.17, minContact: 0.05 };
 
+// His hands: the right one shut round his stick (sculpted so: see
+// tools/runner/elder.py); the left, old and bony, hangs loose, rests in the
+// small of his back as he hobbles, and is flung out wide when he throws
+// himself across a lane or over his stick.
+const HANDS = { ...HAND_KIT, idle: 'relaxed', run: 'relaxed', pump: 0.12, jump: 'open', slide: 'claw', lane: 0.85, hold: { R: 'bound' } };
+
 export class Elder extends Player {
+  get handKit() {
+    return HANDS;
+  }
+
   constructor(envDef, asset) {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
   }

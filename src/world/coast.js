@@ -1846,7 +1846,12 @@ export default {
       const x = side * rng.float(34, 95);
       const zz = z();
       const sc = rng.float(0.9, 1.2);
-      ctx.put('boat', x, SEA_Y + 0.3, zz, { s: sc, c: rng.pick([C.boatBlue, C.boatRed, C.boatGreen, C.boatWhite]), p0: rng.float(0, TAU) });
+      {
+        // (each its own heading, and its own rocking)
+        const c = rng.pick([C.boatBlue, C.boatRed, C.boatGreen, C.boatWhite]);
+        const p0 = rng.float(0, TAU);
+        ctx.put('boat', x, SEA_Y + 0.3, zz, { s: sc, ry: p0, c, p0 });
+      }
       ctx.put('glow', x, SEA_Y + 2.6 * sc, zz, { s: 4.5, c: [1, 0.7, 0.4] });
       ctx.put('streak', x, SEA_Y + 0.05, zz, { sx: sc * 1.6, sz: sc * 1.4 });
       ctx.put('glow', x, SEA_Y + 6.6 * sc, zz, { s: 2.6, c: [1, 0.8, 0.5] });
