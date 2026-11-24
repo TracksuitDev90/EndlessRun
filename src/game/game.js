@@ -30,6 +30,9 @@ const smooth01 = (e0, e1, x) => {
   return t * t * (3 - 2 * t);
 };
 const NO_MOTES = { color: '#000000', size: 1, drift: [0, 0, 0], opacity: 0 };
+// (wonkOf's answer: [how far unstuck, how wonky]; one array, reused)
+const NO_WONK = [0, 0];
+const _wonk = [0, 0];
 const CHEST = 0.9; // a collected gem is sucked into the runner's chest, this high above their feet
 // the work done ahead of time, per frame (ms; see prep.js and prepBudget)
 const PREP_IDLE = 8;
@@ -1257,23 +1260,56 @@ export class Game {
   }
 
   // --- time coming unstuck ------------------------------------------------------
-  // A world whose env asks for it (env.wonk: [at the start, by the end], the
-  // Gallery of Hours) has its clock hands spin wonkier and wonkier the
-  // further you run through it — and a little wonkier each time it comes
-  // round. Seen through a doorway, it's as calm as it starts.
+  // A world whose env asks for it (env.wonk: [at the start, by the end, the
+  // laps it keeps true time], the Gallery of Hours) has clocks that keep the
+  // true time - the player's own - the first times it comes round. Then it
+  // comes unstuck: over the first stretch of the next visit every hand eases
+  // off onto a pace of its own, either way round, and from there they spin
+  // wonkier and wonkier the further you run through it — and a little
+  // wonkier each time it comes round. Seen through a doorway, it's as calm
+  // as it starts.
+  // Returns [how far unstuck (0 true time .. 1), how wonky].
   wonkOf(world, seg, t) {
     const w = world.def.env.wonk;
-    if (!w) return 0;
-    return Math.min(2.2, w[0] + (w[1] - w[0]) * t + 0.3 * (seg?.visit || 0));
+    if (!w) return NO_WONK;
+    const v = (seg?.visit || 0) - (w[2] ?? 0);
+    if (v < 0) return NO_WONK;
+    const k = v > 0 ? 1 : smooth01(0.04, 0.3, t);
+    _wonk[0] = k;
+    _wonk[1] = k * Math.min(2.2, w[0] + (w[1] - w[0]) * t + 0.3 * v);
+    return _wonk;
   }
 
-  updateWonk() {
+  // (dt: how long the hands have been unstuck is counted up as they go)
+  updateWonk(dt) {
+    // the true time, for every clock that keeps it (the local time: the
+    // clock's offset from UTC looked up once a minute, so a frame makes no
+    // garbage)
+    const ms = Date.now();
+    if (!(ms < this.tzAt)) {
+      this.tzAt = ms + 60000;
+      this.tzOff = new Date(ms).getTimezoneOffset() * 60000;
+    }
+    const day = (((ms - this.tzOff) % 86400000) + 86400000) % 86400000;
+    const sec = (day % 60000) / 1000;
+    const min = (day % 3600000) / 60000;
+    shared.uHours.value.set(sec, min, (day % 43200000) / 3600000, 0);
+    const set = (world, k, wonk) => {
+      const u = world.u;
+      u.uWonk.value = wonk;
+      u.uUnstuck.value.x = k;
+      u.uUnstuck.value.y += k * dt;
+    };
     const seg = this.course.segAt(this.dist);
     if (seg.world === this.current) {
       const t = Math.min(1, Math.max(0, (this.dist - seg.start) / Math.max(1, seg.end - seg.start)));
-      this.current.u.uWonk.value = this.wonkOf(this.current, seg, t);
+      const [k, wonk] = this.wonkOf(this.current, seg, t);
+      set(this.current, k, wonk);
     }
-    if (this.next && this.door) this.next.u.uWonk.value = this.wonkOf(this.next, this.door.seg, 0);
+    if (this.next && this.door) {
+      const [k, wonk] = this.wonkOf(this.next, this.door.seg, 0);
+      set(this.next, k, wonk);
+    }
   }
 
   // --- snow settling ------------------------------------------------------------
@@ -1314,9 +1350,11 @@ export class Game {
       b = this.snowOf(this.next, this.door.seg);
       this.next.u.uSnow.value.x = b;
     }
+    // (a world with no snow can still ask for fewer motes than the rule:
+    // env.particles.density - the Deepwood's, so its fireflies aren't crowded)
     const fall = (world, lv) => {
       const f = world.env.snow?.fall;
-      return f ? f[0] + (f[1] - f[0]) * lv : 1;
+      return f ? f[0] + (f[1] - f[0]) * lv : world.env.particles?.density ?? 1;
     };
     const wa = this.snowWeightOf(this.current, here && here.world === this.current ? here : null);
     const wb = this.next && this.door ? this.snowWeightOf(this.next, this.door.seg) : wa;
@@ -1571,6 +1609,14 @@ export class Game {
     // until they're through the one out (see Player)
     this.player.lowG = st !== 'title' && !!this.course.segAt(this.dist).world.def.lowGravity;
     const boosts = this.player.boosted;
+    // (a span overhead anywhere along the next secs of running: see
+    // Player.takeOff)
+    this.overhead ??= (secs) => {
+      const p = this.player;
+      const pd = CONFIG.player.halfDepth;
+      return this.obstacles.ceilingAt(p.x, this.dist - pd, this.dist + Math.max(this.speed, 1) * secs + pd, p.y);
+    };
+    this.player.overhead = this.overhead;
     this.player.update(dt, this.speed, (x) => {
       const h = this.obstacles.groundAt(x, this.dist, this.player.y);
       // (on a stair, carried up and down it rather than stepping off it)
@@ -1611,7 +1657,7 @@ export class Game {
     if (this.warp.active) this.warp.aim(this.cam.camera, this.player.root.position);
     shared.uCamPos.value.copy(this.cam.camera.position);
     this.updateDoor();
-    this.updateWonk();
+    this.updateWonk(dt);
     this.updateSnow();
     this.worldFrames(dt);
     shared.uCamPos.value.copy(this.cam.camera.position);

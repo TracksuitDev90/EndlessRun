@@ -81,13 +81,13 @@ to hold 60 fps), and plays just as well on desktop with a keyboard or mouse.
 |---|-------|-------|-------------|
 | I | **The Cypress Lane** — towering scribbled cypresses, mossy-roofed houses in mustard, mint and teal, a cobbled lane through a lived-in neighbourhood: now and then a greengrocer's or a bakery café on a ground floor, picket fences round front gardens of raspberry canes, market stalls on the verge (apples, grapefruit and oranges at one; watermelons, grapes and pineapples at the other), benches, post boxes, a bike with a basket of apples, the bus stop's shelter; and the market spilling into the road (see [The breather](#the-breather-the-cypress-lane)) | soft and glowing: wrapped shading, green-gold haze, sun shafts between the trees, leafy dapple on the cobbles | the green forest illustration (this sets the art style for everything) |
 | II | **The Glasshouse** — a white-ribbed greenhouse tunnel gone to jungle: a path of mossy old stone pavers between beds crowded with zinnias and spilling over their edges, banana plants arching up into the roof, elephant ears, barred calatheas, ferns, monstera and dark ficus, Spanish moss hanging in curtains from the purlins, ivy up the ribs, baskets hung from brackets and on long chains from the roof, shelves of pots against the glass, potted cypress and orange trees, and here and there a Venus flytrap left to grow far too big (see [The Glasshouse, run wild](#the-glasshouse-run-wild)) | warm, humid and soft: sunlight through glass fogged with condensation, a gentle golden haze far down the tunnel, soft sunbeams slanting down over the beds, motes drifting in them, leaf-dappled pavers, deep green shade closing in at the edges | the nested garden illustration; greenhouses packed to the roof with plants, and a field of zinnias; old palm houses in the morning sun — Spanish moss, banana leaves, elephant ears and calatheas along a winding paved path |
-| III | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, moss everywhere — cushions of it heaped over the roots and carpeting the floor, its spore stalks standing up out of it, beards of it hanging from the trunks — a trodden path through long grass (thick right along its edges, taller still in among the trunks), ferns, wildflowers, glowing mushrooms, fireflies wandering and flashing over the path and in among the trees (a few by day, the wood full of them by night), campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
+| III | **The Deepwood** — colossal mossy trunks in deep-furrowed bark on buttress roots under a canopy that closes overhead, moss everywhere — cushions of it heaped over the roots and carpeting the floor, its spore stalks standing up out of it, beards of it hanging from the trunks — a trodden path through long grass (thick right along its edges, taller still in among the trunks), ferns, wildflowers, glowing mushrooms, fireflies wandering and flashing over the path and in among the trees (a few by day, more by night, never so many they crowd the dark), campfires left burning on the path and a creek cutting right across it; its doorway is two ancient trees grown into an arch, hung with paper lanterns | deep shade: cool dark shadows, heavy vignette, shafts of light through gaps in the leaves pooling warm on the path, ground mist, fog that swallows the far trunks, fireflies | the marsh, the creek through the meadow and the dark forest stream (Ghibli-style painted backgrounds) |
 | IV | **Candy World** — out of the Deepwood's shade into a country made of sweets (see [Candy World](#candy-world)): a dead-flat road of big docked biscuits in staggered courses, strips of wafer down the lane lines and round butter cookies scalloping its edges, a shell border of frosting piped along it; rolling hills of frosting, sprinkled, drizzled with chocolate and crowned with cherries; gingerbread villages iced like wedding cakes; layered cake mesas; ice-cream towers of waffle cone with scoops as big as rooms; lollipop orchards, cotton-candy woods and candy canes as tall as trees; cupcakes as big as houses and hills of ice cream; and a land, not a sweet shop tipped out: its candy is its nature — gumdrop bushes, lollipop flowers, piped frosting rosettes, meringue peaks, gummy succulents with sugared jelly fruit fallen under them, rock-candy crystals, chocolate outcrops and truffle boulders, groves of giant candy canes, gummy bears grazing — and what's baked is its towns: gingerbread houses with gardens, an ice-cream district with a parlour's stand and a picnic laid out for a garden party; each side of the road one landscape for a while, its sweets growing in patches with open, rolling frosting between; marshmallow clouds drifting overhead; bouncy gumdrops in the road that throw you up high; and a river of melted chocolate winding through it all, now alongside the road, now right across it, once cutting back across twice in a row | sugar-bright and soft: pastel light whose shade is lavender rather than grey, glossy chocolate and boiled sweets catching it, sugar glittering | the candy world concept sheet; gingerbread houses, sweet-shop windows, and the chocolate river of every childhood |
 | V | **The Night Rooftops** — New York over the roofs at night (see [New York at night](#new-york-at-night)): a tar-paper roof walkway behind a brick parapet, gooseneck lamps and strings of little lights, washing stirring on the lines strung across it; either side the roofs of tenements and lofts at every height — brick and limestone, cornices, windows lit warm, air conditioners in them, iron fire escapes down their fronts — water towers on stilts, stair bulkheads, antennas, rooftop gardens, a lit sign now and then; and out past them the towers of the city, every window a light, and a great art-deco spire lit at its crown | high-contrast night: hard moonlight from ahead rims every silhouette, lamps pour warm cones and pools onto the tar, puddles give back the sky, fog pools in the streets below, a warm glow of city light along the horizon | the night garden illustration; New York — fire escapes in the rain, a roof of water towers at blue hour, the skyline from a roof |
 | VI | **The Hall of Doors** — a mustard-yellow corridor through the heart of a library that goes on for ever, a floor of dark old storybook boards laid wall to wall — wandering seams, knots curled into spirals, doors of every colour (now and then one stands swung open on nothing but light — each its own colour, a hint of some other world beyond that you never see and never reach — pouring out across the floor), nine different paintings between them, nested door frames, books fluttering up off the shelves and stacks in the way; over its walls the library rises on either side in four tiers of books, each a gallery railed and lamplit with rolling ladders on its shelves, and behind them rows and rows and rows of book stacks run off into a warm haze, lamps glowing on their ends; great timber arches span the hall under a beamed and plastered roof, green-shaded lamps hanging from them, shafts of sunlight slant down from high windows, a ladder leans now and then on the hall's wall up to the gallery, and doors and armchairs drift down the aisles between the stacks (see [The endless library](#the-endless-library)) | harsh and surreal, like a de Chirico piazza: raking sun, razor-edged shadows — the sunlit wall's shadow falls across the right of the hall (and across you), each lintel throws a crisp bar | the door-in-the-head illustration; old reading rooms — timber galleries under hammerbeam roofs, alcoves of shelves, rolling ladders, a domed reading room |
 | VII | **The Sky Road** — the processional way of the sun, high over a sea of golden cloud: a road of painted limestone with a band of lapis down its middle strewn with gold stars like a tomb's ceiling, colonnades of painted papyrus columns either side (shafts banded in red, gold, lapis and green, figures striding round them, capitals opening like papyrus heads, a striped cornice over them), now and then an avenue of sphinxes with braziers burning between them, great temple pylons painted with figures spanning the road with obelisks before them, golden pyramids and palms on floating islands, the three great pyramids far off on a plateau of their own, and Ra's disc low over the end of the road with its wings spread across the sky (see [The Sky Road of the sun](#the-sky-road-of-the-sun)) | a low sun ahead and to the right: warm light on the painted faces, the shade still showing their colours, golden rims, lapis overhead fading to gold | Sky Dancer; Egyptian temple painting — the winged sun, the eye of Horus, the scarab, the ankh — the pyramids of Giza at sunset, the painted columns of Philae |
 | VIII | **Hell** — fire and brimstone, and above all emptiness, and haunted: a plain of dark ash and cinders out to the edge of the world under a ceiling of smoke and, where the sun should be, a total eclipse — a black disc in a ring of fire (see [The eclipse](#the-eclipse)), a pale road of bone-white ash through it, split by glowing fissures, broken only now and then by black basalt columns, jagged spires, pools and rivers of lava that seethe and splash, and far-off volcanoes throwing up fountains of fire; pale hooded souls drift over the plain, the ribs of colossal dead things arch out of the ash, gibbet cages creak on crooked posts by the road, dead trees claw at the smoke, people on fire stand and sit at the edge of the road and turn to watch you pass (see [Hell's fire, and its ghosts](#hells-fire-and-its-ghosts)), and dry lightning flickers in it, now and then forking down and lighting everything for an instant; embers rise and ash falls all the time | seen through its doorway it burns red and black; come through and its colour is sapped away down a whirlpool (see [The colour drain](#the-colour-drain)) — black, grey and white, dim and darker still toward the edges, lit hard from the burning horizon, with only the lava, the fire in the rock, the embers, the souls' eyes and the wayfarer's cape (or the explorer's hair) still in colour | fire and brimstone |
-| IX | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump, curtains of sand pouring in through the arches; and the whole gallery stands inside the works of one enormous clock — out past the colonnade on either side a single train of great wheels runs the length of the walk, a wheel behind one arch and a pinion behind the next, tooth in tooth, each pinion's arbor carrying a greater wheel behind it, every arbor on a brass pillar, the sand banked up through it all over the wheels' feet and poured off their rims as they turn, and beyond the works a sea of dunes rolling to the horizon (see [The sands of time](#the-sands-of-time)); open movements in the bays — a wheel driving its pinion, tooth in tooth, an anchor rocking over the scape wheel; your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces whose hands spin every which way — wonkier and wonkier the further you run — pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, now and then one lane raised into a high walk over the rest, a stone stair up, a bridge across the road and sand pouring off it into the lanes below (see [High routes](#high-routes-two-ways-through)), pocket watches dangling out of the sky on their chains, and dials and hourglasses adrift high in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
+| IX | **The Gallery of Hours** — a gallery of clocks open to the sky, where time has come unstuck and its sands are running out: a walk of sand between colonnades of ivory arches, drifted high against the balustrades and spilling in across the walk, threads of sand falling from the cornice onto piles that heap up and slump, curtains of sand pouring in through the arches; and the whole gallery stands inside the works of one enormous clock — out past the colonnade on either side a single train of great wheels runs the length of the walk, a wheel behind one arch and a pinion behind the next, tooth in tooth, each pinion's arbor carrying a greater wheel behind it, every arbor on a brass pillar, the sand banked up through it all over the wheels' feet and poured off their rims as they turn, and beyond the works a sea of dunes rolling to the horizon (see [The sands of time](#the-sands-of-time)); open movements in the bays — a wheel driving its pinion, tooth in tooth, an anchor rocking over the scape wheel; your footprints left behind you, and the sea lapping in through the doorway out when it leads under the sea; oversized clock faces that keep the true time the first two times through, second hands ticking, and from the third come unstuck, their hands spinning every which way — wonkier and wonkier the further you run (see [Time coming unstuck](#time-coming-unstuck)) — pendulums swinging in the bays, grandfather clocks, armillary spheres turning on pedestals, hourglasses that really run and turn themselves over, now and then one lane raised into a high walk over the rest, a stone stair up, a bridge across the road and sand pouring off it into the lanes below (see [High routes](#high-routes-two-ways-through)), pocket watches dangling out of the sky on their chains, and dials and hourglasses adrift high in a pale heavenly sky | soft and heavenly: high warm light, pale cool shadows, a hazy sky of cloud | the clockwork gallery |
 | X | **The Kelp Deep** — under the sea: a path of pale sand rippled by the current over the ocean floor, strewn with shells and starfish, between banks of coral — brain coral, staghorn, table coral, lacy sea fans, tube sponges and anemones waving in the current — forests of kelp towering up toward the light, and far off, great stacks and arches of rock furred with weed fading into the teal; schools of silver fish stream alongside, dark shoals turn in the distance, bait balls mill, jellyfish pulse and drift trailing their arms, turtles and manta rays glide by, columns of bubbles rise from the reef — and whales cross the path (see [Under the sea](#under-the-sea)) | light from far overhead through a rippling surface: shafts of it slanting down, a net of caustics wavering over everything (the runner too), teal and green at the top of the screen sinking to deep blue at the bottom | the kelp forest, the whale beneath the waves, the jellyfish, the reef in gouache |
 | XI | **Blue Hour** — a lonely, windswept coast held for ever at blue hour (see [Blue Hour](#blue-hour-the-sea-comes-over-the-causeway)): an enormous restless sea, swells rolling in on black rocks and bursting into spray, fields of long grass bending in broad waves with gusts running silver through them, and far off on a rocky headland a little right of the road, a lighthouse turning two slow beams over the water. The route runs through three stretches every time: a weathered coastal path through the long grass between low dry-stone walls, driftwood thrown up on it, the sea over the brow; out of grass grown tall and dense onto an exposed stone causeway, the sea on both sides — just as you come out onto it the beam swings round over the road and a great wave breaks beside you, its spray lit warm — where great swells rear up against its walls and pitch over the coping beside you, a low wash runs right across now and then, and tidal cuts break through it; and an old fishing landing of worn boards and setts by a quay, half abandoned — net-drying frames, a wreck's spar, torn sails between posts, lobster pots, stranded dinghies, boats moored off it with their lights lit — then the grass again. Fishing boats rock offshore, gulls wheel, rope ends, torn sailcloth and seed heads all stream the same way in the wind | blue hour, always: deep denim overhead and a pale slate glow where the sun's gone, slate and muted teal and charcoal, soft cool light off the whole sky bright enough to read by, white foam for contrast, and only a few warm lights — the lighthouse's amber lantern, the boats' lights, their reflections in the wet stone and the puddles; sea mist lying low on the water | a windswept coast at blue hour: the lighthouse on its headland, waves breaking on a causeway, long grass in the wind, a fishing landing |
 | XII | **The Frostbound Pass** — a route of packed snow and bare blue ice through a glacier: towering cliffs of turquoise and cobalt ice either side, banded and cracked and capped with snow, frozen waterfalls down their faces, icicles, and now and then an enormous natural arch of ice right over the route; in places the canyon opens out — on one side, then both, then the other — onto a field of pack ice, plates of it up-ended along the pressure ridges, icebergs frozen into it, and jagged mountains far off; firs bowed under snow by the route, and here and there a small timber cabin, its windows lit amber. And the snow stays: it lies a little deeper by the end of every visit and a good deal deeper every time the run comes back round (see [The Frostbound Pass: snow that stays](#the-frostbound-pass-snow-that-stays)) | cold and clear: a low peach sun ahead, lavender shade, ice that holds the light, spindrift low over the snow; later, a snow sky, then the blue hour with the windows bright | the glacier canyon, the frozen lake under the mountain, the ice cave, the crack in the ice, the pack ice under the peaks, the snowy road between the firs |
@@ -486,16 +486,27 @@ a stretch.
 
 ### Time coming unstuck
 
-In the Gallery of Hours every clock hand — on the great clocks up on the
-arches, the dials adrift in the sky, the grandfather clocks (obstacles
-included), the pocket watches dangling on their chains and the clock over the
-doorway out — turns at its own pace, either way round. And the further you run
-through the gallery, the wonkier they get: lurching back and forth, racing and
+The first two times you come through the Gallery of Hours, every clock in it
+keeps the true time — the time on the player's own clock, every one of them
+agreeing: the great clocks up on the arches, the dials adrift in the sky, the
+grandfather clocks (obstacles included), the pocket watches dangling on their
+chains and the clock over the doorway out, each with an hour hand, a minute
+hand and a thin red second hand with a round counterweight, ticking round a
+second at a time — a snap onto each second and a little recoil as it settles,
+as a real movement does. The third time, a little way in, time comes unstuck:
+every hand eases off the true time onto a pace of its own, either way round
+(eased, so none of them leaps). And from there, the further you run through
+the gallery, the wonkier they get: lurching back and forth, racing and
 stalling, ticking in jerks that snap forward and back, until by the doorway
 out they're flailing — purposely disorienting. Each time the gallery comes
-round it starts a little wonkier (`env.wonk: [as you come in, by the doorway
-out]`, driven by `game.js`; toon option `wonky` — a clock's two hands are one
-batch, the hour hand's vertices marked to turn at its own pace).
+round after that it starts a little wonkier (`env.wonk: [as you come in, by
+the doorway out, the laps it keeps true time]`, driven by `game.js`: the true
+time is `shared.uHours`, and each world's `uUnstuck` how far unstuck its
+clocks are and for how long; toon option `wonky` — a clock's three hands are
+one batch, the hour hand's vertices marked role 1, the second hand's role 2).
+Every turning thing - a clock's hands, a gear, a pendulum - turns in its own
+plane: a phase starts something that spins at its own angle, but never tips
+it out of its face.
 
 The hourglasses work (toon and glass option `sand`): their sand runs from the
 top bulb to the bottom one — the pile above sinking into the neck, a thin
@@ -656,16 +667,30 @@ then splits into two routes at once: one of the outer lanes rises into a
 - **Down below**: the walk walls off its lane, so the road crosses the other
   way - out of the far lane before the far walk begins, under the bridge -
   while sand pours off the walk through brass chutes over the middle lane.
-  A curtain of sand knocks you stumbling (one hit, never a crash); between
+  A curtain of sand knocks you stumbling (one hit, never a crash) - though
+  only under the chute's lip it pours from: up over it (stepping off the
+  side of the walk, or flung up scrambling onto it) it's below you; between
   the curtains, the odd hurdle or bar in the open outer lane. At every moment
   there's a lane you can just run along.
 
 Run into the side of the walk, or the front of the far walk from the road,
-and you stumble and scramble up onto it, as on a climb. The walk is its own
+and you stumble and scramble up onto it, as on a climb. A companion who runs
+takes whichever way she happens to: up the stair with you, or a bound up the
+face of the walk from the road beside it (a leap that clears its top,
+higher if the stair she lands on has risen under her in the air), or a drop
+off its edge, falling as anything falls - never hoisted up a wall or let
+down one slowly (`Companion.liftStep`); and hopping down off your shoulder
+up on the walk, she lands on the walk. The walk is its own
 lane only, so stepping sideways off it drops you to the road the moment
-you're clear of it. The bridge's underside over the lanes sits above the
-head of the highest jump, and nothing under it is ever a hit from below; it
-is only ground for someone already up on it. The stairs carry you up and
+you're clear of it. Nothing under the bridge is ever a hit from below, and
+nothing there is ever to be jumped: a jump taken under it - or one that
+would carry you under it before you came down - rises only as high as keeps
+your head under its underside (each runner's own head - Bramble's ears,
+Wren's bun, Hazel on her board with her ponytail flying - measured off their
+skeleton, `Player.headroom`; the jump's own arc, hang and all, solved down
+to fit: `Player.takeOff`, `ObstacleField.ceilingAt`), so no head ever passes
+up through the stone. The bridge is only ground for someone already up on
+it. The stairs carry you up and
 down them however long a frame is (at 30 fps, or through a hitch, as at 60).
 
 How it's done: `ObstacleField.placeHigh` lays the pieces (each a record:
@@ -1739,14 +1764,14 @@ Append to the URL:
   gallop, legs, tail, ears and mind take about 0.05 ms a frame; nothing she
   does allocates.
 - **One skinned runner and a cape.** The wayfarer is a single skinned mesh
-  and the cape one more, each with its ink hull — four draw calls, ~22k
+  and the cape one more, each with its ink hull — four draw calls, ~28k
   sculpted triangles plus ~9k for the cape. Legs are placed by IK, the body
   rides on spring follow-through, the cape is a 19×19 cloth simulation whose
   surface the GPU rebuilds from a 19×19 texture of particle positions (the
   only thing uploaded per frame), and the curls and hip pouch are springs;
   animation and simulation together take about half a millisecond on a
   desktop (see [The runners](#the-runners)). The explorer is the same four
-  draw calls (her body, ~25k triangles, and her hair: a 15×12 cloth), costs
+  draw calls (her body, ~36k triangles, and her hair: a 15×12 cloth), costs
   about half as much to simulate, and adds two draw calls for each thing
   flying out of her backpack while it's in the air (at most six). Each
   adds one more for dust while there's any in the air (his boots' puffs, her
@@ -1918,6 +1943,57 @@ are, their card and how to make them live in `characters.js`).
 | Slide | feet first, leaning back | a baseball slide on her hip, leading with the other leg each time, the sketchbook held up out of the dirt; often a cloud of dust | a squat right down on his heels, folded over his knees, dragging his stick behind him like a skid in a trail of dust | a dive roll: arms reaching for the road, tucked into a ball, over once and up into a crouch, in a little cloud of dust | ducked right down on the board, folded over her knees, her front hand on its rail and the back arm up behind | an iai crouch: low on his back knee, his front knee deep, his chin up, his hand on the hilt — and now and then he draws rising out of it |
 | Run | a bruiser's charge: hunched, head down, crouched low on bent knees, stomping along wide-footed with the knees driven high, rocking side to side, the elbows out and the arms pumping round in big loops | a quicker, lighter, narrower one, more lean, less bounce | a quick, short-stepping, shuffling hobble, toes out, bent double, limping on his bad left leg and lurching onto his stick as it strikes the road every stride, his free hand in the small of his back — though now and then he swings it up onto his shoulder and just walks | two, and every few seconds he changes from one to the other: bolt upright with his head thrown back and his fists pumping at his chest on quick little steps; or flung forward, arms swinging long and straight, in big bounding strides | she rides: side-on, never still — carving in a long slow S, the whole of her leaning out from the wheels over her toes and back on her heels, drifting across her lane, hips leading and chest, head and loose arms following on behind; pumping, shifting her weight, in one of three moods — and every few seconds she turns her front foot down the board and pushes off the road, hard, two or three times | a big cat's sprint: low and driving, the heel kicked high and the knee driven through, his head level and still, his right arm pumping and his left hand on his scabbard; and now and then the sword drawn on the run and carried trailing low behind him, his left arm pumping, until he flicks it clean and slides it home |
 
+### Hands
+
+The four who are people - Rowan, Wren, Alder and Hazel - have real hands: a
+palm with the pads of the thumb and the heel of the hand, the ridges of its
+bones and its knuckles across the back; four fingers of three joints each,
+tapering, fuller at each knuckle and fanned a little apart; and a thumb of
+three, swinging round in front of the palm (`tools/runner/hands.py`, shared
+by all four sculpts: sculpted the way everything else is, and meshed finer
+than the rest, a sparse grid laid only where the surface runs, so the gaps
+between the fingers stay open). Each digit is three bones of its own, so the
+game shapes them (`src/game/hands.js`): every frame each hand reaches for a
+blend of shapes by what the body's doing - hanging relaxed with a gentle
+curl, deeper toward the little finger, when they stand about (breathing a
+little, and now and then one hand stretching its fingers out and curling
+them back in); a loose fist on the run that tightens as the arm drives
+forward and eases on the back swing; flung wide open through a jump; braced
+and grasping on a slide; spread as they land and as they throw themselves
+across a lane; grasping at the air in a crash. Every digit gets there on a
+spring of its own, the index quickest and the little finger last, so a hand
+opens and closes in a ripple, never all at once.
+
+Each of them has their own hands and uses them their own way:
+
+- **Rowan's** are big and blunt-fingered, seated out of his long puffer
+  cuffs so his knuckles show: clenched fists on the charge, flung open like
+  wings through his stride leap. (His hands are sculpted after his stretch,
+  where his stretched wrists are, so they keep their shape.)
+- **Wren's** are small and slender. Her right hand is sculpted holding her
+  sketchbook by its top outer corner - turned palm forward behind it, her
+  fingers laid down its back cover and her thumb round its outer edge onto
+  the front (the angles that bring the thumb round without passing through
+  the book are searched for: `hands.clasp`) - and never lets go; her left
+  runs loose, flies open through her tricks and lies flat on the road as she
+  slides.
+- **Alder's** are long, bony and big-knuckled. His right is sculpted shut
+  round his stick, which lies across his palm just in from the knuckles:
+  each finger's joints are found so its pad lies on the shaft (`hands.wrap`)
+  and the thumb closes over them (`hands.clasp`). His left hangs open, rests
+  in the small of his back as he hobbles and is flung out wide when he
+  throws himself across a lane or over his stick.
+- **Hazel's** are slim and long-fingered: loose as she rides, fanned through
+  her flips, the front one hooked round the board's rail when she ducks, and
+  both slipped flat into her pockets when she stands about.
+
+(Reed's, the newest and still being finished, are sculpted fists, fingers
+and all, the right shut round his rod's cork grip;
+Bramble's are a rabbit's paws and Birch's a tiger's, padded and clawed.) In a
+viewer, `tools/runner/view.html?runner=elder&at=handR&zoom=6` looks a hand in
+the face, and `&hands=fist|loose|open|relaxed|claw|hook|flat` holds both in a
+shape.
+
 ### Choosing who runs
 
 ![The title screen on a phone and on a wide screen, choosing Birch: the runners' cards three by two - Rowan's greyed out for now - the companions' badges under them](docs/runners.jpg)
@@ -2073,7 +2149,8 @@ back up out of it onto her toes — a little stretch, chin up, arms flicking up
 and out — then a smaller dip and a smaller bounce as it rings out.
 
 Her simulation costs about half his per frame (the hair grid is smaller than
-the cape's); her mesh is about 25k triangles to his 23k.
+the cape's); her mesh is about 36k triangles to his 28k (her hands
+alone, fingers and all, about 7k).
 
 To change a runner, edit their script and regenerate (about 15, 35, 65, 85,
 35 and 100 seconds, in the order below), then look at them turned round like their
@@ -2089,7 +2166,9 @@ the elder picking up his stick as soon as he can, `&style=pump|reach` the bunny
 keeping to one of his two runs (`flow|chill|low`: the skater riding in one
 mood), `&sword=out|in` the samurai keeping his sword drawn or sheathed, `&speed=` how fast they run (m/s, 14 if not given; 12–28 in the game),
 `&views=front,left,back,right,three`, `&zoom=`, `&y=`, `&follow=1` the cameras
-rising with them up through a jump):
+rising with them up through a jump, `&at=handR` the cameras looking at that
+bone instead - a hand, close up with `&zoom=` - `&hands=fist|loose|open|relaxed|claw|hook|flat`
+both hands held in that shape, `&ink=0` without the ink outline):
 
 ```sh
 pip install numpy scipy scikit-image fast-simplification pillow
@@ -2458,7 +2537,7 @@ Through Hell's drain his robe and his orange spectacles keep their colour.
 His simulation costs the most of the runners per frame (three sheets - the
 beard larger than Wren's hair, the robe's skirt and the under-robe's; the
 arms' solves are a handful of vector sums), still well under a millisecond;
-his mesh is about 26k triangles.
+his mesh is about 32k triangles.
 
 ### The bunny
 
@@ -2800,7 +2879,7 @@ she goes (`uFlutter`). Her hoops swing on the shared hair springs. On the
 Gallery's sand her wheels roll two thin tracks behind her, and where she
 plants her foot to push, a print. The fox rides on her shoulder but doesn't
 shoot through her legs (`onBoard`: there's a board between them). Her mesh is
-about 35k triangles, a seventh of them the braids; her simulation costs a
+about 44k triangles, a ninth of them the braids; her simulation costs a
 little less than the elder's per frame.
 
 **She plays with her board.** Every so often (six to thirteen seconds of
@@ -4053,6 +4132,8 @@ src/game/                     game loop, player (the runners' shared core:
                               carried and sheathed and the arms that reach
                               for it, his tail and the obi's ends on
                               ropes, ears, and how he moves between them),
+                              hands (fingers that curl, spread and grip:
+                              the shapes, and a spring for every digit),
                               kit (body geometry, sheet
                               surfaces and colliders), cloth, runner asset
                               loader, camera, course (world order),
@@ -4107,6 +4188,10 @@ tools/runner/pitcher.py       offline sculpt of the pitcher plant -> assets/pitc
 tools/runner/thistle.py       offline sculpt of the storm thistle's pod and legs
                               -> assets/thistle/ (its crown is drawn in the game)
 tools/runner/crab.py          offline sculpt of the giant crab -> assets/crab/
+tools/runner/hands.py         the human runners' hands - palm, knuckles, three
+                              bones a finger - sculpted in any shape (round a
+                              stick, on a book) and boned for hands.js; used
+                              by build.py, explorer.py, elder.py, skater.py
 tools/runner/view.html        a runner turned round like their reference sheet
 tools/runner/fox.html         the fox turned round, posed, or as a film strip
 tools/runner/dragon.html      the dragon turned round, posed, flying, or as a
@@ -4173,7 +4258,8 @@ gives a surface the molten-rock material (it lights itself and keeps its colour
 through a drain), and `b.toon(…, { turn: [spinZ, swingX, swingRate, spinY] })`
 turns a prop in the vertex shader — gears and clock hands spinning about their
 face, pendulums swinging from their origin (`p0` offsets a spinner's phase);
-add `wonky: true` and its hands come unstuck with `env.wonk`. `crust: [glow,
+add `wonky: true` and it's a clock's hands, keeping the true time until
+`env.wonk` unsticks them (see [Time coming unstuck](#time-coming-unstuck)). `crust: [glow,
 ash, scale]` textures rock, charred wood and obsidian (each part picks its kind
 with its `mark` flag: 0, 0.5, 1), `splash: true` makes a part list of droplets
 from `splashGeo` leap and fall, and `sand: [seconds, waist, depth, floor]`
@@ -4194,7 +4280,8 @@ corners; Hell pulls it right in).
 `env.drain` makes the world drain of colour once you're in it, `skyFx.smoke`
 lays a ceiling of smoke with dry lightning in it over the sky, and
 `env.particles2` adds a second layer of motes (Hell's falling ash under its
-rising embers). `gate` and `door(b)` are the doorway INTO the world, built
+rising embers); `env.particles.density` thins the motes out from the usual
+(the Deepwood's, at a half, so its fireflies aren't crowded). `gate` and `door(b)` are the doorway INTO the world, built
 in its own style (see [The doors](#the-doors)): `door(b)` registers
 `gateFrame` (the frame and anything round it), `gateLeaf` (one leaf — build
 it with `leafParts(opening, { deco })`, `deco` dressing each face of it) and

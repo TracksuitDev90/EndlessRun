@@ -38,6 +38,9 @@ import { clamp } from './rig.js';
 
 const LANES = CONFIG.laneX;
 const HW = 0.17; // her half-width, for the obstacles
+// a rise or a drop in the ground under her taller than this is a face to
+// leap up or an edge to drop off, not a step (see liftStep)
+const LIFT_FACE = 0.4;
 const MOUTH = [0.6, 0.56]; // her jaws: ahead of and above her feet
 const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -95,6 +98,8 @@ export class Companion {
     this.vdz = 0;
     this.y = 0;
     this.vy = 0;
+    this.lift = 0;
+    this.liftAir = null;
     this.grounded = true;
     this.yaw = Math.PI - 0.5;
     this.yawV = 0;
@@ -272,7 +277,7 @@ export class Companion {
     // (up a climb's ramp and along its decks, leaping its gaps: see
     // ObstacleField.surfaceAt)
     const sf = Number.isFinite(g.dist) ? g.obstacles.surfaceAt(this.x, g.dist + this.dz, (this.lift || 0) + 0.6) : 0;
-    this.lift = (this.lift || 0) + (sf - (this.lift || 0)) * (sf > (this.lift || 0) ? 1 - Math.exp(-dt * 16) : 1 - Math.exp(-dt * 7));
+    this.liftStep(sf, dt);
     _p.set(this.x, this.y + this.lift, this.pz - this.dz);
     // facing where she's going, banked into turns
     _e.set(0, this.yaw + this.spin, 0, 'YXZ');
@@ -284,12 +289,18 @@ export class Companion {
     ctx.vel.set(this.vx, this.vy, -vf);
     ctx.lat = this.vx;
     ctx.curl = this.curl;
-    ctx.fall = this.grounded ? 0 : this.C.gravity;
+    ctx.fall = this.grounded && !this.liftAir ? 0 : this.C.gravity;
     if (!this.grounded) {
       ctx.mode = 'air';
       ctx.airT = this.air.t;
       ctx.airDur = this.air.T;
       ctx.airKind = this.air.kind;
+    } else if (this.liftAir) {
+      // (bounding up onto a walk, or dropping off its edge)
+      ctx.mode = 'air';
+      ctx.airT = this.liftAir.t;
+      ctx.airDur = this.liftAir.T;
+      ctx.airKind = 'leap';
     } else if (this.sitting) ctx.mode = 'sit';
     else ctx.mode = Math.abs(vf) > 0.3 || g.state === 'running' ? 'run' : 'stand';
     ctx.crouch = this.windup ? this.windup.t / this.windup.dur : 0;
@@ -307,6 +318,50 @@ export class Companion {
     }
     b.lookAt = at;
     b.lookW += ((at ? 1 : 0) - b.lookW) * (1 - Math.exp(-(dt || 0) * 7));
+  }
+
+  // The ground under her as she runs over a climb or a high route (sf: the
+  // surface there, see ObstacleField.surfaceAt). Up and down a ramp or a
+  // stair, and along a gap's arc, she keeps her feet on it; but a sheer
+  // face - the side or the end of a high walk, 3.6 m up, run into from the
+  // road - she bounds up in a leap, and off an edge she drops, falling as
+  // anything falls: never hoisted up a wall, or lowered down one.
+  liftStep(sf, dt) {
+    const G = this.C.gravity;
+    let L = this.lift || 0;
+    const A = this.liftAir;
+    if (A) {
+      // (still rising, and what's under her - a stair - has risen since she
+      // took off: she leaps that much higher, to clear it; and if a face
+      // rises up in front of her in the air, she leaps again off nothing,
+      // as cats do)
+      const need = sf + 0.15 - L;
+      if (need > 0 && (A.v > 0 || need > LIFT_FACE)) {
+        const v = Math.sqrt(2 * G * need);
+        if (v > A.v) {
+          A.T += (v - Math.max(0, A.v)) / G;
+          A.v = v;
+        }
+      }
+      A.t += dt;
+      L += A.v * dt - 0.5 * G * dt * dt;
+      A.v -= G * dt;
+      // (landed: on whatever is under her when she comes down to it)
+      if (A.v <= 0 && L <= sf) {
+        L = sf;
+        this.liftAir = null;
+      }
+    } else if (sf > L + LIFT_FACE) {
+      // up a face: a leap that clears its top by a little
+      const v = Math.sqrt(2 * G * (sf - L + 0.3));
+      this.liftAir = { t: 0, v, T: (v + Math.sqrt(2 * G * 0.3)) / G };
+    } else if (sf < L - LIFT_FACE) {
+      // off an edge
+      this.liftAir = { t: 0, v: 0, T: Math.sqrt((2 * (L - sf)) / G) };
+    } else {
+      L += (sf - L) * (1 - Math.exp(-dt * 16));
+    }
+    this.lift = L;
   }
 
   // A point on the runner's shoulder to ride on, and how to sit there.
@@ -580,7 +635,8 @@ export class Companion {
   mount(side) {
     this.beat = null;
     this.rideSide = 0;
-    _p.set(this.x, this.y, this.pz - this.dz);
+    // (from where she is - up on a walk, if that's where she is)
+    _p.set(this.x, this.y + (this.lift || 0), this.pz - this.dz);
     _e.set(0, this.yaw, 0, 'YXZ');
     this.ride = { side, t: 0, up: 0.42, stay: rand(this.C.ride[0], this.C.ride[1]), from: _p.clone(), fromQ: new THREE.Quaternion().setFromEuler(_e) };
     // (the runner knows which shoulder she's on, to keep that arm clear of
@@ -613,8 +669,12 @@ export class Companion {
     this.perch(_p, _q);
     const lane = this.freeLane(p.x, 1.2);
     this.x = _p.x;
-    this.y = Math.max(0, _p.y);
     this.dz = this.pz - _p.z;
+    // (her height is over the ground under her: off a shoulder up on a
+    // walk or a deck, that's its top, not the road)
+    this.lift = Number.isFinite(g.dist) ? g.obstacles.surfaceAt(this.x, g.dist + this.dz, _p.y) : 0;
+    this.liftAir = null;
+    this.y = Math.max(0, _p.y - this.lift);
     this.vdz = g.state === 'running' ? 4.5 : 0;
     const tx = LANES[lane];
     this.vy = 3.2;

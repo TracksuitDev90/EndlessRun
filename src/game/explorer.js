@@ -3,7 +3,7 @@ import { makeCharacterMaterials } from '../render/shaders.js';
 import { clamp, smooth, Spring } from './rig.js';
 import { Cloth } from './cloth.js';
 import { palette, setColliders, sheetGeometry, writeSheet } from './kit.js';
-import { Player, C, mirror, hermite } from './player.js';
+import { Player, C, mirror, hermite, HAND_KIT } from './player.js';
 import { CONFIG } from '../config.js';
 import { Spill } from './spill.js';
 import { Dust } from './dust.js';
@@ -265,7 +265,16 @@ const HS_EASE = (() => {
   };
 })();
 
+// Her hands: the right one never lets go of her sketchbook (it's sculpted
+// holding it: see tools/runner/explorer.py); the left runs loose, flies open
+// through her tricks and lies flat to the road as she slides.
+const HANDS = { ...HAND_KIT, run: 'loose', pump: 0.4, jump: 'open', slide: 'flat', lane: 0.7, hold: { R: 'bound' } };
+
 export class Explorer extends Player {
+  get handKit() {
+    return HANDS;
+  }
+
   constructor(envDef, asset) {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
   }

@@ -992,7 +992,9 @@ export default {
     shadowDecal: [0.5, 0.6, 0.55],
     cast: [-0.3, -0.3],
     glowGain: 0.9,
-    particles: { color: '#e2ff86', size: 2.6, drift: [0, 0.12, 0], opacity: 1 },
+    // (the motes here read as fireflies too: fewer of them than elsewhere,
+    // so the placed fireflies have the dark to themselves - see Game.updateSnow)
+    particles: { color: '#e2ff86', size: 2.6, drift: [0, 0.12, 0], opacity: 1, density: 0.5 },
   },
 
   visits: [
@@ -1227,9 +1229,10 @@ export default {
       if (gz > -2 && gz < 18) ctx.put('sunspot', gx, 0.05, gz, { sx: 3.6 * sc, sz: 4.4 * sc, c: [rng.float(0.7, 1), 1, 1] });
     }
     // fireflies drifting over the path and in among the trunks - a few by
-    // day, the wood full of them by night (see FIREFLY)
+    // day, more by night, but never so many that they crowd the wood (see
+    // FIREFLY)
     {
-      const n = v === 1 ? 26 : v >= 2 ? 18 : 10;
+      const n = v === 1 ? 14 : v >= 2 ? 9 : 5;
       for (let i = 0; i < n; i++) {
         const x = rng.float(-13, 13);
         const y = rng.float(0.4, Math.abs(x) < 4 ? 3.2 : 5.5);

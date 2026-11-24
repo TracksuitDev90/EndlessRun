@@ -2,7 +2,7 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { makeCharacterMaterials } from '../render/shaders.js';
 import { TAU, damp, clamp, smooth, Spring } from './rig.js';
 import { palette } from './kit.js';
-import { Player, C, mirror, hermite } from './player.js';
+import { Player, C, mirror, hermite, HAND_KIT } from './player.js';
 import { CONFIG } from '../config.js';
 import { Dust } from './dust.js';
 
@@ -229,9 +229,28 @@ const ease = (x) => x * x * (3 - 2 * x);
 // on top of pullTip); and its flutter in the wind mostly at the tips (flut).
 const TAIL = { heavy: 1.5, side: 0.45, lift: 0.4, lag: 11, keepTie: 0.95, keepTip: 0.975, pullTie: 0.045, pullTip: 0.006, flut: 0.5 };
 
+// Her hands: loose and open as she rides, flung wide through her flips,
+// the front one hooked round the board's rail when she ducks, and both
+// slipped flat into her pockets when she stands about (see handsStep).
+const HANDS = { ...HAND_KIT, idle: 'relaxed', run: 'relaxed', pump: 0.1, jump: 'open', slide: 'open', lane: 0.35 };
+
 export class Skater extends Player {
+  get handKit() {
+    return HANDS;
+  }
+
+  // (the front hand round the rail, both in her pockets: see handsStep)
+  handMore(side, H) {
+    if (side.name === 'L') H.mix(side, 'hook', this.grabK || 0);
+    H.mix(side, 'flat', this.pocketK || 0);
+  }
+
   constructor(envDef, asset) {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
+    // (she rides a board's height up off the road, and her ponytail flies
+    // up over her as she pops: a span overhead has that much more of her
+    // to clear - see Player.takeOff)
+    this.headroom += 0.22;
     // (the fox can ride on her shoulder, but there's a board between her feet)
     this.onBoard = true;
     // (her braids stream out behind her; the board goes up with her)
@@ -1443,6 +1462,7 @@ export class Skater extends Player {
     const W = this.w;
     const tot = W.run + W.jump + W.slide + W.idle || 1;
     const grab = (W.slide / tot) * (this.duckK || 0) * live;
+    this.grabK = grab;
     if (grab > 0.01) {
       // (the rail: the deck's toe-side edge, just behind its middle)
       const R = this.rig.board;
@@ -1452,6 +1472,7 @@ export class Skater extends Player {
       this.reachArm(0, _p, _n, grab);
     }
     const pockets = (W.idle / tot) * (1 - this.greetHop().any) * live;
+    this.pocketK = pockets;
     if (pockets > 0.01) {
       b.hips.matrixWorld.decompose(_v, _q, _v2);
       for (let side = 0; side < 2; side++) {

@@ -45,6 +45,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 import build as B  # noqa: E402
+import hands  # noqa: E402
 from build import V, smin, smax, smooth, clamp, ellipsoid, round_cone, stroke, round_box, torus_y, Prim, rot_x, rot_y, rot_z, Garment, rigid, by_y, by_axis, along  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'skater')
@@ -267,6 +268,23 @@ def build_rig():
             bone(braid_bones(b, k), parent, at)
     bone('sim', None, (0, 0, 0))
     bone('board', 'sim', (0, BOARD['y'], 0))
+    for H in make_hands().values():
+        H.add_bones()
+
+
+# Her hands (tools/runner/hands.py): slim and long-fingered, both bound
+# hanging relaxed (the game closes the front one round the board's rail and
+# slips both flat into her pockets).
+HAND_SIZE = 0.14
+HANDS = {}
+
+
+def make_hands():
+    fw = V(0, 0, -1)
+    for s, L in SIDES:
+        S, E, W, dn, out = arm_frame(s)
+        HANDS[L] = hands.Hand(s, L, W, dn, out, fw, HAND_SIZE, slim=0.96, wrist=1.15)
+    return HANDS
 
 
 def arm_frame(s):
@@ -947,40 +965,31 @@ def g_shoes():
     return Garment('shoes', MAT['shoe'], 0.0025, (-0.15, -0.012, -0.22), (0.15, 0.19, 0.095), field, owners, 3300, tau=0.01)
 
 
-def g_arms():
-    """Slim bare arms out of the sleeves, and her hands."""
-    parts, owners = [], []
-    fw = V(0, 0, -1)
-    for s, L in SIDES:
-        S, E, W, dn, out = arm_frame(s)
-        R = np.stack([out, dn, fw], 1)
-        upper = round_cone(S + 0.11 * dn, E, 0.036, 0.031)
-        fore = round_cone(E, W, 0.031, 0.022)
-        palm = round_box(W + 0.045 * dn, (0.015, 0.041, 0.035), 0.013, R)
-        c = W + 0.094 * dn - 0.006 * out
-        fingers = round_cone(c - 0.026 * fw, c + 0.026 * fw, 0.016, 0.015)
-        thumb = round_cone(W + 0.03 * dn - 0.01 * out + 0.03 * fw, W + 0.072 * dn - 0.018 * out + 0.026 * fw, 0.011, 0.009)
-        parts.append((upper, fore, palm, fingers, thumb))
-        arm_w = by_axis(S, dn, [(0.0, 'arm' + L), (UPPER_ARM - 0.03, 'arm' + L), (UPPER_ARM + 0.025, 'fore' + L)])
-        hand_w = by_axis(W, dn, [(-0.02, 'fore' + L), (0.012, 'hand' + L)])
-        owners += [(upper, arm_w), (fore, arm_w), (palm, hand_w), (fingers, rigid('hand' + L)), (thumb, rigid('hand' + L))]
+def g_arm(s, L):
+    """A slim bare arm out of the sleeve, and her hand (one garment each
+    side, meshed finely enough for the fingers)."""
+    S, E, W, dn, out = arm_frame(s)
+    H = HANDS[L]
+    upper = round_cone(S + 0.11 * dn, E, 0.036, 0.031)
+    fore = round_cone(E, W - 0.004 * dn, 0.031, 0.0215)
+    arm_w = by_axis(S, dn, [(0.0, 'arm' + L), (UPPER_ARM - 0.03, 'arm' + L), (UPPER_ARM + 0.025, 'fore' + L), (UPPER_ARM + FOREARM - 0.03, 'fore' + L), (UPPER_ARM + FOREARM + 0.012, 'hand' + L)])
+    owners = [(upper, arm_w), (fore, arm_w)] + H.parts()
 
     def field(p):
-        out = np.full(len(p), 1.0)
-        for upper, fore, palm, fingers, thumb in parts:
-            d = smin(upper(p), fore(p), 0.03)
-            d = smin(d, palm(p), 0.014)
-            d = smin(d, fingers(p), 0.01)
-            d = smin(d, thumb(p), 0.009)
-            out = np.minimum(out, d)
-        return out
+        d = smin(upper(p), fore(p), 0.03)
+        return smin(d, H.field(p), 0.012)
 
     def details(p, n, own):
-        # x: on the hand (knuckles and nails are drawn there)
-        hand = own[:, 2::5].sum(1) + own[:, 3::5].sum(1) + own[:, 4::5].sum(1)
+        # x: on the hand
+        hand = own[:, 2:].sum(1)
         return np.stack([hand, np.zeros(len(p)), np.zeros(len(p)), np.zeros(len(p))], 1)
 
-    return Garment('arms', MAT['hand'], 0.0026, (-0.48, 0.58, -0.08), (0.48, 1.24, 0.08), field, owners, 3000, details=details)
+    lo, hi = H.box()
+    lo = np.minimum(lo, np.minimum(S + 0.11 * dn, W) - 0.05)
+    hi = np.maximum(hi, np.maximum(S + 0.11 * dn, W) + 0.05)
+    g = Garment('arm' + L, MAT['hand'], 0.0012, lo, hi, field, owners, 4800, tau=0.0009, details=details, outline=0.8)
+    g.sparse = True
+    return g
 
 
 # --------------------------------------------------------------------------------
@@ -1103,7 +1112,7 @@ def braid_colliders():
 def build():
     t0 = time.time()
     build_rig()
-    garments = [g_head(), g_hair(), g_braids(), g_gold(), g_tee(), g_shorts(), g_legs(), g_shoes(), g_arms(), g_board()]
+    garments = [g_head(), g_hair(), g_braids(), g_gold(), g_tee(), g_shorts(), g_legs(), g_shoes(), g_arm(-1, 'L'), g_arm(1, 'R'), g_board()]
     only = os.environ.get('ONLY')
     if only:
         garments = [g for g in garments if g.name in only.split(',')]
@@ -1125,6 +1134,7 @@ def build():
         sockTop=SOCK_TOP, shortsHem=SHORTS_HEM, shoeX=SHOE_X, soleH=SOLE_H, shoeCollar=SHOE_COLLAR, ankleY=ANKLE_Y,
         shoe=[SHOE_HEEL, SHOE_TOE],
         nose=list(NOSE), lips=[LIPS['y'], LIPS['z']], ear=[EAR['x'], EAR['y'], EAR['z']], tie=lst(TIE),
+        hands=[HANDS['L'].rig(), HANDS['R'].rig()],
     )
     B.export(garments, OUT, MAT, rig, 'skater', 'skater.py')
     print(f'skater: {time.time() - t0:.1f}s')
