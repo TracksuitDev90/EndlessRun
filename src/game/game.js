@@ -1609,6 +1609,14 @@ export class Game {
     // until they're through the one out (see Player)
     this.player.lowG = st !== 'title' && !!this.course.segAt(this.dist).world.def.lowGravity;
     const boosts = this.player.boosted;
+    // (a span overhead anywhere along the next secs of running: see
+    // Player.takeOff)
+    this.overhead ??= (secs) => {
+      const p = this.player;
+      const pd = CONFIG.player.halfDepth;
+      return this.obstacles.ceilingAt(p.x, this.dist - pd, this.dist + Math.max(this.speed, 1) * secs + pd, p.y);
+    };
+    this.player.overhead = this.overhead;
     this.player.update(dt, this.speed, (x) => {
       const h = this.obstacles.groundAt(x, this.dist, this.player.y);
       // (on a stair, carried up and down it rather than stepping off it)

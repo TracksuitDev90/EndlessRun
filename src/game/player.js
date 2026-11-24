@@ -307,6 +307,14 @@ export class Player {
     this.skeleton = new THREE.Skeleton(bones);
     this.bindPos = {};
     for (const b of bones) this.bindPos[b.name] = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);
+    // how high the top of them stands over their feet (their highest bone
+    // as bound - the crown, a bun, an ear - and a little over it): what a
+    // span overhead has to clear (see takeOff)
+    let top = 0;
+    this.body.traverse((o) => {
+      if (o.isBone) top = Math.max(top, this.bindPos[o.name].y);
+    });
+    this.headroom = top + 0.14;
     // fingers, for those who have them (see hands.js)
     this.hands = this.rig.hands ? new Hands(this) : null;
     this.fidget = { t: 3 + 4 * Math.random(), side: 0, k: 0 };
@@ -516,6 +524,45 @@ export class Player {
     this.bounding = false;
     this.jump();
     if (this.lowG) this.boost();
+    // Under a span - a high route's bridge - or about to run under one
+    // before they'd come down (overhead: the game's look along the jump's
+    // flight), the jump only rises as high as keeps their head under it:
+    // nothing is ever there to be jumped, and a head should never pass up
+    // through stone. (Gravity's own arc, a little to spare for a character
+    // who hangs at the top.)
+    if (this.overhead) {
+      const ceil = this.overhead(this.feel.jump.time * 1.15);
+      if (ceil < Infinity) {
+        const room = Math.max(0.3, ceil - this.headroom - 0.08 - this.y);
+        if (this.apexOf(this.vy) > room) {
+          // (the fastest take-off whose own arc - this character's, hang
+          // and all - tops out in the room there is)
+          let lo = 0, hi = this.vy;
+          for (let i = 0; i < 14; i++) {
+            const mid = 0.5 * (lo + hi);
+            if (this.apexOf(mid) > room) hi = mid;
+            else lo = mid;
+          }
+          this.vy = lo;
+          this.vyPose = lo;
+        }
+      }
+    }
+  }
+
+  // How high a jump taken at vy rises, by this character's own arc.
+  apexOf(vy) {
+    const y = this.y, v = this.vy;
+    this.y = 0;
+    this.vy = vy;
+    let top = 0;
+    for (let i = 0; i < 400 && this.vy > 0; i++) {
+      this.fall(1 / 240);
+      top = Math.max(top, this.y);
+    }
+    this.y = y;
+    this.vy = v;
+    return top;
   }
 
   boost() {

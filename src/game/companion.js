@@ -635,7 +635,8 @@ export class Companion {
   mount(side) {
     this.beat = null;
     this.rideSide = 0;
-    _p.set(this.x, this.y, this.pz - this.dz);
+    // (from where she is - up on a walk, if that's where she is)
+    _p.set(this.x, this.y + (this.lift || 0), this.pz - this.dz);
     _e.set(0, this.yaw, 0, 'YXZ');
     this.ride = { side, t: 0, up: 0.42, stay: rand(this.C.ride[0], this.C.ride[1]), from: _p.clone(), fromQ: new THREE.Quaternion().setFromEuler(_e) };
     // (the runner knows which shoulder she's on, to keep that arm clear of
@@ -668,8 +669,12 @@ export class Companion {
     this.perch(_p, _q);
     const lane = this.freeLane(p.x, 1.2);
     this.x = _p.x;
-    this.y = Math.max(0, _p.y);
     this.dz = this.pz - _p.z;
+    // (her height is over the ground under her: off a shoulder up on a
+    // walk or a deck, that's its top, not the road)
+    this.lift = Number.isFinite(g.dist) ? g.obstacles.surfaceAt(this.x, g.dist + this.dz, _p.y) : 0;
+    this.liftAir = null;
+    this.y = Math.max(0, _p.y - this.lift);
     this.vdz = g.state === 'running' ? 4.5 : 0;
     const tx = LANES[lane];
     this.vy = 3.2;

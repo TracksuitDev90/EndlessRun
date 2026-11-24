@@ -667,7 +667,9 @@ then splits into two routes at once: one of the outer lanes rises into a
 - **Down below**: the walk walls off its lane, so the road crosses the other
   way - out of the far lane before the far walk begins, under the bridge -
   while sand pours off the walk through brass chutes over the middle lane.
-  A curtain of sand knocks you stumbling (one hit, never a crash); between
+  A curtain of sand knocks you stumbling (one hit, never a crash) - though
+  only under the chute's lip it pours from: up over it (stepping off the
+  side of the walk, or flung up scrambling onto it) it's below you; between
   the curtains, the odd hurdle or bar in the open outer lane. At every moment
   there's a lane you can just run along.
 
@@ -677,11 +679,18 @@ takes whichever way she happens to: up the stair with you, or a bound up the
 face of the walk from the road beside it (a leap that clears its top,
 higher if the stair she lands on has risen under her in the air), or a drop
 off its edge, falling as anything falls - never hoisted up a wall or let
-down one slowly (`Companion.liftStep`). The walk is its own
+down one slowly (`Companion.liftStep`); and hopping down off your shoulder
+up on the walk, she lands on the walk. The walk is its own
 lane only, so stepping sideways off it drops you to the road the moment
-you're clear of it. The bridge's underside over the lanes sits above the
-head of the highest jump, and nothing under it is ever a hit from below; it
-is only ground for someone already up on it. The stairs carry you up and
+you're clear of it. Nothing under the bridge is ever a hit from below, and
+nothing there is ever to be jumped: a jump taken under it - or one that
+would carry you under it before you came down - rises only as high as keeps
+your head under its underside (each runner's own head - Bramble's ears,
+Wren's bun, Hazel on her board with her ponytail flying - measured off their
+skeleton, `Player.headroom`; the jump's own arc, hang and all, solved down
+to fit: `Player.takeOff`, `ObstacleField.ceilingAt`), so no head ever passes
+up through the stone. The bridge is only ground for someone already up on
+it. The stairs carry you up and
 down them however long a frame is (at 30 fps, or through a hitch, as at 60).
 
 How it's done: `ObstacleField.placeHigh` lays the pieces (each a record:
@@ -1978,8 +1987,8 @@ Each of them has their own hands and uses them their own way:
   her flips, the front one hooked round the board's rail when she ducks, and
   both slipped flat into her pockets when she stands about.
 
-(Reed's - still in the workshop - are fists, fingers and all, the right
-shut round his rod's cork grip;
+(Reed's, the newest and still being finished, are sculpted fists, fingers
+and all, the right shut round his rod's cork grip;
 Bramble's are a rabbit's paws and Birch's a tiger's, padded and clawed.) In a
 viewer, `tools/runner/view.html?runner=elder&at=handR&zoom=6` looks a hand in
 the face, and `&hands=fist|loose|open|relaxed|claw|hook|flat` holds both in a
@@ -4271,7 +4280,8 @@ corners; Hell pulls it right in).
 `env.drain` makes the world drain of colour once you're in it, `skyFx.smoke`
 lays a ceiling of smoke with dry lightning in it over the sky, and
 `env.particles2` adds a second layer of motes (Hell's falling ash under its
-rising embers). `gate` and `door(b)` are the doorway INTO the world, built
+rising embers); `env.particles.density` thins the motes out from the usual
+(the Deepwood's, at a half, so its fireflies aren't crowded). `gate` and `door(b)` are the doorway INTO the world, built
 in its own style (see [The doors](#the-doors)): `door(b)` registers
 `gateFrame` (the frame and anything round it), `gateLeaf` (one leaf — build
 it with `leafParts(opening, { deco })`, `deco` dressing each face of it) and

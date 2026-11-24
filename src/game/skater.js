@@ -247,6 +247,10 @@ export class Skater extends Player {
 
   constructor(envDef, asset) {
     super(envDef, asset, { gait: GAIT, feel: FEEL });
+    // (she rides a board's height up off the road, and her ponytail flies
+    // up over her as she pops: a span overhead has that much more of her
+    // to clear - see Player.takeOff)
+    this.headroom += 0.22;
     // (the fox can ride on her shoulder, but there's a board between her feet)
     this.onBoard = true;
     // (her braids stream out behind her; the board goes up with her)

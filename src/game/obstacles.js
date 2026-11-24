@@ -754,6 +754,9 @@ export class ObstacleField {
       drawn({ kind: 'chute', lane: 1, from }, { d: at, len, h: H, group: g });
       const rec = this.record(g, 1, at, len, 'W', def.curtain);
       rec.soft = true;
+      // (it pours from the chute's lip, under the walk: up over that - off
+      // the side of the walk, or scrambling up onto it - it's below you)
+      rec.y1 = H - 0.4;
       S.under.push(rec);
       return rec;
     };
@@ -1026,6 +1029,22 @@ export class ObstacleField {
     // (and whether it's something bouncy: see CONFIG.bounce)
     this.bounceUnder = bounce;
     return h;
+  }
+
+  // The underside of a span overhead - a high route's bridge - anywhere over
+  // x between track distances d0 and d1, for someone under it at height y;
+  // Infinity if there's none. (Never a hit from below - see Game.collide -
+  // but a jump taken under one only rises as high as keeps their head
+  // under it: see Player.takeOff.)
+  ceilingAt(x, d0, d1, y) {
+    let c = Infinity;
+    const pw = CONFIG.player.halfWidth;
+    for (const o of this.records) {
+      if (!o.over || o.d > d1 || o.d + o.len < d0 || y >= o.y0) continue;
+      if (Math.abs(x - o.x) >= o.hw + pw) continue;
+      if (o.y0 < c) c = o.y0;
+    }
+    return c;
   }
 
   // Whether the runner's feet are over water (a wade obstacle): no dust there.
